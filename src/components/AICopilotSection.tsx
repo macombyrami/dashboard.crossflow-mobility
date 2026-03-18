@@ -87,7 +87,7 @@ export default function AICopilotSection() {
                   onClick={() => sendMessage(s)}
                   className="text-left px-4 py-3 rounded-xl border border-white/5 glass text-sm text-text-muted hover:text-white hover:border-primary/20 transition-all duration-200 group"
                 >
-                  <span className="text-primary mr-2 group-hover:mr-3 transition-all"›</span>
+                  <span className="text-primary mr-2 group-hover:mr-3 transition-all">{"›"}</span>
                   {s}
                 </button>
               ))}
