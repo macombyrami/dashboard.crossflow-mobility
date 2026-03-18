@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { motion, useInView } from "framer-motion";
 import { TrendingDown, Wind, Clock } from "lucide-react";
 
@@ -46,9 +46,10 @@ const impacts = [
   },
 ];
 
-function KpiCard({ impact, index }: { impact: typeof impacts[0]; index: number }) {
+function KpiCard({ impact, index, mounted }: { impact: typeof impacts[0]; index: number; mounted: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-60px" });
+  const show = mounted && isInView;
 
   return (
     <motion.div
@@ -71,7 +72,7 @@ function KpiCard({ impact, index }: { impact: typeof impacts[0]; index: number }
         {/* KPI value */}
         <div
           className={`font-mono-nums text-5xl md:text-6xl font-black mb-2 transition-all duration-700 ${impact.color} ${
-            isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
         >
           {impact.value}
@@ -79,7 +80,7 @@ function KpiCard({ impact, index }: { impact: typeof impacts[0]; index: number }
 
         {/* Progress bar */}
         <div className="kpi-bar w-16 mx-auto mb-4">
-          {isInView && (
+          {show && (
             <div
               className="kpi-bar-fill"
               style={{
@@ -98,6 +99,9 @@ function KpiCard({ impact, index }: { impact: typeof impacts[0]; index: number }
 }
 
 export default function ImpactSection() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   return (
     <section id="impact" className="py-32 relative overflow-hidden">
       {/* Background */}
@@ -144,7 +148,7 @@ export default function ImpactSection() {
 
         <div className="grid md:grid-cols-3 gap-6">
           {impacts.map((impact, i) => (
-            <KpiCard key={impact.label} impact={impact} index={i} />
+            <KpiCard key={impact.label} impact={impact} index={i} mounted={mounted} />
           ))}
         </div>
       </div>
