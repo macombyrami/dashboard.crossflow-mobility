@@ -36,8 +36,8 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-5 sm:px-8 h-[60px] flex items-center justify-between gap-4">
           {/* Logo */}
           <a href="#" className="flex items-center gap-2.5 group shrink-0">
-            <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center transition-all duration-300 group-hover:shadow-[0_0_20px_rgba(34,197,94,0.35)] group-hover:scale-105">
-              <img src="/logo.png" alt="CrossFlow Logo" className="w-full h-full object-cover" />
+            <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center transition-all duration-300 group-hover:shadow-[0_0_20px_rgba(34,197,94,0.35)] group-hover:scale-105">
+              <img src="/crossflow-white.png" alt="CrossFlow Logo" className="w-full h-full object-contain" />
             </div>
             <span className="font-bold text-sm tracking-tight hidden sm:block">
               CrossFlow{" "}

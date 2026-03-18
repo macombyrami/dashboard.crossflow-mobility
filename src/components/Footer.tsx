@@ -84,8 +84,8 @@ export default function Footer() {
             {/* Brand */}
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center gap-3 mb-5">
-                <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center border border-white/[0.06]">
-                  <img src="/logo.png" alt="CrossFlow Logo" className="w-full h-full object-cover" />
+                <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center border border-white/[0.06]">
+                  <img src="/crossflow-white.png" alt="CrossFlow Logo" className="w-full h-full object-contain" />
                 </div>
                 <span className="text-white font-bold text-sm tracking-tight">CrossFlow</span>
               </div>
