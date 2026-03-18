@@ -57,7 +57,7 @@ export default function AICopilotSection() {
       <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-purple-600/[0.04] blur-[130px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-5 sm:px-8">
-        <div className="grid lg:grid-cols-2 gap-14 items-center">
+        <div className="grid md:grid-cols-2 gap-14 items-center">
           {/* Left: content */}
           <div>
             <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-6">
