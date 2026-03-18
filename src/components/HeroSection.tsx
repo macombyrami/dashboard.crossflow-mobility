@@ -102,20 +102,19 @@ export default function HeroSection() {
           {/* Nodes */}
           {NODES.map((node) => (
             <g key={node.id}>
-              {mounted && (
-                <motion.circle
-                  cx={`${node.x}%`} cy={`${node.y}%`}
-                  r={node.congested ? "1.8" : "1.2"}
-                  fill={node.congested ? "rgba(245,158,11,0.08)" : "rgba(34,197,94,0.08)"}
-                  stroke={node.congested ? "#F59E0B" : "#22C55E"}
-                  strokeWidth="0.25"
-                  animate={{
-                    r:       node.congested ? ["1.8", "3.2", "1.8"] : ["1.2", "2.4", "1.2"],
-                    opacity: [0.7, 0.15, 0.7],
-                  }}
-                  transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: node.id * 0.25 }}
-                />
-              )}
+              <motion.circle
+                cx={`${node.x}%`} cy={`${node.y}%`}
+                r={node.congested ? "1.8" : "1.2"}
+                fill={node.congested ? "rgba(245,158,11,0.08)" : "rgba(34,197,94,0.08)"}
+                stroke={node.congested ? "#F59E0B" : "#22C55E"}
+                strokeWidth="0.25"
+                animate={mounted ? {
+                  r:       node.congested ? ["1.8", "3.2", "1.8"] : ["1.2", "2.4", "1.2"],
+                  opacity: [0.7, 0.15, 0.7],
+                } : {}}
+                transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: node.id * 0.25 }}
+                style={{ visibility: mounted ? "visible" : "hidden" }}
+              />
               <circle
                 cx={`${node.x}%`} cy={`${node.y}%`}
                 r="0.55"

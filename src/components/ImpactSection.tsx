@@ -80,15 +80,13 @@ function KpiCard({ impact, index, mounted }: { impact: typeof impacts[0]; index:
 
         {/* Progress bar */}
         <div className="kpi-bar w-16 mx-auto mb-4">
-          {show && (
-            <div
-              className="kpi-bar-fill"
-              style={{
-                background: impact.barColor,
-                "--bar-width": impact.barWidth,
-              } as React.CSSProperties}
-            />
-          )}
+          <div
+            className={`kpi-bar-fill transition-opacity duration-500 ${show ? "opacity-100" : "opacity-0"}`}
+            style={{
+              background: impact.barColor,
+              "--bar-width": impact.barWidth,
+            } as React.CSSProperties}
+          />
         </div>
 
         <div className={`text-sm font-semibold mb-1.5 ${impact.color}`}>{impact.label}</div>
