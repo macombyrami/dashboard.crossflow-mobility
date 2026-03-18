@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Activity, Twitter, Linkedin, Github, ArrowRight } from "lucide-react";
+import { Twitter, Linkedin, Github, ArrowRight } from "lucide-react";
 
 const footerLinks = {
   Produit: ["Analyse temps réel", "Simulation", "IA Copilot", "Intégrations", "Roadmap"],
