@@ -111,7 +111,7 @@ export default function AICopilotSection() {
                 <div className="text-sm font-semibold text-white">CrossFlow AI</div>
                 <div className="text-xs text-primary flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  En ligne · Connexion sécurisée
+                  Prototype Démo · Données simulées
                 </div>
               </div>
             </div>

@@ -31,19 +31,22 @@ export default function Navbar() {
           scrolled ? "glass-dark border-b border-white/5" : "bg-transparent"
         }`}
       >
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
           {/* Logo */}
-          <a href="#" className="flex items-center gap-2.5 group">
+          <a href="#" className="flex items-center gap-2.5 group shrink-0">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center transition-all duration-300 group-hover:shadow-[0_0_20px_rgba(34,197,94,0.6)]">
               <Activity className="w-4 h-4 text-black" strokeWidth={2.5} />
             </div>
-            <span className="text-white font-semibold text-sm tracking-tight">
+            <span className="text-white font-semibold text-sm tracking-tight lg:block hidden">
               CrossFlow <span className="text-primary">Mobility</span>
+            </span>
+            <span className="text-white font-semibold text-sm tracking-tight lg:hidden block">
+              CrossFlow
             </span>
           </a>
 
           {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden lg:flex items-center gap-8">
             {navLinks.map((link) => (
               <a
                 key={link.label}
@@ -56,16 +59,16 @@ export default function Navbar() {
           </div>
 
           {/* CTA */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-3 ml-auto">
             <a
               href="#demo"
-              className="text-sm text-text-muted hover:text-white transition-colors duration-200"
+              className="text-sm text-text-muted hover:text-white transition-colors duration-200 hidden md:block"
             >
               Voir la démo
             </a>
             <a
               href="#contact"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold hover:bg-primary-dark transition-all duration-200 hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]"
+              className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-primary text-black text-xs md:text-sm font-semibold hover:bg-primary-dark transition-all duration-200 hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] whitespace-nowrap"
             >
               Demander une démo
             </a>

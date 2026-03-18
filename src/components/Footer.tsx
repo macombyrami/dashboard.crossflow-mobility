@@ -78,7 +78,13 @@ export default function Footer() {
                 <ul className="space-y-2.5">
                   {links.map((link) => (
                     <li key={link}>
-                      <a href="#" className="text-sm text-text-muted hover:text-white transition-colors duration-200">
+                      <a 
+                        href="#contact" 
+                        className="text-sm text-text-muted hover:text-white transition-colors duration-200"
+                        onClick={(e) => {
+                          if (link === "Roadmap" || link === "Simulation") return; // Keep standard scroll
+                        }}
+                      >
                         {link}
                       </a>
                     </li>

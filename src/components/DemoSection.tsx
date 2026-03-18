@@ -124,8 +124,11 @@ export default function DemoSection() {
           <span className="text-primary">En direct.</span>
         </motion.h2>
 
-        <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.2 }} className="text-center text-text-muted text-lg max-w-2xl mx-auto mb-12">
+        <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.2 }} className="text-center text-text-muted text-lg max-w-2xl mx-auto mb-4">
           Interagissez avec une simulation réelle de notre interface de gestion urbaine.
+        </motion.p>
+        <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.3 }} className="text-center text-text-secondary text-xs italic mb-12">
+          Note : Les données présentées sont simulées à des fins de démonstration.
         </motion.p>
 
         {/* Main Demo UI */}

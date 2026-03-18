@@ -141,10 +141,10 @@ export default function HeroSection() {
           transition={{ duration: 0.8, delay: 0.1 }}
           className="text-6xl md:text-8xl font-black tracking-tight leading-[0.95] mb-6"
         >
-          Control{" "}
-          <span className="gradient-text">Urban</span>
+          Contrôlez le{" "}
+          <span className="gradient-text">flux</span>
           <br />
-          Flow.
+          urbain.
         </motion.h1>
 
         {/* Subtitle */}
@@ -190,8 +190,8 @@ export default function HeroSection() {
         >
           {[
             { value: "12+", label: "Villes partenaires" },
-            { value: "99.9%", label: "Disponibilité SLA" },
-            { value: "<50ms", label: "Latence temps réel" },
+            { value: "99.9%", label: "Disponibilité" },
+            { value: "<50ms", label: "Latence globale" },
           ].map((stat) => (
             <div key={stat.label} className="flex flex-col gap-1">
               <span className="text-2xl font-bold text-white">{stat.value}</span>

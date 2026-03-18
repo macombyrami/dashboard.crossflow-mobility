@@ -89,7 +89,7 @@ export default function UseCasesSection() {
               </ul>
 
               <a href="#contact" className={`flex items-center gap-2 text-sm font-medium ${u.color} group-hover:gap-3 transition-all duration-200`}>
-                En savoir plus <ArrowRight className="w-4 h-4" />
+                Demander une étude <ArrowRight className="w-4 h-4" />
               </a>
             </motion.div>
           ))}
