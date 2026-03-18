@@ -33,9 +33,16 @@ export default function AICopilotSection() {
   const [loading, setLoading]     = useState(false);
   const [suggIdx, setSuggIdx]     = useState(0);
   const endRef = useRef<HTMLDivElement>(null);
+  const isFirstRender = useRef(true);
 
   const scroll = () => endRef.current?.scrollIntoView({ behavior: "smooth" });
-  useEffect(() => { scroll(); }, [messages]);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    scroll();
+  }, [messages]);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
