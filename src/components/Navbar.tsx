@@ -34,13 +34,17 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
           {/* Logo */}
           <a href="#" className="flex items-center gap-2.5 group shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center transition-all duration-300 group-hover:shadow-[0_0_20px_rgba(34,197,94,0.6)]">
-              <Activity className="w-4 h-4 text-black" strokeWidth={2.5} />
+            <div className="w-11 h-11 rounded-xl overflow-hidden flex items-center justify-center transition-all duration-300 group-hover:shadow-[0_0_25px_rgba(34,197,94,0.4)]">
+              <img 
+                src="/logo.png" 
+                alt="CrossFlow Logo" 
+                className="w-full h-full object-cover"
+              />
             </div>
-            <span className="text-white font-semibold text-sm tracking-tight lg:block hidden">
+            <span className="text-white font-bold text-base tracking-tight lg:block hidden ml-1">
               CrossFlow <span className="text-primary">Mobility</span>
             </span>
-            <span className="text-white font-semibold text-sm tracking-tight lg:hidden block">
+            <span className="text-white font-bold text-base tracking-tight lg:hidden block ml-1">
               CrossFlow
             </span>
           </a>

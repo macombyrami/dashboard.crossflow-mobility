@@ -189,9 +189,9 @@ export default function HeroSection() {
           className="mt-16 flex flex-col sm:flex-row items-center justify-center gap-8 text-center"
         >
           {[
-            { value: "12+", label: "Villes partenaires" },
-            { value: "99.9%", label: "Disponibilité" },
-            { value: "<50ms", label: "Latence globale" },
+            { value: "12+", label: "Villes" },
+            { value: "99.9%", label: "SLA" },
+            { value: "<50ms", label: "Latence" },
           ].map((stat) => (
             <div key={stat.label} className="flex flex-col gap-1">
               <span className="text-2xl font-bold text-white">{stat.value}</span>

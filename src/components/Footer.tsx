@@ -53,11 +53,15 @@ export default function Footer() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-10">
             {/* Brand */}
             <div className="col-span-2 md:col-span-1">
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                  <Activity className="w-4 h-4 text-black" strokeWidth={2.5} />
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-11 h-11 rounded-xl overflow-hidden flex items-center justify-center border border-white/5">
+                  <img 
+                    src="/logo.png" 
+                    alt="CrossFlow Logo" 
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-                <span className="text-white font-semibold text-sm">CrossFlow</span>
+                <span className="text-white font-bold text-base tracking-tight">CrossFlow</span>
               </div>
               <p className="text-text-muted text-xs leading-relaxed mb-5">
                 La plateforme d&apos;IA pour la mobilité urbaine intelligente.
@@ -80,10 +84,8 @@ export default function Footer() {
                     <li key={link}>
                       <a 
                         href="#contact" 
+                        title="Bientôt disponible"
                         className="text-sm text-text-muted hover:text-white transition-colors duration-200"
-                        onClick={(e) => {
-                          if (link === "Roadmap" || link === "Simulation") return; // Keep standard scroll
-                        }}
                       >
                         {link}
                       </a>
