@@ -75,6 +75,7 @@ export default function AICopilotSection() {
               style={{ fontSize: "clamp(2.25rem, 5vw, 3.5rem)", lineHeight: "1.08", letterSpacing: "-0.03em" }}
             >
               Votre assistant IA
+              <span suppressHydrationWarning className={`text-sm font-bold text-primary`}>→</span>
               <br />
               <span className="text-primary">pour chaque décision.</span>
             </motion.h2>
@@ -128,7 +129,7 @@ export default function AICopilotSection() {
               </div>
               <div>
                 <div className="text-sm font-semibold text-white tracking-tight">CrossFlow AI</div>
-                <div className="text-[0.65rem] text-primary flex items-center gap-1.5 font-medium">
+                <div suppressHydrationWarning className="text-[0.65rem] text-primary flex items-center gap-1.5 font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                   Prototype Démo · Données simulées
                 </div>

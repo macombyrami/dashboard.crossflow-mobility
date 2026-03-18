@@ -141,7 +141,7 @@ export default function HeroSection() {
           }}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-          <span className="text-[0.65rem] text-primary font-semibold tracking-[0.14em] uppercase">
+          <span suppressHydrationWarning className="text-[0.65rem] text-primary font-semibold tracking-[0.14em] uppercase">
             IA Urbaine · Temps Réel
           </span>
         </motion.div>

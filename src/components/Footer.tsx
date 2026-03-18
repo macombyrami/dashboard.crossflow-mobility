@@ -133,8 +133,8 @@ export default function Footer() {
       {/* Bottom bar */}
       <div className="border-t border-white/[0.04]">
         <div className="max-w-7xl mx-auto px-5 sm:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-xs text-text-dim">© 2025 CrossFlow Mobility. Tous droits réservés.</p>
-          <p className="text-xs text-text-dim">Fait avec ❤️ pour les villes intelligentes.</p>
+          <p suppressHydrationWarning className="text-xs text-text-dim">© 2025 CrossFlow Mobility. Tous droits réservés.</p>
+          <p suppressHydrationWarning className="text-xs text-text-dim">Fait avec ❤️ pour les villes intelligentes.</p>
         </div>
       </div>
     </footer>
