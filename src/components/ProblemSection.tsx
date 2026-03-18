@@ -62,8 +62,7 @@ export default function ProblemSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.1 }}
-          className="font-black text-center tracking-tight mb-5"
-          style={{ fontSize: "clamp(2.25rem, 5vw, 3.5rem)", lineHeight: "1.08", letterSpacing: "-0.03em" }}
+          className="h2-responsive font-black text-center tracking-tight mb-5"
         >
           Les villes manquent de
           <br />

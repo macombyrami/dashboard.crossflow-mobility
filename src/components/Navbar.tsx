@@ -91,7 +91,7 @@ export default function Navbar() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="fixed inset-x-0 top-[60px] z-40 glass-dark border-b border-white/[0.06] lg:hidden"
+            className="fixed inset-x-0 top-[60px] z-40 bg-[#08090B]/98 backdrop-blur-2xl border-b border-white/[0.06] lg:hidden"
           >
             <div className="px-6 py-5 flex flex-col gap-3">
               {navLinks.map((link) => (

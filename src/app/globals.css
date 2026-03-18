@@ -129,6 +129,26 @@
   font-feature-settings: "tnum";
 }
 
+.h1-responsive {
+  font-size: clamp(2.5rem, 8vw, 5.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.045em;
+}
+
+.h2-responsive {
+  font-size: clamp(2rem, 6vw, 4rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+@media (max-width: 640px) {
+  .h2-responsive {
+    font-size: 1.875rem; /* 30px */
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+}
+
 /* --------------------------------------------------------------------------
    GRADIENT TEXT VARIANTS
 -------------------------------------------------------------------------- */

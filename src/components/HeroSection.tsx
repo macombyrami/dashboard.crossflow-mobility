@@ -150,8 +150,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 32 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.85, delay: 0.1, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
-          className="font-black tracking-[-0.04em] leading-[0.92] mb-6"
-          style={{ fontSize: "clamp(3.25rem, 9vw, 7.5rem)" }}
+          className="h1-responsive font-black tracking-[-0.04em] mb-6"
         >
           Contrôlez le{" "}
           <span className="gradient-text">flux</span>
