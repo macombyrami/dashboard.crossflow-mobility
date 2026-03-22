@@ -10,7 +10,7 @@ const footerLinks = {
   Légal:      ["Confidentialité", "CGU", "Sécurité", "RGPD"],
 };
 
-export default function Footer() {
+export default function Footer({ dictionary, locale }: { dictionary: any, locale: string }) {
   return (
     <footer id="contact" className="border-t border-white/[0.05] bg-background">
       {/* CTA section with distinct premium styling */}
@@ -28,7 +28,7 @@ export default function Footer() {
           >
             <span className="section-label group cursor-default">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse group-hover:scale-125 transition-transform" />
-              Lancer la transformation urbaine
+              {dictionary.cta.label}
             </span>
           </motion.div>
 
@@ -39,9 +39,9 @@ export default function Footer() {
             className="font-black tracking-tight mb-8"
             style={{ fontSize: "clamp(2.5rem, 8vw, 5rem)", lineHeight: "0.95", letterSpacing: "-0.05em" }}
           >
-            Rejoignez l&apos;ère de la
+            {dictionary.cta.title.split(" ").slice(0, -2).join(" ")}
             <br />
-            <span className="gradient-text">mobilité augmentée.</span>
+            <span className="gradient-text">{dictionary.cta.title.split(" ").slice(-2).join(" ")}</span>
           </motion.h2>
 
           <motion.p
@@ -50,7 +50,7 @@ export default function Footer() {
             viewport={{ once: true }}
             className="text-text-muted text-xl max-w-2xl mx-auto mb-12 leading-relaxed"
           >
-            Déjà +12 métropoles européennes optimisent leur flux quotidien avec notre technologie. Demandez votre accès privilégié aujourd&apos;hui.
+            {dictionary.cta.desc}
           </motion.p>
 
           <motion.div
@@ -60,11 +60,11 @@ export default function Footer() {
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <a href="mailto:contact@crossflow-mobility.com" className="btn-primary group h-14 min-w-[240px] justify-center text-base">
-              Planifier une démonstration
+              {dictionary.cta.primary}
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition-transform" />
             </a>
             <a href="#solution" className="btn-secondary h-14 min-w-[200px] justify-center text-base">
-              Explorer les fonctionnalités
+              {dictionary.cta.secondary}
             </a>
           </motion.div>
         </div>
@@ -83,27 +83,27 @@ export default function Footer() {
                 <span className="text-xl font-bold tracking-tight">CrossFlow</span>
               </div>
               <p className="text-text-muted text-sm leading-relaxed max-w-xs">
-                La plateforme d&apos;intelligence urbaine nouvelle génération. Redéfinir la ville par les données.
+                {dictionary.desc}
               </p>
             </div>
 
             {/* Newsletter simulated */}
             <div className="space-y-4">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-text-secondary">Restez informé</h4>
+              <h4 className="text-xs font-bold uppercase tracking-widest text-text-secondary">{dictionary.newsletter.title}</h4>
               <div className="relative group">
                 <input
                   type="email"
-                  placeholder="votre-email@ville.fr"
+                  placeholder={dictionary.newsletter.placeholder}
                   className="w-full h-12 bg-white/[0.03] border border-white/[0.05] rounded-xl px-4 text-sm focus:outline-none focus:border-primary/40 focus:bg-white/[0.05] transition-all"
                 />
                 <button 
-                  aria-label="S'inscrire à la newsletter"
+                  aria-label={dictionary.newsletter.buttonAria}
                   className="absolute right-1.5 top-1.5 h-9 w-9 bg-surface-2 hover:bg-primary transition-all rounded-lg flex items-center justify-center text-white group-hover:scale-105 active:scale-95"
                 >
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
-              <p className="text-[10px] text-text-dim">En vous inscrivant, vous acceptez nos CGU.</p>
+              <p className="text-[10px] text-text-dim">{dictionary.newsletter.terms}</p>
             </div>
 
             {/* Socials */}
@@ -126,38 +126,16 @@ export default function Footer() {
           </div>
 
           {/* Nav groups */}
-          <div className="col-span-1 lg:col-span-1">
-            <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em] mb-8">Produit</h4>
-            <ul className="space-y-4">
-              {["Analyse temps réel", "Simulation", "IA Copilot", "Intégrations", "Roadmap"].map((link) => (
-                <li key={link}><a href="#solution" className="text-sm text-text-secondary hover:text-white hover:translate-x-1 inline-flex transition-all">{link}</a></li>
-              ))}
-            </ul>
-          </div>
-          <div className="col-span-1 lg:col-span-1">
-            <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em] mb-8">Ressources</h4>
-            <ul className="space-y-4">
-              {["Documentation", "API Reference", "Guides", "Changelog", "Status"].map((link) => (
-                <li key={link}><a href="#" className="text-sm text-text-secondary hover:text-white hover:translate-x-1 inline-flex transition-all">{link}</a></li>
-              ))}
-            </ul>
-          </div>
-          <div className="col-span-1 lg:col-span-1">
-            <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em] mb-8">Entreprise</h4>
-            <ul className="space-y-4">
-              {["À propos", "Blog", "Presse", "Partenaires", "Carrières"].map((link) => (
-                <li key={link}><a href={link === "À propos" ? "#solution" : "#"} className="text-sm text-text-secondary hover:text-white hover:translate-x-1 inline-flex transition-all">{link}</a></li>
-              ))}
-            </ul>
-          </div>
-          <div className="col-span-1 lg:col-span-1">
-            <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em] mb-8">Légal</h4>
-            <ul className="space-y-4">
-              {["Confidentialité", "CGU", "Sécurité", "RGPD"].map((link) => (
-                <li key={link}><a href={`/${link.toLowerCase().replace("é", "e")}`} className="text-sm text-text-secondary hover:text-white hover:translate-x-1 inline-flex transition-all">{link}</a></li>
-              ))}
-            </ul>
-          </div>
+          {dictionary.sections.map((section: any) => (
+            <div key={section.title} className="col-span-1 lg:col-span-1">
+              <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em] mb-8">{section.title}</h4>
+              <ul className="space-y-4">
+                {section.links.map((link: string) => (
+                  <li key={link}><a href="#" className="text-sm text-text-secondary hover:text-white hover:translate-x-1 inline-flex transition-all">{link}</a></li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
         {/* Divider */}
@@ -175,12 +153,12 @@ export default function Footer() {
           </div>
 
           <div className="flex flex-col md:flex-row items-center gap-4 text-text-dim text-xs">
-            <p suppressHydrationWarning>© 2026 CrossFlow Mobility. Systèmes urbains autonomes.</p>
+            <p suppressHydrationWarning>© 2026 CrossFlow Mobility. {dictionary.tagline}</p>
             <span className="hidden md:inline w-1 h-1 rounded-full bg-white/10" />
             <div className="flex items-center gap-4">
-              <button className="hover:text-text-muted transition-colors">Português</button>
-              <button className="text-primary font-medium">Français</button>
-              <button className="hover:text-text-muted transition-colors">English</button>
+              <a href="/pt" className={`${locale === 'pt' ? 'text-primary font-medium' : 'hover:text-text-muted transition-colors'}`}>Português</a>
+              <a href="/fr" className={`${locale === 'fr' ? 'text-primary font-medium' : 'hover:text-text-muted transition-colors'}`}>Français</a>
+              <a href="/en" className={`${locale === 'en' ? 'text-primary font-medium' : 'hover:text-text-muted transition-colors'}`}>English</a>
             </div>
           </div>
         </div>

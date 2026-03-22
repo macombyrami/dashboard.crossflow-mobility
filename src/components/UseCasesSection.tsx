@@ -48,7 +48,7 @@ const usecases = [
   },
 ];
 
-export default function UseCasesSection() {
+export default function UseCasesSection({ dictionary }: { dictionary: any }) {
   return (
     <section id="usecases" className="py-32 relative">
       <div className="max-w-7xl mx-auto px-5 sm:px-8">
@@ -60,7 +60,7 @@ export default function UseCasesSection() {
           className="flex justify-center mb-6"
         >
           <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-white/10 bg-white/[0.02] text-[0.65rem] text-text-muted uppercase tracking-[0.12em] font-semibold">
-            Use Cases
+            {dictionary.label}
           </span>
         </motion.div>
 
@@ -72,9 +72,9 @@ export default function UseCasesSection() {
           className="font-black text-center tracking-tight mb-5"
           style={{ fontSize: "clamp(2.25rem, 5vw, 3.5rem)", lineHeight: "1.08", letterSpacing: "-0.03em" }}
         >
-          Une solution,
+          {dictionary.title?.split(",")?.slice(0, 1)?.join(",")},
           <br />
-          <span className="text-text-muted">plusieurs secteurs.</span>
+          <span className="text-text-muted">{dictionary.title?.split(",")?.slice(1)?.join(",")}</span>
         </motion.h2>
 
         <motion.p
@@ -84,56 +84,59 @@ export default function UseCasesSection() {
           transition={{ delay: 0.2 }}
           className="text-center text-text-muted text-lg max-w-2xl mx-auto mb-20 leading-relaxed"
         >
-          CrossFlow s&apos;adapte à votre contexte et s&apos;intègre à vos systèmes existants sans friction.
+          {dictionary.desc}
         </motion.p>
 
         <div className="grid md:grid-cols-3 gap-5">
-          {usecases.map((u, i) => (
-            <motion.div
-              key={u.title}
-              initial={{ opacity: 0, y: 32 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.13, duration: 0.65 }}
-              className={`group glass rounded-2xl border transition-all duration-300 hover-lift flex flex-col overflow-hidden relative ${u.border} ${u.hoverShadow}`}
-            >
-              {/* Top gradient accent bar */}
-              <div className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${u.topBar}`} />
+          {dictionary.items?.map((item: any, i: number) => {
+            const u = usecases[i];
+            return (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 32 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.13, duration: 0.65 }}
+                className={`group glass rounded-2xl border transition-all duration-300 hover-lift flex flex-col overflow-hidden relative ${u.border} ${u.hoverShadow}`}
+              >
+                {/* Top gradient accent bar */}
+                <div className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${u.topBar}`} />
 
-              <div className="p-7 flex flex-col flex-1">
-                {/* Icon + tag row */}
-                <div className="flex items-center justify-between mb-5">
-                  <div className={`w-11 h-11 rounded-xl border flex items-center justify-center transition-all duration-300 ${u.bg}`}>
-                    <u.icon className={`w-5 h-5 ${u.color}`} />
+                <div className="p-7 flex flex-col flex-1">
+                  {/* Icon + tag row */}
+                  <div className="flex items-center justify-between mb-5">
+                    <div className={`w-11 h-11 rounded-xl border flex items-center justify-center transition-all duration-300 ${u.bg}`}>
+                      <u.icon className={`w-5 h-5 ${u.color}`} />
+                    </div>
+                    <span className={`text-[0.65rem] font-semibold px-2.5 py-1 rounded-full tracking-wide ${u.tagBg}`}>
+                      {item.tag}
+                    </span>
                   </div>
-                  <span className={`text-[0.65rem] font-semibold px-2.5 py-1 rounded-full tracking-wide ${u.tagBg}`}>
-                    {u.tag}
-                  </span>
+
+                  <h3 className="text-lg font-bold text-white mb-2.5 tracking-tight">{item.title}</h3>
+                  <p className="text-text-muted text-sm leading-relaxed mb-5 flex-1">{item.desc}</p>
+
+                  {/* Points */}
+                  <ul className="space-y-2 mb-5">
+                    {item.points?.map((p: string) => (
+                      <li key={p} className="flex items-center gap-2 text-xs text-text-muted">
+                        <span className={`text-sm font-bold ${u.color}`}>→</span>
+                        {p}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* CTA link with underline animation */}
+                  <a
+                    href="#contact"
+                    className={`link-underline flex items-center gap-2 text-sm font-medium text-text-muted transition-all duration-200 group-hover:gap-3 ${u.arrowHover}`}
+                  >
+                    {item.cta} <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
                 </div>
-
-                <h3 className="text-lg font-bold text-white mb-2.5 tracking-tight">{u.title}</h3>
-                <p className="text-text-muted text-sm leading-relaxed mb-5 flex-1">{u.desc}</p>
-
-                {/* Points */}
-                <ul className="space-y-2 mb-5">
-                  {u.points.map((p) => (
-                    <li key={p} className="flex items-center gap-2 text-xs text-text-muted">
-                      <span className={`text-sm font-bold ${u.color}`}>→</span>
-                      {p}
-                    </li>
-                  ))}
-                </ul>
-
-                {/* CTA link with underline animation */}
-                <a
-                  href="#contact"
-                  className={`link-underline flex items-center gap-2 text-sm font-medium text-text-muted transition-all duration-200 group-hover:gap-3 ${u.arrowHover}`}
-                >
-                  Demander une étude <ArrowRight className="w-3.5 h-3.5" />
-                </a>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </section>

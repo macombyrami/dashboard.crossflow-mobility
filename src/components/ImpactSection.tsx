@@ -96,7 +96,7 @@ function KpiCard({ impact, index, mounted }: { impact: typeof impacts[0]; index:
   );
 }
 
-export default function ImpactSection() {
+export default function ImpactSection({ dictionary }: { dictionary: any }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
@@ -117,7 +117,7 @@ export default function ImpactSection() {
         >
           <span className="section-label">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            Impact mesurable
+            {dictionary.label}
           </span>
         </motion.div>
 
@@ -129,9 +129,9 @@ export default function ImpactSection() {
           className="font-black text-center tracking-tight mb-5"
           style={{ fontSize: "clamp(2.25rem, 5vw, 3.5rem)", lineHeight: "1.08", letterSpacing: "-0.03em" }}
         >
-          Des résultats prouvés,
+          {dictionary.title?.split(",")?.slice(0, 1)?.join(",")},
           <br />
-          <span className="text-primary">dès le premier mois.</span>
+          <span className="text-primary">{dictionary.title?.split(",")?.slice(1)?.join(",")}</span>
         </motion.h2>
 
         <motion.p
@@ -141,12 +141,12 @@ export default function ImpactSection() {
           transition={{ delay: 0.2 }}
           className="text-center text-text-muted text-lg max-w-2xl mx-auto mb-20 leading-relaxed"
         >
-          Basé sur les données agrégées de nos déploiements en conditions réelles dans 12 métropoles européennes.
+          {dictionary.desc}
         </motion.p>
 
         <div className="grid md:grid-cols-3 gap-6">
-          {impacts.map((impact, i) => (
-            <KpiCard key={impact.label} impact={impact} index={i} mounted={mounted} />
+          {dictionary.items?.map((item: any, i: number) => (
+            <KpiCard key={i} impact={{ ...impacts[i], ...item }} index={i} mounted={mounted} />
           ))}
         </div>
       </div>

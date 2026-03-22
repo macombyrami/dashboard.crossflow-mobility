@@ -43,14 +43,10 @@ const CONGESTED_NODES: Record<TrafficState, string[]> = {
   optimized: [],
 };
 
-export default function DemoSection() {
+export default function DemoSection({ dictionary }: { dictionary: any }) {
   const [state, setState] = useState<TrafficState>("normal");
   const [kpi, setKpi] = useState<KPI>(STATE_KPIS.normal);
-  const [log, setLog] = useState<string[]>([
-    "Système opérationnel — Surveillance active",
-    "Connexion à 247 capteurs confirmée",
-    "Latence réseau : 23ms",
-  ]);
+  const [log, setLog] = useState<string[]>(dictionary.log?.initial || []);
   const [tick, setTick] = useState(0);
 
   const getNode = (id: string) => DEMO_NODES.find((n) => n.id === id)!;
@@ -72,31 +68,26 @@ export default function DemoSection() {
   const simulateAccident = useCallback(() => {
     setState("accident");
     setLog((prev) => [
-      `Incident détecté — Nœud C bloqué`,
-      `Recalcul des routes en cours...`,
-      `Alerte envoyée aux équipes terrain`,
+      ...dictionary.log.accident,
       ...prev.slice(0, 5),
     ]);
-  }, []);
+  }, [dictionary.log.accident]);
 
   const optimizeLights = useCallback(() => {
     setState("optimized");
     setLog((prev) => [
-      `IA activée — Optimisation des feux`,
-      `Cycles adaptés sur 12 carrefours`,
-      `Flux augmenté de +31%`,
+      ...dictionary.log.optimize,
       ...prev.slice(0, 5),
     ]);
-  }, []);
+  }, [dictionary.log.optimize]);
 
   const resetState = useCallback(() => {
     setState("normal");
     setLog((prev) => [
-      `Réseau normalisé`,
-      `Mode surveillance standard actif`,
+      ...dictionary.log.reset,
       ...prev.slice(0, 5),
     ]);
-  }, []);
+  }, [dictionary.log.reset]);
 
   const congested = CONGESTED_NODES[state];
   const congestedEdges = DEMO_EDGES.filter((e) => congested.includes(e.from) || congested.includes(e.to));
@@ -114,21 +105,21 @@ export default function DemoSection() {
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex justify-center mb-6">
           <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 text-xs text-primary uppercase tracking-widest font-medium">
-            <Activity className="w-3 h-3" /> Interface produit live
+            <Activity className="w-3 h-3" /> {dictionary.label}
           </span>
         </motion.div>
 
         <motion.h2 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className="text-4xl md:text-5xl font-black text-center tracking-tight mb-5">
-          Prenez le contrôle du trafic.
+          {dictionary.title}
           <br />
-          <span className="text-primary">En direct.</span>
+          <span className="text-primary">{dictionary.titleAccent}</span>
         </motion.h2>
 
         <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.2 }} className="text-center text-text-muted text-lg max-w-2xl mx-auto mb-4">
-          Interagissez avec une simulation réelle de notre interface de gestion urbaine.
+          {dictionary.desc}
         </motion.p>
         <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.3 }} className="text-center text-text-secondary text-xs italic mb-12">
-          Note : Les données présentées sont simulées à des fins de démonstration.
+          {dictionary.note}
         </motion.p>
 
         {/* Main Demo UI */}
@@ -255,7 +246,7 @@ export default function DemoSection() {
                       state === "optimized" ? "bg-primary animate-pulse" :
                       "bg-text-muted"
                     }`} />
-                    {state === "accident" ? "INCIDENT DÉTECTÉ" : state === "optimized" ? "OPTIMISATION ACTIVE" : "SURVEILLANCE ACTIVE"}
+                    {state === "accident" ? dictionary.status?.accident : state === "optimized" ? dictionary.status?.optimized : dictionary.status?.normal}
                   </motion.div>
                 </AnimatePresence>
               </div>
@@ -267,20 +258,20 @@ export default function DemoSection() {
                   disabled={state === "accident"}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <AlertCircle className="w-3.5 h-3.5" /> Simuler un accident
+                  <AlertCircle className="w-3.5 h-3.5" /> {dictionary.controls.accident}
                 </button>
                 <button
                   onClick={optimizeLights}
                   disabled={state === "optimized"}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary/10 border border-primary/30 text-primary text-xs font-medium hover:bg-primary/20 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <Zap className="w-3.5 h-3.5" /> Optimiser les feux
+                  <Zap className="w-3.5 h-3.5" /> {dictionary.controls.optimize}
                 </button>
                 <button
                   onClick={resetState}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-text-muted text-xs font-medium hover:text-white hover:bg-white/10 transition-all duration-200"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" /> Reset
+                  <RefreshCw className="w-3.5 h-3.5" /> {dictionary.controls.reset}
                 </button>
               </div>
             </div>

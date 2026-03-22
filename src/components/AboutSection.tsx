@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 
-export default function AboutSection() {
+export default function AboutSection({ dictionary }: { dictionary: any }) {
   return (
     <section id="about" className="py-24 relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-5 sm:px-8">
@@ -13,30 +13,20 @@ export default function AboutSection() {
             viewport={{ once: true }}
             className="space-y-6"
           >
-            <span className="section-label">L&apos;entreprise</span>
+            <span className="section-label">{dictionary.label}</span>
             <h2 className="text-4xl sm:text-5xl font-black tracking-tight leading-[1.1]">
-              Redéfinir le futur de la <span className="gradient-text">mobilité urbaine.</span>
+              {dictionary.title?.split(" ")?.slice(0, -2)?.join(" ")} <span className="gradient-text">{dictionary.title?.split(" ")?.slice(-2)?.join(" ")}</span>
             </h2>
             <p className="text-text-muted text-lg leading-relaxed">
-              Fondée en 2024 à Paris, CrossFlow Mobility est née d&apos;une vision simple : transformer les données urbaines en levier d&apos;action immédiat pour les décideurs.
+              {dictionary.desc}
             </p>
             <div className="grid grid-cols-2 gap-8 pt-4">
-              <div>
-                <div className="text-3xl font-black text-white mb-1">2024</div>
-                <div className="text-xs text-text-dim uppercase tracking-widest font-bold">Fondation</div>
-              </div>
-              <div>
-                <div className="text-3xl font-black text-white mb-1">Paris</div>
-                <div className="text-xs text-text-dim uppercase tracking-widest font-bold">Siège Social</div>
-              </div>
-              <div>
-                <div className="text-3xl font-black text-white mb-1">25+</div>
-                <div className="text-xs text-text-dim uppercase tracking-widest font-bold">Experts IA & Urbanisme</div>
-              </div>
-              <div>
-                <div className="text-3xl font-black text-white mb-1">12</div>
-                <div className="text-xs text-text-dim uppercase tracking-widest font-bold">Villes Partenaires</div>
-              </div>
+              {dictionary.stats?.map((stat: any, i: number) => (
+                <div key={i}>
+                  <div className="text-3xl font-black text-white mb-1">{stat.value}</div>
+                  <div className="text-xs text-text-dim uppercase tracking-widest font-bold">{stat.label}</div>
+                </div>
+              ))}
             </div>
           </motion.div>
 

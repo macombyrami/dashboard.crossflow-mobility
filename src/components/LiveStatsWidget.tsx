@@ -13,13 +13,13 @@ interface StatItem {
   color: string;
 }
 
-const INITIAL_STATS: StatItem[] = [
-  { id: "cars", label: "Véhicules", icon: Car, value: 1248, initialValue: 1248, color: "text-white" },
-  { id: "buses", label: "Bus & Transit", icon: Bus, value: 42, initialValue: 42, color: "text-primary" },
-  { id: "bikes", label: "Vélo & Mobilité", icon: Bike, value: 312, initialValue: 312, color: "text-accent-cyan" },
-];
+export default function LiveStatsWidget({ dictionary }: { dictionary: any }) {
+  const INITIAL_STATS: StatItem[] = [
+    { id: "cars", label: dictionary.items?.cars, icon: Car, value: 1248, initialValue: 1248, color: "text-white" },
+    { id: "buses", label: dictionary.items?.buses, icon: Bus, value: 42, initialValue: 42, color: "text-primary" },
+    { id: "bikes", label: dictionary.items?.bikes, icon: Bike, value: 312, initialValue: 312, color: "text-accent-cyan" },
+  ];
 
-export default function LiveStatsWidget() {
   const [stats, setStats] = useState(INITIAL_STATS);
   const [total, setTotal] = useState(1602);
 
@@ -52,14 +52,14 @@ export default function LiveStatsWidget() {
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          <span className="text-[0.6rem] font-bold uppercase tracking-[0.15em] text-text-muted">Live City Monitor</span>
+          <span className="text-[0.6rem] font-bold uppercase tracking-[0.15em] text-text-muted">{dictionary.monitor}</span>
         </div>
         <span className="text-[0.6rem] font-mono text-text-secondary">v1.0.4</span>
       </div>
 
       {/* Total Display */}
       <div className="mb-2">
-        <div className="text-[0.6rem] text-text-muted uppercase tracking-wider mb-0.5">Total en circulation</div>
+        <div className="text-[0.6rem] text-text-muted uppercase tracking-wider mb-0.5">{dictionary.totalLabel}</div>
         <div className="text-2xl font-black font-mono-nums tracking-tighter flex items-baseline gap-1.5" suppressHydrationWarning>
           {total.toLocaleString()}
           <Activity className="w-3.5 h-3.5 text-primary opacity-50" />
@@ -93,10 +93,10 @@ export default function LiveStatsWidget() {
       </div>
 
       <div className="mt-2 pt-2 border-t border-white/[0.04] flex items-center justify-between text-[0.55rem]">
-        <span className="text-text-secondary italic">Actualisé à l&apos;instant</span>
+        <span className="text-text-secondary italic">{dictionary.updated}</span>
         <div className="flex items-center gap-1 text-primary/70">
           <span className="w-1 h-1 rounded-full bg-current" />
-          <span className="font-semibold uppercase tracking-wider">Metropole Alpha</span>
+          <span className="font-semibold uppercase tracking-wider">{dictionary.metro}</span>
         </div>
       </div>
 

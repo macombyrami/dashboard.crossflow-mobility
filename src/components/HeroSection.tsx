@@ -51,7 +51,7 @@ function FlowLine({ from, to, color = "#22C55E", delay = 0 }: {
   );
 }
 
-export default function HeroSection() {
+export default function HeroSection({ dictionary }: { dictionary: any }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const getNode = (id: number) => NODES.find((n) => n.id === id)!;
@@ -141,7 +141,7 @@ export default function HeroSection() {
         >
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
           <span suppressHydrationWarning className="text-[0.65rem] text-primary font-semibold tracking-[0.14em] uppercase">
-            IA Urbaine · Temps Réel
+            {dictionary.badge}
           </span>
         </motion.div>
 
@@ -152,10 +152,8 @@ export default function HeroSection() {
           transition={{ duration: 0.85, delay: 0.1, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
           className="h1-responsive font-black tracking-[-0.04em] mb-6"
         >
-          Contrôlez le{" "}
-          <span className="gradient-text">flux</span>{" "}
-          <br />
-          urbain.
+          {dictionary.title?.split(" ").slice(0, -1).join(" ")}{" "}
+          <span className="gradient-text">{dictionary.title?.split(" ").slice(-1)}</span>
         </motion.h1>
 
         {/* Subtitle */}
@@ -166,8 +164,7 @@ export default function HeroSection() {
           className="text-white/55 max-w-xl mx-auto leading-relaxed mb-10"
           style={{ fontSize: "clamp(1rem, 1.8vw, 1.2rem)" }}
         >
-          Analysez, simulez et optimisez le trafic en temps réel grâce à l&apos;IA.
-          La plateforme dédiée aux villes intelligentes de demain.
+          {dictionary.subtitle}
         </motion.p>
 
         {/* CTAs */}
@@ -179,11 +176,11 @@ export default function HeroSection() {
         >
           <a href="#demo" className="btn-primary group">
             <Play className="w-4 h-4 fill-black shrink-0" />
-            Voir la démo
+            {dictionary.ctaPrimary}
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
           </a>
           <a href="#contact" className="btn-secondary">
-            Demander une présentation
+            {dictionary.ctaSecondary}
           </a>
         </motion.div>
 
@@ -194,7 +191,7 @@ export default function HeroSection() {
           transition={{ duration: 1, delay: 0.65 }}
           className="mt-16 flex flex-col sm:flex-row items-center justify-center gap-0 sm:gap-0 text-center divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08]"
         >
-          {STATS.map((stat) => (
+          {dictionary.stats?.map((stat: any) => (
             <div key={stat.label} className="flex flex-col gap-1 px-8 py-4 sm:py-0">
               <span className="font-mono-nums text-2xl font-black text-white tracking-tight">
                 {stat.value}

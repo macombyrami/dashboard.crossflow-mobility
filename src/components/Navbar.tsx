@@ -4,14 +4,25 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 
-const navLinks = [
-  { label: "Produit",    href: "#solution" },
-  { label: "Impact",    href: "#impact" },
-  { label: "Use Cases", href: "#usecases" },
-  { label: "À propos",  href: "#about" },
-];
+import { useRouter, usePathname } from "next/navigation";
+import { Locale } from "@/lib/i18n-config";
 
-export default function Navbar() {
+export default function Navbar({ locale, dictionary }: { locale: Locale; dictionary: any }) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleLocaleChange = (newLocale: string) => {
+    const segments = pathname.split("/");
+    segments[1] = newLocale;
+    router.push(segments.join("/") || "/");
+  };
+
+  const navLinks = [
+    { label: dictionary.solution, href: "#solution" },
+    { label: dictionary.impact, href: "#impact" },
+    { label: dictionary.useCases, href: "#usecases" },
+    { label: dictionary.about, href: "#about" },
+  ];
   const [scrolled, setScrolled]     = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -59,15 +70,24 @@ export default function Navbar() {
           {/* Desktop CTAs */}
           <div className="hidden sm:flex items-center gap-6">
             <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest border-r border-white/10 pr-6">
-              <button className="text-primary">FR</button>
-              <button className="text-text-dim hover:text-text-muted transition-colors">EN</button>
-              <button className="text-text-dim hover:text-text-muted transition-colors">PT</button>
+              <button 
+                onClick={() => handleLocaleChange("fr")}
+                className={locale === "fr" ? "text-primary" : "text-text-dim hover:text-text-muted transition-colors"}
+              >FR</button>
+              <button 
+                onClick={() => handleLocaleChange("en")}
+                className={locale === "en" ? "text-primary" : "text-text-dim hover:text-text-muted transition-colors"}
+              >EN</button>
+              <button 
+                onClick={() => handleLocaleChange("pt")}
+                className={locale === "pt" ? "text-primary" : "text-text-dim hover:text-text-muted transition-colors"}
+              >PT</button>
             </div>
             <a
               href="#contact"
               className="btn-primary !py-2 !px-4 !text-xs !gap-1.5"
             >
-              Demander une démo
+              {dictionary.demo}
             </a>
           </div>
 
@@ -109,7 +129,7 @@ export default function Navbar() {
                   onClick={() => setMobileOpen(false)}
                   className="btn-primary w-full justify-center"
                 >
-                  Demander une démo
+                  {dictionary.demo}
                 </a>
               </div>
             </div>

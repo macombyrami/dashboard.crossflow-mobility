@@ -1,0 +1,227 @@
+{
+  "common": {
+    "demo": "Solicitar uma demonstração",
+    "viewDemo": "Ver demonstração",
+    "contact": "Contacto",
+    "about": "Sobre",
+    "solution": "Produto",
+    "impact": "Impacto",
+    "useCases": "Use Cases",
+    "skipToContent": "Pular para o conteúdo principal"
+  },
+  "hero": {
+    "badge": "IA Urbana · Tempo Real",
+    "title": "Controle o fluxo urbano.",
+    "subtitle": "Analise, simule e otimize o tráfego em tempo real usando IA. A plataforma dedicada às cidades inteligentes de amanhã.",
+    "stats": [
+      { "value": "12+", "label": "Cidades ativas" },
+      { "value": "99.9%", "label": "SLA garantido" },
+      { "value": "<50ms", "label": "Latência IA" }
+    ],
+    "ctaPrimary": "Ver demonstração",
+    "ctaSecondary": "Solicitar uma apresentação"
+  },
+  "problem": {
+    "label": "O problema",
+    "title": "As cidades carecem de visibilidade e controlo.",
+    "desc": "Nas metrópoles modernas, os fluxos de mobilidade tornaram-se incontroláveis. As ferramentas existentes são arcaicas, reactivas e dispendiosas.",
+    "items": [
+      {
+        "title": "Tempo perdido",
+        "value": "200h/ano",
+        "desc": "Um condutor perde em média 200 horas por ano em engarrafamentos urbanos."
+      },
+      {
+        "title": "Ineficiência operacional",
+        "value": "45%",
+        "desc": "Os semáforos funcionam com ciclos fixos desadequados ao tráfego real."
+      },
+      {
+        "title": "Dados não explorados",
+        "value": "80%",
+        "desc": "Os dados de mobilidade recolhidos não são analisados nem utilizados para otimização."
+      }
+    ]
+  },
+  "solution": {
+    "label": "A solução",
+    "title": "Uma plataforma de inteligência unificada.",
+    "desc": "A CrossFlow funde visão computacional e modelos preditivos para uma gestão proactiva.",
+    "items": [
+      { "title": "Análise em Tempo Real", "desc": "Ingestão massiva de fluxos IoT e câmaras com latência de processamento <50ms." },
+      { "title": "Simulação de Cenários", "desc": "Teste o impacto de encerramentos de vias ou grandes eventos antes da implementação." },
+      { "title": "Decisão Autónoma", "desc": "A IA ajusta dinamicamente os ciclos dos sinais para maximizar o fluxo e reduzir o CO₂." }
+    ]
+  },
+  "impact": {
+    "label": "Impacto Mensurável",
+    "title": "Resultados concretos, no terreno.",
+    "desc": "Implantado em 12 metrópoles europeias com benefícios imediatos.",
+    "items": [
+      { "value": "-15%", "label": "Tempo de espera" },
+      { "value": "+20%", "label": "Fluidez do tráfego" },
+      { "value": "-10%", "label": "Emissões CO₂" }
+    ]
+  },
+  "useCases": {
+    "label": "Casos de uso",
+    "title": "Uma solução, para cada desafio urbano.",
+    "desc": "A nossa tecnologia adapta-se às necessidades específicas de cada território.",
+    "items": [
+      { 
+        "title": "Gestão do Centro Urbano", 
+        "tag": "Sector público",
+        "desc": "Reduzir a saturação durante as horas de ponta e eventos especiais.",
+        "points": ["Gestão de eventos", "Zonas REZ", "Relatórios automáticos"],
+        "cta": "Ver estudo de caso"
+      },
+      { 
+        "title": "Mobilidade Multi-modal", 
+        "tag": "Urbanismo digital",
+        "desc": "Agilizar as transferências entre autocarros, elétricos e micro-mobilidade.",
+        "points": ["Integração IoT", "Open Data", "Gémeo digital"],
+        "cta": "Descobrir plataforma"
+      },
+      { 
+        "title": "Logística Urbana", 
+        "tag": "Mobilidade pro",
+        "desc": "Otimizar o último quilómetro para os operadores de entregas B2B.",
+        "points": ["Otimização rotas", "ETA preciso", "Integração TMS"],
+        "cta": "Solução logística"
+      }
+    ]
+  },
+  "about": {
+    "label": "A empresa",
+    "title": "Construir o futuro da mobilidade ágil.",
+    "desc": "A CrossFlow Mobility é uma startup DeepTech fundada em Paris, dedicada à transformação digital das infraestruturas de transporte.",
+    "stats": [
+      { "value": "2024", "label": "Fundação" },
+      { "value": "Paris", "label": "Sede Social" },
+      { "value": "25+", "label": "Especialistas IA" },
+      { "value": "12", "label": "Parceiros" }
+    ]
+  },
+  "contact": {
+    "label": "Contacto & Suporte",
+    "title": "Pronto para otimizar a sua rede?",
+    "desc": "Contacte os nossos especialistas para uma demonstração personalizada.",
+    "form": {
+        "name": "Nome Completo",
+        "org": "Organização / Cidade",
+        "email": "Email Profissional",
+        "message": "Mensagem",
+        "submit": "Enviar o meu pedido",
+        "privacy": "Ao enviar este formulário, aceita a nossa política de privacidade."
+    }
+  },
+  "copilot": {
+    "label": "IA Copilot",
+    "title": "O seu assistente de IA para cada decisão.",
+    "desc": "O CrossFlow AI compreende os seus dados, antecipa interrupções e gera recomendações acionáveis. Coloque as suas questões em linguagem natural.",
+    "welcome": "Olá! Sou a IA da CrossFlow. Posso analisar os seus dados de tráfego, simular cenários e recomendar acções optimizadas em tempo real.",
+    "placeholder": "Faça uma pergunta ao CrossFlow AI...",
+    "status": "Protótipo de Demonstração · Dados Simulados",
+    "suggestionsLabel": "Perguntas Frequentes",
+    "conversations": [
+      {
+        "user": "Simular um pico de tráfego às 18h",
+        "ai": "Simulação lançada para as 18:00. Estou a analisar os fluxos actuais e projecções de um aumento de volume de +67% nas rotas principais.\n\n→ 3 intersecções críticas identificadas: Estação Norte, Centro da Cidade, Circular Sul.\n\n→ Recomendação: activar plano 'Hora de Ponta' em 8 cruzamentos, preparar rotas alternativas B3 e C7."
+      },
+      {
+        "user": "Qual é a melhor estratégia para o eixo Norte-Sul?",
+        "ai": "Após análise de dados históricos (30 dias) e previsões meteorológicas:\n\n→ Extensão de 15s de sinal verde no eixo Norte-Sul das 17:30 às 19:00.\n→ Activação de faixas reversíveis na Boulevard Haussmann.\n→ Desvio preventivo de 18% do fluxo para a A86.\n\nGanho estimado: -22% tempo de espera, +340 veículos adicionais/h."
+      },
+      {
+        "user": "Gerar um relatório de optimização semanal",
+        "ai": "Relatório semanal gerado ✓\n\n→ Redução global da congestão: -18.3%\n→ Poupança de carbono: 4.2 toneladas CO₂\n→ Incidentes tratados automaticamente: 14/14\n→ Satisfação dos utilizadores: +12 pontos NPS\n\nRelatório PDF disponível. Deseja enviá-lo para os interessados?"
+      }
+    ]
+  },
+  "demo": {
+    "label": "Interface do produto ao vivo",
+    "title": "Assuma o controlo do tráfego.",
+    "titleAccent": "Ao vivo.",
+    "desc": "Interaja com uma simulação real da nossa interface de gestão urbana.",
+    "note": "Nota: Os dados apresentados são simulados para fins de demonstração.",
+    "dashboardName": "Painel CrossFlow · Metrópole Alpha",
+    "status": {
+      "normal": "SURVEILLÂNCIA ATIVA",
+      "accident": "INCIDENTE DETETADO",
+      "optimized": "OTIMIZAÇÃO ATIVA"
+    },
+    "controls": {
+      "accident": "Simular um acidente",
+      "optimize": "Otimizar semáforos",
+      "reset": "Redefinir"
+    },
+    "kpis": {
+      "label": "KPIs — Ao vivo",
+      "avgTime": "Tempo médio de viagem",
+      "congestion": "Taxa de congestão",
+      "flux": "Fluxo veículos/hora"
+    },
+    "log": {
+      "label": "Diário de eventos",
+      "initial": [
+        "Sistema operacional — Vigilância ativa",
+        "Ligação a 247 sensores confirmada",
+        "Latência de rede: 23ms"
+      ],
+      "accident": [
+        "Incidente detetado — Nó C bloqueado",
+        "Recálculo de rotas em curso...",
+        "Alerta enviado às equipas de campo"
+      ],
+      "optimize": [
+        "IA activada — Optimização de semáforos",
+        "Ciclos adaptados em 12 intersecções",
+        "Fluxo aumentado em +31%"
+      ],
+      "reset": [
+        "Rede normalizada",
+        "Modo de vigilância standard activo"
+      ]
+    }
+  },
+  "liveStats": {
+    "monitor": "City Monitor",
+    "totalLabel": "Total em circulação",
+    "updated": "Atualizado agora",
+    "metro": "Metrópole Alpha",
+    "items": {
+      "cars": "Veículos",
+      "buses": "Autocarro & Trânsito",
+      "bikes": "Biciseta & Mobilidade"
+    }
+  },
+  "footer": {
+    "cta": {
+      "label": "Pronto para o futuro?",
+      "title": "Otimize a sua cidade com o CrossFlow",
+      "desc": "Junte-se às metrópoles que já estão a transformar a sua mobilidade. Implantação rápida, impacto imediato.",
+      "primary": "Começar agora",
+      "secondary": "Ver solução"
+    },
+    "desc": "IA de gestão de tráfego para as cidades do futuro.",
+    "newsletter": {
+      "title": "Newsletter",
+      "placeholder": "O seu email profissional",
+      "buttonAria": "Assinar newsletter",
+      "terms": "Ao assinar, concorda em receber as nossas novidades."
+    },
+    "sections": [
+      { "title": "Produto", "links": ["Funcionalidades", "Simulação", "IA Copilot", "Segurança"] },
+      { "title": "Empresa", "links": ["Sobre", "Blog", "Carreiras", "Imprensa"] },
+      { "title": "Recursos", "links": ["Documentação", "API", "Guias", "Suporte"] },
+      { "title": "Legal", "links": ["Privacidade", "Termos", "RGPD", "Segurança"] }
+    ],
+    "copyright": "© 2026 CrossFlow Mobility. Sistemas urbanos autónomos.",
+    "tagline": "Sistemas urbanos autónomos."
+  },
+  "metadata": {
+    "title": "CrossFlow Mobility | IA para Gestão Inteligente do Tráfego Urbano",
+    "description": "Plataforma de IA revolucionária para cidades inteligentes. Otimize a mobilidade urbana, reduza o congestionamento e simule o futuro do transporte em tempo real com o CrossFlow.",
+    "keywords": "IA urbana, Smart City, Mobilidade Urbana, Gestão de Tráfego, Simulação Urbana, Cidade Inteligente, Otimização de Transportes, IA em tempo real"
+  }
+}

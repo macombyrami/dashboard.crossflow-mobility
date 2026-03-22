@@ -1,0 +1,227 @@
+{
+  "common": {
+    "demo": "Request a demo",
+    "viewDemo": "View demo",
+    "contact": "Contact",
+    "about": "About",
+    "solution": "Product",
+    "impact": "Impact",
+    "useCases": "Use Cases",
+    "skipToContent": "Skip to main content"
+  },
+  "hero": {
+    "badge": "Urban AI · Real Time",
+    "title": "Control the urban flow.",
+    "subtitle": "Analyze, simulate and optimize traffic in real time using AI. The dedicated platform for the smart cities of tomorrow.",
+    "stats": [
+      { "value": "12+", "label": "Active cities" },
+      { "value": "99.9%", "label": "Guaranteed SLA" },
+      { "value": "<50ms", "label": "AI Latency" }
+    ],
+    "ctaPrimary": "View the demo",
+    "ctaSecondary": "Request a presentation"
+  },
+  "problem": {
+    "label": "The problem",
+    "title": "Cities lack visibility and control.",
+    "desc": "In modern metropolises, mobility flows have become uncontrollable. Existing tools are archaic, reactive, and expensive.",
+    "items": [
+      {
+        "title": "Time lost",
+        "value": "200h/yr",
+        "desc": "A driver loses an average of 200 hours per year in urban traffic jams."
+      },
+      {
+        "title": "Operational inefficiency",
+        "value": "45%",
+        "desc": "Traffic lights operate with fixed cycles unsuited to actual traffic."
+      },
+      {
+        "title": "Unused data",
+        "value": "80%",
+        "desc": "Collected mobility data is not analyzed or used for optimization."
+      }
+    ]
+  },
+  "solution": {
+    "label": "The solution",
+    "title": "A unified intelligence platform.",
+    "desc": "CrossFlow merges computer vision and predictive models for proactive management.",
+    "items": [
+      { "title": "Real-Time Analysis", "desc": "Massive ingestion of IoT and camera feeds with processing latency <50ms." },
+      { "title": "Scenario Simulation", "desc": "Test the impact of lane closures or major events before implementation." },
+      { "title": "Autonomous Decision", "desc": "AI dynamically adjusts signal cycles to maximize flow and reduce CO₂." }
+    ]
+  },
+  "impact": {
+    "label": "Measurable Impact",
+    "title": "Concrete results, on the ground.",
+    "desc": "Deployed in 12 European metropolises with immediate benefits.",
+    "items": [
+      { "value": "-15%", "label": "Waiting time" },
+      { "value": "+20%", "label": "Traffic flow" },
+      { "value": "-10%", "label": "CO₂ emissions" }
+    ]
+  },
+  "useCases": {
+    "label": "Use cases",
+    "title": "One solution, for every urban challenge.",
+    "desc": "Our technology adapts to the specific needs of each territory.",
+    "items": [
+      { 
+        "title": "City Center Management", 
+        "tag": "Public sector",
+        "desc": "Reduce saturation during peak hours and special events.",
+        "points": ["Event management", "REZ zones", "Automated reporting"],
+        "cta": "View case study"
+      },
+      { 
+        "title": "Multi-modal Mobility", 
+        "tag": "Digital urbanism",
+        "desc": "Streamline transfers between buses, streetcars and micro-mobility.",
+        "points": ["IoT integration", "Open Data", "Digital twin"],
+        "cta": "Discover platform"
+      },
+      { 
+        "title": "Urban Logistics", 
+        "tag": "Pro mobility",
+        "desc": "Optimize the last mile for B2B delivery players.",
+        "points": ["Route optimization", "Accurate ETA", "TMS integration"],
+        "cta": "Logistics solution"
+      }
+    ]
+  },
+  "about": {
+    "label": "The company",
+    "title": "Building the future of agile mobility.",
+    "desc": "CrossFlow Mobility is a DeepTech startup founded in Paris, dedicated to the digital transformation of transport infrastructure.",
+    "stats": [
+      { "value": "2024", "label": "Founded" },
+      { "value": "Paris", "label": "Headquarters" },
+      { "value": "25+", "label": "AI Experts" },
+      { "value": "12", "label": "Partners" }
+    ]
+  },
+  "contact": {
+    "label": "Contact & Support",
+    "title": "Ready to optimize your network?",
+    "desc": "Contact our experts for a personalized demonstration.",
+    "form": {
+        "name": "Full Name",
+        "org": "Organization / City",
+        "email": "Business Email",
+        "message": "Message",
+        "submit": "Send my request",
+        "privacy": "By sending this form, you accept our privacy policy."
+    }
+  },
+  "copilot": {
+    "label": "AI Copilot",
+    "title": "Your AI assistant for every decision.",
+    "desc": "CrossFlow AI understands your data, anticipates disruptions, and generates actionable recommendations. Ask your questions in natural language.",
+    "welcome": "Hello! I am CrossFlow AI. I can analyze your traffic data, simulate scenarios, and recommend optimal actions in real time.",
+    "placeholder": "Ask CrossFlow AI a question...",
+    "status": "Demo Prototype · Simulated Data",
+    "suggestionsLabel": "Frequently Asked Questions",
+    "conversations": [
+      {
+        "user": "Simulate a traffic peak at 6 PM",
+        "ai": "Simulation launched for 6 PM. I am analyzing current flows and projecting a +67% volume increase on main routes.\n\n→ 3 critical intersections identified: North Station, City Center, South Ring Road.\n\n→ Recommendation: activate 'Rush Hour' plan at 8 intersections, prepare alternative routes B3 and C7."
+      },
+      {
+        "user": "What is the best strategy for the North-South axis?",
+        "ai": "After analyzing historical data (30 days) and weather forecasts:\n\n→ 15s green light extension on the North-South axis from 5:30 PM to 7 PM.\n→ Activation of reversible lanes on Boulevard Haussmann.\n→ Preventive diversion of 18% of the flow to the A86.\n\nEstimated gain: -22% waiting time, +340 additional vehicles/h."
+      },
+      {
+        "user": "Generate a weekly optimization report",
+        "ai": "Weekly report generated ✓\n\n→ Overall congestion reduction: -18.3%\n→ Carbon savings: 4.2 tons CO₂\n→ Automatically handled incidents: 14/14\n→ User satisfaction: +12 NPS points\n\nPDF report available. Would you like to send it to stakeholders?"
+      }
+    ]
+  },
+  "demo": {
+    "label": "Live product interface",
+    "title": "Take control of the traffic.",
+    "titleAccent": "Live.",
+    "desc": "Interact with a real simulation of our urban management interface.",
+    "note": "Note: The data presented is simulated for demonstration purposes.",
+    "dashboardName": "CrossFlow Dashboard · Alpha Metropolis",
+    "status": {
+      "normal": "ACTIVE SURVEILLANCE",
+      "accident": "INCIDENT DETECTED",
+      "optimized": "OPTIMIZATION ACTIVE"
+    },
+    "controls": {
+      "accident": "Simulate an accident",
+      "optimize": "Optimize lights",
+      "reset": "Reset"
+    },
+    "kpis": {
+      "label": "KPIs — Live",
+      "avgTime": "Average travel time",
+      "congestion": "Congestion rate",
+      "flux": "Vehicles/hour flow"
+    },
+    "log": {
+      "label": "Event log",
+      "initial": [
+        "System operational — Active surveillance",
+        "Connection to 247 sensors confirmed",
+        "Network latency: 23ms"
+      ],
+      "accident": [
+        "Incident detected — Node C blocked",
+        "Route recalculation in progress...",
+        "Alert sent to field teams"
+      ],
+      "optimize": [
+        "AI activated — Traffic light optimization",
+        "Cycles adapted at 12 intersections",
+        "Flow increased by +31%"
+      ],
+      "reset": [
+        "Network normalized",
+        "Standard surveillance mode active"
+      ]
+    }
+  },
+  "liveStats": {
+    "monitor": "City Monitor",
+    "totalLabel": "Total in circulation",
+    "updated": "Updated just now",
+    "metro": "Alpha Metropolis",
+    "items": {
+      "cars": "Vehicles",
+      "buses": "Bus & Transit",
+      "bikes": "Bike & Mobility"
+    }
+  },
+  "footer": {
+    "cta": {
+      "label": "Ready for the future?",
+      "title": "Optimize your city with CrossFlow",
+      "desc": "Join the metropolises already transforming their mobility. Rapide deployment, immediate impact.",
+      "primary": "Start now",
+      "secondary": "See the solution"
+    },
+    "desc": "Traffic management AI for the cities of the future.",
+    "newsletter": {
+      "title": "Newsletter",
+      "placeholder": "Your professional email",
+      "buttonAria": "Subscribe to newsletter",
+      "terms": "By subscribing, you agree to receive our news."
+    },
+    "sections": [
+      { "title": "Product", "links": ["Features", "Simulation", "AI Copilot", "Security"] },
+      { "title": "Company", "links": ["About", "Blog", "Careers", "Press"] },
+      { "title": "Resources", "links": ["Documentation", "API", "Guides", "Support"] },
+      { "title": "Legal", "links": ["Privacy", "Terms", "GDPR", "Security"] }
+    ],
+    "copyright": "© 2026 CrossFlow Mobility. Autonomous urban systems.",
+    "tagline": "Autonomous urban systems."
+  },
+  "metadata": {
+    "title": "CrossFlow Mobility | AI for Intelligent Urban Traffic Management",
+    "description": "Revolutionary AI platform for smart cities. Optimize urban mobility, reduce congestion and simulate the future of transport in real-time with CrossFlow.",
+    "keywords": "Urban AI, Smart City, Urban Mobility, Traffic Management, Urban Simulation, Intelligent City, Transport Optimization, Real-time AI"
+  }
+}

@@ -25,9 +25,9 @@ interface Message {
   id: number;
 }
 
-export default function AICopilotSection() {
+export default function AICopilotSection({ dictionary }: { dictionary: any }) {
   const [messages, setMessages] = useState<Message[]>([
-    { role: "ai", content: "Bonjour ! Je suis CrossFlow AI. Je peux analyser vos données de trafic, simuler des scénarios et vous recommander des actions optimales en temps réel.", id: 0 },
+    { role: "ai", content: dictionary.welcome, id: 0 },
   ]);
   const [input, setInput]         = useState("");
   const [loading, setLoading]     = useState(false);
@@ -50,13 +50,13 @@ export default function AICopilotSection() {
     setInput("");
     setLoading(true);
     await new Promise((r) => setTimeout(r, 1000 + Math.random() * 700));
-    const response = CONVERSATIONS[suggIdx % CONVERSATIONS.length].ai;
+    const response = dictionary.conversations?.[suggIdx % (dictionary.conversations?.length || 1)]?.ai;
     setSuggIdx((i) => i + 1);
-    setMessages((m) => [...m, { role: "ai", content: response, id: Date.now() + 1 }]);
+    setMessages((m) => [...m, { role: "ai", content: response || "", id: Date.now() + 1 }]);
     setLoading(false);
   };
 
-  const suggestions = CONVERSATIONS.map((c) => c.user);
+  const suggestions = dictionary.conversations?.map((c: any) => c.user) || [];
 
   return (
     <section id="copilot" className="py-32 relative overflow-hidden">
@@ -69,7 +69,7 @@ export default function AICopilotSection() {
           <div>
             <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-6">
               <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-purple-500/25 bg-purple-500/5 text-[0.65rem] text-purple-400 uppercase tracking-[0.12em] font-semibold">
-                <BrainCircuit className="w-3 h-3" /> IA Copilot
+                <BrainCircuit className="w-3 h-3" /> {dictionary.label}
               </span>
             </motion.div>
 
@@ -81,10 +81,10 @@ export default function AICopilotSection() {
               className="font-black tracking-tight mb-5"
               style={{ fontSize: "clamp(2.25rem, 5vw, 3.5rem)", lineHeight: "1.08", letterSpacing: "-0.03em" }}
             >
-              Votre assistant IA
+              {dictionary.title?.split(" ")?.slice(0, -3)?.join(" ")}
               <span suppressHydrationWarning className={`text-sm font-bold text-primary`}>→</span>
               <br />
-              <span className="text-primary">pour chaque décision.</span>
+              <span className="text-primary">{dictionary.title?.split(" ")?.slice(-3)?.join(" ")}</span>
             </motion.h2>
 
             <motion.p
@@ -94,7 +94,7 @@ export default function AICopilotSection() {
               transition={{ delay: 0.2 }}
               className="text-text-muted text-lg leading-relaxed mb-9"
             >
-              CrossFlow AI comprend vos données, anticipe les perturbations et génère des recommandations actionnables. Posez vos questions en langage naturel.
+              {dictionary.desc}
             </motion.p>
 
             {/* Suggestion buttons */}
@@ -105,8 +105,8 @@ export default function AICopilotSection() {
               transition={{ delay: 0.3 }}
               className="flex flex-col gap-2"
             >
-              <p className="text-[0.65rem] text-text-muted uppercase tracking-[0.12em] font-semibold mb-1.5">Questions fréquentes</p>
-              {suggestions.map((s, i) => (
+              <p className="text-[0.65rem] text-text-muted uppercase tracking-[0.12em] font-semibold mb-1.5">{dictionary.suggestionsLabel}</p>
+              {suggestions.map((s: string, i: number) => (
                 <button
                   key={i}
                   onClick={() => sendMessage(s)}
@@ -138,7 +138,7 @@ export default function AICopilotSection() {
                 <div className="text-sm font-semibold text-white tracking-tight">CrossFlow AI</div>
                 <div suppressHydrationWarning className="text-[0.65rem] text-primary flex items-center gap-1.5 font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  Prototype Démo · Données simulées
+                  {dictionary.status}
                 </div>
               </div>
               {/* Traffic lights */}
@@ -204,7 +204,7 @@ export default function AICopilotSection() {
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Posez une question à CrossFlow AI..."
+                  placeholder={dictionary.placeholder}
                   className="flex-1 bg-transparent text-sm text-white placeholder-text-muted outline-none"
                 />
                 <button
