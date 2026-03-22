@@ -6,6 +6,8 @@ import DemoSection from "@/components/DemoSection";
 import AICopilotSection from "@/components/AICopilotSection";
 import ImpactSection from "@/components/ImpactSection";
 import UseCasesSection from "@/components/UseCasesSection";
+import AboutSection from "@/components/AboutSection";
+import ContactSection from "@/components/ContactSection";
 import Footer from "@/components/Footer";
 import LiveStatsWidget from "@/components/LiveStatsWidget";
 
@@ -24,6 +26,8 @@ export default function Home() {
       <AICopilotSection />
       <ImpactSection />
       <UseCasesSection />
+      <AboutSection />
+      <ContactSection />
       <Footer />
     </main>
   );

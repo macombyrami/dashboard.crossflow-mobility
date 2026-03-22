@@ -6,9 +6,9 @@ import { Menu, X } from "lucide-react";
 
 const navLinks = [
   { label: "Produit",    href: "#solution" },
-  { label: "Démo",      href: "#demo" },
   { label: "Impact",    href: "#impact" },
   { label: "Use Cases", href: "#usecases" },
+  { label: "À propos",  href: "#about" },
 ];
 
 export default function Navbar() {
@@ -57,13 +57,12 @@ export default function Navbar() {
           </nav>
 
           {/* Desktop CTAs */}
-          <div className="hidden sm:flex items-center gap-3">
-            <a
-              href="#demo"
-              className="text-sm text-text-muted hover:text-white transition-colors duration-200 hidden md:block"
-            >
-              Voir la démo
-            </a>
+          <div className="hidden sm:flex items-center gap-6">
+            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest border-r border-white/10 pr-6">
+              <button className="text-primary">FR</button>
+              <button className="text-text-dim hover:text-text-muted transition-colors">EN</button>
+              <button className="text-text-dim hover:text-text-muted transition-colors">PT</button>
+            </div>
             <a
               href="#contact"
               className="btn-primary !py-2 !px-4 !text-xs !gap-1.5"

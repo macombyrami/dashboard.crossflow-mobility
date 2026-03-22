@@ -155,7 +155,7 @@ export default function HeroSection() {
           Contrôlez le{" "}
           <span className="gradient-text">flux</span>
           <br />
-          urbain.
+          {" "}urbain.
         </motion.h1>
 
         {/* Subtitle */}
@@ -203,6 +203,20 @@ export default function HeroSection() {
                 {stat.label}
               </span>
             </div>
+          ))}
+        </motion.div>
+
+        {/* Social Proof / Partners */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.4 }}
+          transition={{ duration: 1, delay: 0.9 }}
+          className="mt-20 flex flex-wrap items-center justify-center gap-x-12 gap-y-8 grayscale"
+        >
+          {["Paris", "Lisbonne", "Munich", "Milan", "Barcelone"].map((city) => (
+            <span key={city} className="text-xs font-bold tracking-[0.2em] uppercase text-text-muted">
+              {city} Mobility
+            </span>
           ))}
         </motion.div>
       </div>

@@ -1,10 +1,26 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#08090B",
+};
+
 export const metadata: Metadata = {
   title: "CrossFlow Mobility | IA pour la Gestion Intelligente du Trafic Urbain",
   description:
     "Plateforme d'IA révolutionnaire pour les villes intelligentes. Optimisez la mobilité urbaine, réduisez les embouteillages et simulez l'avenir du transport en temps réel avec CrossFlow.",
+  metadataBase: new URL("https://crossflow-mobility.com"),
+  alternates: {
+    canonical: "/",
+    languages: {
+      "fr-FR": "/fr",
+      "en-US": "/en",
+      "pt-PT": "/pt",
+    },
+  },
   keywords: [
     "IA urbaine",
     "Smart City",
@@ -16,13 +32,11 @@ export const metadata: Metadata = {
     "IA temps réel",
   ],
   authors: [{ name: "CrossFlow Mobility Team" }],
-  viewport: "width=device-width, initial-scale=1, maximum-scale=5",
-  themeColor: "#08090B",
   manifest: "/manifest.json",
   openGraph: {
     title: "CrossFlow Mobility | Smart City AI",
     description: "Analysez et optimisez le trafic urbain en temps réel grâce à l'IA.",
-    url: "https://crossflow.mobility",
+    url: "https://crossflow-mobility.com",
     siteName: "CrossFlow Mobility",
     images: [
       {
@@ -48,6 +62,26 @@ export const metadata: Metadata = {
   },
 };
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "CrossFlow Mobility",
+  "operatingSystem": "Web",
+  "applicationCategory": "BusinessApplication, SmartCity",
+  "description": "Plateforme d'IA pour la gestion intelligente du trafic urbain.",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "EUR"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "CrossFlow Mobility",
+    "url": "https://crossflow-mobility.com",
+    "logo": "https://crossflow-mobility.com/crossflow-mobility.png"
+  }
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -70,7 +104,19 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-background text-white antialiased">
-        {children}
+        <a 
+          href="#main-content" 
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-6 focus:py-3 focus:bg-primary focus:text-black focus:font-bold focus:rounded-xl focus:shadow-[0_0_40px_rgba(34,197,94,0.4)] transition-all"
+        >
+          Passer au contenu principal
+        </a>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+        <div id="main-content">
+          {children}
+        </div>
       </body>
     </html>
   );

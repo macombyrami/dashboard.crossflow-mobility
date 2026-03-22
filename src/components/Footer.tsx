@@ -59,11 +59,11 @@ export default function Footer() {
             viewport={{ once: true }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <a href="mailto:contact@crossflow.io" className="btn-primary group h-14 min-w-[240px] justify-center text-base">
+            <a href="mailto:contact@crossflow-mobility.com" className="btn-primary group h-14 min-w-[240px] justify-center text-base">
               Planifier une démonstration
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition-transform" />
             </a>
-            <a href="#features" className="btn-secondary h-14 min-w-[200px] justify-center text-base">
+            <a href="#solution" className="btn-secondary h-14 min-w-[200px] justify-center text-base">
               Explorer les fonctionnalités
             </a>
           </motion.div>
@@ -96,7 +96,10 @@ export default function Footer() {
                   placeholder="votre-email@ville.fr"
                   className="w-full h-12 bg-white/[0.03] border border-white/[0.05] rounded-xl px-4 text-sm focus:outline-none focus:border-primary/40 focus:bg-white/[0.05] transition-all"
                 />
-                <button className="absolute right-1.5 top-1.5 h-9 w-9 bg-surface-2 hover:bg-primary transition-all rounded-lg flex items-center justify-center text-white group-hover:scale-105 active:scale-95">
+                <button 
+                  aria-label="S'inscrire à la newsletter"
+                  className="absolute right-1.5 top-1.5 h-9 w-9 bg-surface-2 hover:bg-primary transition-all rounded-lg flex items-center justify-center text-white group-hover:scale-105 active:scale-95"
+                >
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -105,10 +108,15 @@ export default function Footer() {
 
             {/* Socials */}
             <div className="flex items-center gap-3">
-              {[Twitter, Linkedin, Github].map((Icon, i) => (
+              {[
+                { Icon: Twitter, label: "Twitter" },
+                { Icon: Linkedin, label: "LinkedIn" },
+                { Icon: Github, label: "GitHub" }
+              ].map(({ Icon, label }, i) => (
                 <a
                   key={i}
                   href="#"
+                  aria-label={`Suivre CrossFlow sur ${label}`}
                   className="w-10 h-10 rounded-xl glass border border-white/[0.06] flex items-center justify-center text-text-secondary hover:text-primary hover:border-primary/30 transition-all hover:-translate-y-1"
                 >
                   <Icon className="w-4 h-4" />
@@ -118,25 +126,38 @@ export default function Footer() {
           </div>
 
           {/* Nav groups */}
-          {Object.entries(footerLinks).map(([section, links]) => (
-            <div key={section} className="col-span-1 lg:col-span-1">
-              <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em] mb-8">
-                {section}
-              </h4>
-              <ul className="space-y-4">
-                {links.map((link) => (
-                  <li key={link}>
-                    <a
-                      href="#"
-                      className="text-sm text-text-secondary hover:text-white hover:translate-x-1 inline-flex transition-all"
-                    >
-                      {link}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <div className="col-span-1 lg:col-span-1">
+            <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em] mb-8">Produit</h4>
+            <ul className="space-y-4">
+              {["Analyse temps réel", "Simulation", "IA Copilot", "Intégrations", "Roadmap"].map((link) => (
+                <li key={link}><a href="#solution" className="text-sm text-text-secondary hover:text-white hover:translate-x-1 inline-flex transition-all">{link}</a></li>
+              ))}
+            </ul>
+          </div>
+          <div className="col-span-1 lg:col-span-1">
+            <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em] mb-8">Ressources</h4>
+            <ul className="space-y-4">
+              {["Documentation", "API Reference", "Guides", "Changelog", "Status"].map((link) => (
+                <li key={link}><a href="#" className="text-sm text-text-secondary hover:text-white hover:translate-x-1 inline-flex transition-all">{link}</a></li>
+              ))}
+            </ul>
+          </div>
+          <div className="col-span-1 lg:col-span-1">
+            <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em] mb-8">Entreprise</h4>
+            <ul className="space-y-4">
+              {["À propos", "Blog", "Presse", "Partenaires", "Carrières"].map((link) => (
+                <li key={link}><a href={link === "À propos" ? "#solution" : "#"} className="text-sm text-text-secondary hover:text-white hover:translate-x-1 inline-flex transition-all">{link}</a></li>
+              ))}
+            </ul>
+          </div>
+          <div className="col-span-1 lg:col-span-1">
+            <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em] mb-8">Légal</h4>
+            <ul className="space-y-4">
+              {["Confidentialité", "CGU", "Sécurité", "RGPD"].map((link) => (
+                <li key={link}><a href={`/${link.toLowerCase().replace("é", "e")}`} className="text-sm text-text-secondary hover:text-white hover:translate-x-1 inline-flex transition-all">{link}</a></li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         {/* Divider */}
