@@ -60,7 +60,7 @@ export default function LiveStatsWidget() {
       {/* Total Display */}
       <div className="mb-2">
         <div className="text-[0.6rem] text-text-muted uppercase tracking-wider mb-0.5">Total en circulation</div>
-        <div className="text-2xl font-black font-mono-nums tracking-tighter flex items-baseline gap-1.5">
+        <div className="text-2xl font-black font-mono-nums tracking-tighter flex items-baseline gap-1.5" suppressHydrationWarning>
           {total.toLocaleString()}
           <Activity className="w-3.5 h-3.5 text-primary opacity-50" />
         </div>

@@ -78,7 +78,7 @@ const jsonLd = {
     "@type": "Organization",
     "name": "CrossFlow Mobility",
     "url": "https://crossflow-mobility.com",
-    "logo": "https://crossflow-mobility.com/crossflow-mobility.png"
+    "logo": "https://crossflow-mobility.com/logo.png"
   }
 };
 
@@ -88,7 +88,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />

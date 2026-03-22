@@ -49,7 +49,7 @@ export default function AboutSection() {
             <div className="aspect-square rounded-3xl overflow-hidden glass border border-white/[0.08] p-2">
               <div className="w-full h-full rounded-2xl bg-gradient-to-br from-primary/20 to-accent-cyan/20 flex items-center justify-center relative group">
                 <img 
-                  src="/crossflow-mobility.png" 
+                  src="/logo.png" 
                   alt="CrossFlow Platform Preview" 
                   className="w-3/4 h-3/4 object-contain group-hover:scale-110 transition-transform duration-500 opacity-60"
                 />

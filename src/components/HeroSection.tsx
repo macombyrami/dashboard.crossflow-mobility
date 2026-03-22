@@ -153,9 +153,9 @@ export default function HeroSection() {
           className="h1-responsive font-black tracking-[-0.04em] mb-6"
         >
           Contrôlez le{" "}
-          <span className="gradient-text">flux</span>
+          <span className="gradient-text">flux</span>{" "}
           <br />
-          {" "}urbain.
+          urbain.
         </motion.h1>
 
         {/* Subtitle */}
