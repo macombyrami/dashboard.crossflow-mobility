@@ -11,6 +11,7 @@ import { format } from 'date-fns'
 import { fr, enUS } from 'date-fns/locale'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils/cn'
+import { IntegrationStatus } from '@/components/dashboard/IntegrationStatus'
 
 export function Header() {
   const { t, locale } = useTranslation()
@@ -22,9 +23,12 @@ export function Header() {
   const incidents      = useTrafficStore(s => s.incidents)
   const weather        = useTrafficStore(s => s.weather)
   const dataSource     = useTrafficStore(s => s.dataSource)
+  const [mounted, setMounted] = useState(false)
   const [now, setNow]  = useState(new Date())
+  const [showInteg, setShowInteg] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     const t = setInterval(() => setNow(new Date()), 30_000)
     return () => clearInterval(t)
   }, [])
@@ -52,21 +56,39 @@ export function Header() {
         <div className="hidden sm:flex items-center gap-2 text-text-secondary">
           <Clock className="w-4 h-4 opacity-50" />
           <span className="text-[13px] font-medium tracking-tight">
-            {format(now, "EEE d MMM · HH:mm", { locale: locale === 'fr' ? fr : enUS })}
+            {mounted ? format(now, "EEE d MMM · HH:mm", { locale: locale === 'fr' ? fr : enUS }) : '--:--'}
           </span>
         </div>
 
         {/* Data source badge */}
-        <div className={cn(
-          'flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-[9px] font-bold tracking-[0.2em] transition-all',
-          isLive
-            ? 'glass-light border-brand-green/30 text-brand-green shadow-glow'
-            : 'glass-light border-white/10 text-text-muted opacity-60',
-        )}>
-          {isLive
-            ? <><div className="w-1.5 h-1.5 rounded-full bg-brand-green shadow-glow animate-pulse" /> {t('common.live').toUpperCase()} </>
-            : <><WifiOff className="w-3 h-3" /> {t('common.demo').toUpperCase()}</>
-          }
+        <div className="relative">
+          <button 
+            onClick={() => setShowInteg(!showInteg)}
+            className={cn(
+              'flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-[9px] font-bold tracking-[0.2em] transition-all hover:scale-105 active:scale-95',
+              isLive
+                ? 'glass-light border-brand-green/30 text-brand-green shadow-glow'
+                : 'glass-light border-white/10 text-text-muted opacity-60',
+            )}
+          >
+            {isLive
+              ? <><div className="w-1.5 h-1.5 rounded-full bg-brand-green shadow-glow animate-pulse" /> {t('common.live').toUpperCase()} </>
+              : <><WifiOff className="w-3 h-3" /> {t('common.demo').toUpperCase()}</>
+            }
+          </button>
+
+          {/* Popover */}
+          {showInteg && (
+            <>
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setShowInteg(false)} 
+              />
+              <div className="absolute top-full mt-3 left-1/2 -translate-x-1/2 w-72 p-5 glass-dark border border-white/10 rounded-2xl shadow-apple-lg z-50 animate-in fade-in zoom-in-95 duration-200">
+                <IntegrationStatus />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Weather (Minimal) */}

@@ -33,6 +33,11 @@ export default function TransportPage() {
   const [error,      setError]      = useState<string | null>(null)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [filter,     setFilter]     = useState<LineType | 'all'>('all')
+  const [mounted,    setMounted]    = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const isParis = city.countryCode === 'FR' &&
     (city.name.toLowerCase().includes('paris') ||
@@ -81,23 +86,32 @@ export default function TransportPage() {
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <Header />
-          <main className="flex-1 overflow-y-auto p-6">
-            <div className="max-w-lg mx-auto mt-12 text-center space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-bg-elevated border border-bg-border flex items-center justify-center mx-auto">
-                <Train className="w-7 h-7 text-text-muted" />
+          <main className="flex-1 overflow-y-auto p-6 flex items-center justify-center">
+            <div className="max-w-md w-full glass-dark border border-white/10 rounded-3xl p-10 text-center space-y-6 shadow-apple-lg">
+              <div className="w-20 h-20 rounded-full bg-brand-green/10 border border-brand-green/20 flex items-center justify-center mx-auto shadow-glow">
+                <Train className="w-10 h-10 text-brand-green" />
               </div>
-              <h2 className="text-lg font-semibold text-text-primary">Données RATP disponibles pour Paris</h2>
-              <p className="text-sm text-text-secondary">
-                L'API RATP couvre le réseau Île-de-France (Paris, Gennevilliers, banlieue...).
-                Sélectionne une ville de la région parisienne dans la barre de recherche.
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold text-white tracking-tight">Expansion en cours</h2>
+                <p className="text-[13px] font-medium text-text-secondary leading-relaxed">
+                  L'intégration des données de transport pour <span className="text-white">{city.name}</span> est actuellement en phase de déploiement Enterprise.
+                </p>
+              </div>
+              
+              <div className="bg-white/5 border border-white/5 rounded-2xl p-4 text-left space-y-3">
+                <p className="text-[10px] font-black text-brand-green uppercase tracking-[0.2em]">Région Disponible</p>
+                <div className="flex items-center gap-3">
+                   <div className="w-8 h-8 rounded-lg bg-bg-elevated flex items-center justify-center text-xs font-bold text-white">IDFM</div>
+                   <div className="flex flex-col">
+                      <span className="text-xs font-bold text-white">Île-de-France Mobilités</span>
+                      <span className="text-[10px] text-text-muted">Réseau complet RATP & SNCF</span>
+                   </div>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-text-muted font-medium italic">
+                Support pour {city.name} ({city.countryCode}) prévu au Q3 2026.
               </p>
-              <div className="bg-bg-surface border border-bg-border rounded-xl p-4 text-left space-y-2">
-                <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">Villes couvertes</p>
-                {['Paris', 'Gennevilliers', 'Saint-Denis', 'Nanterre', 'Créteil', 'Vincennes'].map(v => (
-                  <p key={v} className="text-sm text-text-secondary">· {v}</p>
-                ))}
-              </div>
-              <p className="text-xs text-text-muted">Ville actuelle: <strong className="text-text-secondary">{city.name}</strong> ({city.countryCode})</p>
             </div>
           </main>
         </div>
@@ -123,7 +137,7 @@ export default function TransportPage() {
                 Île-de-France Mobilités
                 {lastUpdate && (
                   <span className="text-text-muted">
-                    · {formatDistanceToNow(lastUpdate, { locale: fr, addSuffix: true })}
+                    · {mounted ? formatDistanceToNow(lastUpdate, { locale: fr, addSuffix: true }) : '...'}
                   </span>
                 )}
               </p>
@@ -167,9 +181,9 @@ export default function TransportPage() {
 
           {/* Loading */}
           {loading && lines.length === 0 && (
-            <div className="bg-bg-surface border border-bg-border rounded-2xl p-12 text-center">
-              <div className="w-8 h-8 border-2 border-brand-green border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-sm text-text-secondary">Chargement des données RATP...</p>
+            <div className="glass-light border border-white/5 rounded-3xl p-16 text-center animate-pulse">
+              <div className="w-10 h-10 border-[3px] border-brand-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-[13px] font-bold text-text-secondary tracking-tight uppercase">Initialisation du flux RATP...</p>
             </div>
           )}
 

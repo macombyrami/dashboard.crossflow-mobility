@@ -28,6 +28,11 @@ export default function IncidentsPage() {
   const setKPIs    = useTrafficStore(s => s.setKPIs)
   const [filter, setFilter] = useState<IncidentSeverity | 'all'>('all')
   const [lastRefresh, setLastRefresh] = useState(new Date())
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const refresh = () => {
     setIncidents(generateIncidents(city))
@@ -75,7 +80,7 @@ export default function IncidentsPage() {
                 Incidents — {city.flag} {city.name}
               </h1>
               <p className="text-sm text-text-secondary mt-1">
-                Actualisé {formatDistanceToNow(lastRefresh, { locale: fr, addSuffix: true })}
+                Actualisé {mounted ? formatDistanceToNow(lastRefresh, { locale: fr, addSuffix: true }) : '...'}
               </p>
             </div>
             <button
@@ -145,7 +150,7 @@ export default function IncidentsPage() {
                     </span>
                     <span className="flex items-center gap-1.5 text-xs text-text-muted">
                       <Clock className="w-3 h-3" />
-                      {formatDistanceToNow(new Date(inc.startedAt), { locale: fr, addSuffix: true })}
+                      {mounted ? formatDistanceToNow(new Date(inc.startedAt), { locale: fr, addSuffix: true }) : '...'}
                     </span>
                     <span className="text-xs text-text-muted ml-auto">Source: {inc.source}</span>
                   </div>

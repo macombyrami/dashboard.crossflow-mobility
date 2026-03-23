@@ -13,7 +13,7 @@ function getKey(): string {
   return process.env.NEXT_PUBLIC_HERE_API_KEY ?? ''
 }
 
-export function hasHereKey(): boolean {
+export function hasKey(): boolean {
   return Boolean(getKey())
 }
 

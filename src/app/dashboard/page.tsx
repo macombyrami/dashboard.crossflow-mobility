@@ -1,5 +1,5 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Activity, Clock, Wind, AlertTriangle, Zap, Network } from 'lucide-react'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
@@ -29,6 +29,11 @@ export default function DashboardPage() {
   const setOpenMeteoWeather = useTrafficStore(s => s.setOpenMeteoWeather)
   const airQuality          = useTrafficStore(s => s.airQuality)
   const setAirQuality       = useTrafficStore(s => s.setAirQuality)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Synthetic KPIs + incidents
   useEffect(() => {
@@ -69,8 +74,8 @@ export default function DashboardPage() {
   const pollWarn   = kpis.pollutionIndex >= targets.pollution_index.warning
   const pollColor  = pollutionLabel(kpis.pollutionIndex).color
 
-  // Stable deltas (seeded by city + minute)
-  const seed = city.id.charCodeAt(0) + new Date().getMinutes()
+  // Stable deltas (seeded by city + minute, but only after mount to avoid #418)
+  const seed = mounted ? (city.id.charCodeAt(0) + new Date().getMinutes()) : city.id.charCodeAt(0)
   const congDelta   = ((seed % 21) - 10) / 10
   const travelDelta = ((seed % 11) - 5)  / 10
   const pollDelta   = ((seed % 31) - 15) / 10

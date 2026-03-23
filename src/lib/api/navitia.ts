@@ -13,7 +13,7 @@ function getKey(): string {
   return process.env.NEXT_PUBLIC_NAVITIA_API_KEY ?? ''
 }
 
-export function hasNavitiaKey(): boolean {
+export function hasKey(): boolean {
   return Boolean(getKey())
 }
 

@@ -62,17 +62,6 @@ export default function MapPage() {
               </div>
             )}
 
-            {/* Demo mode notice */}
-            {!isLive && (
-              <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 pointer-events-none w-[90%] sm:w-auto">
-                <div className="bg-[rgba(255,214,0,0.1)] border border-[rgba(255,214,0,0.3)] rounded-full px-3 py-1.5 flex items-center gap-2 backdrop-blur-sm">
-                  <WifiOff className="w-3 h-3 text-[#FFD600]" />
-                  <span className="text-[10px] text-[#FFD600] font-semibold whitespace-nowrap overflow-hidden text-overflow-ellipsis">
-                    {t('common.demo')} · API Key required for real-time data
-                  </span>
-                </div>
-              </div>
-            )}
 
             {/* Status indicators */}
             {mode === 'live' && (
