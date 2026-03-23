@@ -1,108 +1,146 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --bg-base:     #07070D;
-  --bg-surface:  #0F0F1A;
-  --bg-elevated: #161625;
-  --bg-border:   #1E1E30;
-  --bg-subtle:   #252538;
-  --text-primary:   #F0F0FF;
-  --text-secondary: #8080A0;
-  --text-muted:     #454560;
-  --brand-green:    #00E676;
+  /* Apple-inspired Graphite Palette */
+  --bg-base:     #08090B;
+  --bg-surface:  #0F1014;
+  --bg-elevated: #18191E;
+  --bg-border:   #22252C;
+  --bg-subtle:   #2A2D36;
+  
+  --text-primary:   #F5F5F7;
+  --text-secondary: #86868B;
+  --text-muted:     #424245;
+  
+  --brand-green:    #22C55E;
+  --brand-green-glow: rgba(34, 197, 94, 0.15);
+  
+  /* Traffic Colors (Apple Maps style) */
+  --traffic-free:      #22C55E;
+  --traffic-slow:      #FFD600;
+  --traffic-congested: #FF9F0A;
+  --traffic-critical:  #FF3B30;
+  
+  --radius-xl: 20px;
+  --radius-lg: 16px;
 }
 
 *, *::before, *::after {
   box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html, body {
   background-color: var(--bg-base);
   color:            var(--text-primary);
-  font-family:      'Inter', system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family:      'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
   padding: 0;
+  overflow: hidden;
+  height: 100vh;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar         { width: 4px; height: 4px; }
-::-webkit-scrollbar-track   { background: var(--bg-surface); }
-::-webkit-scrollbar-thumb   { background: var(--bg-border); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+/* --- Glassmorphism --- */
+.glass {
+  background: rgba(22, 22, 28, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
 
-/* Mapbox overrides */
-.mapboxgl-ctrl-bottom-right {
-  bottom: 20px !important;
-  right: 20px !important;
+.glass-light {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
-.mapboxgl-ctrl-bottom-left {
-  bottom: 20px !important;
-  left: 20px !important;
+
+/* --- Mapbox Overrides --- */
+.mapboxgl-ctrl-bottom-right, .mapboxgl-ctrl-bottom-left {
+  bottom: 24px !important;
+  padding: 0 12px !important;
 }
+
 .mapboxgl-ctrl button {
-  background-color: #0F0F1A !important;
-  border: 1px solid #1E1E30 !important;
+  background-color: rgba(15, 16, 20, 0.8) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  margin-bottom: 4px !important;
 }
-.mapboxgl-ctrl button:hover {
-  background-color: #161625 !important;
-}
-.mapboxgl-ctrl button span {
-  filter: invert(1);
-}
+
 .mapboxgl-ctrl-scale {
-  background-color: rgba(15,15,26,0.8) !important;
-  border-color: #1E1E30 !important;
-  color: #8080A0 !important;
+  background-color: rgba(0, 0, 0, 0.3) !important;
+  border: none !important;
+  color: var(--text-secondary) !important;
   font-size: 10px !important;
-  font-family: 'JetBrains Mono', monospace !important;
+  backdrop-filter: blur(4px);
 }
 
-/* Range input styling */
-input[type=range] {
-  -webkit-appearance: none;
-  height: 4px;
-  border-radius: 9999px;
-  background: #252538;
-}
-input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #00E676;
-  cursor: pointer;
-  border: 2px solid #07070D;
-  box-shadow: 0 0 8px rgba(0,230,118,0.4);
+/* --- Custom Scrollbar --- */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
 }
 
-/* Select styling */
-select {
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238080A0' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  background-size: 1rem;
-  padding-right: 2rem !important;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-/* Animation utilities */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
+::-webkit-scrollbar-thumb {
+  background: var(--bg-border);
+  border-radius: 10px;
 }
-@keyframes slideIn {
-  from { opacity: 0; transform: translateX(16px); }
-  to   { opacity: 1; transform: translateX(0); }
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
+
+/* --- Animations --- */
+@keyframes glow-pulse {
+  0%, 100% { filter: drop-shadow(0 0 2px var(--brand-green)); opacity: 0.8; }
+  50% { filter: drop-shadow(0 0 8px var(--brand-green)); opacity: 1; }
 }
-.animate-fade-in  { animation: fadeIn  0.2s ease; }
-.animate-slide-in { animation: slideIn 0.25s ease; }
+
+.animate-glow {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes flow-line {
+  from { stroke-dashoffset: 20; }
+  to { stroke-dashoffset: 0; }
+}
+
+.traffic-flow {
+  stroke-dasharray: 10 10;
+  animation: flow-line 1s linear infinite;
+}
+
+/* --- Apple-like Typography --- */
+.text-apple-title {
+  font-weight: 700;
+  letter-spacing: -0.022em;
+}
+
+.text-apple-body {
+  font-weight: 400;
+  letter-spacing: -0.011em;
+  color: var(--text-secondary);
+}
+
+.card-premium {
+  @apply glass rounded-panel;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-premium:hover {
+  background: rgba(22, 22, 28, 0.8);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px);
+}

@@ -142,34 +142,39 @@ export function CrossFlowMap() {
     if (!flow) return
     popupRef.current?.remove()
     const ratio   = flow.currentSpeed / flow.freeFlowSpeed
-    const color   = ratio > 0.75 ? '#00E676' : ratio > 0.5 ? '#FFD600' : ratio > 0.25 ? '#FF6D00' : '#FF1744'
+    const color   = ratio > 0.75 ? '#22C55E' : ratio > 0.5 ? '#FFD600' : ratio > 0.25 ? '#FF9F0A' : '#FF3B30'
     const delay   = Math.max(0, flow.currentTravelTime - flow.freeFlowTravelTime)
 
-    popupRef.current = new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '240px' })
+    popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '280px', className: 'apple-popup' })
       .setLngLat(lngLat)
       .setHTML(`
-        <div style="font-family:Inter,sans-serif;font-size:12px;color:#F0F0FF;background:#0F0F1A;padding:12px;border-radius:12px;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
-            <span style="font-weight:600;font-size:11px;color:${color}">
-              ${flow.currentSpeed} km/h
-            </span>
-            <span style="color:#454560;font-size:10px;">/ ${flow.freeFlowSpeed} km/h</span>
+        <div class="glass" style="padding: 16px; border-radius: 20px; font-family: Inter, -apple-system, sans-serif; color: #F5F5F7; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
+          <div style="display: flex; align-items: center; justify-between; margin-bottom: 12px; gap: 12px;">
+             <div style="flex: 1;">
+                <p style="font-size: 10px; font-weight: 700; color: #86868B; text-transform: uppercase; tracking: 0.1em; margin: 0 0 4px 0;">Vitesse Actuelle</p>
+                <p style="font-size: 24px; font-weight: 700; color: white; margin: 0;">${flow.currentSpeed} <span style="font-size: 14px; font-weight: 500; color: #86868B;">km/h</span></p>
+             </div>
+             <div style="width: 44px; h-44px; border-radius: 12px; background: ${color}15; border: 1px solid ${color}30; display: flex; items-center; justify-center; height: 44px;">
+                <div style="width: 10px; height: 10px; border-radius: 50%; background: ${color}; box-shadow: 0 0 12px ${color};"></div>
+             </div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-            <div style="background:#161625;border-radius:8px;padding:8px;">
-              <p style="color:#454560;font-size:9px;text-transform:uppercase;letter-spacing:0.05em;">Trajet</p>
-              <p style="font-weight:700;margin-top:2px;">${Math.round(flow.currentTravelTime / 60)} min</p>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+            <div style="background: rgba(255,255,255,0.03); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.05);">
+              <p style="color: #86868B; font-size: 9px; font-weight: 600; text-transform: uppercase; margin: 0 0 4px 0;">Trajet</p>
+              <p style="font-size: 15px; font-weight: 700; color: white; margin: 0;">${Math.round(flow.currentTravelTime / 60)} <span style="font-size: 11px; font-color: #86868B;">min</span></p>
             </div>
-            <div style="background:#161625;border-radius:8px;padding:8px;">
-              <p style="color:#454560;font-size:9px;text-transform:uppercase;letter-spacing:0.05em;">Retard</p>
-              <p style="font-weight:700;margin-top:2px;color:${delay > 0 ? '#FF6D00' : '#00E676'}">
-                ${delay > 0 ? '+' : ''}${Math.round(delay / 60)} min
+            <div style="background: rgba(255,255,255,0.03); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.05);">
+              <p style="color: #86868B; font-size: 9px; font-weight: 600; text-transform: uppercase; margin: 0 0 4px 0;">Retard</p>
+              <p style="font-size: 15px; font-weight: 700; color: ${delay > 0 ? '#FF9F0A' : '#22C55E'}; margin: 0;">
+                ${delay > 0 ? '+' : ''}${Math.round(delay / 60)} <span style="font-size: 11px;">min</span>
               </p>
             </div>
           </div>
-          <div style="margin-top:8px;color:#454560;font-size:9px;">
-            Confiance: ${Math.round(flow.confidence * 100)}% · Source: TomTom Live
+
+          <div style="display: flex; justify-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); pt-12px; padding-top: 10px;">
+            <span style="font-size: 10px; font-weight: 500; color: #424245;">Fiabilité: ${Math.round(flow.confidence * 100)}%</span>
+            <span style="font-size: 10px; font-weight: 600; color: #22C55E; margin-left: auto;">TomTom Live</span>
           </div>
         </div>
       `)
@@ -307,8 +312,10 @@ export function CrossFlowMap() {
     }
 
     trySet(TRAFFIC_SOURCE  + '-lines',    activeLayers.has('traffic')   ? 'visible' : 'none')
+    trySet(TRAFFIC_SOURCE  + '-glow',     activeLayers.has('traffic')   ? 'visible' : 'none')
     trySet(HEATMAP_SOURCE  + '-layer',    activeLayers.has('heatmap')   ? 'visible' : 'none')
     trySet(INCIDENT_SOURCE + '-circles',  activeLayers.has('incidents') ? 'visible' : 'none')
+    trySet(INCIDENT_SOURCE + '-glow',     activeLayers.has('incidents') ? 'visible' : 'none')
     trySet(INCIDENT_SOURCE + '-labels',   activeLayers.has('incidents') ? 'visible' : 'none')
 
     // TomTom live tiles
@@ -330,6 +337,26 @@ function initStaticSources(map: maplibregl.Map) {
 
   // Synthetic traffic lines
   map.addSource(TRAFFIC_SOURCE, { type: 'geojson', data: emptyFC })
+
+  // 1. Glow Layer (Outer)
+  map.addLayer({
+    id:     TRAFFIC_SOURCE + '-glow',
+    type:   'line',
+    source: TRAFFIC_SOURCE,
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint:  {
+      'line-color':   ['get', 'color'],
+      'line-width':   ['*', ['get', 'width'], 3], // Glow is wider
+      'line-opacity': [
+        'interpolate', ['linear'], ['zoom'],
+        10, 0.05,
+        14, 0.15
+      ],
+      'line-blur':    10,
+    },
+  })
+
+  // 2. Main Flow Line (Inner)
   map.addLayer({
     id:     TRAFFIC_SOURCE + '-lines',
     type:   'line',
@@ -338,7 +365,7 @@ function initStaticSources(map: maplibregl.Map) {
     paint:  {
       'line-color':   ['get', 'color'],
       'line-width':   ['get', 'width'],
-      'line-opacity': ['case', ['boolean', hasKey(), false], 0.3, 0.9], // dimmed if live data active
+      'line-opacity': ['case', ['boolean', hasKey(), false], 0.2, 0.9],
     },
   })
 
@@ -354,47 +381,64 @@ function initStaticSources(map: maplibregl.Map) {
       'heatmap-weight':   ['interpolate', ['linear'], ['get', 'intensity'], 0, 0, 1, 1],
       'heatmap-intensity':['interpolate', ['linear'], ['zoom'], 0, 1, 9, 3],
       'heatmap-radius':   ['interpolate', ['linear'], ['zoom'], 0, 2, 9, 22],
-      'heatmap-opacity':  0.80,
+      'heatmap-opacity':  0.60,
       'heatmap-color': [
         'interpolate', ['linear'], ['heatmap-density'],
-        0,    'rgba(0,230,118,0)',
-        0.25, 'rgba(0,230,118,0.55)',
-        0.5,  'rgba(255,214,0,0.75)',
-        0.75, 'rgba(255,109,0,0.90)',
-        1,    'rgba(255,23,68,1)',
+        0,    'rgba(34, 197, 94, 0)',
+        0.25, 'rgba(34, 197, 94, 0.3)',
+        0.5,  'rgba(255, 214, 0, 0.5)',
+        0.75, 'rgba(255, 159, 10, 0.7)',
+        1,    'rgba(255, 59, 48, 0.9)',
       ],
     },
   })
 
-  // Incidents
+  // Incidents (Luminous dots)
   map.addSource(INCIDENT_SOURCE, { type: 'geojson', data: emptyFC })
+  
+  // Outer glow for incidents
+  map.addLayer({
+    id:     INCIDENT_SOURCE + '-glow',
+    type:   'circle',
+    source: INCIDENT_SOURCE,
+    paint:  {
+      'circle-radius':       ['interpolate', ['linear'], ['zoom'], 8, 8, 14, 16],
+      'circle-color':        ['get', 'color'],
+      'circle-opacity':      0.2,
+      'circle-blur':         1,
+    },
+  })
+
   map.addLayer({
     id:     INCIDENT_SOURCE + '-circles',
     type:   'circle',
     source: INCIDENT_SOURCE,
     paint:  {
-      'circle-radius':       ['interpolate', ['linear'], ['zoom'], 8, 5, 14, 10],
+      'circle-radius':       ['interpolate', ['linear'], ['zoom'], 8, 4, 14, 7],
       'circle-color':        ['get', 'color'],
-      'circle-opacity':      0.92,
+      'circle-opacity':      1,
       'circle-stroke-width': 2,
-      'circle-stroke-color': '#07070D',
+      'circle-stroke-color': '#08090B',
     },
   })
+  
   map.addLayer({
     id:     INCIDENT_SOURCE + '-labels',
     type:   'symbol',
     source: INCIDENT_SOURCE,
-    minzoom: 12,
+    minzoom: 13,
     layout: {
       'text-field':  ['get', 'title'],
-      'text-size':   10,
-      'text-offset': [0, 1.8],
+      'text-font':   ['Inter SemiBold'],
+      'text-size':   11,
+      'text-offset': [0, 2],
       'text-anchor': 'top',
+      'text-letter-spacing': 0.02,
     },
     paint: {
-      'text-color':      '#F0F0FF',
-      'text-halo-color': '#07070D',
-      'text-halo-width': 1.5,
+      'text-color':      '#F5F5F7',
+      'text-halo-color': 'rgba(8, 9, 11, 0.8)',
+      'text-halo-width': 2,
     },
   })
 }

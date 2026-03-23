@@ -35,35 +35,35 @@ export function Sidebar() {
       )}
 
       <aside className={cn(
-        "fixed inset-y-0 left-0 w-[240px] flex-shrink-0 flex flex-col bg-bg-surface border-r border-bg-border h-screen z-50 transition-transform duration-300 lg:sticky lg:top-0 lg:translate-x-0",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        "fixed inset-y-4 left-4 w-[240px] flex-shrink-0 flex flex-col glass rounded-panel z-50 transition-all duration-500 ease-in-out lg:sticky lg:top-4 lg:translate-x-0 lg:h-[calc(100vh-32px)] shadow-apple",
+        isSidebarOpen ? "translate-x-0" : "-translate-x-[calc(100%+16px)]"
       )}>
         {/* Logo & Close Button */}
-        <div className="px-5 py-5 border-b border-bg-border flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-brand-green flex items-center justify-center flex-shrink-0">
-              <Zap className="w-4 h-4 text-bg-base" />
+        <div className="px-6 py-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-apple bg-brand-green flex items-center justify-center flex-shrink-0 shadow-glow">
+              <Zap className="w-5 h-5 text-bg-base" />
             </div>
             <div>
-              <p className="text-xs font-bold text-text-primary tracking-wider">CROSSFLOW</p>
-              <p className="text-[10px] text-text-muted tracking-widest">MOBILITY</p>
+              <p className="text-[11px] font-bold text-white tracking-[0.2em] leading-none">CROSSFLOW</p>
+              <p className="text-[9px] text-text-secondary tracking-[0.2em] mt-1.5 uppercase">MOBILITY</p>
             </div>
           </div>
           <button 
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-1 rounded-md hover:bg-bg-elevated text-text-muted hover:text-text-primary"
+            className="lg:hidden p-2 rounded-apple hover:bg-white/5 text-text-secondary hover:text-white transition-all"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Live indicator */}
-        <div className="px-5 py-3 border-b border-bg-border">
+        {/* Live indicator (Subtle) */}
+        <div className="px-6 py-3 opacity-80">
           <LiveIndicator />
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto custom-scrollbar">
           {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
             const active = pathname === href || pathname.startsWith(href + '/')
             return (
@@ -72,36 +72,40 @@ export function Sidebar() {
                 href={href}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group',
+                  'flex items-center gap-3.5 px-4 py-3 rounded-apple text-[13px] font-medium transition-all duration-200 group relative',
                   active
-                    ? 'bg-brand-green-dim text-brand-green'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated',
+                    ? 'text-brand-green bg-brand-green/10'
+                    : 'text-text-secondary hover:text-white hover:bg-white/5',
                 )}
               >
-                <Icon className={cn('w-4 h-4 flex-shrink-0', active ? 'text-brand-green' : 'text-text-muted group-hover:text-text-secondary')} />
-                {label}
-                {active && <ChevronRight className="w-3 h-3 ml-auto text-brand-green opacity-60" />}
+                {active && <div className="absolute left-1.5 w-1 h-4 bg-brand-green rounded-full shadow-glow" />}
+                <Icon className={cn('w-[18px] h-[18px] flex-shrink-0 transition-colors', active ? 'text-brand-green' : 'text-text-muted group-hover:text-text-secondary')} />
+                <span className={cn(active ? 'font-semibold' : 'font-medium')}>{label}</span>
+                {active && <ChevronRight className="w-3.5 h-3.5 ml-auto text-brand-green/40" />}
               </Link>
             )
           })}
         </nav>
 
         {/* Bottom */}
-        <div className="px-3 pb-4 space-y-1 border-t border-bg-border pt-4">
+        <div className="px-4 pb-6 pt-4 space-y-2 border-t border-white/5 mt-auto">
           <Link
             href="/settings"
             onClick={() => setSidebarOpen(false)}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-all"
+            className="flex items-center gap-3.5 px-4 py-3 rounded-apple text-[13px] font-medium text-text-secondary hover:text-white hover:bg-white/5 transition-all"
           >
-            <Settings className="w-4 h-4 text-text-muted" />
+            <Settings className="w-[18px] h-[18px] text-text-muted" />
             {t('common.settings')}
           </Link>
-          <div className="px-3 pt-2">
-            <div className="bg-bg-elevated rounded-lg p-3 border border-bg-border">
-              <p className="text-[10px] text-text-muted uppercase tracking-widest mb-1">Plan</p>
-              <p className="text-xs font-semibold text-brand-green">Enterprise</p>
-              <div className="mt-2 h-1 rounded-full bg-bg-subtle overflow-hidden">
-                <div className="h-full w-3/4 rounded-full bg-brand-green opacity-60" />
+          <div className="px-2 pt-2">
+            <div className="glass-light rounded-apple p-4 border border-white/5 shadow-inner">
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-[10px] text-text-muted uppercase tracking-[0.15em] font-bold">Status</p>
+                <div className="w-1.5 h-1.5 rounded-full bg-brand-green shadow-glow animate-pulse" />
+              </div>
+              <p className="text-xs font-bold text-brand-green mb-3">Enterprise v2.4</p>
+              <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+                <div className="h-full w-4/5 rounded-full bg-brand-green opacity-40" />
               </div>
             </div>
           </div>

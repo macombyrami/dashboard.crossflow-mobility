@@ -33,12 +33,12 @@ export function Header() {
   const isLive        = hasKey() && dataSource === 'live'
 
   return (
-    <header className="h-14 flex items-center justify-between px-4 sm:px-5 bg-bg-surface border-b border-bg-border flex-shrink-0 z-30 gap-3 sm:gap-4">
+    <header className="h-16 flex items-center justify-between px-6 sm:px-8 glass-light border-b border-white/5 flex-shrink-0 z-30 gap-4">
       {/* Left: Mobile Menu + City search */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
         <button
           onClick={toggleSidebar}
-          className="lg:hidden p-2 rounded-lg hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors"
+          className="lg:hidden p-2.5 rounded-apple hover:bg-white/5 text-text-secondary hover:text-white transition-all"
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -48,42 +48,40 @@ export function Header() {
       </div>
 
       {/* Center: time + data status */}
-      <div className="flex items-center gap-3 sm:gap-4 flex-1 justify-center">
-        <div className="hidden sm:flex items-center gap-1.5 text-text-muted">
-          <Clock className="w-3 h-3" />
-          <span className="text-xs font-mono">
+      <div className="flex items-center gap-5 flex-1 justify-center">
+        <div className="hidden sm:flex items-center gap-2 text-text-secondary">
+          <Clock className="w-4 h-4 opacity-50" />
+          <span className="text-[13px] font-medium tracking-tight">
             {format(now, "EEE d MMM · HH:mm", { locale: locale === 'fr' ? fr : enUS })}
           </span>
         </div>
 
         {/* Data source badge */}
         <div className={cn(
-          'flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold tracking-widest',
+          'flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-[9px] font-bold tracking-[0.2em] transition-all',
           isLive
-            ? 'bg-[rgba(0,230,118,0.08)] border-brand-green/30 text-brand-green'
-            : 'bg-bg-elevated border-bg-border text-text-muted',
+            ? 'glass-light border-brand-green/30 text-brand-green shadow-glow'
+            : 'glass-light border-white/10 text-text-muted opacity-60',
         )}>
           {isLive
-            ? <><Wifi className="w-2.5 h-2.5" /> {t('common.live')}</>
-            : <><WifiOff className="w-2.5 h-2.5" /> {t('common.demo')}</>
+            ? <><div className="w-1.5 h-1.5 rounded-full bg-brand-green shadow-glow animate-pulse" /> {t('common.live').toUpperCase()} </>
+            : <><WifiOff className="w-3 h-3" /> {t('common.demo').toUpperCase()}</>
           }
         </div>
 
-        {/* Weather */}
+        {/* Weather (Minimal) */}
         {weather && (
-          <div className="hidden md:flex items-center gap-1.5 text-xs text-text-secondary">
-            <span className="text-base leading-none">{weather.icon}</span>
-            <span>{weather.temp}°C</span>
+          <div className="hidden md:flex items-center gap-2.5 text-[13px] font-medium text-text-secondary glass-light px-3.5 py-1.5 rounded-full border border-white/5">
+            <span className="text-lg leading-none">{weather.icon}</span>
+            <span>{weather.temp}°</span>
             {weather.trafficImpact !== 'none' && (
               <span className={cn(
-                'text-[10px] px-1.5 py-0.5 rounded-full',
-                weather.trafficImpact === 'severe'   ? 'bg-[rgba(255,23,68,0.12)] text-[#FF1744]' :
-                weather.trafficImpact === 'moderate' ? 'bg-[rgba(255,109,0,0.12)] text-[#FF6D00]' :
-                                                        'bg-[rgba(255,214,0,0.12)] text-[#FFD600]',
-              )}
-                title={`${t('common.weather')} : ${weather.trafficImpact}`}
-              >
-                ⚠ {t('common.weather').toLowerCase()}
+                'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider',
+                weather.trafficImpact === 'severe'   ? 'bg-[#FF3B30]/10 text-[#FF3B30]' :
+                weather.trafficImpact === 'moderate' ? 'bg-[#FF9F0A]/10 text-[#FF9F0A]' :
+                                                        'bg-[#FFD600]/10 text-[#FFD600]',
+              )}>
+                {weather.trafficImpact}
               </span>
             )}
           </div>
@@ -91,11 +89,11 @@ export function Header() {
       </div>
 
       {/* Right: alerts + localization + AI */}
-      <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+      <div className="flex items-center gap-3 flex-shrink-0">
         {/* Language switch */}
         <button
           onClick={() => setLocale(locale === 'fr' ? 'en' : 'fr')}
-          className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors text-[10px] font-bold"
+          className="flex items-center justify-center w-9 h-9 rounded-apple glass-light hover:bg-white/10 text-text-secondary hover:text-white transition-all text-[11px] font-bold tracking-tight"
         >
           {locale === 'fr' ? 'EN' : 'FR'}
         </button>
@@ -103,11 +101,11 @@ export function Header() {
         {/* Alerts */}
         <button
           title={criticalCount > 0 ? `${criticalCount} incident(s)` : `${t('common.incidents')} — OK`}
-          className="relative p-2 rounded-lg hover:bg-bg-elevated transition-colors text-text-secondary hover:text-text-primary"
+          className="relative p-2.5 rounded-apple glass-light hover:bg-white/10 transition-all text-text-secondary hover:text-white"
         >
-          <Bell className="w-4 h-4" />
+          <Bell className="w-4.5 h-4.5" />
           {criticalCount > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#FF1744] text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
+            <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#FF3B30] text-white text-[9px] font-bold flex items-center justify-center shadow-lg border-2 border-bg-surface">
               {criticalCount}
             </span>
           )}
@@ -118,18 +116,19 @@ export function Header() {
           onClick={() => setAIPanelOpen(!isAIPanelOpen)}
           title={t('common.ai_assistant')}
           className={cn(
-            'flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all',
+            'flex items-center gap-2.5 px-4 py-2 rounded-apple border text-[13px] font-semibold transition-all shadow-apple',
             isAIPanelOpen
-              ? 'bg-brand-green text-bg-base border-brand-green'
-              : 'bg-bg-elevated border-bg-border text-text-secondary hover:text-text-primary hover:border-text-muted',
+              ? 'bg-brand-green text-bg-base border-brand-green shadow-glow'
+              : 'glass-light border-white/10 text-text-secondary hover:text-white hover:border-white/20',
           )}
         >
-          <BrainCircuit className="w-3.5 h-3.5" />
+          <BrainCircuit className="w-4 h-4" />
           <span className="hidden lg:inline">{t('common.ai_assistant')}</span>
         </button>
 
-        <div className="hidden sm:flex items-center justify-center w-8 h-8 rounded-full bg-brand-green-dim border border-brand-green/30 cursor-default">
-          <span className="text-xs font-bold text-brand-green">CF</span>
+        <div className="hidden sm:flex items-center justify-center w-9 h-9 rounded-full glass border border-brand-green/20 shadow-glow cursor-default overflow-hidden">
+          <div className="absolute inset-0 bg-brand-green/10" />
+          <span className="text-[11px] font-bold text-brand-green relative z-10">CF</span>
         </div>
       </div>
     </header>
