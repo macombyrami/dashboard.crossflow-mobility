@@ -95,7 +95,7 @@ export async function fetchIncidents(
 
   try {
     const [west, south, east, north] = bbox
-    const bboxStr = `${south},${west},${north},${east}`
+    const bboxStr = `${west},${south},${east},${north}`
     const fields  = '{incidents{type,geometry,properties{id,iconCategory,magnitudeOfDelay,events{description,code,iconCategory},startTime,endTime,from,to,length,delay,roadNumbers,timeValidity}}}'
     const url     = `${BASE}/traffic/services/5/incidentDetails.json?bbox=${bboxStr}&fields=${encodeURIComponent(fields)}&language=fr-FR&categoryFilter=${encodeURIComponent('0,1,2,3,4,5,6,7,8,9,10,11')}&key=${key}`
     const res     = await fetch(url, { next: { revalidate: 60 } })

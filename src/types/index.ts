@@ -12,7 +12,7 @@ export type IncidentType = 'accident' | 'roadwork' | 'congestion' | 'anomaly' | 
 
 export type TransportMode = 'car' | 'pedestrian' | 'metro' | 'bus' | 'bike' | 'tram'
 
-export type MapLayerId = 'traffic' | 'heatmap' | 'transport' | 'incidents' | 'prediction'
+export type MapLayerId = 'traffic' | 'heatmap' | 'transport' | 'incidents' | 'prediction' | 'boundary'
 
 export type OrgPlan = 'starter' | 'pro' | 'enterprise'
 

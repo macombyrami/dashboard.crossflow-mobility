@@ -97,13 +97,13 @@ export function Header() {
 
 // ─── Preset cities ─────────────────────────────────────────────────────────
 const PRESET_CITIES = [
-  { name: 'Paris',         lat: 48.8566, lng: 2.3522,  country: 'FR' },
-  { name: 'Lyon',          lat: 45.7640, lng: 4.8357,  country: 'FR' },
-  { name: 'Marseille',     lat: 43.2965, lng: 5.3698,  country: 'FR' },
-  { name: 'Bordeaux',      lat: 44.8378, lng: -0.5792, country: 'FR' },
-  { name: 'Gennevilliers', lat: 48.9233, lng: 2.3042,  country: 'FR' },
-  { name: 'Londres',       lat: 51.5074, lng: -0.1278, country: 'GB' },
-  { name: 'Berlin',        lat: 52.5200, lng: 13.4050, country: 'DE' },
+  { name: 'Paris',         lat: 48.8566, lng: 2.3522,  country: 'FR', query: 'Paris, France' },
+  { name: 'Lyon',          lat: 45.7640, lng: 4.8357,  country: 'FR', query: 'Lyon, France' },
+  { name: 'Marseille',     lat: 43.2965, lng: 5.3698,  country: 'FR', query: 'Marseille, France' },
+  { name: 'Bordeaux',      lat: 44.8378, lng: -0.5792, country: 'FR', query: 'Bordeaux, France' },
+  { name: 'Gennevilliers', lat: 48.9233, lng: 2.3042,  country: 'FR', query: 'Gennevilliers, France' },
+  { name: 'Londres',       lat: 51.5074, lng: -0.1278, country: 'GB', query: 'London, UK' },
+  { name: 'Berlin',        lat: 52.5200, lng: 13.4050, country: 'DE', query: 'Berlin, Germany' },
 ]
 
 function countryFlag(code: string) {
@@ -113,10 +113,30 @@ function countryFlag(code: string) {
   return '🌍'
 }
 
+// Fetch city boundary polygon from Nominatim
+async function fetchCityBoundary(query: string): Promise<GeoJSON.Feature | null> {
+  try {
+    const res  = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&polygon_geojson=1&limit=1&featuretype=city&accept-language=fr`,
+      { next: { revalidate: 86400 } } as RequestInit,
+    )
+    const data = await res.json()
+    if (!data[0]?.geojson) return null
+    return {
+      type:       'Feature',
+      geometry:   data[0].geojson,
+      properties: { name: data[0].display_name },
+    }
+  } catch {
+    return null
+  }
+}
+
 // ─── Inline city search bar ─────────────────────────────────────────────────
 function CitySearchBar() {
-  const city    = useMapStore(s => s.city)
-  const setCity = useMapStore(s => s.setCity)
+  const city            = useMapStore(s => s.city)
+  const setCity         = useMapStore(s => s.setCity)
+  const setCityBoundary = useMapStore(s => s.setCityBoundary)
   const [open, setOpen]       = useState(false)
   const [query, setQuery]     = useState('')
   const [results, setResults] = useState<any[]>([])
@@ -134,21 +154,23 @@ function CitySearchBar() {
     const tid = setTimeout(async () => {
       setLoading(true)
       try {
-        const preset = PRESET_CITIES.filter(c =>
-          c.name.toLowerCase().includes(query.toLowerCase())
-        ).slice(0, 3)
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=4&accept-language=fr`
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&polygon_geojson=1&limit=5&accept-language=fr`
         )
         const data = await res.json()
-        const nominatim = data.slice(0, 4).map((r: any) => ({
+        const items = data.slice(0, 5).map((r: any) => ({
           name:    r.display_name.split(',')[0].trim(),
           label:   r.display_name.split(',').slice(0, 2).join(',').trim(),
           lat:     parseFloat(r.lat),
           lng:     parseFloat(r.lon),
-          country: r.address?.country_code?.toUpperCase() ?? '',
+          country: (r.address?.country_code ?? '').toUpperCase(),
+          geojson: r.geojson ?? null,
+          bbox:    r.boundingbox
+            ? [parseFloat(r.boundingbox[2]), parseFloat(r.boundingbox[0]),
+               parseFloat(r.boundingbox[3]), parseFloat(r.boundingbox[1])]
+            : null,
         }))
-        setResults([...preset, ...nominatim].slice(0, 6))
+        setResults(items)
       } catch {
         setResults([])
       } finally {
@@ -169,8 +191,12 @@ function CitySearchBar() {
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  const select = (c: { name: string; lat: number; lng: number; country: string; label?: string }) => {
-    const delta = 0.15
+  const select = async (c: {
+    name: string; lat: number; lng: number; country: string
+    label?: string; query?: string; geojson?: any; bbox?: number[] | null
+  }) => {
+    setOpen(false)
+    const bbox = c.bbox ?? [c.lng - 0.15, c.lat - 0.15, c.lng + 0.15, c.lat + 0.15]
     setCity(geocodingToCity({
       id:          `${c.lat},${c.lng}`,
       displayName: c.name,
@@ -180,11 +206,19 @@ function CitySearchBar() {
       lat:         c.lat,
       lng:         c.lng,
       zoom:        12,
-      bbox:        [c.lng - delta, c.lat - delta, c.lng + delta, c.lat + delta],
+      bbox:        bbox as [number, number, number, number],
       type:        'city',
       importance:  1,
     }))
-    setOpen(false)
+
+    // Fetch and set boundary polygon
+    if (c.geojson) {
+      setCityBoundary({ type: 'Feature', geometry: c.geojson, properties: { name: c.name } })
+    } else {
+      // For preset cities, fetch via Nominatim
+      const boundary = await fetchCityBoundary(c.query ?? c.name)
+      setCityBoundary(boundary)
+    }
   }
 
   return (
@@ -243,7 +277,7 @@ function CitySearchBar() {
                 {PRESET_CITIES.slice(0, 5).map(c => (
                   <button
                     key={c.name}
-                    onClick={() => select(c)}
+                    onClick={() => select({ ...c, geojson: null })}
                     className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-bg-elevated transition-colors duration-100 text-left"
                   >
                     <div className="w-6 h-6 rounded-md bg-bg-subtle flex items-center justify-center shrink-0">

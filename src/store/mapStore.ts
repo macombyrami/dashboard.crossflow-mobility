@@ -4,6 +4,7 @@ import type { TrafficMode, MapLayerId, MapViewState, City } from '@/types'
 import { CITIES, DEFAULT_CITY_ID } from '@/config/cities.config'
 import { platformConfig } from '@/config/platform.config'
 import type { GeocodingResult } from '@/lib/api/geocoding'
+import { fetchCityBoundary } from '@/lib/api/geocoding'
 
 // Convert a geocoding result to a City object
 export function geocodingToCity(r: GeocodingResult): City {
@@ -31,10 +32,12 @@ export function geocodingToCity(r: GeocodingResult): City {
 
 interface MapStore {
   // City
-  city:          City
-  cityHistory:   City[]   // last searched cities
-  setCity:       (city: City) => void
-  addToHistory:  (city: City) => void
+  city:             City
+  cityHistory:      City[]
+  cityBoundary:     GeoJSON.Feature | null
+  setCity:          (city: City) => void
+  setCityBoundary:  (boundary: GeoJSON.Feature | null) => void
+  addToHistory:     (city: City) => void
 
   // Mode
   mode:    TrafficMode
@@ -72,13 +75,22 @@ const defaultCity = CITIES.find(c => c.id === DEFAULT_CITY_ID)!
 export const useMapStore = create<MapStore>()(
   persist(
     subscribeWithSelector((set, get) => ({
-      city:        defaultCity,
-      cityHistory: CITIES.slice(0, 5),
-      setCity: (city) => {
+      city:            defaultCity,
+      cityHistory:     CITIES.slice(0, 5),
+      cityBoundary:    null,
+      setCity: async (city) => {
         set({ city, selectedSegmentId: null })
         get().addToHistory(city)
         get().flyToCity(city)
+
+        // Reset and fetch new boundary
+        set({ cityBoundary: null })
+        const boundary = await fetchCityBoundary(city.name, city.country)
+        if (boundary) {
+          set({ cityBoundary: boundary })
+        }
       },
+      setCityBoundary: (boundary) => set({ cityBoundary: boundary }),
       addToHistory: (city) =>
         set(s => ({
           cityHistory: [city, ...s.cityHistory.filter(c => c.id !== city.id)].slice(0, 10),
@@ -87,7 +99,7 @@ export const useMapStore = create<MapStore>()(
       mode:    'live',
       setMode: (mode) => set({ mode, selectedSegmentId: null }),
 
-      activeLayers: new Set<MapLayerId>(['traffic', 'incidents']),
+      activeLayers: new Set<MapLayerId>(['traffic', 'incidents', 'boundary']),
       toggleLayer: (layer) =>
         set(s => {
           const next = new Set(s.activeLayers)
@@ -162,6 +174,7 @@ export const useMapStore = create<MapStore>()(
         cityHistory:  state.cityHistory,
         activeLayers: state.activeLayers,
         mode:         state.mode,
+        // cityBoundary intentionally NOT persisted (large JSON)
       } as MapStore), // Cast to satisfy the expected type, though only data is returned
     }
   )

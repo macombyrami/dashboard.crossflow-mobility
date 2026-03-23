@@ -1,5 +1,5 @@
 'use client'
-import { Car, Flame, Train, AlertTriangle, BrainCircuit, Layers } from 'lucide-react'
+import { Car, Flame, Train, AlertTriangle, BrainCircuit, Layers, MapPinned } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
 import { cn } from '@/lib/utils/cn'
 import type { MapLayerId } from '@/types'
@@ -10,6 +10,7 @@ const LAYERS: { id: MapLayerId; label: string; icon: typeof Car; hint?: string }
   { id: 'transport',  label: 'Transport',  icon: Train,        hint: 'Réseaux TC' },
   { id: 'incidents',  label: 'Incidents',  icon: AlertTriangle,hint: 'Accidents & travaux' },
   { id: 'prediction', label: 'Prédiction', icon: BrainCircuit, hint: '+30 min IA' },
+  { id: 'boundary',   label: 'Contour ville', icon: MapPinned, hint: 'Délimitation administrative' },
 ]
 
 export function LayerControls() {

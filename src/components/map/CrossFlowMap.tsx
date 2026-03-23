@@ -16,13 +16,15 @@ import {
   tomtomSeverityToLocal,
 } from '@/lib/api/tomtom'
 import { fetchWeather as fetchOpenMeteoWeather, fetchAirQuality } from '@/lib/api/openmeteo'
+import { fetchCityBoundary } from '@/lib/api/geocoding'
 import type { Incident } from '@/types'
 
-const TRAFFIC_SOURCE  = 'cf-traffic'
-const HEATMAP_SOURCE  = 'cf-heatmap'
-const INCIDENT_SOURCE = 'cf-incidents'
-const TOMTOM_FLOW     = 'tomtom-flow'
-const TOMTOM_INC      = 'tomtom-incidents'
+const TRAFFIC_SOURCE   = 'cf-traffic'
+const HEATMAP_SOURCE   = 'cf-heatmap'
+const INCIDENT_SOURCE  = 'cf-incidents'
+const TOMTOM_FLOW      = 'tomtom-flow'
+const TOMTOM_INC       = 'tomtom-incidents'
+const BOUNDARY_SOURCE  = 'city-boundary'
 
 // CartoDB Voyager Dark — completely free, no key, beautiful dark style
 const CARTO_DARK_STYLE: maplibregl.StyleSpecification = {
@@ -53,10 +55,12 @@ export function CrossFlowMap() {
   const popupRef     = useRef<maplibregl.Popup | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
 
-  const city          = useMapStore(s => s.city)
-  const activeLayers  = useMapStore(s => s.activeLayers)
-  const setMapReady   = useMapStore(s => s.setMapReady)
-  const selectSegment = useMapStore(s => s.selectSegment)
+  const city            = useMapStore(s => s.city)
+  const cityBoundary    = useMapStore(s => s.cityBoundary)
+  const setCityBoundary = useMapStore(s => s.setCityBoundary)
+  const activeLayers    = useMapStore(s => s.activeLayers)
+  const setMapReady     = useMapStore(s => s.setMapReady)
+  const selectSegment   = useMapStore(s => s.selectSegment)
 
   const setSnapshot           = useTrafficStore(s => s.setSnapshot)
   const setIncidents          = useTrafficStore(s => s.setIncidents)
@@ -86,6 +90,7 @@ export function CrossFlowMap() {
 
     map.on('load', () => {
       initStaticSources(map)
+      initBoundaryLayers(map)
 
       // Add TomTom tile layers if key available
       if (useLiveData) {
@@ -181,6 +186,15 @@ export function CrossFlowMap() {
       .addTo(map)
   }
 
+  // ─── Load boundary for initial city ──────────────────────────────────
+
+  useEffect(() => {
+    if (!mapLoaded || cityBoundary) return
+    fetchCityBoundary(city.name, city.country).then(b => {
+      if (b) setCityBoundary(b)
+    })
+  }, [mapLoaded]) // eslint-disable-line
+
   // ─── Fly to city ─────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -193,6 +207,34 @@ export function CrossFlowMap() {
       essential: true,
     })
   }, [city.id, mapLoaded]) // eslint-disable-line
+
+  // ─── City boundary ────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return
+    const map = mapRef.current
+    const src = map.getSource(BOUNDARY_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (!src) return
+
+    if (!cityBoundary) {
+      // Clear boundary
+      src.setData({ type: 'FeatureCollection', features: [] })
+      return
+    }
+
+    src.setData({ type: 'FeatureCollection', features: [cityBoundary] })
+
+    // Compute bounds from polygon and fitBounds
+    const coords = extractCoords(cityBoundary.geometry as any)
+    if (coords.length === 0) return
+    const lngs = coords.map(c => c[0])
+    const lats = coords.map(c => c[1])
+    const bounds = new maplibregl.LngLatBounds(
+      [Math.min(...lngs), Math.min(...lats)],
+      [Math.max(...lngs), Math.max(...lats)],
+    )
+    map.fitBounds(bounds, { padding: 48, duration: 1600, essential: true })
+  }, [cityBoundary, mapLoaded])
 
   // ─── Data refresh ─────────────────────────────────────────────────────
 
@@ -274,6 +316,16 @@ export function CrossFlowMap() {
     }
     const iSrc = map.getSource(INCIDENT_SOURCE) as maplibregl.GeoJSONSource | undefined
     if (iSrc) iSrc.setData(incGeo)
+    
+    // Boundary layer update
+    const bSrc = map.getSource(BOUNDARY_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (bSrc) {
+      if (cityBoundary) {
+        bSrc.setData(cityBoundary)
+      } else {
+        bSrc.setData({ type: 'FeatureCollection', features: [] })
+      }
+    }
 
     // Real weather + air quality (OpenMeteo, 100% free, no key)
     const [omWeather, aq] = await Promise.all([
@@ -317,6 +369,14 @@ export function CrossFlowMap() {
     trySet(INCIDENT_SOURCE + '-circles',  activeLayers.has('incidents') ? 'visible' : 'none')
     trySet(INCIDENT_SOURCE + '-glow',     activeLayers.has('incidents') ? 'visible' : 'none')
     trySet(INCIDENT_SOURCE + '-labels',   activeLayers.has('incidents') ? 'visible' : 'none')
+
+    // Boundary layers
+    const boundaryVis = activeLayers.has('boundary') ? 'visible' : 'none'
+    trySet(BOUNDARY_SOURCE + '-glow-outer', boundaryVis)
+    trySet(BOUNDARY_SOURCE + '-glow',       boundaryVis)
+    trySet(BOUNDARY_SOURCE + '-fill',       boundaryVis)
+    trySet(BOUNDARY_SOURCE + '-line',       boundaryVis)
+    trySet(BOUNDARY_SOURCE + '-label',      boundaryVis)
 
     // TomTom live tiles
     if (useLiveData) {
@@ -429,7 +489,7 @@ function initStaticSources(map: maplibregl.Map) {
     minzoom: 13,
     layout: {
       'text-field':  ['get', 'title'],
-      'text-font':   ['Inter SemiBold'],
+      'text-font':   ['Open Sans Regular'],
       'text-size':   11,
       'text-offset': [0, 2],
       'text-anchor': 'top',
@@ -441,6 +501,94 @@ function initStaticSources(map: maplibregl.Map) {
       'text-halo-width': 2,
     },
   })
+}
+
+function initBoundaryLayers(map: maplibregl.Map) {
+  const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
+
+  map.addSource(BOUNDARY_SOURCE, { type: 'geojson', data: emptyFC })
+
+  // 1. Outer glow — very wide blurred line
+  map.addLayer({
+    id:     BOUNDARY_SOURCE + '-glow-outer',
+    type:   'line',
+    source: BOUNDARY_SOURCE,
+    paint:  {
+      'line-color':   '#22C55E',
+      'line-width':   28,
+      'line-opacity': 0.07,
+      'line-blur':    20,
+    },
+  })
+
+  // 2. Mid glow
+  map.addLayer({
+    id:     BOUNDARY_SOURCE + '-glow',
+    type:   'line',
+    source: BOUNDARY_SOURCE,
+    paint:  {
+      'line-color':   '#22C55E',
+      'line-width':   10,
+      'line-opacity': 0.18,
+      'line-blur':    6,
+    },
+  })
+
+  // 3. Fill — very subtle city tint
+  map.addLayer({
+    id:     BOUNDARY_SOURCE + '-fill',
+    type:   'fill',
+    source: BOUNDARY_SOURCE,
+    paint:  {
+      'fill-color':   '#22C55E',
+      'fill-opacity': 0.04,
+    },
+  })
+
+  // 4. Crisp border line
+  map.addLayer({
+    id:     BOUNDARY_SOURCE + '-line',
+    type:   'line',
+    source: BOUNDARY_SOURCE,
+    paint:  {
+      'line-color':        '#22C55E',
+      'line-width':        2,
+      'line-opacity':      0.85,
+      'line-dasharray':    [3, 2],
+    },
+  })
+
+  // 5. City name label at centroid (symbol layer)
+  map.addLayer({
+    id:     BOUNDARY_SOURCE + '-label',
+    type:   'symbol',
+    source: BOUNDARY_SOURCE,
+    layout: {
+      'text-field':    ['coalesce', ['get', 'name'], ''],
+      'text-font':     ['Open Sans Bold', 'Arial Unicode MS Bold'],
+      'text-size':     13,
+      'text-offset':   [0, 0],
+      'text-anchor':   'center',
+      'symbol-placement': 'point',
+    },
+    paint: {
+      'text-color':      'rgba(34,197,94,0.9)',
+      'text-halo-color': 'rgba(8,9,11,0.8)',
+      'text-halo-width': 3,
+    },
+    minzoom: 8,
+    maxzoom: 13,
+  })
+}
+
+// Flatten all coordinates from a GeoJSON geometry
+function extractCoords(geom: GeoJSON.Geometry): number[][] {
+  if (!geom) return []
+  if (geom.type === 'Point') return [geom.coordinates as number[]]
+  if (geom.type === 'LineString') return geom.coordinates as number[][]
+  if (geom.type === 'Polygon') return (geom.coordinates as number[][][]).flat()
+  if (geom.type === 'MultiPolygon') return (geom.coordinates as number[][][][]).flat(2)
+  return []
 }
 
 function addTomTomLayers(map: maplibregl.Map) {
