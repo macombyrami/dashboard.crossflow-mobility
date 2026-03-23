@@ -16,51 +16,57 @@ export function IncidentFeed({ maxItems = 5 }: { maxItems?: number }) {
     .slice(0, maxItems)
 
   return (
-    <div className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-bg-border flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-[#FF6D00]" />
-          <span className="text-sm font-semibold text-text-primary">Incidents actifs</span>
+    <div className="card-premium overflow-hidden border border-white/5">
+      <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+        <div className="flex items-center gap-3">
+          <AlertTriangle className="w-4 h-4 text-[#FF9F0A]" />
+          <span className="text-[13px] font-bold text-white uppercase tracking-[0.15em]">Incidents Actifs</span>
         </div>
-        <span className="text-xs font-medium text-text-muted bg-bg-subtle px-2 py-0.5 rounded-full">
-          {incidents.length}
-        </span>
+        <div className="flex items-center gap-2">
+           <div className="w-2 h-2 rounded-full bg-brand-green shadow-glow animate-pulse" />
+           <span className="text-[11px] font-bold text-text-muted bg-white/5 px-2.5 py-1 rounded-full border border-white/5">
+             {incidents.length}
+           </span>
+        </div>
       </div>
 
       {sorted.length === 0 && (
-        <div className="px-5 py-8 text-center">
-          <Zap className="w-6 h-6 text-[#00E676] mx-auto mb-2" />
-          <p className="text-sm text-text-secondary">Réseau nominal</p>
-          <p className="text-xs text-text-muted">Aucun incident signalé</p>
+        <div className="px-6 py-10 text-center animate-fade-in">
+          <div className="w-12 h-12 rounded-apple bg-brand-green/10 flex items-center justify-center mx-auto mb-4 border border-brand-green/20">
+            <Zap className="w-6 h-6 text-brand-green shadow-glow" />
+          </div>
+          <p className="text-[15px] font-bold text-white">Réseau Nominal</p>
+          <p className="text-[11px] text-text-muted mt-1 uppercase tracking-wider font-medium">Aucun dysfonctionnement détecté</p>
         </div>
       )}
 
-      <div className="divide-y divide-bg-border">
+      <div className="divide-y divide-white/5">
         {sorted.map(inc => (
           <div key={inc.id} className={cn(
-            'px-5 py-3.5 hover:bg-bg-elevated transition-colors cursor-pointer',
-            inc.severity === 'critical' && 'border-l-2 border-l-[#FF1744]',
+            'px-6 py-5 hover:bg-white/[0.03] transition-all duration-300 cursor-pointer relative group',
+            inc.severity === 'critical' && 'bg-red-500/[0.02]',
           )}>
-            <div className="flex items-start justify-between gap-3">
+            {inc.severity === 'critical' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 shadow-glow" />}
+            <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-3 mb-2">
                   <SeverityPill severity={inc.severity} size="sm" />
-                  <span className="text-[10px] text-text-muted uppercase tracking-wide">{inc.type}</span>
+                  <span className="text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] opacity-60 group-hover:opacity-100 transition-opacity">{inc.type}</span>
                 </div>
-                <p className="text-sm font-medium text-text-primary truncate">{inc.title}</p>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="flex items-center gap-1 text-xs text-text-muted">
-                    <MapPin className="w-3 h-3" />
+                <p className="text-[14px] font-bold text-white truncate group-hover:text-brand-green transition-colors">{inc.title}</p>
+                <div className="flex items-center gap-4 mt-2.5">
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-text-muted/60">
+                    <MapPin className="w-3.5 h-3.5" />
                     {inc.address.split('—')[1]?.trim() || inc.address}
                   </span>
-                  <span className="flex items-center gap-1 text-xs text-text-muted">
-                    <Clock className="w-3 h-3" />
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-text-muted/60">
+                    <Clock className="w-3.5 h-3.5" />
                     {formatDistanceToNow(new Date(inc.startedAt), { locale: fr, addSuffix: true })}
                   </span>
                 </div>
               </div>
-              <span
-                className="w-2 h-2 rounded-full flex-shrink-0 mt-1"
+              <div
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1 shadow-glow group-hover:scale-125 transition-transform"
                 style={{ backgroundColor: inc.iconColor }}
               />
             </div>

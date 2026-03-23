@@ -4,6 +4,7 @@ import { Activity, Clock, Wind, AlertTriangle, Zap, Network } from 'lucide-react
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 import { KPICard } from '@/components/dashboard/KPICard'
+import { cn } from '@/lib/utils/cn'
 import { TrafficChart } from '@/components/dashboard/TrafficChart'
 import { IncidentFeed } from '@/components/dashboard/IncidentFeed'
 import { ModalSplitChart } from '@/components/dashboard/ModalSplitChart'
@@ -79,41 +80,82 @@ export default function DashboardPage() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-          {/* Title */}
-          <div>
-            <h1 className="text-xl font-bold text-text-primary">
-              {city.flag} {city.name} — {t('dashboard.title')}
-            </h1>
-            <p className="text-sm text-text-secondary mt-1">
-              {t('dashboard.updated')} · {city.timezone}
-            </p>
+        <main className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-8 custom-scrollbar">
+          {/* Title & Stats Summary */}
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-1.5 h-6 bg-brand-green rounded-full shadow-glow" />
+                <h1 className="text-2xl font-bold text-white tracking-tight">
+                  {city.flag} {city.name}
+                </h1>
+              </div>
+              <p className="text-[13px] font-medium text-text-secondary">
+                {t('dashboard.title')} · <span className="text-text-muted">{t('dashboard.updated')} · {city.timezone}</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+               {openMeteoWeather && (
+                 <div className="glass-light px-4 py-2 rounded-apple border border-white/5 flex items-center gap-2.5">
+                   <span className="text-xl">{openMeteoWeather.weatherEmoji}</span>
+                   <div className="flex flex-col">
+                      <span className="text-[13px] font-bold text-white leading-none">{openMeteoWeather.temp}°C</span>
+                      <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider mt-1">{openMeteoWeather.weatherLabel}</span>
+                   </div>
+                 </div>
+               )}
+            </div>
           </div>
 
-          {/* Network status banner */}
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
-            congCrit ? 'bg-[rgba(255,23,68,0.08)] border-[rgba(255,23,68,0.3)]' :
-            congWarn ? 'bg-[rgba(255,109,0,0.08)] border-[rgba(255,109,0,0.3)]' :
-                        'bg-brand-green-dim border-brand-green/20'
-          }`}>
-            <div className={`w-2 h-2 rounded-full ${
-              congCrit ? 'bg-[#FF1744] animate-pulse' :
-              congWarn ? 'bg-[#FF6D00] animate-pulse' : 'bg-brand-green'
-            }`} />
-            <span className="text-sm font-medium text-text-primary">
-              {t('dashboard.performance')} {congCrit ? `⚠ ${t('common.incidents').toUpperCase()}` : congWarn ? '⚠ WARNING' : '✓ OK'}
-            </span>
-            {openMeteoWeather && (
-              <span className="hidden sm:inline text-sm ml-2">
-                {openMeteoWeather.weatherEmoji} {openMeteoWeather.temp}°C
-                {openMeteoWeather.trafficImpact !== 'none' && (
-                  <span className="ml-1 text-xs text-[#FF6D00]">· {t('common.weather')}: {openMeteoWeather.trafficImpact}</span>
-                )}
-              </span>
-            )}
-            <span className="ml-auto text-xs text-text-muted">
-              {t('common.efficiency')}: <span className="font-semibold text-text-secondary">{Math.round(kpis.networkEfficiency * 100)}%</span>
-            </span>
+          {/* Network status banner — Ultra-premium */}
+          <div className={cn(
+            "relative overflow-hidden p-0.5 rounded-apple group",
+            congCrit ? "bg-gradient-to-r from-red-500/20 to-transparent" :
+            congWarn ? "bg-gradient-to-r from-orange-500/20 to-transparent" :
+                      "bg-gradient-to-r from-brand-green/20 to-transparent"
+          )}>
+            <div className="glass-light px-6 py-4 rounded-[14px] flex items-center gap-4 border border-white/5">
+              <div className="relative">
+                <div className={cn(
+                  "w-3 h-3 rounded-full shadow-glow animate-pulse",
+                  congCrit ? "bg-red-500" : congWarn ? "bg-orange-500" : "bg-brand-green"
+                )} />
+                <div className={cn(
+                  "absolute inset-0 w-3 h-3 rounded-full blur-sm",
+                  congCrit ? "bg-red-500" : congWarn ? "bg-orange-500" : "bg-brand-green"
+                )} />
+              </div>
+              
+              <div className="flex-1">
+                <div className="flex items-center gap-3">
+                  <span className="text-[14px] font-bold text-white tracking-tight uppercase">
+                    {t('dashboard.performance')}
+                  </span>
+                  <span className={cn(
+                    "text-[10px] font-bold px-2 py-0.5 rounded-full border tracking-widest uppercase",
+                    congCrit ? "text-red-500 border-red-500/20 bg-red-500/10" :
+                    congWarn ? "text-orange-500 border-orange-500/20 bg-orange-500/10" :
+                              "text-brand-green border-brand-green/20 bg-brand-green/10"
+                  )}>
+                    {congCrit ? t('common.incidents') : congWarn ? 'Warning' : 'Optimal'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-8 pr-2">
+                <div className="flex flex-col items-end">
+                   <p className="text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Efficacité</p>
+                   <p className="text-[15px] font-bold text-white tabular-nums">{Math.round(kpis.networkEfficiency * 100)}%</p>
+                </div>
+                <div className="w-[1px] h-8 bg-white/5 hidden sm:block" />
+                <div className="flex flex-col items-end hidden sm:flex">
+                   <p className="text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Impact Météo</p>
+                   <p className={cn("text-[13px] font-bold tabular-nums", openMeteoWeather?.trafficImpact === 'none' ? 'text-brand-green' : 'text-orange-500')}>
+                     {openMeteoWeather?.trafficImpact.toUpperCase() || 'N/A'}
+                   </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* KPI grid */}
@@ -202,17 +244,17 @@ export default function DashboardPage() {
   )
 }
 
-function EfficiencyBar({ label, value, color = '#00E676' }: { label: string; value: number; color?: string }) {
+function EfficiencyBar({ label, value, color = '#22C55E' }: { label: string; value: number; color?: string }) {
   return (
-    <div className="space-y-1.5 mb-3">
-      <div className="flex justify-between">
-        <span className="text-xs text-text-secondary">{label}</span>
-        <span className="text-xs font-semibold" style={{ color }}>{Math.round(value * 100)}%</span>
+    <div className="space-y-2 mb-4 group">
+      <div className="flex justify-between items-end">
+        <span className="text-[11px] font-bold text-text-muted uppercase tracking-[0.1em]">{label}</span>
+        <span className="text-[13px] font-bold tabular-nums" style={{ color }}>{Math.round(value * 100)}%</span>
       </div>
-      <div className="h-1.5 rounded-full bg-bg-subtle overflow-hidden">
+      <div className="h-2 rounded-full bg-white/5 overflow-hidden shadow-inner">
         <div
-          className="h-full rounded-full transition-all"
-          style={{ width: `${value * 100}%`, backgroundColor: color }}
+          className="h-full rounded-full transition-all duration-1000 ease-out shadow-glow"
+          style={{ width: `${value * 100}%`, backgroundColor: color, boxShadow: `0 0 12px ${color}40` }}
         />
       </div>
     </div>

@@ -15,7 +15,7 @@ export function ModeSelector() {
   const setMode = useMapStore(s => s.setMode)
 
   return (
-    <div className="flex rounded-xl bg-bg-surface border border-bg-border p-1 gap-1">
+    <div className="flex glass rounded-apple p-1.5 gap-1.5 shadow-apple border border-white/5">
       {MODES.map(({ id, label, sublabel, icon: Icon }) => {
         const active = mode === id
         return (
@@ -23,17 +23,19 @@ export function ModeSelector() {
             key={id}
             onClick={() => setMode(id)}
             className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all',
+              'flex items-center gap-2.5 px-5 py-2 rounded-apple text-[13px] font-semibold transition-all duration-300 relative group overflow-hidden',
               active
                 ? 'bg-brand-green text-bg-base shadow-glow'
-                : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated',
+                : 'text-text-secondary hover:text-white hover:bg-white/5',
             )}
           >
-            <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-            <span className="tracking-wider">{label}</span>
-            <span className={cn('text-[10px] font-normal', active ? 'text-bg-base/70' : 'text-text-muted')}>
-              {sublabel}
-            </span>
+            <Icon className={cn("w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110", active ? "text-bg-base" : "text-text-muted group-hover:text-text-secondary")} />
+            <div className="flex flex-col items-start translate-y-[-1px]">
+               <span className="tracking-tight leading-none">{label}</span>
+               <span className={cn('text-[9px] font-bold uppercase tracking-wider mt-1 opacity-60', active ? 'text-bg-base' : 'text-text-muted')}>
+                 {sublabel}
+               </span>
+            </div>
           </button>
         )
       })}
