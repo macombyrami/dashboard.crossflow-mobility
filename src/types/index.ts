@@ -1,0 +1,181 @@
+// ═══════════════════════════════════════════
+// CrossFlow Mobility — Core Types
+// ═══════════════════════════════════════════
+
+export type TrafficMode = 'live' | 'predict' | 'simulate'
+
+export type CongestionLevel = 'free' | 'slow' | 'congested' | 'critical'
+
+export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical'
+
+export type IncidentType = 'accident' | 'roadwork' | 'congestion' | 'anomaly' | 'event'
+
+export type TransportMode = 'car' | 'pedestrian' | 'metro' | 'bus' | 'bike' | 'tram'
+
+export type MapLayerId = 'traffic' | 'heatmap' | 'transport' | 'incidents' | 'prediction'
+
+export type OrgPlan = 'starter' | 'pro' | 'enterprise'
+
+// ─── Geography ────────────────────────────────────────────────────────────────
+
+export interface LatLng {
+  lat: number
+  lng: number
+}
+
+export interface Bounds {
+  ne: LatLng
+  sw: LatLng
+}
+
+export interface City {
+  id:         string
+  name:       string
+  country:    string
+  countryCode:string
+  center:     LatLng
+  zoom:       number
+  timezone:   string
+  bbox:       [number, number, number, number] // [west, south, east, north]
+  population: number
+  flag:       string
+}
+
+// ─── Traffic ──────────────────────────────────────────────────────────────────
+
+export interface TrafficSegment {
+  id:               string
+  coordinates:      [number, number][] // [lng, lat][]
+  speedKmh:         number
+  freeFlowSpeedKmh: number
+  congestionScore:  number // 0-1
+  level:            CongestionLevel
+  flowVehiclesPerHour: number
+  travelTimeSeconds:   number
+  length:           number // meters
+  mode:             TransportMode
+  lastUpdated:      string // ISO
+}
+
+export interface HeatmapPoint {
+  lng:       number
+  lat:       number
+  intensity: number // 0-1
+}
+
+export interface TrafficSnapshot {
+  cityId:    string
+  segments:  TrafficSegment[]
+  heatmap:   HeatmapPoint[]
+  fetchedAt: string
+}
+
+// ─── Incidents ────────────────────────────────────────────────────────────────
+
+export interface Incident {
+  id:          string
+  type:        IncidentType
+  severity:    IncidentSeverity
+  title:       string
+  description: string
+  location:    LatLng
+  address:     string
+  startedAt:   string
+  resolvedAt?: string
+  source:      string
+  iconColor:   string
+}
+
+// ─── Predictions ──────────────────────────────────────────────────────────────
+
+export interface PredictionSegment {
+  segmentId:       string
+  congestionScore: number
+  confidence:      number
+  trend:           'improving' | 'stable' | 'worsening'
+}
+
+export interface Prediction {
+  cityId:           string
+  horizonMinutes:   number
+  predictedFor:     string // ISO
+  segments:         PredictionSegment[]
+  globalCongestion: number
+  confidence:       number
+}
+
+// ─── Simulation ───────────────────────────────────────────────────────────────
+
+export type ScenarioType =
+  | 'road_closure'
+  | 'traffic_light'
+  | 'bike_lane'
+  | 'speed_limit'
+  | 'public_transport'
+  | 'event'
+
+export interface SimulationScenario {
+  type:        ScenarioType
+  name:        string
+  description: string
+  params:      Record<string, unknown>
+  affectedSegmentIds: string[]
+  timeWindowStart: number // hour 0-23
+  timeWindowEnd:   number
+  durationHours:   number
+}
+
+export interface SimulationResult {
+  id:              string
+  scenarioName:    string
+  status:          'running' | 'completed' | 'failed'
+  progress:        number // 0-100
+  before: {
+    congestionRate:   number
+    avgTravelMin:     number
+    pollutionIndex:   number
+    affectedSegments: number
+  }
+  after: {
+    congestionRate:   number
+    avgTravelMin:     number
+    pollutionIndex:   number
+    affectedSegments: number
+  }
+  delta: {
+    congestionPct:  number
+    travelTimePct:  number
+    pollutionPct:   number
+  }
+  alternativePaths: number
+  completedAt?: string
+}
+
+// ─── KPIs ─────────────────────────────────────────────────────────────────────
+
+export interface CityKPIs {
+  cityId:          string
+  congestionRate:  number // 0-1
+  avgTravelMin:    number
+  pollutionIndex:  number // 0-10
+  activeIncidents: number
+  networkEfficiency: number // 0-1
+  modalSplit: {
+    car:        number
+    metro:      number
+    bus:        number
+    bike:       number
+    pedestrian: number
+  }
+  capturedAt: string
+}
+
+// ─── UI State ─────────────────────────────────────────────────────────────────
+
+export interface MapViewState {
+  longitude: number
+  latitude:  number
+  zoom:      number
+  pitch:     number
+  bearing:   number
+}
