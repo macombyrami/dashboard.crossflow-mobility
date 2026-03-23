@@ -1,5 +1,8 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { Sidebar } from '@/components/layout/Sidebar'
+import { Header } from '@/components/layout/Header'
+import { BottomNav } from '@/components/layout/BottomNav'
 
 export const metadata: Metadata = {
   title:       'CrossFlow Mobility — Smart City Platform',
@@ -9,10 +12,36 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  width:        'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor:   '#08090B',
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" suppressHydrationWarning>
-      <body>{children}</body>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        />
+      </head>
+      <body>
+        <div className="app-shell">
+          <Sidebar />
+          <div className="main-content">
+            <Header />
+            <main className="flex-1 overflow-hidden relative">
+              {children}
+            </main>
+          </div>
+        </div>
+        <BottomNav />
+      </body>
     </html>
   )
 }

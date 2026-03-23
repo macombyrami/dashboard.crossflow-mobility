@@ -1,8 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { AlertTriangle, RefreshCw, MapPin, Clock, Zap } from 'lucide-react'
-import { Sidebar } from '@/components/layout/Sidebar'
-import { Header } from '@/components/layout/Header'
 import { SeverityPill } from '@/components/ui/SeverityPill'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
@@ -67,11 +65,7 @@ export default function IncidentsPage() {
   ]
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg-base">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6 space-y-5">
+    <main className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* Page header */}
           <div className="flex items-center justify-between">
             <div>
@@ -158,8 +152,6 @@ export default function IncidentsPage() {
               ))}
             </div>
           )}
-        </main>
-      </div>
-    </div>
+    </main>
   )
 }

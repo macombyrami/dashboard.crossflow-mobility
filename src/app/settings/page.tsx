@@ -1,6 +1,4 @@
 'use client'
-import { Sidebar } from '@/components/layout/Sidebar'
-import { Header } from '@/components/layout/Header'
 import { Settings, Key, RefreshCw, Bell, Globe, CheckCircle2, XCircle } from 'lucide-react'
 
 // API inventory with live status detection
@@ -48,11 +46,7 @@ const API_SOURCES = [
 
 export default function SettingsPage() {
   return (
-    <div className="flex h-screen overflow-hidden bg-bg-base">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6 space-y-6 max-w-2xl">
+    <main className="flex-1 overflow-y-auto p-6 space-y-6 max-w-2xl">
           <div>
             <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
               <Settings className="w-5 h-5 text-brand-green" />
@@ -124,9 +118,7 @@ export default function SettingsPage() {
               <p className="text-xs text-text-secondary mt-1">Accès complet · Toutes les villes · IA avancée · Données temps réel</p>
             </div>
           </Section>
-        </main>
-      </div>
-    </div>
+    </main>
   )
 }
 

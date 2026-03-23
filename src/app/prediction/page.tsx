@@ -1,8 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { TrendingUp, Calendar, Cloud, Zap, Users, AlertCircle, RefreshCw, Sun, Train, ThumbsUp, ThumbsDown, CheckCircle2 } from 'lucide-react'
-import { Sidebar } from '@/components/layout/Sidebar'
-import { Header } from '@/components/layout/Header'
 import { EventsWidget } from '@/components/dashboard/EventsWidget'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
@@ -44,11 +42,7 @@ export default function PredictionPage() {
     f <= 1.4  ? 'Heavy Traffic' : 'Major Congestion'
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg-base">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+    <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
           {/* Title */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -234,9 +228,7 @@ export default function PredictionPage() {
               </p>
             </>
           )}
-        </main>
-      </div>
-    </div>
+    </main>
   )
 }
 
