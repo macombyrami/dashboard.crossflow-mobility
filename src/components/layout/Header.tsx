@@ -1,5 +1,5 @@
 'use client'
-import { Bell, Clock, BrainCircuit, Wifi, WifiOff, Menu, Globe } from 'lucide-react'
+import { Bell, Clock, BrainCircuit, Wifi, WifiOff, Menu, Globe, LogIn } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useLocaleStore } from '@/store/localeStore'
@@ -12,6 +12,9 @@ import { fr, enUS } from 'date-fns/locale'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { IntegrationStatus } from '@/components/dashboard/IntegrationStatus'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
+import type { User } from '@supabase/supabase-js'
 
 export function Header() {
   const { t, locale } = useTranslation()
@@ -26,12 +29,24 @@ export function Header() {
   const [mounted, setMounted] = useState(false)
   const [now, setNow]  = useState(new Date())
   const [showInteg, setShowInteg] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
+  
+  const supabase = createClient()
+  const router = useRouter()
 
   useEffect(() => {
     setMounted(true)
     const t = setInterval(() => setNow(new Date()), 30_000)
+    
+    // Fetch user
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    getUser()
+
     return () => clearInterval(t)
-  }, [])
+  }, [supabase.auth])
 
   const criticalCount = incidents.filter(i => i.severity === 'critical' || i.severity === 'high').length
   const isLive        = hasKey() && dataSource === 'live'
@@ -148,10 +163,27 @@ export function Header() {
           <span className="hidden lg:inline">{t('common.ai_assistant')}</span>
         </button>
 
-        <div className="hidden sm:flex items-center justify-center w-9 h-9 rounded-full glass border border-brand-green/20 shadow-glow cursor-default overflow-hidden">
-          <div className="absolute inset-0 bg-brand-green/10" />
-          <span className="text-[11px] font-bold text-brand-green relative z-10">CF</span>
-        </div>
+        {user ? (
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut()
+              router.push('/login')
+              router.refresh()
+            }}
+            className="hidden sm:flex items-center justify-center w-9 h-9 rounded-full glass border border-brand-green/20 shadow-glow hover:bg-white/5 transition-all overflow-hidden group"
+            title="Se déconnecter"
+          >
+            <div className="absolute inset-0 bg-brand-green/10" />
+            <span className="text-[11px] font-bold text-brand-green relative z-10 group-hover:hidden">
+              {user.email?.[0].toUpperCase()}
+            </span>
+            <LogIn className="w-4 h-4 text-brand-green relative z-10 hidden group-hover:block rotate-180" />
+          </button>
+        ) : (
+          <div className="hidden sm:flex items-center justify-center w-9 h-9 rounded-full glass border border-white/10 overflow-hidden">
+            <span className="text-[11px] font-bold text-text-muted">--</span>
+          </div>
+        )}
       </div>
     </header>
   )
