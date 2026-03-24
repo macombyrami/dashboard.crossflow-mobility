@@ -3,6 +3,7 @@ import './globals.css'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
+import { UserCityProvider } from '@/components/auth/UserCityProvider'
 
 export const metadata: Metadata = {
   title:       'CrossFlow Mobility — Smart City Platform',
@@ -31,16 +32,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <div className="app-shell">
-          <Sidebar />
-          <div className="main-content">
-            <Header />
-            <div className="flex-1 overflow-hidden relative flex flex-col min-h-0">
-              {children}
+        <UserCityProvider>
+          <div className="app-shell">
+            <Sidebar />
+            <div className="main-content">
+              <Header />
+              <div className="flex-1 overflow-hidden relative flex flex-col min-h-0">
+                {children}
+              </div>
             </div>
           </div>
-        </div>
-        <BottomNav />
+          <BottomNav />
+        </UserCityProvider>
       </body>
     </html>
   )

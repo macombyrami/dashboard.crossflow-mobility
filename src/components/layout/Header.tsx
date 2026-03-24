@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap } from 'lucide-react'
+import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap, Lock, Settings } from 'lucide-react'
 import { useMapStore, geocodingToCity } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import Link from 'next/link'
@@ -42,7 +42,7 @@ export function Header() {
         </div>
       </Link>
 
-      {/* City search — grows to fill available space */}
+      {/* City — locked badge or free search */}
       <div className="flex-1 min-w-0">
         <CitySearchBar />
       </div>
@@ -135,10 +135,30 @@ async function fetchCityBoundary(query: string): Promise<GeoJSON.Feature | null>
   }
 }
 
+// ─── Locked city badge (when user has a default city set) ──────────────────
+function LockedCityBadge() {
+  const city = useMapStore(s => s.city)
+  return (
+    <div className="flex items-center gap-2 w-full max-w-xs h-9 px-3 rounded-lg bg-bg-elevated/70 border border-bg-border/60">
+      <MapPin className="w-3.5 h-3.5 text-brand shrink-0" strokeWidth={2} />
+      <span className="flex-1 truncate text-[13px] font-medium text-text-primary leading-none">
+        {city.flag} {city.name}
+      </span>
+      <Link href="/settings" title="Changer de ville" className="text-text-muted hover:text-text-secondary transition-colors">
+        <Lock className="w-3 h-3" />
+      </Link>
+    </div>
+  )
+}
+
 // ─── Inline city search bar ─────────────────────────────────────────────────
 function CitySearchBar() {
+  const lockedCityId    = useMapStore(s => s.lockedCityId)
   const city            = useMapStore(s => s.city)
   const setCity         = useMapStore(s => s.setCity)
+
+  // When the user has a locked city, show a read-only badge
+  if (lockedCityId) return <LockedCityBadge />
   const setCityBoundary = useMapStore(s => s.setCityBoundary)
   const [open, setOpen]       = useState(false)
   const [query, setQuery]     = useState('')

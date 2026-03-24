@@ -192,8 +192,8 @@ export default function OnboardingPage() {
           Tout est prêt{name ? `, ${name}` : ''} !
         </h2>
         <p className="text-text-secondary">
-          CrossFlow est configuré sur <span className="text-brand-green font-semibold">{selectedCity.flag} {selectedCity.name}</span>.
-          Vous pouvez changer de ville à tout moment depuis la barre de recherche.
+          CrossFlow est configuré sur <span className="text-brand-green font-semibold">{selectedCity.flag} {selectedCity.name}</span> —
+          votre ville de travail principale. Vous pourrez la modifier depuis les paramètres.
         </p>
       </div>
 
@@ -312,20 +312,7 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        {/* Skip */}
-        {step < 3 && (
-          <div className="text-center mt-4">
-            <button
-              onClick={async () => {
-                await supabase.auth.updateUser({ data: { onboarding_completed: true } })
-                router.push('/map')
-              }}
-              className="text-[12px] text-text-muted hover:text-text-secondary transition-colors"
-            >
-              Passer l'onboarding →
-            </button>
-          </div>
-        )}
+        {/* Étape obligatoire — pas de skip */}
       </div>
     </div>
   )

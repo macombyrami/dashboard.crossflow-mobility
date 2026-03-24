@@ -1,144 +1,194 @@
 'use client'
-import { Settings, Key, RefreshCw, Bell, Globe, CheckCircle2, XCircle } from 'lucide-react'
-
-// API inventory with live status detection
-const API_SOURCES = [
-  {
-    category: 'Trafic',
-    apis: [
-      { name: 'TomTom Traffic',          env: 'NEXT_PUBLIC_TOMTOM_API_KEY',    status: 'configured', note: '2 500 req/jour · Flux + incidents temps réel' },
-      { name: 'HERE Traffic',            env: 'NEXT_PUBLIC_HERE_API_KEY',      status: 'missing',    note: '250 000 req/mois · Couverture 80+ pays' },
-    ],
-  },
-  {
-    category: 'Prévisions & Événements',
-    apis: [
-      { name: 'PredictHQ (événements)',  env: 'NEXT_PUBLIC_PREDICTHQ_API_KEY', status: 'configured', note: 'Concerts, matchs, congrès · Impact trafic estimé' },
-      { name: 'OpenRouteService',        env: 'NEXT_PUBLIC_ORS_API_KEY',       status: 'configured', note: 'Isochrones · Routing réel · Matrice O/D' },
-      { name: 'Calendrier scolaire',     env: null, status: 'free',            note: 'Vacances zones A/B/C · data.education.gouv.fr' },
-      { name: 'Jours fériés France',     env: null, status: 'free',            note: 'calendrier.api.gouv.fr' },
-      { name: 'Lever/coucher soleil',    env: null, status: 'free',            note: 'sunrise-sunset.org' },
-    ],
-  },
-  {
-    category: 'Transports',
-    apis: [
-      { name: 'RATP (trafic IDF)',       env: null, status: 'free',            note: 'Métro · RER · Tram · Temps réel' },
-      { name: 'SNCF Open Data',          env: null, status: 'free',            note: 'Ponctualité grandes lignes' },
-      { name: 'Navitia (multimodal)',    env: 'NEXT_PUBLIC_NAVITIA_API_KEY',   status: 'missing',    note: 'Horaires TC France/Europe' },
-    ],
-  },
-  {
-    category: 'Météo & Environnement',
-    apis: [
-      { name: 'Open-Meteo (météo)',      env: null, status: 'free',            note: 'Température · Vent · Précipitations · Prévisions 7j' },
-      { name: 'Open-Meteo (qualité air)',env: null, status: 'free',            note: 'PM2.5 · PM10 · NO₂ · O₃ · IQA européen' },
-      { name: 'OpenStreetMap / Overpass',env: null, status: 'free',            note: 'Réseau routier · POIs · Pistes cyclables' },
-    ],
-  },
-  {
-    category: 'Intelligence Artificielle',
-    apis: [
-      { name: 'OpenRouter — GPT OSS 120B', env: 'OPENROUTER_API_KEY',         status: 'configured', note: 'Assistant IA · Analyse trafic · Recommandations' },
-    ],
-  },
-]
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { useMapStore } from '@/store/mapStore'
+import { CITIES } from '@/config/cities.config'
+import { Settings, MapPin, User, LogOut, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react'
+import { cn } from '@/lib/utils/cn'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 export default function SettingsPage() {
+  const router        = useRouter()
+  const supabase      = createClient()
+  const setCity       = useMapStore(s => s.setCity)
+  const setLockedCity = useMapStore(s => s.setLockedCity)
+  const lockedCityId  = useMapStore(s => s.lockedCityId)
+
+  const [user,         setUser]         = useState<SupabaseUser | null>(null)
+  const [selectedCity, setSelectedCity] = useState(lockedCityId ?? 'paris')
+  const [saving,       setSaving]       = useState(false)
+  const [saved,        setSaved]        = useState(false)
+  const [signingOut,   setSigningOut]   = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+      const cityId = data.user?.user_metadata?.default_city as string | undefined
+      if (cityId) setSelectedCity(cityId)
+    })
+  }, []) // eslint-disable-line
+
+  const handleSaveCity = async () => {
+    if (!user) return
+    setSaving(true)
+    setSaved(false)
+    try {
+      await supabase.auth.updateUser({ data: { default_city: selectedCity } })
+      const city = CITIES.find(c => c.id === selectedCity)
+      if (city) {
+        setCity(city)
+        setLockedCity(selectedCity)
+      }
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSignOut = async () => {
+    setSigningOut(true)
+    await supabase.auth.signOut()
+    setLockedCity(null)
+    router.push('/login')
+  }
+
+  const meta        = user?.user_metadata ?? {}
+  const currentCity = CITIES.find(c => c.id === (lockedCityId ?? selectedCity))
+
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 max-w-2xl">
-          <div>
-            <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
-              <Settings className="w-5 h-5 text-brand-green" />
-              Paramètres
-            </h1>
-            <p className="text-sm text-text-secondary mt-1">Configuration de la plateforme et des sources de données</p>
+    <main className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 max-w-2xl mx-auto w-full">
+
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-bg-elevated border border-bg-border flex items-center justify-center">
+          <Settings className="w-4 h-4 text-text-secondary" />
+        </div>
+        <div>
+          <h1 className="text-lg font-bold text-text-primary">Paramètres</h1>
+          <p className="text-sm text-text-secondary">Gérez votre compte et votre ville de travail</p>
+        </div>
+      </div>
+
+      {/* Account */}
+      <section className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-bg-border flex items-center gap-2">
+          <User className="w-4 h-4 text-brand" />
+          <span className="text-sm font-semibold text-text-primary">Compte</span>
+        </div>
+        <div className="p-5">
+          {user ? (
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-brand/15 border border-brand/30 flex items-center justify-center text-xl font-bold text-brand select-none">
+                {(meta.display_name ?? user.email ?? '?')[0].toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                {meta.display_name && (
+                  <p className="text-[15px] font-semibold text-text-primary truncate">{meta.display_name}</p>
+                )}
+                <p className="text-[13px] text-text-secondary truncate">{user.email}</p>
+                {meta.role && (
+                  <p className="text-[11px] text-text-muted mt-0.5 capitalize">
+                    {String(meta.role).replace('_', ' ')}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand/10 border border-brand/30 shrink-0">
+                <ShieldCheck className="w-3 h-3 text-brand" />
+                <span className="text-[10px] font-bold text-brand uppercase tracking-wider">Connecté</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-text-muted py-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Chargement…</span>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* City selection */}
+      <section className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-bg-border flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-brand" />
+          <span className="text-sm font-semibold text-text-primary">Ville principale</span>
+          {currentCity && (
+            <span className="ml-auto text-[12px] text-text-muted">
+              Actuelle :&nbsp;
+              <span className="text-text-secondary font-medium">{currentCity.flag} {currentCity.name}</span>
+            </span>
+          )}
+        </div>
+
+        <div className="p-5 space-y-4">
+          <p className="text-[13px] text-text-secondary">
+            Votre tableau de bord et votre carte sont verrouillés sur cette ville. Vous pouvez en choisir une autre ici.
+          </p>
+
+          <div className="grid gap-2 max-h-[380px] overflow-y-auto pr-1">
+            {CITIES.map(c => (
+              <button
+                key={c.id}
+                onClick={() => setSelectedCity(c.id)}
+                className={cn(
+                  'flex items-center gap-4 p-3.5 rounded-xl border text-left transition-all',
+                  selectedCity === c.id
+                    ? 'border-brand/60 bg-brand/10'
+                    : 'border-bg-border bg-bg-elevated hover:border-bg-hover',
+                )}
+              >
+                <span className="text-xl leading-none">{c.flag}</span>
+                <div className="flex-1 min-w-0">
+                  <p className={cn('text-[13px] font-semibold truncate', selectedCity === c.id ? 'text-brand' : 'text-text-primary')}>
+                    {c.name}
+                  </p>
+                  <p className="text-[11px] text-text-muted">{c.country} · {(c.population / 1_000_000).toFixed(1)}M hab.</p>
+                </div>
+                {selectedCity === c.id && <CheckCircle2 className="w-4 h-4 text-brand flex-shrink-0" />}
+              </button>
+            ))}
           </div>
 
-          <Section icon={Key} title="Sources de données & API">
-            {API_SOURCES.map(cat => (
-              <div key={cat.category}>
-                <p className="text-xs text-text-muted uppercase tracking-wider font-medium mb-2">{cat.category}</p>
-                <div className="space-y-2 mb-4">
-                  {cat.apis.map(api => (
-                    <div key={api.name} className="flex items-center justify-between py-2.5 px-3 bg-bg-elevated rounded-xl border border-bg-border">
-                      <div className="flex items-center gap-3">
-                        {api.status === 'configured' || api.status === 'free'
-                          ? <CheckCircle2 className="w-4 h-4 text-brand-green flex-shrink-0" />
-                          : <XCircle className="w-4 h-4 text-[#FF6D00] flex-shrink-0" />
-                        }
-                        <div>
-                          <p className="text-sm font-medium text-text-primary">{api.name}</p>
-                          <p className="text-[10px] text-text-muted">{api.note}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        {api.status === 'free' && (
-                          <span className="text-xs bg-brand-green-dim text-brand-green px-2 py-1 rounded-lg font-medium">Actif</span>
-                        )}
-                        {api.status === 'configured' && (
-                          <span className="text-xs bg-[rgba(41,121,255,0.12)] text-[#2979FF] px-2 py-1 rounded-lg font-medium">Configuré</span>
-                        )}
-                        {api.status === 'missing' && (
-                          <span className="text-xs bg-[rgba(255,109,0,0.12)] text-[#FF6D00] px-2 py-1 rounded-lg font-medium">Clé manquante</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <div className="mt-2 p-3 bg-bg-subtle rounded-xl text-xs text-text-muted">
-              Pour ajouter une clé API, modifie le fichier <code className="text-text-secondary bg-bg-elevated px-1.5 py-0.5 rounded">.env.local</code> à la racine du projet.
-            </div>
-          </Section>
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={handleSaveCity}
+              disabled={saving || selectedCity === lockedCityId}
+              className={cn(
+                'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-[13px] transition-all',
+                saving || selectedCity === lockedCityId
+                  ? 'bg-bg-elevated text-text-muted cursor-not-allowed'
+                  : 'bg-brand text-black hover:bg-brand/90 shadow-glow',
+              )}
+            >
+              {saving  && <Loader2     className="w-3.5 h-3.5 animate-spin" />}
+              {saved   && <CheckCircle2 className="w-3.5 h-3.5" />}
+              {saved ? 'Ville enregistrée !' : 'Enregistrer cette ville'}
+            </button>
+            {selectedCity === lockedCityId && !saving && (
+              <span className="text-[12px] text-text-muted">Déjà votre ville actuelle</span>
+            )}
+          </div>
+        </div>
+      </section>
 
-          <Section icon={RefreshCw} title="Intervalles de rafraîchissement">
-            <InfoRow label="Trafic temps réel"      value="30 secondes" />
-            <InfoRow label="KPIs dashboard"          value="30 secondes" />
-            <InfoRow label="Météo (OpenMeteo)"       value="5 minutes" />
-            <InfoRow label="Qualité de l'air"        value="10 minutes" />
-            <InfoRow label="Incidents RATP"          value="60 secondes" />
-          </Section>
-
-          <Section icon={Globe} title="Assistant IA actif">
-            <div className="bg-brand-green-dim border border-brand-green/20 rounded-xl p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-brand-green">GPT OSS 120B</p>
-                <span className="text-xs bg-brand-green/10 text-brand-green px-2 py-0.5 rounded-lg">Gratuit</span>
-              </div>
-              <p className="text-xs text-text-secondary">Modèle de langage haute capacité, spécialisé pour l'analyse de mobilité urbaine. Répond en français aux questions sur le trafic, les incidents et les optimisations.</p>
-              <p className="text-[10px] text-text-muted">Modèles alternatifs disponibles dans l'assistant : Gemini Flash, Claude Haiku, GPT-4o mini, Llama 3.1</p>
-            </div>
-          </Section>
-
-          <Section icon={Bell} title="Plan actif">
-            <div className="bg-bg-elevated border border-bg-border rounded-xl p-4">
-              <p className="text-sm font-semibold text-[#AA00FF]">Enterprise</p>
-              <p className="text-xs text-text-secondary mt-1">Accès complet · Toutes les villes · IA avancée · Données temps réel</p>
-            </div>
-          </Section>
+      {/* Sign out */}
+      <section className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
+        <div className="p-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[13px] font-semibold text-text-primary">Déconnexion</p>
+            <p className="text-[12px] text-text-muted mt-0.5">Vous serez redirigé vers la page de connexion</p>
+          </div>
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all text-[13px] font-medium disabled:opacity-50 shrink-0"
+          >
+            {signingOut ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+            Se déconnecter
+          </button>
+        </div>
+      </section>
     </main>
-  )
-}
-
-function Section({ icon: Icon, title, children }: { icon: typeof Settings; title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-bg-border flex items-center gap-2">
-        <Icon className="w-4 h-4 text-brand-green" />
-        <h2 className="text-sm font-semibold text-text-primary">{title}</h2>
-      </div>
-      <div className="p-5 space-y-1">{children}</div>
-    </div>
-  )
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between py-2.5 border-b border-bg-border last:border-0">
-      <span className="text-sm text-text-secondary">{label}</span>
-      <span className="text-sm font-medium text-text-primary">{value}</span>
-    </div>
   )
 }

@@ -1,14 +1,14 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Map, LayoutDashboard, TrendingUp, GitBranch, Activity } from 'lucide-react'
+import { Map, LayoutDashboard, TrendingUp, GitBranch, Settings } from 'lucide-react'
 
 const TABS = [
   { href: '/map',        icon: Map,             label: 'Carte' },
   { href: '/dashboard',  icon: LayoutDashboard, label: 'Tableau' },
   { href: '/prediction', icon: TrendingUp,      label: 'Prévisions' },
   { href: '/simulation', icon: GitBranch,       label: 'Simulation' },
-  { href: '/transport',  icon: Activity,        label: 'Transport' },
+  { href: '/settings',   icon: Settings,        label: 'Réglages' },
 ]
 
 export function BottomNav() {
