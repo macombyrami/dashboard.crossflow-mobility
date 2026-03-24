@@ -222,7 +222,7 @@ export default function OnboardingPage() {
     // Finalize: save to Supabase user metadata
     setLoading(true)
     try {
-      await supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         data: {
           onboarding_completed: true,
           display_name: name.trim(),
@@ -230,11 +230,18 @@ export default function OnboardingPage() {
           default_city: cityId,
         },
       })
-      router.push('/map')
-    } catch {
+      if (error) throw error
+      
+      // Delay slightly for visual feedback
+      setTimeout(() => {
+        router.push('/map')
+      }, 500)
+    } catch (err) {
+      console.error('Onboarding update error:', err)
+      // Fallback but log it
       router.push('/map')
     } finally {
-      setLoading(false)
+      // Don't set loading false immediately to keep the spinner while redirecting
     }
   }
 
