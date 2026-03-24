@@ -53,10 +53,20 @@ export function MapLegend() {
 
   return (
     <div className="absolute bottom-24 right-3 z-10 flex flex-col items-end gap-2">
-      {/* City Context Label (shown when boundary is active) */}
+      {/* District choropleth legend pill (shown when boundary is active) */}
       {isBoundary && (
-        <div className="glass px-3 py-1.5 rounded-full border border-brand-green/30 text-[10px] font-bold text-brand-green uppercase tracking-wider animate-in fade-in slide-in-from-right-4">
-          Cœur Urbain Actif
+        <div className="glass px-3 py-2.5 rounded-2xl border border-white/10 animate-in fade-in slide-in-from-right-4 w-44 shadow-xl">
+          <p className="text-[9px] font-bold text-text-muted uppercase tracking-[0.12em] mb-2 flex items-center gap-1.5">
+            <span className="w-1 h-1 rounded-full bg-brand-green animate-pulse" />
+            Densité par quartier
+          </p>
+          <div className="h-2 w-full rounded-full mb-1.5" style={{ background: 'linear-gradient(to right, rgba(34,197,94,0.8), rgba(255,214,0,0.8), rgba(255,159,10,0.8), rgba(255,59,48,0.8))' }} />
+          <div className="flex justify-between text-[9px] text-text-muted font-medium">
+            <span>Fluide</span>
+            <span>Modéré</span>
+            <span>Dense</span>
+            <span>Saturé</span>
+          </div>
         </div>
       )}
 

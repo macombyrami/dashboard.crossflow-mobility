@@ -146,6 +146,84 @@ export async function fetchCityBoundary(name: string, country?: string): Promise
   }
 }
 
+// Seeded deterministic pseudo-random (0-1) from any string
+function seededRandom(seed: string): number {
+  let h = 2166136261 >>> 0
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i)
+    h = Math.imul(h, 16777619) >>> 0
+  }
+  return (h & 0xffff) / 0xffff
+}
+
+/**
+ * Fetch district/neighbourhood polygons for a city using Overpass API.
+ * Returns a GeoJSON FeatureCollection with `name` and `density` (0-1) per district.
+ */
+export async function fetchCityDistricts(
+  bbox: [number, number, number, number], // [west, south, east, north]
+): Promise<GeoJSON.FeatureCollection> {
+  const [west, south, east, north] = bbox
+  const bboxStr = `${south},${west},${north},${east}` // Overpass: S,W,N,E
+
+  const query = `[out:json][timeout:20];
+(
+  way["boundary"="administrative"]["admin_level"~"^[89]$"](${bboxStr});
+  relation["boundary"="administrative"]["admin_level"~"^[89]$"](${bboxStr});
+);
+out geom;`
+
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    'data=' + encodeURIComponent(query),
+    })
+    if (!res.ok) return { type: 'FeatureCollection', features: [] }
+
+    const data = await res.json()
+    const features: GeoJSON.Feature[] = []
+
+    for (const el of data.elements ?? []) {
+      let ring: [number, number][] | null = null
+
+      if (el.type === 'way' && el.geometry?.length >= 3) {
+        ring = el.geometry.map((p: any) => [p.lon, p.lat] as [number, number])
+        if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) {
+          ring.push(ring[0])
+        }
+      } else if (el.type === 'relation') {
+        const outerWays = (el.members ?? []).filter((m: any) => m.role === 'outer' && m.geometry?.length)
+        if (outerWays.length === 0) continue
+        ring = []
+        for (const way of outerWays) {
+          for (const p of way.geometry) ring.push([p.lon, p.lat])
+        }
+        if (ring.length >= 3 && (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1])) {
+          ring.push(ring[0])
+        }
+      }
+
+      if (!ring || ring.length < 4) continue
+
+      const name = el.tags?.name ?? el.tags?.['name:fr'] ?? el.tags?.['name:en'] ?? 'Zone'
+      features.push({
+        type:     'Feature',
+        geometry: { type: 'Polygon', coordinates: [ring] },
+        properties: {
+          name,
+          admin_level: Number(el.tags?.admin_level ?? 9),
+          density:     seededRandom(name + String(el.id)),
+        },
+      })
+    }
+
+    return { type: 'FeatureCollection', features }
+  } catch {
+    return { type: 'FeatureCollection', features: [] }
+  }
+}
+
 interface NominatimResult {
   place_id:    number
   display_name:string

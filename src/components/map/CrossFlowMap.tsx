@@ -26,7 +26,7 @@ import {
   jamFactorToCongestion,
 } from '@/lib/api/here'
 import { fetchWeather as fetchOpenMeteoWeather, fetchAirQuality } from '@/lib/api/openmeteo'
-import { fetchCityBoundary } from '@/lib/api/geocoding'
+import { fetchCityBoundary, fetchCityDistricts } from '@/lib/api/geocoding'
 import type { Incident, HeatmapMode } from '@/types'
 
 const TRAFFIC_SOURCE          = 'cf-traffic'
@@ -37,6 +37,7 @@ const INCIDENT_SOURCE         = 'cf-incidents'
 const TOMTOM_FLOW             = 'tomtom-flow'
 const TOMTOM_INC              = 'tomtom-incidents'
 const BOUNDARY_SOURCE         = 'city-boundary'
+const DISTRICTS_SOURCE        = 'city-districts'
 const ZONE_SOURCE             = 'cf-zone'
 const ZONE_DRAFT_SOURCE       = 'cf-zone-draft'
 const POI_SOURCE              = 'cf-pois'
@@ -144,6 +145,7 @@ export function CrossFlowMap() {
     map.on('load', () => {
       initStaticSources(map)
       initBoundaryLayers(map)
+      initDistrictsLayers(map)
       initHeatmapPassagesLayers(map)
       initZoneLayers(map)
 
@@ -270,6 +272,50 @@ export function CrossFlowMap() {
           </div>
         `)
         .addTo(map)
+    })
+
+    // Click on District choropleth
+    map.on('click', DISTRICTS_SOURCE + '-fill', (e) => {
+      if (zoneActiveRef.current) return
+      const feat = e.features?.[0]
+      if (!feat) return
+      const name    = feat.properties?.name ?? 'Zone'
+      const density = feat.properties?.density ?? 0.5
+      const pct     = Math.round(density * 100)
+      const color   = density < 0.25 ? '#22C55E' : density < 0.5 ? '#FFD600' : density < 0.75 ? '#FF9F0A' : '#FF3B30'
+      const label   = density < 0.25 ? 'Fluide' : density < 0.5 ? 'Modéré' : density < 0.75 ? 'Dense' : 'Saturé'
+      popupRef.current?.remove()
+      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '260px', className: 'apple-popup' })
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div class="glass" style="padding:16px;border-radius:20px;color:white;border:1px solid ${color}30;font-family:Inter,-apple-system,sans-serif;">
+            <p style="margin:0 0 2px 0;font-size:9px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:0.1em;">Quartier Urbain</p>
+            <h3 style="margin:0 0 14px 0;font-size:17px;font-weight:700;">${name}</h3>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+              <div style="flex:1;height:6px;border-radius:3px;background:linear-gradient(to right,#22C55E,#FFD600,#FF9F0A,#FF3B30);overflow:hidden;position:relative;">
+                <div style="position:absolute;top:-3px;width:2px;height:12px;background:white;border-radius:1px;left:${pct}%;box-shadow:0 0 6px white;"></div>
+              </div>
+              <span style="font-size:13px;font-weight:700;color:${color};min-width:36px;">${pct}%</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="background:rgba(255,255,255,0.04);padding:8px;border-radius:10px;">
+                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase;">Densité trafic</p>
+                <p style="margin:3px 0 0 0;font-size:13px;font-weight:600;color:${color};">${label}</p>
+              </div>
+              <div style="background:rgba(255,255,255,0.04);padding:8px;border-radius:10px;">
+                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase;">Niveau admin</p>
+                <p style="margin:3px 0 0 0;font-size:13px;font-weight:600;">Niv. ${feat.properties?.admin_level ?? 9}</p>
+              </div>
+            </div>
+          </div>
+        `)
+        .addTo(map)
+    })
+    map.on('mouseenter', DISTRICTS_SOURCE + '-fill', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = 'pointer'
+    })
+    map.on('mouseleave', DISTRICTS_SOURCE + '-fill', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
     })
 
     // Click on Heatmap Points (using the points rendered as transparent circles for interaction)
@@ -484,6 +530,23 @@ export function CrossFlowMap() {
     )
     map.fitBounds(bounds, { padding: 48, duration: 1600, essential: true })
   }, [cityBoundary, mapLoaded])
+
+  // ─── City districts choropleth ────────────────────────────────────────
+
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return
+    const map = mapRef.current
+    const src = map.getSource(DISTRICTS_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (!src) return
+
+    src.setData({ type: 'FeatureCollection', features: [] }) // clear while loading
+    if (!city.bbox) return
+
+    fetchCityDistricts(city.bbox).then(fc => {
+      const s = map.getSource(DISTRICTS_SOURCE) as maplibregl.GeoJSONSource | undefined
+      if (s) s.setData(fc)
+    })
+  }, [city, mapLoaded]) // eslint-disable-line
 
   // ─── Data refresh ─────────────────────────────────────────────────────
 
@@ -781,6 +844,11 @@ export function CrossFlowMap() {
     trySet(BOUNDARY_SOURCE + '-fill',       boundaryVis)
     trySet(BOUNDARY_SOURCE + '-line',       boundaryVis)
     trySet(BOUNDARY_SOURCE + '-label',      boundaryVis)
+
+    // District choropleth
+    trySet(DISTRICTS_SOURCE + '-fill',  boundaryVis)
+    trySet(DISTRICTS_SOURCE + '-line',  boundaryVis)
+    trySet(DISTRICTS_SOURCE + '-label', boundaryVis)
 
     // TomTom live tiles
     if (useLiveData) {
@@ -1083,6 +1151,61 @@ function initStaticSources(map: maplibregl.Map) {
       'text-color':      '#000000',
       'text-halo-color': 'rgba(0,0,0,0)',
       'text-halo-width': 0,
+    },
+  })
+}
+
+function initDistrictsLayers(map: maplibregl.Map) {
+  const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
+  map.addSource(DISTRICTS_SOURCE, { type: 'geojson', data: emptyFC })
+
+  // Choropleth fill — color driven by `density` property (0-1)
+  map.addLayer({
+    id:     DISTRICTS_SOURCE + '-fill',
+    type:   'fill',
+    source: DISTRICTS_SOURCE,
+    paint:  {
+      'fill-color': [
+        'interpolate', ['linear'], ['get', 'density'],
+        0,    'rgba(34, 197, 94, 0.30)',
+        0.33, 'rgba(255, 214, 0, 0.35)',
+        0.66, 'rgba(255, 159, 10, 0.40)',
+        1,    'rgba(255, 59, 48, 0.45)',
+      ],
+      'fill-opacity': 1,
+      'fill-outline-color': 'rgba(0,0,0,0)',
+    },
+  })
+
+  // District borders
+  map.addLayer({
+    id:     DISTRICTS_SOURCE + '-line',
+    type:   'line',
+    source: DISTRICTS_SOURCE,
+    paint:  {
+      'line-color':   'rgba(255,255,255,0.12)',
+      'line-width':   0.8,
+    },
+  })
+
+  // District name labels (visible from zoom 12)
+  map.addLayer({
+    id:     DISTRICTS_SOURCE + '-label',
+    type:   'symbol',
+    source: DISTRICTS_SOURCE,
+    minzoom: 12,
+    layout: {
+      'text-field':    ['get', 'name'],
+      'text-font':     ['Open Sans Bold'],
+      'text-size':     11,
+      'text-anchor':   'center',
+      'symbol-placement': 'point',
+      'text-allow-overlap': false,
+    },
+    paint: {
+      'text-color':      'rgba(255,255,255,0.85)',
+      'text-halo-color': 'rgba(0,0,0,0.7)',
+      'text-halo-width': 2,
     },
   })
 }
