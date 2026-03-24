@@ -45,7 +45,7 @@ const VEHICLES_SOURCE         = 'cf-vehicles'
 // CartoDB Voyager Dark — completely free, no key, beautiful dark style
 const CARTO_DARK_STYLE: maplibregl.StyleSpecification = {
   version: 8,
-  glyphs:  'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+  glyphs:  'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
   sources: {
     'carto-dark': {
       type:        'raster',
@@ -243,6 +243,57 @@ export function CrossFlowMap() {
     map.on('mouseleave', VEHICLES_SOURCE + '-layer', () => {
       if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
     })
+
+    // Click on City Boundary
+    map.on('click', BOUNDARY_SOURCE + '-fill', (e) => {
+      if (zoneActiveRef.current) return
+      popupRef.current?.remove()
+      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '240px', className: 'apple-popup' })
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div class="glass" style="padding: 16px; border-radius: 20px; color: white; border: 1px solid rgba(34,197,94,0.2);">
+            <p style="margin:0 0 4px 0; font-size:10px; font-weight:700; color:#22C55E; text-transform:uppercase; tracking:0.1em;">Périmètre Urbain</p>
+            <h3 style="margin:0 0 12px 0; font-size:18px;">${city.name}</h3>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:12px;">
+                <p style="margin:0; font-size:9px; color:#86868B;">POPULATION</p>
+                <p style="margin:0; font-size:13px; font-weight:600;">${city.population.toLocaleString()}</p>
+              </div>
+              <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:12px;">
+                <p style="margin:0; font-size:9px; color:#86868B;">PAYS</p>
+                <p style="margin:0; font-size:13px; font-weight:600;">${city.country} ${city.flag}</p>
+              </div>
+            </div>
+            <p style="margin:12px 0 0 0; font-size:10px; color:#86868B; line-height:1.4;">
+              Analyse en temps réel du flux de mobilité sur l'ensemble de la zone métropolitaine.
+            </p>
+          </div>
+        `)
+        .addTo(map)
+    })
+
+    // Click on Heatmap Points (using the points rendered as transparent circles for interaction)
+    const handleHeatmapClick = (mode: HeatmapMode, color: string, unit: string) => (e: any) => {
+      const feat = e.features?.[0]
+      if (!feat) return
+      const intensity = feat.properties?.intensity
+      popupRef.current?.remove()
+      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, className: 'apple-popup' })
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div class="glass" style="padding:12px; border-radius:16px; min-width:140px; border:1px solid ${color}40;">
+            <p style="margin:0; font-size:9px; font-weight:700; color:${color}; text-transform:uppercase;">Intensité ${mode}</p>
+            <p style="margin:4px 0 0 0; font-size:22px; font-weight:700; color:white;">
+              ${Math.round(intensity * 100)}<span style="font-size:12px; font-weight:500; color:#86868B; margin-left:4px;">${unit}</span>
+            </p>
+          </div>
+        `)
+        .addTo(map)
+    }
+
+    map.on('click', HEATMAP_SOURCE + '-circles', handleHeatmapClick('congestion', '#FF3B30', '%'))
+    map.on('click', HEATMAP_PASSAGES_SOURCE + '-circles', handleHeatmapClick('passages', '#FFD600', 'pts'))
+    map.on('click', HEATMAP_CO2_SOURCE + '-circles', handleHeatmapClick('co2', '#A855F7', 'g'))
 
     mapRef.current = map
     return () => {
@@ -751,9 +802,14 @@ export function CrossFlowMap() {
       if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', vis)
     }
     const isHeatmapActive = activeLayers.has('heatmap')
-    trySet(HEATMAP_SOURCE          + '-layer', isHeatmapActive && heatmapMode === 'congestion' ? 'visible' : 'none')
-    trySet(HEATMAP_PASSAGES_SOURCE + '-layer', isHeatmapActive && heatmapMode === 'passages'   ? 'visible' : 'none')
-    trySet(HEATMAP_CO2_SOURCE      + '-layer', isHeatmapActive && heatmapMode === 'co2'        ? 'visible' : 'none')
+    trySet(HEATMAP_SOURCE          + '-layer',   isHeatmapActive && heatmapMode === 'congestion' ? 'visible' : 'none')
+    trySet(HEATMAP_SOURCE          + '-circles', isHeatmapActive && heatmapMode === 'congestion' ? 'visible' : 'none')
+    
+    trySet(HEATMAP_PASSAGES_SOURCE + '-layer',   isHeatmapActive && heatmapMode === 'passages'   ? 'visible' : 'none')
+    trySet(HEATMAP_PASSAGES_SOURCE + '-circles', isHeatmapActive && heatmapMode === 'passages'   ? 'visible' : 'none')
+    
+    trySet(HEATMAP_CO2_SOURCE      + '-layer',   isHeatmapActive && heatmapMode === 'co2'        ? 'visible' : 'none')
+    trySet(HEATMAP_CO2_SOURCE      + '-circles', isHeatmapActive && heatmapMode === 'co2'        ? 'visible' : 'none')
   }, [heatmapMode, activeLayers, mapLoaded])
 
   // ─── Zone drawing (draft line + finalized polygon) ─────────────────
@@ -857,9 +913,20 @@ function initStaticSources(map: maplibregl.Map) {
         0.25, 'rgba(34, 197, 94, 0.3)',
         0.5,  'rgba(255, 214, 0, 0.5)',
         0.75, 'rgba(255, 159, 10, 0.7)',
-        1,    'rgba(255, 59, 48, 0.9)',
       ],
     },
+  })
+
+  // Transparent click targets for heatmap
+  map.addLayer({
+    id:     HEATMAP_SOURCE + '-circles',
+    type:   'circle',
+    source: HEATMAP_SOURCE,
+    paint:  {
+      'circle-radius': 18,
+      'circle-color': 'rgba(0,0,0,0)',
+      'circle-opacity': 0
+    }
   })
 
   // Incidents (Luminous dots)
@@ -1025,53 +1092,53 @@ function initBoundaryLayers(map: maplibregl.Map) {
 
   map.addSource(BOUNDARY_SOURCE, { type: 'geojson', data: emptyFC })
 
-  // 1. Outer glow — very wide blurred line
+  // 1. Very wide outer glow (Neon effect)
   map.addLayer({
     id:     BOUNDARY_SOURCE + '-glow-outer',
     type:   'line',
     source: BOUNDARY_SOURCE,
     paint:  {
       'line-color':   '#22C55E',
-      'line-width':   28,
-      'line-opacity': 0.07,
-      'line-blur':    20,
+      'line-width':   40,
+      'line-opacity': 0.05,
+      'line-blur':    25,
     },
   })
 
-  // 2. Mid glow
+  // 2. Focused mid glow
   map.addLayer({
     id:     BOUNDARY_SOURCE + '-glow',
     type:   'line',
     source: BOUNDARY_SOURCE,
     paint:  {
       'line-color':   '#22C55E',
-      'line-width':   10,
-      'line-opacity': 0.18,
-      'line-blur':    6,
+      'line-width':   12,
+      'line-opacity': 0.2,
+      'line-blur':    8,
     },
   })
 
-  // 3. Fill — very subtle city tint
+  // 3. Fill — Elegant glassmorphism area
   map.addLayer({
     id:     BOUNDARY_SOURCE + '-fill',
     type:   'fill',
     source: BOUNDARY_SOURCE,
     paint:  {
       'fill-color':   '#22C55E',
-      'fill-opacity': 0.04,
+      'fill-opacity': 0.03,
     },
   })
 
-  // 4. Crisp border line
+  // 4. Crisp high-tech border line
   map.addLayer({
     id:     BOUNDARY_SOURCE + '-line',
     type:   'line',
     source: BOUNDARY_SOURCE,
     paint:  {
       'line-color':        '#22C55E',
-      'line-width':        2,
-      'line-opacity':      0.85,
-      'line-dasharray':    [3, 2],
+      'line-width':        1.5,
+      'line-opacity':      0.9,
+      'line-dasharray':    [4, 4],
     },
   })
 
@@ -1082,7 +1149,7 @@ function initBoundaryLayers(map: maplibregl.Map) {
     source: BOUNDARY_SOURCE,
     layout: {
       'text-field':    ['coalesce', ['get', 'name'], ''],
-      'text-font':     ['Open Sans Bold', 'Arial Unicode MS Bold'],
+      'text-font':     ['Open Sans Bold'],
       'text-size':     13,
       'text-offset':   [0, 0],
       'text-anchor':   'center',
@@ -1120,9 +1187,19 @@ function initHeatmapPassagesLayers(map: maplibregl.Map) {
         0.25, 'rgba(0, 150, 255, 0.4)',
         0.5,  'rgba(0, 200, 200, 0.6)',
         0.75, 'rgba(0, 255, 150, 0.8)',
-        1,    'rgba(255, 255, 0, 1)',
       ],
     },
+  })
+
+  map.addLayer({
+    id:     HEATMAP_PASSAGES_SOURCE + '-circles',
+    type:   'circle',
+    source: HEATMAP_PASSAGES_SOURCE,
+    paint:  {
+      'circle-radius': 18,
+      'circle-color': 'rgba(0,0,0,0)',
+      'circle-opacity': 0
+    }
   })
 
   // CO2 heatmap
@@ -1144,9 +1221,19 @@ function initHeatmapPassagesLayers(map: maplibregl.Map) {
         0.2,  'rgba(100, 0, 200, 0.3)',
         0.5,  'rgba(200, 50, 50, 0.6)',
         0.75, 'rgba(255, 100, 0, 0.8)',
-        1,    'rgba(255, 30, 30, 1)',
       ],
     },
+  })
+
+  map.addLayer({
+    id:     HEATMAP_CO2_SOURCE + '-circles',
+    type:   'circle',
+    source: HEATMAP_CO2_SOURCE,
+    paint:  {
+      'circle-radius': 18,
+      'circle-color': 'rgba(0,0,0,0)',
+      'circle-opacity': 0
+    }
   })
 }
 
