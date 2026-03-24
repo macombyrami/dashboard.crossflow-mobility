@@ -21,39 +21,41 @@ export function ModalSplitChart() {
   }))
 
   return (
-    <div className="card-premium p-6 space-y-6">
-      <div className="flex items-center gap-2">
-         <div className="w-1 h-4 bg-brand-green rounded-full shadow-glow" />
-         <p className="text-[11px] font-bold text-text-muted uppercase tracking-[0.15em]">Répartition Modale</p>
+    <div className="glass-card p-6 space-y-7 hover:shadow-apple transition-all duration-500 group animate-scale-in">
+      <div className="flex items-center gap-2.5">
+         <div className="w-1.5 h-4.5 bg-brand rounded-full shadow-glow" />
+         <p className="text-[11px] font-bold text-text-muted uppercase tracking-[0.18em]">Répartition Modale</p>
       </div>
 
       <div className="flex items-center gap-8">
         <div className="relative group">
-          <ResponsiveContainer width={130} height={130}>
+          <ResponsiveContainer width={140} height={140}>
             <PieChart>
               <Pie
                 data={data}
                 cx="50%"
                 cy="50%"
-                innerRadius={45}
-                outerRadius={65}
-                paddingAngle={4}
+                innerRadius={50}
+                outerRadius={68}
+                paddingAngle={5}
                 dataKey="value"
                 strokeWidth={0}
               >
                 {data.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} className="hover:opacity-80 transition-opacity" />
+                  <Cell key={i} fill={entry.color} className="hover:opacity-85 transition-opacity duration-300" />
                 ))}
               </Pie>
               <Tooltip
                 contentStyle={{
-                  backgroundColor: 'rgba(21, 21, 24, 0.8)',
+                  backgroundColor: 'rgba(25, 25, 28, 0.7)',
                   backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '12px',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '14px',
                   fontSize: 12,
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                  padding: '10px 14px'
                 }}
+                itemStyle={{ color: '#FFF', fontWeight: 800 }}
                 formatter={(v) => [`${v}%`, '']}
               />
             </PieChart>
@@ -66,14 +68,14 @@ export function ModalSplitChart() {
           </div>
         </div>
 
-        <div className="flex-1 space-y-3">
+        <div className="flex-1 space-y-3.5">
           {data.map(d => (
             <div key={d.name} className="flex items-center justify-between group/row">
               <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full flex-shrink-0 shadow-glow transition-transform group-hover/row:scale-125" style={{ backgroundColor: d.color }} />
-                <span className="text-[12px] font-medium text-text-secondary group-hover/row:text-white transition-colors">{d.name}</span>
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-glow-sm transition-all group-hover/row:scale-125 duration-300" style={{ backgroundColor: d.color }} />
+                <span className="text-[13px] font-bold text-text-secondary group-hover/row:text-white transition-colors">{d.name}</span>
               </div>
-              <span className="text-[13px] font-bold text-white tabular-nums">{d.value}%</span>
+              <span className="text-[14px] font-bold text-white tabular-nums tracking-tight">{d.value}%</span>
             </div>
           ))}
         </div>

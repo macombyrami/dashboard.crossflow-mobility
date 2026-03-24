@@ -122,13 +122,13 @@ export default function DashboardPage() {
       {/* Title & Stats Summary */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6">
         <div>
-          <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
-            <div className="w-1 h-5 sm:w-1.5 sm:h-6 bg-brand rounded-full shadow-glow" />
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+          <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2 animate-slide-up">
+            <div className="w-1.5 h-6 sm:w-2 sm:h-7 bg-brand rounded-full shadow-glow" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
               {city.flag} {city.name}
             </h1>
           </div>
-          <p className="text-[11px] sm:text-[13px] font-medium text-text-secondary flex flex-wrap items-center gap-2">
+          <p className="text-[12px] sm:text-[14px] font-medium text-text-secondary flex flex-wrap items-center gap-2 animate-slide-up [animation-delay:100ms]">
             {t('dashboard.title')} · <span className="text-text-muted">{t('dashboard.updated')}</span>
             {dataSource === 'live' && (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-brand/10 border border-brand/30 text-brand text-[9px] font-bold uppercase tracking-wider">
@@ -159,12 +159,12 @@ export default function DashboardPage() {
 
       {/* Network status banner */}
       <div className={cn(
-        "relative overflow-hidden p-0.5 rounded-xl group",
-        congCrit ? "bg-gradient-to-r from-red-500/20 to-transparent" :
-        congWarn ? "bg-gradient-to-r from-orange-500/20 to-transparent" :
-                  "bg-gradient-to-r from-brand/20 to-transparent"
+        "relative overflow-hidden p-[1px] rounded-[22px] group animate-slide-up [animation-delay:200ms]",
+        congCrit ? "bg-gradient-to-r from-red-500/30 to-transparent" :
+        congWarn ? "bg-gradient-to-r from-orange-500/30 to-transparent" :
+                  "bg-gradient-to-r from-brand/30 to-transparent"
       )}>
-        <div className="glass-light px-4 sm:px-6 py-3 sm:py-4 rounded-[14px] flex items-center gap-3 sm: gap-4 border border-white/5">
+        <div className="glass px-5 sm:px-7 py-4 sm:py-5 rounded-[21px] flex items-center gap-4 border border-white/5">
           <div className="relative">
             <div className={cn(
               "w-3 h-3 rounded-full shadow-glow animate-pulse",
@@ -262,15 +262,15 @@ export default function DashboardPage() {
         </div>
         <div className="space-y-4">
           <ModalSplitChart />
-          <div className="bg-bg-surface border border-bg-border rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Network className="w-4 h-4 text-brand" />
-              <p className="text-sm font-semibold text-text-primary">{t('dashboard.performance')}</p>
+          <div className="glass-card border border-white/5 rounded-[22px] p-6 shadow-sm group animate-scale-in [animation-delay:600ms]">
+            <div className="flex items-center gap-2.5 mb-5">
+              <div className="w-1.5 h-4.5 bg-brand rounded-full shadow-glow" />
+              <p className="text-[11px] font-bold text-text-muted uppercase tracking-[0.18em]">{t('dashboard.performance')}</p>
             </div>
             <EfficiencyBar label="Main roads"       value={kpis.networkEfficiency * 0.9 + 0.1} />
-            <EfficiencyBar label="Public transit"   value={0.78}  color="#2979FF" />
-            <EfficiencyBar label="Cycle network"    value={0.85}  color="#00E5FF" />
-            <EfficiencyBar label="Pedestrian zones" value={0.92}  color="#AA00FF" />
+            <EfficiencyBar label="Public transit"   value={0.78}  color="#0A84FF" />
+            <EfficiencyBar label="Cycle network"    value={0.85}  color="#30D158" />
+            <EfficiencyBar label="Pedestrian zones" value={0.92}  color="#AF52DE" />
           </div>
         </div>
       </div>

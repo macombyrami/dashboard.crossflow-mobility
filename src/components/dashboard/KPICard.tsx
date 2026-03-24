@@ -26,20 +26,20 @@ export function KPICard({
   const { t } = useTranslation()
   return (
     <div className={cn(
-      'card-premium p-6 space-y-4 hover:shadow-apple transition-all duration-300 relative group overflow-hidden',
+      'glass-card p-5 sm:p-6 space-y-5 hover:shadow-apple transition-all duration-500 relative group overflow-hidden animate-scale-in',
       className,
     )}>
-      {/* Background Glow Overlay */}
+      {/* Background Glow Overlay (Apple-style subtle vibrancy) */}
       <div 
-        className="absolute -top-10 -right-10 w-32 h-32 blur-[80px] opacity-20 transition-opacity group-hover:opacity-30" 
+        className="absolute -top-12 -right-12 w-40 h-40 blur-[100px] opacity-10 transition-opacity group-hover:opacity-25" 
         style={{ backgroundColor: color }} 
       />
 
       <div className="flex items-center justify-between relative z-10">
-        <span className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">{label}</span>
+        <span className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.12em] block">{label}</span>
         <div
-          className="w-10 h-10 rounded-apple flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110 duration-300"
-          style={{ backgroundColor: `${color}10`, border: `1px solid ${color}20` }}
+          className="w-11 h-11 rounded-[14px] flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-110 group-hover:rotate-3 duration-500 shadow-sm"
+          style={{ backgroundColor: `${color}14`, border: `1px solid ${color}25` }}
         >
           <Icon className="w-5 h-5" style={{ color }} />
         </div>
@@ -48,20 +48,20 @@ export function KPICard({
       <div className="relative z-10">
         <div className="flex items-baseline gap-2">
           <span className={cn(
-            "text-3xl font-bold tracking-tight text-white",
+            "text-3xl sm:text-4xl font-bold tracking-tight text-white",
             critical ? "text-[#FF3B30]" : warning ? "text-[#FF9F0A]" : ""
           )}>
             {value}
           </span>
-          {unit && <span className="text-[13px] font-medium text-text-secondary">{unit}</span>}
+          {unit && <span className="text-sm font-semibold text-text-secondary">{unit}</span>}
         </div>
-        {sub && <p className="text-[11px] font-medium text-text-muted mt-1.5 leading-relaxed">{sub}</p>}
+        {sub && <p className="text-[11px] font-medium text-text-muted mt-2 leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity duration-500">{sub}</p>}
       </div>
 
       {delta !== undefined && (
-        <div className="flex items-center gap-2 pt-4 border-t border-white/5 relative z-10">
-          <MetricDelta value={delta} unit={deltaUnit} inverse={inverse} />
-          <span className="text-[11px] font-medium text-text-secondary/60">vs {t('common.yesterday') || 'hier'}</span>
+        <div className="flex items-center gap-2 pt-5 border-t border-white/5 relative z-10">
+          <MetricDelta value={Number(delta)} unit={deltaUnit} inverse={inverse} />
+          <span className="text-[11px] font-semibold text-text-muted">vs {t('common.yesterday') || 'hier'}</span>
         </div>
       )}
     </div>
