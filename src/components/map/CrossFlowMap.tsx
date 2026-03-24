@@ -8,8 +8,9 @@ import { useSimulationStore } from '@/store/simulationStore'
 import { platformConfig } from '@/config/platform.config'
 import { congestionColor } from '@/lib/utils/congestion'
 import { generateTrafficSnapshot, generateIncidents, generateTrafficFromOSMRoads } from '@/lib/engine/traffic.engine'
-import { fetchRoads, fetchTrafficPOIs } from '@/lib/api/overpass'
-import type { OSMRoad, OSMPOIPoint } from '@/lib/api/overpass'
+import { fetchRoads, fetchTrafficPOIs, fetchRouteGeometries } from '@/lib/api/overpass'
+import type { OSMRoad, OSMPOIPoint, OSMRouteGeometry } from '@/lib/api/overpass'
+import { simulateTransitVehicles } from '@/lib/engine/transit.engine'
 import {
   hasKey,
   getTrafficFlowTileUrl,
@@ -39,6 +40,7 @@ const BOUNDARY_SOURCE         = 'city-boundary'
 const ZONE_SOURCE             = 'cf-zone'
 const ZONE_DRAFT_SOURCE       = 'cf-zone-draft'
 const POI_SOURCE              = 'cf-pois'
+const VEHICLES_SOURCE         = 'cf-vehicles'
 
 // CartoDB Voyager Dark — completely free, no key, beautiful dark style
 const CARTO_DARK_STYLE: maplibregl.StyleSpecification = {
@@ -81,6 +83,7 @@ export function CrossFlowMap() {
   const popupRef        = useRef<maplibregl.Popup | null>(null)
   const osmRoadsRef     = useRef<Map<string, OSMRoad[]>>(new Map())
   const osmPoisRef      = useRef<Map<string, OSMPOIPoint[]>>(new Map())
+  const osmRoutesRef    = useRef<Map<string, OSMRouteGeometry[]>>(new Map())
   const refreshDataRef  = useRef<() => void>(() => {})
   const [mapLoaded, setMapLoaded] = useState(false)
 
@@ -197,6 +200,50 @@ export function CrossFlowMap() {
       if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
     })
 
+    // Click on transit vehicles
+    map.on('click', VEHICLES_SOURCE + '-layer', (e) => {
+      if (zoneActiveRef.current) return
+      const feat = e.features?.[0]
+      if (!feat) return
+      const p = feat.properties as any
+      popupRef.current?.remove()
+      const typeLabel: Record<string, string> = {
+        subway: 'Métro', tram: 'Tramway', bus: 'Bus',
+        train: 'Train', ferry: 'Ferry', monorail: 'Monorail',
+      }
+      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '220px' })
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div style="font-family:Inter,sans-serif;color:#F5F5F7;padding:12px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <div style="width:28px;height:28px;border-radius:8px;background:${p.color};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000">${(p.routeRef || '?').slice(0,3)}</div>
+              <div>
+                <p style="margin:0;font-size:12px;font-weight:700;color:#F5F5F7">${typeLabel[p.routeType] ?? p.routeType} ${p.routeRef}</p>
+                <p style="margin:0;font-size:10px;color:#86868B">${p.routeName || ''}</p>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <div style="flex:1;background:rgba(255,255,255,0.04);border-radius:8px;padding:6px;text-align:center">
+                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase">Vitesse</p>
+                <p style="margin:0;font-size:14px;font-weight:700">${p.speedKmh} <span style="font-size:9px">km/h</span></p>
+              </div>
+              <div style="flex:1;background:rgba(255,255,255,0.04);border-radius:8px;padding:6px;text-align:center">
+                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase">Type</p>
+                <p style="margin:0;font-size:11px;font-weight:700">${typeLabel[p.routeType] ?? p.routeType}</p>
+              </div>
+            </div>
+          </div>
+        `)
+        .addTo(map)
+    })
+
+    map.on('mouseenter', VEHICLES_SOURCE + '-layer', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = 'pointer'
+    })
+    map.on('mouseleave', VEHICLES_SOURCE + '-layer', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
+    })
+
     mapRef.current = map
     return () => {
       popupRef.current?.remove()
@@ -294,6 +341,56 @@ export function CrossFlowMap() {
         })
       })
     }
+  }, [city.id, mapLoaded]) // eslint-disable-line
+
+  // ─── Load transit route geometries for vehicle simulation ────────────
+
+  useEffect(() => {
+    if (!mapLoaded) return
+    if (osmRoutesRef.current.has(city.id)) return
+
+    // Fetch subway + tram + bus routes with real geometry (max 30)
+    fetchRouteGeometries(city.bbox, ['subway', 'tram', 'bus'], 30).then(routes => {
+      if (!routes.length) return
+      osmRoutesRef.current.set(city.id, routes)
+      // Trigger initial vehicle paint immediately
+      updateVehicleSource()
+    })
+  }, [city.id, mapLoaded]) // eslint-disable-line
+
+  // ─── Vehicle position update (every 10 seconds) ───────────────────────
+
+  function updateVehicleSource() {
+    const map    = mapRef.current
+    const routes = osmRoutesRef.current.get(city.id)
+    if (!map || !routes?.length) return
+    const src = map.getSource(VEHICLES_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (!src) return
+
+    const vehicles = simulateTransitVehicles(routes, Date.now())
+    src.setData({
+      type: 'FeatureCollection',
+      features: vehicles.map(v => ({
+        type:       'Feature' as const,
+        geometry:   { type: 'Point' as const, coordinates: [v.lng, v.lat] },
+        properties: {
+          id:        v.id,
+          routeType: v.routeType,
+          routeRef:  v.routeRef,
+          routeName: v.routeName,
+          color:     v.color,
+          bearing:   v.bearing,
+          speedKmh:  v.speedKmh,
+        },
+      })),
+    })
+  }
+
+  useEffect(() => {
+    if (!mapLoaded) return
+    updateVehicleSource()
+    const interval = setInterval(updateVehicleSource, 10_000)
+    return () => clearInterval(interval)
   }, [city.id, mapLoaded]) // eslint-disable-line
 
   // ─── Fly to city ─────────────────────────────────────────────────────
@@ -639,6 +736,10 @@ export function CrossFlowMap() {
       trySet(TOMTOM_FLOW + '-layer', activeLayers.has('traffic') ? 'visible' : 'none')
       trySet(TOMTOM_INC  + '-layer', activeLayers.has('incidents') ? 'visible' : 'none')
     }
+
+    trySet(VEHICLES_SOURCE + '-glow',  activeLayers.has('transport') ? 'visible' : 'none')
+    trySet(VEHICLES_SOURCE + '-layer', activeLayers.has('transport') ? 'visible' : 'none')
+    trySet(VEHICLES_SOURCE + '-label', activeLayers.has('transport') ? 'visible' : 'none')
   }, [activeLayers, mapLoaded, useLiveData])
 
   // ─── Heatmap mode (shows/hides correct heatmap layer) ────────────────
@@ -858,6 +959,63 @@ function initStaticSources(map: maplibregl.Map) {
       'circle-opacity':       1,
       'circle-stroke-width':  2,
       'circle-stroke-color':  '#08090B',
+    },
+  })
+
+  // ── Transit Vehicles ──────────────────────────────────────────────────
+  map.addSource(VEHICLES_SOURCE, { type: 'geojson', data: emptyFC })
+
+  // Outer glow ring (type-colored)
+  map.addLayer({
+    id:     VEHICLES_SOURCE + '-glow',
+    type:   'circle',
+    source: VEHICLES_SOURCE,
+    layout: { visibility: 'visible' },
+    paint:  {
+      'circle-radius':    ['interpolate', ['linear'], ['zoom'], 10, 8, 15, 16],
+      'circle-color':     ['get', 'color'],
+      'circle-opacity':   0.18,
+      'circle-blur':      0.6,
+    },
+  })
+
+  // Main vehicle dot
+  map.addLayer({
+    id:     VEHICLES_SOURCE + '-layer',
+    type:   'circle',
+    source: VEHICLES_SOURCE,
+    layout: { visibility: 'visible' },
+    paint:  {
+      'circle-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        9,  ['match', ['get', 'routeType'], 'subway', 4, 'train', 4, 'tram', 3.5, 3],
+        14, ['match', ['get', 'routeType'], 'subway', 8, 'train', 8, 'tram', 7,   6],
+        17, ['match', ['get', 'routeType'], 'subway', 11,'train', 11,'tram', 9,   8],
+      ],
+      'circle-color':        ['get', 'color'],
+      'circle-opacity':      0.95,
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 9, 1, 14, 2],
+      'circle-stroke-color': '#08090B',
+    },
+  })
+
+  // Line ref label (show line number on the vehicle dot)
+  map.addLayer({
+    id:      VEHICLES_SOURCE + '-label',
+    type:    'symbol',
+    source:  VEHICLES_SOURCE,
+    minzoom: 13,
+    layout: {
+      'text-field':   ['slice', ['get', 'routeRef'], 0, 3],
+      'text-font':    ['Open Sans Regular'],
+      'text-size':    ['interpolate', ['linear'], ['zoom'], 13, 8, 16, 11],
+      'text-anchor':  'center',
+      'text-allow-overlap': true,
+    },
+    paint: {
+      'text-color':      '#000000',
+      'text-halo-color': 'rgba(0,0,0,0)',
+      'text-halo-width': 0,
     },
   })
 }

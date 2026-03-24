@@ -281,6 +281,112 @@ export async function fetchTransitRoutes(
   }
 }
 
+// ─── Transit route geometries (with way geometry for vehicle simulation) ────
+
+export interface OSMRouteGeometry {
+  id:       number
+  route:    string          // subway | tram | bus | train | ferry
+  name:     string
+  ref:      string          // line number / letter
+  colour:   string          // hex color
+  coords:   [number, number][] // [lng, lat][] — stitched route path
+}
+
+export async function fetchRouteGeometries(
+  bbox: [number, number, number, number],
+  routeTypes: string[] = ['subway', 'tram', 'bus'],
+  maxRoutes = 30,
+): Promise<OSMRouteGeometry[]> {
+  const [west, south, east, north] = bbox
+  // Prioritise metro + tram (fewer routes, better geometry), then bus
+  const types = routeTypes.join('|')
+  const query = `
+    [out:json][timeout:35];
+    (
+      relation["type"="route"]["route"~"^(${types})$"](${south},${west},${north},${east});
+    );
+    out geom ${maxRoutes};
+  `
+
+  try {
+    await overpassLimiter.acquire()
+    const res = await fetch(OVERPASS_BASE, {
+      method:  'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body:    `data=${encodeURIComponent(query)}`,
+      signal:  AbortSignal.timeout(20000),
+      next:    { revalidate: 3600 },
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+
+    return (data.elements ?? [])
+      .filter((el: any) => el.type === 'relation')
+      .map((el: any): OSMRouteGeometry | null => {
+        const tags   = el.tags ?? {}
+        const route  = tags.route ?? 'bus'
+        const colour = (tags.colour ?? tags.color ?? transitDefaultColor(route)).replace(/^(?!#)/, '#')
+
+        // Collect all way-member geometries in order
+        const wayGeoms: Array<[number, number][]> = (el.members ?? [])
+          .filter((m: any) => m.type === 'way' && Array.isArray(m.geometry) && m.geometry.length >= 2)
+          .map((m: any) => m.geometry.map((pt: any) => [pt.lon, pt.lat] as [number, number]))
+
+        if (wayGeoms.length === 0) return null
+
+        // Stitch ways into a continuous path (greedy nearest-endpoint matching)
+        const coords = stitchWays(wayGeoms)
+        if (coords.length < 4) return null
+
+        return {
+          id:     el.id,
+          route,
+          name:   tags.name ?? tags.ref ?? '',
+          ref:    tags.ref  ?? '',
+          colour,
+          coords,
+        }
+      })
+      .filter(Boolean) as OSMRouteGeometry[]
+  } catch {
+    return []
+  }
+}
+
+// Greedy way-stitching: tries to form a continuous path from unordered way segments
+function stitchWays(ways: Array<[number, number][]>): [number, number][] {
+  if (ways.length === 0) return []
+  const result: [number, number][] = [...ways[0]]
+  const remaining = ways.slice(1)
+
+  while (remaining.length > 0) {
+    const last  = result[result.length - 1]
+    let bestIdx = 0
+    let bestDist = Infinity
+    let reversed = false
+
+    for (let i = 0; i < remaining.length; i++) {
+      const way   = remaining[i]
+      const dHead = dist2(last, way[0])
+      const dTail = dist2(last, way[way.length - 1])
+      if (dHead < bestDist) { bestDist = dHead; bestIdx = i; reversed = false }
+      if (dTail < bestDist) { bestDist = dTail; bestIdx = i; reversed = true  }
+    }
+
+    const chosen = remaining.splice(bestIdx, 1)[0]
+    const segment = reversed ? [...chosen].reverse() : chosen
+    // Skip duplicate first coord if it matches last
+    const start = dist2(last, segment[0]) < 1e-10 ? 1 : 0
+    result.push(...segment.slice(start))
+  }
+
+  return result
+}
+
+function dist2(a: [number, number], b: [number, number]): number {
+  return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
+}
+
 function transitDefaultColor(route?: string): string {
   const map: Record<string, string> = {
     bus:      '#3B82F6',
