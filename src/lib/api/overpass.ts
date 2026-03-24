@@ -66,10 +66,9 @@ export async function fetchRoads(
     await overpassLimiter.acquire()
     const res = await fetch(OVERPASS_BASE, {
       method:  'POST',
-      headers: { 'Content-Type': 'text/plain' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body:    `data=${encodeURIComponent(query)}`,
       signal:  AbortSignal.timeout(15000),
-      next:    { revalidate: 3600 }, // roads don't change often
     })
     if (!res.ok) return []
     const data = await res.json()
@@ -99,12 +98,12 @@ export async function fetchTrafficPOIs(
   `
 
   try {
+    await overpassLimiter.acquire()
     const res = await fetch(OVERPASS_BASE, {
       method:  'POST',
-      headers: { 'Content-Type': 'text/plain' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body:    `data=${encodeURIComponent(query)}`,
       signal:  AbortSignal.timeout(12000),
-      next:    { revalidate: 3600 },
     })
     if (!res.ok) return []
     const data = await res.json()
@@ -148,12 +147,12 @@ export async function fetchCycleNetwork(
   `
 
   try {
+    await overpassLimiter.acquire()
     const res = await fetch(OVERPASS_BASE, {
       method:  'POST',
-      headers: { 'Content-Type': 'text/plain' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body:    `data=${encodeURIComponent(query)}`,
       signal:  AbortSignal.timeout(12000),
-      next:    { revalidate: 3600 },
     })
     if (!res.ok) return []
     const data = await res.json()
@@ -253,10 +252,9 @@ export async function fetchTransitRoutes(
     await overpassLimiter.acquire()
     const res = await fetch(OVERPASS_BASE, {
       method:  'POST',
-      headers: { 'Content-Type': 'text/plain' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body:    `data=${encodeURIComponent(query)}`,
       signal:  AbortSignal.timeout(15000),
-      next:    { revalidate: 300 },
     })
     if (!res.ok) return []
     const data = await res.json()
@@ -312,10 +310,9 @@ export async function fetchRouteGeometries(
     await overpassLimiter.acquire()
     const res = await fetch(OVERPASS_BASE, {
       method:  'POST',
-      headers: { 'Content-Type': 'text/plain' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body:    `data=${encodeURIComponent(query)}`,
       signal:  AbortSignal.timeout(20000),
-      next:    { revalidate: 3600 },
     })
     if (!res.ok) return []
     const data = await res.json()
