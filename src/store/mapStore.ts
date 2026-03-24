@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { subscribeWithSelector, persist } from 'zustand/middleware'
-import type { TrafficMode, MapLayerId, MapViewState, City } from '@/types'
+import type { TrafficMode, MapLayerId, MapViewState, City, HeatmapMode } from '@/types'
 import { CITIES, DEFAULT_CITY_ID } from '@/config/cities.config'
 import { platformConfig } from '@/config/platform.config'
 import type { GeocodingResult } from '@/lib/api/geocoding'
@@ -60,6 +60,19 @@ interface MapStore {
   // Timeline
   timeOffsetMinutes: number
   setTimeOffset:     (min: number) => void
+
+  // Heatmap mode
+  heatmapMode:    HeatmapMode
+  setHeatmapMode: (mode: HeatmapMode) => void
+
+  // Zone tool
+  zoneActive:   boolean
+  setZoneActive:(active: boolean) => void
+  zoneDraft:    [number, number][]  // in-progress polygon points [lng,lat]
+  addZonePoint: (point: [number, number]) => void
+  zonePolygon:  [number, number][] | null  // finalized
+  finalizeZone: () => void
+  clearZone:    () => void
 
   // UI
   isPanelOpen:   boolean
@@ -137,6 +150,17 @@ export const useMapStore = create<MapStore>()(
 
       timeOffsetMinutes: 0,
       setTimeOffset:     (min) => set({ timeOffsetMinutes: min }),
+
+      heatmapMode:    'congestion',
+      setHeatmapMode: (mode) => set({ heatmapMode: mode }),
+
+      zoneActive:     false,
+      setZoneActive:  (active) => set({ zoneActive: active, ...(active ? {} : { zoneDraft: [], zonePolygon: null }) }),
+      zoneDraft:      [],
+      addZonePoint:   (pt) => set(s => ({ zoneDraft: [...s.zoneDraft, pt] })),
+      zonePolygon:    null,
+      finalizeZone:   () => set(s => s.zoneDraft.length >= 3 ? { zonePolygon: s.zoneDraft, zoneDraft: [] } : {}),
+      clearZone:      () => set({ zonePolygon: null, zoneDraft: [], zoneActive: false }),
 
       isPanelOpen:    false,
       setPanelOpen:   (open) => set({ isPanelOpen: open }),

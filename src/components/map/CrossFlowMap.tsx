@@ -6,7 +6,9 @@ import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { platformConfig } from '@/config/platform.config'
 import { congestionColor } from '@/lib/utils/congestion'
-import { generateTrafficSnapshot, generateIncidents } from '@/lib/engine/traffic.engine'
+import { generateTrafficSnapshot, generateIncidents, generateTrafficFromOSMRoads } from '@/lib/engine/traffic.engine'
+import { fetchRoads } from '@/lib/api/overpass'
+import type { OSMRoad } from '@/lib/api/overpass'
 import {
   hasKey,
   getTrafficFlowTileUrl,
@@ -15,16 +17,26 @@ import {
   fetchIncidents as fetchTomTomIncidents,
   tomtomSeverityToLocal,
 } from '@/lib/api/tomtom'
+import {
+  fetchHereFlow,
+  fetchHereIncidents,
+  hasKey as hereHasKey,
+  jamFactorToCongestion,
+} from '@/lib/api/here'
 import { fetchWeather as fetchOpenMeteoWeather, fetchAirQuality } from '@/lib/api/openmeteo'
 import { fetchCityBoundary } from '@/lib/api/geocoding'
-import type { Incident } from '@/types'
+import type { Incident, HeatmapMode } from '@/types'
 
-const TRAFFIC_SOURCE   = 'cf-traffic'
-const HEATMAP_SOURCE   = 'cf-heatmap'
-const INCIDENT_SOURCE  = 'cf-incidents'
-const TOMTOM_FLOW      = 'tomtom-flow'
-const TOMTOM_INC       = 'tomtom-incidents'
-const BOUNDARY_SOURCE  = 'city-boundary'
+const TRAFFIC_SOURCE          = 'cf-traffic'
+const HEATMAP_SOURCE          = 'cf-heatmap'
+const HEATMAP_PASSAGES_SOURCE = 'cf-heatmap-passages'
+const HEATMAP_CO2_SOURCE      = 'cf-heatmap-co2'
+const INCIDENT_SOURCE         = 'cf-incidents'
+const TOMTOM_FLOW             = 'tomtom-flow'
+const TOMTOM_INC              = 'tomtom-incidents'
+const BOUNDARY_SOURCE         = 'city-boundary'
+const ZONE_SOURCE             = 'cf-zone'
+const ZONE_DRAFT_SOURCE       = 'cf-zone-draft'
 
 // CartoDB Voyager Dark — completely free, no key, beautiful dark style
 const CARTO_DARK_STYLE: maplibregl.StyleSpecification = {
@@ -53,6 +65,7 @@ export function CrossFlowMap() {
   const mapRef       = useRef<maplibregl.Map | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const popupRef     = useRef<maplibregl.Popup | null>(null)
+  const osmRoadsRef  = useRef<Map<string, OSMRoad[]>>(new Map())
   const [mapLoaded, setMapLoaded] = useState(false)
 
   const city            = useMapStore(s => s.city)
@@ -61,6 +74,11 @@ export function CrossFlowMap() {
   const activeLayers    = useMapStore(s => s.activeLayers)
   const setMapReady     = useMapStore(s => s.setMapReady)
   const selectSegment   = useMapStore(s => s.selectSegment)
+  const heatmapMode     = useMapStore(s => s.heatmapMode)
+  const zoneActive      = useMapStore(s => s.zoneActive)
+  const zoneDraft       = useMapStore(s => s.zoneDraft)
+  const zonePolygon     = useMapStore(s => s.zonePolygon)
+  const addZonePoint    = useMapStore(s => s.addZonePoint)
 
   const setSnapshot           = useTrafficStore(s => s.setSnapshot)
   const setIncidents          = useTrafficStore(s => s.setIncidents)
@@ -70,6 +88,19 @@ export function CrossFlowMap() {
   const setDataSource         = useTrafficStore(s => s.setDataSource)
 
   const useLiveData = hasKey()
+
+  // Refs to avoid stale closures in map click handler
+  const zoneActiveRef    = useRef(zoneActive)
+  const addZonePointRef  = useRef(addZonePoint)
+  useEffect(() => { zoneActiveRef.current = zoneActive }, [zoneActive])
+  useEffect(() => { addZonePointRef.current = addZonePoint }, [addZonePoint])
+
+  // ─── Cursor change when zone tool is active ──────────────────────────
+
+  useEffect(() => {
+    if (!mapRef.current) return
+    mapRef.current.getCanvas().style.cursor = zoneActive ? 'crosshair' : ''
+  }, [zoneActive])
 
   // ─── Init map ────────────────────────────────────────────────────────
 
@@ -91,6 +122,8 @@ export function CrossFlowMap() {
     map.on('load', () => {
       initStaticSources(map)
       initBoundaryLayers(map)
+      initHeatmapPassagesLayers(map)
+      initZoneLayers(map)
 
       // Add TomTom tile layers if key available
       if (useLiveData) {
@@ -103,6 +136,8 @@ export function CrossFlowMap() {
 
     // Click on synthetic segments
     map.on('click', TRAFFIC_SOURCE + '-lines', async (e) => {
+      // Don't handle segment click when zone tool is active
+      if (zoneActiveRef.current) return
       const feat = e.features?.[0]
       if (!feat) return
       selectSegment(feat.properties?.id as string)
@@ -117,8 +152,14 @@ export function CrossFlowMap() {
       }
     })
 
-    // Click on map → fetch real TomTom data at that point
+    // General map click — zone drawing + TomTom point query
     map.on('click', async (e) => {
+      // Zone drawing mode
+      if (zoneActiveRef.current) {
+        addZonePointRef.current([e.lngLat.lng, e.lngLat.lat])
+        return
+      }
+
       if (!useLiveData) return
       // Only if not clicking a feature
       const features = map.queryRenderedFeatures(e.point)
@@ -130,8 +171,12 @@ export function CrossFlowMap() {
       }
     })
 
-    map.on('mouseenter', TRAFFIC_SOURCE + '-lines', () => { map.getCanvas().style.cursor = 'pointer' })
-    map.on('mouseleave', TRAFFIC_SOURCE + '-lines', () => { map.getCanvas().style.cursor = '' })
+    map.on('mouseenter', TRAFFIC_SOURCE + '-lines', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = 'pointer'
+    })
+    map.on('mouseleave', TRAFFIC_SOURCE + '-lines', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
+    })
 
     mapRef.current = map
     return () => {
@@ -195,6 +240,17 @@ export function CrossFlowMap() {
     })
   }, [mapLoaded]) // eslint-disable-line
 
+  // ─── Fetch OSM roads for current city ────────────────────────────────
+
+  useEffect(() => {
+    if (!mapLoaded) return
+    if (osmRoadsRef.current.has(city.id)) return
+    fetchRoads(city.bbox, ['motorway', 'trunk', 'primary', 'secondary', 'tertiary'])
+      .then(roads => {
+        if (roads.length > 0) osmRoadsRef.current.set(city.id, roads.slice(0, 600))
+      })
+  }, [city.id, mapLoaded]) // eslint-disable-line
+
   // ─── Fly to city ─────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -242,16 +298,60 @@ export function CrossFlowMap() {
     if (!mapRef.current || !mapLoaded) return
     const map = mapRef.current
 
-    // Always generate synthetic overlay
-    const snapshot  = generateTrafficSnapshot(city)
+    const useHere    = hereHasKey()
+    const useTomTom  = useLiveData
+
+    // ── 1. Fetch HERE real traffic flow (real geometry + real speed) ──────
+    let snapshot = (() => {
+      const osmRoads = osmRoadsRef.current.get(city.id)
+      return osmRoads && osmRoads.length > 0
+        ? generateTrafficFromOSMRoads(city, osmRoads)
+        : generateTrafficSnapshot(city)
+    })()
+
+    if (useHere) {
+      const hereFlow = await fetchHereFlow(city.bbox)
+      if (hereFlow.length > 0) {
+        const now = new Date().toISOString()
+        const hereSegments: import('@/types').TrafficSegment[] = hereFlow
+          .filter(s => s.coords.length >= 2)
+          .map((s, i) => {
+            const congestion = jamFactorToCongestion(s.jamFactor)
+            const freeFlow   = s.freeFlow   > 0 ? s.freeFlow   : 50
+            const speed      = s.speed      > 0 ? s.speed      : freeFlow * (1 - congestion * 0.85)
+            const length     = estimateSegmentLength(s.coords)
+            return {
+              id:               `here-${city.id}-${i}`,
+              coordinates:      s.coords,
+              speedKmh:         Math.round(speed),
+              freeFlowSpeedKmh: Math.round(freeFlow),
+              congestionScore:  Math.round(congestion * 100) / 100,
+              level:            import_scoreToCongestionLevel(congestion),
+              flowVehiclesPerHour: Math.round((1 - congestion) * 1800 + 200),
+              travelTimeSeconds:   length > 0 ? Math.round((length / 1000) / speed * 3600) : 60,
+              length,
+              mode:             'car' as const,
+              lastUpdated:      now,
+            }
+          })
+
+        const heatmap         = hereSegments.map(s => ({ lng: s.coordinates[0][0], lat: s.coordinates[0][1], intensity: s.congestionScore }))
+        const heatmapPassages = hereSegments.map(s => ({ lng: s.coordinates[0][0], lat: s.coordinates[0][1], intensity: Math.min(1, s.flowVehiclesPerHour / 2000) }))
+        const heatmapCo2      = hereSegments.map(s => ({ lng: s.coordinates[0][0], lat: s.coordinates[0][1], intensity: (120 + s.congestionScore * 180) / 300 }))
+
+        snapshot = { cityId: city.id, segments: hereSegments, heatmap, heatmapPassages, heatmapCo2, fetchedAt: now }
+        setDataSource('live')
+      }
+    }
+
     const synthetic = generateIncidents(city)
     setSnapshot(snapshot)
 
     let incidents: Incident[] = synthetic
 
-    if (useLiveData) {
+    if (useTomTom) {
       // Fetch real TomTom incidents
-      setDataSource('live')
+      if (!useHere) setDataSource('live')
       const tomtomIncs = await fetchTomTomIncidents(city.bbox)
       if (tomtomIncs.length > 0) {
         incidents = tomtomIncs.map(inc => ({
@@ -266,6 +366,25 @@ export function CrossFlowMap() {
           resolvedAt:  inc.endTime,
           source:      'TomTom',
           iconColor:   getSeverityColor(tomtomSeverityToLocal(inc.magnitudeOfDelay)),
+        }))
+      }
+    } else if (useHere) {
+      // HERE incidents as fallback
+      const hereIncs = await fetchHereIncidents(city.bbox)
+      if (hereIncs.length > 0) {
+        incidents = hereIncs.map(inc => ({
+          id:          inc.incidentId,
+          type:        (inc.type.toLowerCase().includes('accident') ? 'accident' :
+                        inc.type.toLowerCase().includes('work')     ? 'roadwork' : 'congestion') as Incident['type'],
+          severity:    (inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium') as Incident['severity'],
+          title:       inc.description,
+          description: `${inc.location.description} — ${inc.type}`,
+          location:    { lat: inc.location.lat, lng: inc.location.lng },
+          address:     inc.location.description || city.name,
+          startedAt:   inc.startTime,
+          resolvedAt:  inc.endTime,
+          source:      'HERE',
+          iconColor:   getSeverityColor(inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium'),
         }))
       }
     } else {
@@ -293,7 +412,7 @@ export function CrossFlowMap() {
     const tSrc = map.getSource(TRAFFIC_SOURCE) as maplibregl.GeoJSONSource | undefined
     if (tSrc) tSrc.setData(trafficGeo)
 
-    // Heatmap
+    // Congestion heatmap
     const heatGeo: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
       features: snapshot.heatmap.map(pt => ({
@@ -304,6 +423,30 @@ export function CrossFlowMap() {
     }
     const hSrc = map.getSource(HEATMAP_SOURCE) as maplibregl.GeoJSONSource | undefined
     if (hSrc) hSrc.setData(heatGeo)
+
+    // Passages heatmap
+    const passGeo: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: snapshot.heatmapPassages.map(pt => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [pt.lng, pt.lat] },
+        properties: { intensity: pt.intensity },
+      })),
+    }
+    const pSrc = map.getSource(HEATMAP_PASSAGES_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (pSrc) pSrc.setData(passGeo)
+
+    // CO2 heatmap
+    const co2Geo: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: snapshot.heatmapCo2.map(pt => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [pt.lng, pt.lat] },
+        properties: { intensity: pt.intensity },
+      })),
+    }
+    const cSrc = map.getSource(HEATMAP_CO2_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (cSrc) cSrc.setData(co2Geo)
 
     // Incidents
     const incGeo: GeoJSON.FeatureCollection = {
@@ -316,7 +459,7 @@ export function CrossFlowMap() {
     }
     const iSrc = map.getSource(INCIDENT_SOURCE) as maplibregl.GeoJSONSource | undefined
     if (iSrc) iSrc.setData(incGeo)
-    
+
     // Boundary layer update
     const bSrc = map.getSource(BOUNDARY_SOURCE) as maplibregl.GeoJSONSource | undefined
     if (bSrc) {
@@ -365,7 +508,7 @@ export function CrossFlowMap() {
 
     trySet(TRAFFIC_SOURCE  + '-lines',    activeLayers.has('traffic')   ? 'visible' : 'none')
     trySet(TRAFFIC_SOURCE  + '-glow',     activeLayers.has('traffic')   ? 'visible' : 'none')
-    trySet(HEATMAP_SOURCE  + '-layer',    activeLayers.has('heatmap')   ? 'visible' : 'none')
+    // Heatmap layers are managed by the heatmap mode effect below
     trySet(INCIDENT_SOURCE + '-circles',  activeLayers.has('incidents') ? 'visible' : 'none')
     trySet(INCIDENT_SOURCE + '-glow',     activeLayers.has('incidents') ? 'visible' : 'none')
     trySet(INCIDENT_SOURCE + '-labels',   activeLayers.has('incidents') ? 'visible' : 'none')
@@ -384,6 +527,56 @@ export function CrossFlowMap() {
       trySet(TOMTOM_INC  + '-layer', activeLayers.has('incidents') ? 'visible' : 'none')
     }
   }, [activeLayers, mapLoaded, useLiveData])
+
+  // ─── Heatmap mode (shows/hides correct heatmap layer) ────────────────
+
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return
+    const map = mapRef.current
+    const trySet = (id: string, vis: 'visible' | 'none') => {
+      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', vis)
+    }
+    const isHeatmapActive = activeLayers.has('heatmap')
+    trySet(HEATMAP_SOURCE          + '-layer', isHeatmapActive && heatmapMode === 'congestion' ? 'visible' : 'none')
+    trySet(HEATMAP_PASSAGES_SOURCE + '-layer', isHeatmapActive && heatmapMode === 'passages'   ? 'visible' : 'none')
+    trySet(HEATMAP_CO2_SOURCE      + '-layer', isHeatmapActive && heatmapMode === 'co2'        ? 'visible' : 'none')
+  }, [heatmapMode, activeLayers, mapLoaded])
+
+  // ─── Zone drawing (draft line + finalized polygon) ─────────────────
+
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return
+    const map = mapRef.current
+
+    // Draft polygon (in progress)
+    const draftSrc = map.getSource(ZONE_DRAFT_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (draftSrc) {
+      if (zoneDraft.length >= 2) {
+        draftSrc.setData({
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: zoneDraft },
+          properties: {},
+        })
+      } else {
+        draftSrc.setData({ type: 'FeatureCollection', features: [] })
+      }
+    }
+
+    // Finalized polygon
+    const zoneSrc = map.getSource(ZONE_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (zoneSrc) {
+      if (zonePolygon && zonePolygon.length >= 3) {
+        const closed = [...zonePolygon, zonePolygon[0]]
+        zoneSrc.setData({
+          type: 'Feature',
+          geometry: { type: 'Polygon', coordinates: [closed] },
+          properties: {},
+        })
+      } else {
+        zoneSrc.setData({ type: 'FeatureCollection', features: [] })
+      }
+    }
+  }, [zoneDraft, zonePolygon, mapLoaded])
 
   return (
     <div ref={containerRef} className="w-full h-full" />
@@ -455,7 +648,7 @@ function initStaticSources(map: maplibregl.Map) {
 
   // Incidents (Luminous dots)
   map.addSource(INCIDENT_SOURCE, { type: 'geojson', data: emptyFC })
-  
+
   // Outer glow for incidents
   map.addLayer({
     id:     INCIDENT_SOURCE + '-glow',
@@ -481,7 +674,7 @@ function initStaticSources(map: maplibregl.Map) {
       'circle-stroke-color': '#08090B',
     },
   })
-  
+
   map.addLayer({
     id:     INCIDENT_SOURCE + '-labels',
     type:   'symbol',
@@ -581,6 +774,98 @@ function initBoundaryLayers(map: maplibregl.Map) {
   })
 }
 
+function initHeatmapPassagesLayers(map: maplibregl.Map) {
+  const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
+
+  // Passages heatmap
+  map.addSource(HEATMAP_PASSAGES_SOURCE, { type: 'geojson', data: emptyFC })
+  map.addLayer({
+    id:     HEATMAP_PASSAGES_SOURCE + '-layer',
+    type:   'heatmap',
+    source: HEATMAP_PASSAGES_SOURCE,
+    maxzoom: 16,
+    layout: { visibility: 'none' },
+    paint: {
+      'heatmap-weight':    ['interpolate', ['linear'], ['get', 'intensity'], 0, 0, 1, 1],
+      'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 9, 3],
+      'heatmap-radius':    ['interpolate', ['linear'], ['zoom'], 0, 2, 9, 22],
+      'heatmap-opacity':   0.70,
+      'heatmap-color': [
+        'interpolate', ['linear'], ['heatmap-density'],
+        0,    'rgba(0, 100, 255, 0)',
+        0.25, 'rgba(0, 150, 255, 0.4)',
+        0.5,  'rgba(0, 200, 200, 0.6)',
+        0.75, 'rgba(0, 255, 150, 0.8)',
+        1,    'rgba(255, 255, 0, 1)',
+      ],
+    },
+  })
+
+  // CO2 heatmap
+  map.addSource(HEATMAP_CO2_SOURCE, { type: 'geojson', data: emptyFC })
+  map.addLayer({
+    id:     HEATMAP_CO2_SOURCE + '-layer',
+    type:   'heatmap',
+    source: HEATMAP_CO2_SOURCE,
+    maxzoom: 16,
+    layout: { visibility: 'none' },
+    paint: {
+      'heatmap-weight':    ['interpolate', ['linear'], ['get', 'intensity'], 0, 0, 1, 1],
+      'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 9, 3],
+      'heatmap-radius':    ['interpolate', ['linear'], ['zoom'], 0, 2, 9, 22],
+      'heatmap-opacity':   0.70,
+      'heatmap-color': [
+        'interpolate', ['linear'], ['heatmap-density'],
+        0,    'rgba(100, 0, 200, 0)',
+        0.2,  'rgba(100, 0, 200, 0.3)',
+        0.5,  'rgba(200, 50, 50, 0.6)',
+        0.75, 'rgba(255, 100, 0, 0.8)',
+        1,    'rgba(255, 30, 30, 1)',
+      ],
+    },
+  })
+}
+
+function initZoneLayers(map: maplibregl.Map) {
+  const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
+
+  // Draft polyline source
+  map.addSource(ZONE_DRAFT_SOURCE, { type: 'geojson', data: emptyFC })
+  map.addLayer({
+    id: ZONE_DRAFT_SOURCE + '-line',
+    type: 'line',
+    source: ZONE_DRAFT_SOURCE,
+    paint: {
+      'line-color':    '#FACC15',
+      'line-width':    2,
+      'line-opacity':  0.8,
+      'line-dasharray': [4, 3],
+    },
+  })
+
+  // Finalized zone source
+  map.addSource(ZONE_SOURCE, { type: 'geojson', data: emptyFC })
+  map.addLayer({
+    id: ZONE_SOURCE + '-fill',
+    type: 'fill',
+    source: ZONE_SOURCE,
+    paint: {
+      'fill-color':   '#FACC15',
+      'fill-opacity': 0.12,
+    },
+  })
+  map.addLayer({
+    id: ZONE_SOURCE + '-outline',
+    type: 'line',
+    source: ZONE_SOURCE,
+    paint: {
+      'line-color':   '#FACC15',
+      'line-width':   2.5,
+      'line-opacity': 0.9,
+    },
+  })
+}
+
 // Flatten all coordinates from a GeoJSON geometry
 function extractCoords(geom: GeoJSON.Geometry): number[][] {
   if (!geom) return []
@@ -639,4 +924,23 @@ function mapIncidentType(iconCategory: number): Incident['type'] {
 function getSeverityColor(sev: Incident['severity']): string {
   const colors = { low: '#00E676', medium: '#FFD600', high: '#FF6D00', critical: '#FF1744' }
   return colors[sev]
+}
+
+// Estimate road segment length in meters from coordinate array
+function estimateSegmentLength(coords: [number, number][]): number {
+  let len = 0
+  for (let i = 1; i < coords.length; i++) {
+    const dx = (coords[i][0] - coords[i-1][0]) * 111320 * Math.cos(coords[i][1] * Math.PI / 180)
+    const dy = (coords[i][1] - coords[i-1][1]) * 110540
+    len += Math.sqrt(dx * dx + dy * dy)
+  }
+  return Math.round(len)
+}
+
+// Wrapper to allow inline call with dynamic import-style syntax
+function import_scoreToCongestionLevel(score: number): import('@/types').CongestionLevel {
+  if (score < 0.25) return 'free'
+  if (score < 0.55) return 'slow'
+  if (score < 0.80) return 'congested'
+  return 'critical'
 }

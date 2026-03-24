@@ -14,6 +14,7 @@ import type {
   Prediction,
   PredictionSegment,
 } from '@/types'
+import type { OSMRoad } from '@/lib/api/overpass'
 import { platformConfig } from '@/config/platform.config'
 import { scoreToCongestionLevel } from '@/lib/utils/congestion'
 
@@ -50,6 +51,13 @@ function cityTimeSeed(cityId: string, windowMin: number = 0): number {
     hash = (hash * 31 + cityId.charCodeAt(i)) >>> 0
   }
   return hash || 1
+}
+
+// ─── CO2 emission model ───────────────────────────────────────────────────
+
+function co2GPerKm(congestion: number): number {
+  // 120 g/km free flow → 300 g/km stop-and-go
+  return 120 + congestion * 180
 }
 
 // ─── Route generation (realistic grid + radial for each city) ─────────────
@@ -141,6 +149,8 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
   const roads = generateCityRoads(city)
   const segments: TrafficSegment[] = []
   const heatmap: HeatmapPoint[] = []
+  const heatmapPassages: HeatmapPoint[] = []
+  const heatmapCo2: HeatmapPoint[] = []
 
   roads.forEach((road, idx) => {
     // Spatial variation: center more congested
@@ -163,6 +173,7 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
     const speedKmh  = Math.max(5, freeFlow * (1 - congestion * 0.85))
     const level     = scoreToCongestionLevel(congestion)
     const length    = road.type === 'highway' ? 800 + rng() * 1200 : 200 + rng() * 400
+    const flowVph   = Math.round((freeFlow - speedKmh) * 40 + rng() * 200)
 
     segments.push({
       id:               `${city.id}-seg-${idx}`,
@@ -171,7 +182,7 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
       freeFlowSpeedKmh: freeFlow,
       congestionScore:  Math.round(congestion * 100) / 100,
       level,
-      flowVehiclesPerHour: Math.round((freeFlow - speedKmh) * 40 + rng() * 200),
+      flowVehiclesPerHour: flowVph,
       travelTimeSeconds:   Math.round((length / 1000) / speedKmh * 3600),
       length:           Math.round(length),
       mode:             road.type === 'highway' ? 'car' : 'car',
@@ -180,11 +191,10 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
 
     // Heatmap points along segment
     for (let i = 0; i < road.coords.length; i += 2) {
-      heatmap.push({
-        lng:       road.coords[i][0],
-        lat:       road.coords[i][1],
-        intensity: congestion,
-      })
+      const pt = road.coords[i]
+      heatmap.push({ lng: pt[0], lat: pt[1], intensity: congestion })
+      heatmapPassages.push({ lng: pt[0], lat: pt[1], intensity: Math.min(1, flowVph / 2000) })
+      heatmapCo2.push({ lng: pt[0], lat: pt[1], intensity: co2GPerKm(congestion) / 300 })
     }
   })
 
@@ -192,6 +202,89 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
     cityId:    city.id,
     segments,
     heatmap,
+    heatmapPassages,
+    heatmapCo2,
+    fetchedAt: now.toISOString(),
+  }
+}
+
+// ─── OSM roads traffic generator ─────────────────────────────────────────────
+
+export function generateTrafficFromOSMRoads(city: City, osmRoads: OSMRoad[]): TrafficSnapshot {
+  const now  = new Date()
+  const hour = now.getHours()
+  const isWE = now.getDay() === 0 || now.getDay() === 6
+  const rng  = seededRng(cityTimeSeed(city.id))
+
+  const baseCongestion = Math.min(1, baseCongestionForHour(hour, isWE))
+  const segments: TrafficSegment[] = []
+  const heatmap: HeatmapPoint[] = []
+  const heatmapPassages: HeatmapPoint[] = []
+  const heatmapCo2: HeatmapPoint[] = []
+
+  osmRoads.forEach((osmRoad, idx) => {
+    // Map highway type to segment type
+    let segType: 'main' | 'secondary' | 'highway'
+    if (osmRoad.highway === 'motorway' || osmRoad.highway === 'trunk') {
+      segType = 'highway'
+    } else if (osmRoad.highway === 'primary' || osmRoad.highway === 'secondary') {
+      segType = 'main'
+    } else {
+      segType = 'secondary'
+    }
+
+    // Spatial variation: center more congested
+    const midPt = osmRoad.coords[Math.floor(osmRoad.coords.length / 2)]
+    const distFromCenter = Math.sqrt(
+      Math.pow((midPt[0] - city.center.lng) / (city.bbox[2] - city.bbox[0]), 2) +
+      Math.pow((midPt[1] - city.center.lat) / (city.bbox[3] - city.bbox[1]), 2),
+    ) * 2  // 0 = center, 1 = edge
+
+    const spatial = Math.max(0, 1 - distFromCenter * 0.8)
+    const noise   = (rng() - 0.5) * 0.25
+    let congestion = Math.max(0, Math.min(1, baseCongestion * spatial + noise))
+
+    if (segType === 'highway') {
+      congestion = Math.max(0, Math.min(1, congestion * 0.9 + rng() * 0.15))
+    }
+
+    const freeFlow = osmRoad.maxspeed > 0 ? osmRoad.maxspeed
+      : segType === 'highway' ? 110 : segType === 'main' ? 50 : 30
+    const speedKmh = Math.max(5, freeFlow * (1 - congestion * 0.85))
+    const level    = scoreToCongestionLevel(congestion)
+    const length   = osmRoad.length > 0 ? osmRoad.length
+      : segType === 'highway' ? 800 + rng() * 1200 : 200 + rng() * 400
+    const flowVph  = Math.round((freeFlow - speedKmh) * 40 + rng() * 200)
+
+    segments.push({
+      id:               `${city.id}-osm-${osmRoad.id}-${idx}`,
+      coordinates:      osmRoad.coords,
+      speedKmh:         Math.round(speedKmh),
+      freeFlowSpeedKmh: freeFlow,
+      congestionScore:  Math.round(congestion * 100) / 100,
+      level,
+      flowVehiclesPerHour: flowVph,
+      travelTimeSeconds:   Math.round((length / 1000) / speedKmh * 3600),
+      length:           Math.round(length),
+      mode:             'car',
+      lastUpdated:      now.toISOString(),
+    })
+
+    // Heatmap points along segment
+    for (let i = 0; i < osmRoad.coords.length; i += 2) {
+      const pt = osmRoad.coords[i]
+      heatmap.push({ lng: pt[0], lat: pt[1], intensity: congestion })
+      heatmapPassages.push({ lng: pt[0], lat: pt[1], intensity: Math.min(1, flowVph / 2000) })
+      heatmapCo2.push({ lng: pt[0], lat: pt[1], intensity: co2GPerKm(congestion) / 300 })
+    }
+  })
+
+  return {
+    cityId:    city.id,
+    segments,
+    heatmap,
+    heatmapPassages,
+    heatmapCo2,
     fetchedAt: now.toISOString(),
   }
 }

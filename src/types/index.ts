@@ -14,6 +14,8 @@ export type TransportMode = 'car' | 'pedestrian' | 'metro' | 'bus' | 'bike' | 't
 
 export type MapLayerId = 'traffic' | 'heatmap' | 'transport' | 'incidents' | 'prediction' | 'boundary'
 
+export type HeatmapMode = 'congestion' | 'passages' | 'co2'
+
 export type OrgPlan = 'starter' | 'pro' | 'enterprise'
 
 // ─── Geography ────────────────────────────────────────────────────────────────
@@ -64,10 +66,12 @@ export interface HeatmapPoint {
 }
 
 export interface TrafficSnapshot {
-  cityId:    string
-  segments:  TrafficSegment[]
-  heatmap:   HeatmapPoint[]
-  fetchedAt: string
+  cityId:          string
+  segments:        TrafficSegment[]
+  heatmap:         HeatmapPoint[]   // congestion
+  heatmapPassages: HeatmapPoint[]   // vehicle count intensity
+  heatmapCo2:      HeatmapPoint[]   // CO2 emission intensity
+  fetchedAt:       string
 }
 
 // ─── Incidents ────────────────────────────────────────────────────────────────
@@ -168,6 +172,15 @@ export interface CityKPIs {
     pedestrian: number
   }
   capturedAt: string
+}
+
+export interface ZoneStats {
+  segmentCount:     number
+  avgCongestion:    number  // 0-1
+  avgSpeed:         number  // km/h
+  totalPassages:    number  // vehicles/h summed
+  avgCo2GPerKm:     number  // g/km average
+  area:             string  // estimated km²
 }
 
 // ─── UI State ─────────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import { ModeSelector } from '@/components/map/controls/ModeSelector'
 import { LayerControls } from '@/components/map/controls/LayerControls'
 import { MapLegend } from '@/components/map/controls/MapLegend'
 import { EdgeDetailPanel } from '@/components/map/panels/EdgeDetailPanel'
+import { ZoneStatsPanel } from '@/components/map/panels/ZoneStatsPanel'
 import { SimulationPanel } from '@/components/simulation/SimulationPanel'
 import { SimulationResults } from '@/components/simulation/SimulationResults'
 import { AIPanel } from '@/components/ai/AIPanel'
@@ -85,6 +86,9 @@ export default function MapPage() {
 
         {/* Edge detail panel */}
         {mode !== 'simulate' && <EdgeDetailPanel />}
+
+        {/* Zone stats panel */}
+        <ZoneStatsPanel />
       </div>
 
       {/* AI Panel — right sidebar */}
