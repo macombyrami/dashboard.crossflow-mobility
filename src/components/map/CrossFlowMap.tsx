@@ -4,6 +4,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
+import { useSimulationStore } from '@/store/simulationStore'
 import { platformConfig } from '@/config/platform.config'
 import { congestionColor } from '@/lib/utils/congestion'
 import { generateTrafficSnapshot, generateIncidents, generateTrafficFromOSMRoads } from '@/lib/engine/traffic.engine'
@@ -81,12 +82,15 @@ export function CrossFlowMap() {
   const zonePolygon     = useMapStore(s => s.zonePolygon)
   const addZonePoint    = useMapStore(s => s.addZonePoint)
 
+  const snapshot              = useTrafficStore(s => s.snapshot)
   const setSnapshot           = useTrafficStore(s => s.setSnapshot)
   const setIncidents          = useTrafficStore(s => s.setIncidents)
   const setWeather            = useTrafficStore(s => s.setWeather)
   const setOpenMeteoWeather   = useTrafficStore(s => s.setOpenMeteoWeather)
   const setAirQuality         = useTrafficStore(s => s.setAirQuality)
   const setDataSource         = useTrafficStore(s => s.setDataSource)
+
+  const currentResult = useSimulationStore(s => s.currentResult)
 
   const useLiveData = hasKey()
 
@@ -507,6 +511,66 @@ export function CrossFlowMap() {
     const interval = setInterval(refreshData, platformConfig.traffic.refreshIntervalMs)
     return () => clearInterval(interval)
   }, [mapLoaded, refreshData])
+
+  // ─── Simulation overlay — tint segment colors by delta ────────────────
+
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return
+    const map = mapRef.current
+    const tSrc = map.getSource(TRAFFIC_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (!tSrc) return
+
+    if (!currentResult || !snapshot) return
+
+    // Apply congestion delta proportionally to each segment
+    const { congestionPct } = currentResult.delta
+    const simFeatures: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: snapshot.segments.map(seg => {
+        const simCongestion = Math.max(0, Math.min(1, seg.congestionScore + congestionPct))
+        const level = import_scoreToCongestionLevel(simCongestion)
+        return {
+          type:       'Feature' as const,
+          geometry:   { type: 'LineString' as const, coordinates: seg.coordinates },
+          properties: {
+            id:        seg.id,
+            congestion: simCongestion,
+            speed:     seg.speedKmh,
+            level,
+            color:     congestionColor(simCongestion),
+            width:     platformConfig.traffic.lineWidths[level],
+            realData:  seg.id.startsWith('here-') || seg.id.includes('-osm-'),
+          },
+        }
+      }),
+    }
+    tSrc.setData(simFeatures)
+
+    // Restore normal data when result is cleared
+    return () => {
+      if (!mapRef.current) return
+      const src = mapRef.current.getSource(TRAFFIC_SOURCE) as maplibregl.GeoJSONSource | undefined
+      if (src && snapshot) {
+        const geo: GeoJSON.FeatureCollection = {
+          type: 'FeatureCollection',
+          features: snapshot.segments.map(seg => ({
+            type:       'Feature' as const,
+            geometry:   { type: 'LineString' as const, coordinates: seg.coordinates },
+            properties: {
+              id:        seg.id,
+              congestion: seg.congestionScore,
+              speed:     seg.speedKmh,
+              level:     seg.level,
+              color:     congestionColor(seg.congestionScore),
+              width:     platformConfig.traffic.lineWidths[seg.level],
+              realData:  seg.id.startsWith('here-') || seg.id.includes('-osm-'),
+            },
+          })),
+        }
+        src.setData(geo)
+      }
+    }
+  }, [currentResult, snapshot, mapLoaded]) // eslint-disable-line
 
   // ─── Layer visibility ─────────────────────────────────────────────────
 

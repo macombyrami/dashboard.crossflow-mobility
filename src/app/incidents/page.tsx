@@ -1,10 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { AlertTriangle, RefreshCw, MapPin, Clock, Zap } from 'lucide-react'
+import { AlertTriangle, RefreshCw, MapPin, Clock, Zap, Download } from 'lucide-react'
 import { SeverityPill } from '@/components/ui/SeverityPill'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { generateIncidents, generateCityKPIs } from '@/lib/engine/traffic.engine'
+import { exportToCsv } from '@/lib/utils/export'
 import { formatDistanceToNow } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils/cn'
@@ -20,10 +21,11 @@ const TYPE_LABELS: Record<IncidentType, string> = {
 }
 
 export default function IncidentsPage() {
-  const city       = useMapStore(s => s.city)
-  const incidents  = useTrafficStore(s => s.incidents)
+  const city        = useMapStore(s => s.city)
+  const incidents   = useTrafficStore(s => s.incidents)
+  const dataSource  = useTrafficStore(s => s.dataSource)
   const setIncidents = useTrafficStore(s => s.setIncidents)
-  const setKPIs    = useTrafficStore(s => s.setKPIs)
+  const setKPIs     = useTrafficStore(s => s.setKPIs)
   const [filter, setFilter] = useState<IncidentSeverity | 'all'>('all')
   const [lastRefresh, setLastRefresh] = useState(new Date())
   const [mounted, setMounted] = useState(false)
@@ -33,8 +35,12 @@ export default function IncidentsPage() {
   }, [])
 
   const refresh = () => {
-    setIncidents(generateIncidents(city))
-    setKPIs(generateCityKPIs(city))
+    // When live data is active, the map already populates incidents via trafficStore
+    // Only generate synthetic when no live API is available
+    if (dataSource !== 'live') {
+      setIncidents(generateIncidents(city))
+      setKPIs(generateCityKPIs(city))
+    }
     setLastRefresh(new Date())
   }
 
@@ -42,7 +48,7 @@ export default function IncidentsPage() {
     refresh()
     const interval = setInterval(refresh, 30_000)
     return () => clearInterval(interval)
-  }, [city]) // eslint-disable-line
+  }, [city, dataSource]) // eslint-disable-line
 
   const filtered = [...incidents]
     .filter(i => filter === 'all' || i.severity === filter)
@@ -72,18 +78,34 @@ export default function IncidentsPage() {
               <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-[#FF6D00]" />
                 Incidents — {city.flag} {city.name}
+                {dataSource === 'live' && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand/10 border border-brand/30 text-brand uppercase tracking-wider">Live</span>
+                )}
               </h1>
               <p className="text-sm text-text-secondary mt-1">
                 Actualisé {mounted ? formatDistanceToNow(lastRefresh, { locale: fr, addSuffix: true }) : '...'}
               </p>
             </div>
-            <button
-              onClick={refresh}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-sm text-text-secondary hover:text-text-primary"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Actualiser
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => exportToCsv(
+                  `incidents-${city.id}-${new Date().toISOString().slice(0, 10)}`,
+                  ['ID', 'Type', 'Sévérité', 'Titre', 'Adresse', 'Source', 'Début'],
+                  incidents.map(i => [i.id, i.type, i.severity, i.title, i.address, i.source, i.startedAt]),
+                )}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-sm text-text-secondary hover:text-text-primary"
+              >
+                <Download className="w-3.5 h-3.5" />
+                CSV
+              </button>
+              <button
+                onClick={refresh}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-sm text-text-secondary hover:text-text-primary"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Actualiser
+              </button>
+            </div>
           </div>
 
           {/* Filter tabs */}

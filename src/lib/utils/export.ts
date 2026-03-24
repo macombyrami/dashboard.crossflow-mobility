@@ -1,0 +1,42 @@
+/**
+ * CrossFlow export utilities — CSV + PDF
+ */
+
+/** Download a CSV file */
+export function exportToCsv(
+  filename: string,
+  headers: string[],
+  rows: (string | number | undefined | null)[][],
+): void {
+  const escape = (v: string | number | undefined | null) => {
+    const s = String(v ?? '')
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"`
+      : s
+  }
+
+  const lines = [headers, ...rows].map(row => row.map(escape).join(','))
+  const csv   = '\uFEFF' + lines.join('\r\n') // BOM for Excel UTF-8
+  const blob  = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  triggerDownload(blob, filename.endsWith('.csv') ? filename : filename + '.csv')
+}
+
+/** Open browser print dialog (relies on @media print CSS hiding chrome) */
+export function exportToPdf(pageTitle?: string): void {
+  const prev = document.title
+  if (pageTitle) document.title = pageTitle
+  window.print()
+  if (pageTitle) document.title = prev
+}
+
+function triggerDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const a   = document.createElement('a')
+  a.href     = url
+  a.download = filename
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}

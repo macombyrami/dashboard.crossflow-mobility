@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Activity, Clock, Wind, AlertTriangle, Network, Zap } from 'lucide-react'
+import { Activity, Clock, Wind, AlertTriangle, Network, Zap, Download } from 'lucide-react'
 import { KPICard } from '@/components/dashboard/KPICard'
 import { cn } from '@/lib/utils/cn'
 import { TrafficChart } from '@/components/dashboard/TrafficChart'
@@ -11,9 +11,11 @@ import { AirQualityCard } from '@/components/dashboard/AirQualityCard'
 import { EventsWidget } from '@/components/dashboard/EventsWidget'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
+import { useKPIHistoryStore } from '@/store/kpiHistoryStore'
 import { useTranslation } from '@/lib/hooks/useTranslation'
 import { generateCityKPIs, generateIncidents } from '@/lib/engine/traffic.engine'
 import { fetchWeather, fetchAirQuality } from '@/lib/api/openmeteo'
+import { exportToPdf } from '@/lib/utils/export'
 import { platformConfig } from '@/config/platform.config'
 import { pollutionLabel } from '@/lib/utils/congestion'
 import type { CityKPIs, TrafficSnapshot } from '@/types'
@@ -50,6 +52,7 @@ export default function DashboardPage() {
   const setOpenMeteoWeather = useTrafficStore(s => s.setOpenMeteoWeather)
   const airQuality          = useTrafficStore(s => s.airQuality)
   const setAirQuality       = useTrafficStore(s => s.setAirQuality)
+  const addSnapshot  = useKPIHistoryStore(s => s.addSnapshot)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -62,7 +65,6 @@ export default function DashboardPage() {
     setKPIs(generateCityKPIs(city))
     setIncidents(generateIncidents(city))
     const interval = setInterval(() => {
-      if (dataSource === 'live') return
       setKPIs(generateCityKPIs(city))
       setIncidents(generateIncidents(city))
     }, platformConfig.kpi.dashboardRefreshMs)
@@ -75,6 +77,11 @@ export default function DashboardPage() {
     const base = generateCityKPIs(city)
     setKPIs(kpisFromSnapshot(city.id, snapshot, incidents.length, base))
   }, [snapshot, dataSource, city, incidents.length, setKPIs])
+
+  // Record KPI snapshot to history store (30-min buckets)
+  useEffect(() => {
+    if (kpis) addSnapshot(kpis)
+  }, [kpis, addSnapshot])
 
   // Real weather from OpenMeteo (free, no key)
   useEffect(() => {
@@ -131,6 +138,13 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => exportToPdf(`CrossFlow — ${city.name} Dashboard`)}
+            className="print-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-xs text-text-secondary hover:text-text-primary"
+          >
+            <Download className="w-3.5 h-3.5" />
+            PDF
+          </button>
           {openMeteoWeather && (
             <div className="glass-light px-4 py-2 rounded-xl border border-white/5 flex items-center gap-2.5">
               <span className="text-xl">{openMeteoWeather.weatherEmoji}</span>

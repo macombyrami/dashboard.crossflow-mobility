@@ -9,6 +9,7 @@ import {
   Tooltip,
 } from 'recharts'
 import { useMapStore } from '@/store/mapStore'
+import { useKPIHistoryStore } from '@/store/kpiHistoryStore'
 import { generateKPIHistory } from '@/lib/engine/traffic.engine'
 import { useMemo } from 'react'
 
@@ -18,8 +19,12 @@ const METRICS = [
 ] as const
 
 export function TrafficChart() {
-  const city = useMapStore(s => s.city)
-  const data = useMemo(() => generateKPIHistory(city, 48), [city])
+  const city        = useMapStore(s => s.city)
+  const realHistory = useKPIHistoryStore(s => s.getForCity(city.id, 48))
+  const synth       = useMemo(() => generateKPIHistory(city, 48), [city])
+
+  // Use real history when we have at least 2 points, otherwise fall back to synthetic
+  const data = realHistory.length >= 2 ? realHistory : synth
 
   // Show every 4th label
   const labeledData = data.map((d, i) => ({ ...d, label: i % 4 === 0 ? d.time : '' }))

@@ -28,7 +28,7 @@ export function Header() {
 
   return (
     <header
-      className="flex items-center h-[52px] px-3 sm:px-4 gap-2 shrink-0 border-b border-bg-border"
+      className="print-hidden flex items-center h-[52px] px-3 sm:px-4 gap-2 shrink-0 border-b border-bg-border"
       style={{
         background: 'rgba(10,11,14,0.92)',
         backdropFilter: 'blur(24px) saturate(180%)',

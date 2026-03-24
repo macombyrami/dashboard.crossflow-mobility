@@ -330,3 +330,59 @@ body {
 .pb-safe {
   padding-bottom: max(env(safe-area-inset-bottom), 8px);
 }
+
+/* ─── Print / PDF export ───────────────────────────────────────────────── */
+.print-hidden { /* use on nav, sidebars, buttons during print */ }
+
+@media print {
+  .print-hidden,
+  aside,
+  nav,
+  [class*="Sidebar"],
+  [class*="Header"],
+  [class*="BottomNav"] {
+    display: none !important;
+  }
+
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .app-shell {
+    display: block !important;
+    height: auto !important;
+  }
+
+  .main-content {
+    overflow: visible !important;
+    padding-bottom: 0 !important;
+  }
+
+  main {
+    overflow: visible !important;
+    height: auto !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .bg-bg-surface,
+  .bg-bg-elevated,
+  .glass,
+  .glass-card,
+  .glass-light {
+    background: #f9f9f9 !important;
+    border: 1px solid #ddd !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+
+  .text-text-primary  { color: #111 !important; }
+  .text-text-secondary{ color: #555 !important; }
+  .text-text-muted    { color: #888 !important; }
+  .text-white         { color: #000 !important; }
+
+  @page { margin: 1.5cm; }
+}
