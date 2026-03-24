@@ -224,6 +224,75 @@ export async function fetchCityStats(cityName: string, countryCode: string): Pro
   }
 }
 
+// ─── Transit route relations ──────────────────────────────────────────────
+
+export interface OSMTransitLine {
+  id:       number
+  route:    string   // bus | tram | subway | train | monorail | ferry
+  name:     string
+  ref:      string   // line number / letter
+  colour:   string   // hex color
+  operator: string
+  network:  string
+}
+
+export async function fetchTransitRoutes(
+  bbox: [number, number, number, number],
+  maxLines = 150,
+): Promise<OSMTransitLine[]> {
+  const [west, south, east, north] = bbox
+  const query = `
+    [out:json][timeout:25];
+    (
+      relation["type"="route"]["route"~"^(bus|tram|subway|train|monorail|ferry)$"](${south},${west},${north},${east});
+    );
+    out tags center ${maxLines};
+  `
+
+  try {
+    await overpassLimiter.acquire()
+    const res = await fetch(OVERPASS_BASE, {
+      method:  'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body:    `data=${encodeURIComponent(query)}`,
+      signal:  AbortSignal.timeout(15000),
+      next:    { revalidate: 300 },
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+
+    return (data.elements ?? [])
+      .filter((el: any) => el.type === 'relation')
+      .map((el: any): OSMTransitLine => {
+        const tags = el.tags ?? {}
+        return {
+          id:       el.id,
+          route:    tags.route ?? 'bus',
+          name:     tags.name ?? tags.ref ?? '',
+          ref:      tags.ref ?? '',
+          colour:   (tags.colour ?? tags.color ?? transitDefaultColor(tags.route)).replace(/^(?!#)/, '#'),
+          operator: tags.operator ?? tags.network ?? '',
+          network:  tags.network ?? tags.operator ?? '',
+        }
+      })
+      .slice(0, maxLines)
+  } catch {
+    return []
+  }
+}
+
+function transitDefaultColor(route?: string): string {
+  const map: Record<string, string> = {
+    bus:      '#3B82F6',
+    tram:     '#10B981',
+    subway:   '#8B5CF6',
+    train:    '#F59E0B',
+    monorail: '#EC4899',
+    ferry:    '#06B6D4',
+  }
+  return map[route ?? ''] ?? '#6B7280'
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 interface OverpassElement {

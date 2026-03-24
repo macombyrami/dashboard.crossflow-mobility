@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Activity, Clock, Wind, AlertTriangle, Network } from 'lucide-react'
+import { Activity, Clock, Wind, AlertTriangle, Network, Zap } from 'lucide-react'
 import { KPICard } from '@/components/dashboard/KPICard'
 import { cn } from '@/lib/utils/cn'
 import { TrafficChart } from '@/components/dashboard/TrafficChart'
@@ -16,6 +16,26 @@ import { generateCityKPIs, generateIncidents } from '@/lib/engine/traffic.engine
 import { fetchWeather, fetchAirQuality } from '@/lib/api/openmeteo'
 import { platformConfig } from '@/config/platform.config'
 import { pollutionLabel } from '@/lib/utils/congestion'
+import type { CityKPIs, TrafficSnapshot } from '@/types'
+
+function kpisFromSnapshot(cityId: string, snapshot: TrafficSnapshot, incidentCount: number, base: CityKPIs): CityKPIs {
+  const segs = snapshot.segments
+  if (!segs.length) return base
+  const congestionRate     = segs.reduce((a, s) => a + s.congestionScore, 0) / segs.length
+  const avgTravelMin       = Math.max(5, 10 + congestionRate * 40)
+  const pollutionIndex     = Math.min(10, Math.max(0.5, congestionRate * 8 + 0.5))
+  const networkEfficiency  = Math.max(0.1, 1 - congestionRate * 0.85)
+  return {
+    ...base,
+    cityId,
+    congestionRate,
+    avgTravelMin,
+    pollutionIndex,
+    activeIncidents:  incidentCount,
+    networkEfficiency,
+    capturedAt: snapshot.fetchedAt,
+  }
+}
 
 export default function DashboardPage() {
   const { t } = useTranslation()
@@ -23,6 +43,9 @@ export default function DashboardPage() {
   const kpis                = useTrafficStore(s => s.kpis)
   const setKPIs             = useTrafficStore(s => s.setKPIs)
   const setIncidents        = useTrafficStore(s => s.setIncidents)
+  const snapshot            = useTrafficStore(s => s.snapshot)
+  const incidents           = useTrafficStore(s => s.incidents)
+  const dataSource          = useTrafficStore(s => s.dataSource)
   const openMeteoWeather    = useTrafficStore(s => s.openMeteoWeather)
   const setOpenMeteoWeather = useTrafficStore(s => s.setOpenMeteoWeather)
   const airQuality          = useTrafficStore(s => s.airQuality)
@@ -33,16 +56,25 @@ export default function DashboardPage() {
     setMounted(true)
   }, [])
 
-  // Synthetic KPIs + incidents
+  // Synthetic KPIs + incidents baseline (only when no live data)
   useEffect(() => {
+    if (dataSource === 'live') return
     setKPIs(generateCityKPIs(city))
     setIncidents(generateIncidents(city))
     const interval = setInterval(() => {
+      if (dataSource === 'live') return
       setKPIs(generateCityKPIs(city))
       setIncidents(generateIncidents(city))
     }, platformConfig.kpi.dashboardRefreshMs)
     return () => clearInterval(interval)
-  }, [city, setKPIs, setIncidents])
+  }, [city, dataSource, setKPIs, setIncidents])
+
+  // Real KPIs derived from HERE live snapshot
+  useEffect(() => {
+    if (!snapshot || dataSource !== 'live') return
+    const base = generateCityKPIs(city)
+    setKPIs(kpisFromSnapshot(city.id, snapshot, incidents.length, base))
+  }, [snapshot, dataSource, city, incidents.length, setKPIs])
 
   // Real weather from OpenMeteo (free, no key)
   useEffect(() => {
@@ -89,8 +121,13 @@ export default function DashboardPage() {
               {city.flag} {city.name}
             </h1>
           </div>
-          <p className="text-[13px] font-medium text-text-secondary">
+          <p className="text-[13px] font-medium text-text-secondary flex items-center gap-2">
             {t('dashboard.title')} · <span className="text-text-muted">{t('dashboard.updated')} · {city.timezone}</span>
+            {dataSource === 'live' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand/10 border border-brand/30 text-brand text-[10px] font-bold uppercase tracking-wider">
+                <Zap className="w-2.5 h-2.5" />HERE Live
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-4">

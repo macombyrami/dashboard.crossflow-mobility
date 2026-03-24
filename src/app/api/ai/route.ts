@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const OPENROUTER_BASE    = 'https://openrouter.ai/api/v1'
-const DEFAULT_MODEL      = 'openai/gpt-oss-120b:free'
+const DEFAULT_MODEL      = 'google/gemini-2.0-flash-001'
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENROUTER_API_KEY

@@ -19,7 +19,7 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
   const [loading,   setLoading]   = useState(false)
   
   const MODELS = [
-    { id: 'openai/gpt-oss-120b:free',              label: 'GPT OSS 120B',      note: t('ai.model_note_powerful') },
+    { id: 'google/gemini-2.0-flash-001',            label: 'Gemini 2.0 Flash',  note: t('ai.model_note_fast') },
     { id: 'google/gemini-flash-1.5',               label: 'Gemini Flash 1.5',  note: t('ai.model_note_fast') },
     { id: 'anthropic/claude-haiku',                label: 'Claude Haiku',      note: t('ai.model_note_balanced') },
     { id: 'openai/gpt-4o-mini',                    label: 'GPT-4o mini',       note: t('ai.model_note_fast') },
