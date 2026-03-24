@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type':  'application/json',
-        'HTTP-Referer':  'https://crossflow-mobility.com',
+        'HTTP-Referer':  process.env.NEXT_PUBLIC_APP_URL ?? 'https://myaccount.crossflow-mobility.com',
         'X-Title':       'CrossFlow Mobility',
       },
       body: JSON.stringify({

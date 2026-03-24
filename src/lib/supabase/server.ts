@@ -7,10 +7,9 @@ export async function createClient() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!url || !key) {
-    return createServerClient(
-      'https://dummy.supabase.co',
-      'dummy-key',
-      { cookies: { getAll: () => [], setAll: () => {} } }
+    throw new Error(
+      'NEXT_PUBLIC_SUPABASE_URL et NEXT_PUBLIC_SUPABASE_ANON_KEY sont requis. ' +
+      'Vérifiez votre fichier .env.local ou les variables d\'environnement Vercel.'
     )
   }
 

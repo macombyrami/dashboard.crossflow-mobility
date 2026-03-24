@@ -10,6 +10,14 @@ export async function updateSession(request: NextRequest) {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!url || !key) {
+    // Supabase not configured — block all non-public routes
+    const pathname = request.nextUrl.pathname
+    const isPublic = pathname.startsWith('/login') || pathname.startsWith('/auth')
+    if (!isPublic) {
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = '/login'
+      return NextResponse.redirect(redirectUrl)
+    }
     return supabaseResponse
   }
 
