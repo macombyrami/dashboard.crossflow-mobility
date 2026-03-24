@@ -65,7 +65,7 @@ export default function IncidentsPage() {
   ]
 
   return (
-    <main className="flex-1 overflow-y-auto p-6 space-y-5">
+    <main className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
           {/* Page header */}
           <div className="flex items-center justify-between">
             <div>

@@ -46,7 +46,7 @@ const API_SOURCES = [
 
 export default function SettingsPage() {
   return (
-    <main className="flex-1 overflow-y-auto p-6 space-y-6 max-w-2xl">
+    <main className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 max-w-2xl">
           <div>
             <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
               <Settings className="w-5 h-5 text-brand-green" />

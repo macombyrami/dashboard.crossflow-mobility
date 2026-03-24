@@ -62,10 +62,11 @@ const CARTO_DARK_STYLE: maplibregl.StyleSpecification = {
 }
 
 export function CrossFlowMap() {
-  const mapRef       = useRef<maplibregl.Map | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const popupRef     = useRef<maplibregl.Popup | null>(null)
-  const osmRoadsRef  = useRef<Map<string, OSMRoad[]>>(new Map())
+  const mapRef          = useRef<maplibregl.Map | null>(null)
+  const containerRef    = useRef<HTMLDivElement>(null)
+  const popupRef        = useRef<maplibregl.Popup | null>(null)
+  const osmRoadsRef     = useRef<Map<string, OSMRoad[]>>(new Map())
+  const refreshDataRef  = useRef<() => void>(() => {})
   const [mapLoaded, setMapLoaded] = useState(false)
 
   const city            = useMapStore(s => s.city)
@@ -247,7 +248,11 @@ export function CrossFlowMap() {
     if (osmRoadsRef.current.has(city.id)) return
     fetchRoads(city.bbox, ['motorway', 'trunk', 'primary', 'secondary', 'tertiary'])
       .then(roads => {
-        if (roads.length > 0) osmRoadsRef.current.set(city.id, roads.slice(0, 600))
+        if (roads.length > 0) {
+          osmRoadsRef.current.set(city.id, roads.slice(0, 600))
+          // Re-render now that real road geometries are available
+          refreshDataRef.current()
+        }
       })
   }, [city.id, mapLoaded]) // eslint-disable-line
 
@@ -394,6 +399,8 @@ export function CrossFlowMap() {
     setIncidents(incidents)
 
     // Update synthetic traffic on map
+    // Segments from HERE or OSM have real road geometry → realData:true → full opacity
+    // Segments from synthetic generator → realData:false → barely visible (0.08)
     const trafficGeo: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
       features: snapshot.segments.map(seg => ({
@@ -406,6 +413,7 @@ export function CrossFlowMap() {
           level:     seg.level,
           color:     congestionColor(seg.congestionScore),
           width:     platformConfig.traffic.lineWidths[seg.level],
+          realData:  seg.id.startsWith('here-') || seg.id.includes('-osm-'),
         },
       })),
     }
@@ -489,6 +497,9 @@ export function CrossFlowMap() {
       trafficImpact: omWeather.trafficImpact,
     } : null)
   }, [city, mapLoaded, useLiveData, setSnapshot, setIncidents, setWeather, setOpenMeteoWeather, setAirQuality, setDataSource])
+
+  // Keep refreshDataRef in sync so OSM loader can call it after roads are cached
+  useEffect(() => { refreshDataRef.current = refreshData }, [refreshData])
 
   useEffect(() => {
     if (!mapLoaded) return
@@ -618,7 +629,9 @@ function initStaticSources(map: maplibregl.Map) {
     paint:  {
       'line-color':   ['get', 'color'],
       'line-width':   ['get', 'width'],
-      'line-opacity': ['case', ['boolean', hasKey(), false], 0.2, 0.9],
+      // realData=true → HERE/OSM segments (on real roads) → fully visible
+      // realData=false → synthetic grid → barely visible
+      'line-opacity': ['case', ['boolean', ['get', 'realData'], false], 0.88, 0.08],
     },
   })
 

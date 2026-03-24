@@ -209,10 +209,14 @@ body {
 }
 
 /* ─── Scrollbar ────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--bg-border); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+::-webkit-scrollbar              { width: 6px; height: 6px; }
+::-webkit-scrollbar-track        { background: var(--bg-elevated); border-radius: 99px; margin: 4px; }
+::-webkit-scrollbar-thumb        { background: var(--bg-hover); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover  { background: var(--text-muted); }
+::-webkit-scrollbar-corner       { background: transparent; }
+
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: var(--bg-hover) var(--bg-elevated); }
 
 /* ─── Animations ───────────────────────────────────────────────────────── */
 @keyframes pulse-glow {
@@ -273,8 +277,11 @@ body {
 }
 
 /* ─── Page layouts ─────────────────────────────────────────────────────── */
+
+
 .page-scroll {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 16px;

@@ -35,9 +35,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Sidebar />
           <div className="main-content">
             <Header />
-            <main className="flex-1 overflow-hidden relative">
+            <div className="flex-1 overflow-hidden relative flex flex-col min-h-0">
               {children}
-            </main>
+            </div>
           </div>
         </div>
         <BottomNav />

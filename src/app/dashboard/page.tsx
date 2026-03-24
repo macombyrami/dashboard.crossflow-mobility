@@ -111,7 +111,7 @@ export default function DashboardPage() {
   const pollDelta   = ((seed % 31) - 15) / 10
 
   return (
-    <main className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-8">
+    <main className="flex-1 min-h-0 overflow-y-auto p-6 sm:p-8 space-y-8">
       {/* Title & Stats Summary */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
         <div>
