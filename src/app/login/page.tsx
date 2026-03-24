@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Zap, Mail, Lock, Loader2, ArrowRight, Github } from 'lucide-react'
+import { Zap, Mail, Lock, Loader2, ArrowRight } from 'lucide-react'
 
 function LoginForm() {
   const [email, setEmail] = useState('')
@@ -56,14 +56,6 @@ function LoginForm() {
     }
   }
 
-  const handleOAuth = async (provider: 'github' | 'google') => {
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
-  }
 
   return (
     <>
@@ -135,38 +127,17 @@ function LoginForm() {
           </button>
         </form>
 
-        {/* Divider */}
-        <div className="relative my-8">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-bg-border"></div>
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-[#121318] px-2 text-text-muted">Ou continuer avec</span>
-          </div>
-        </div>
-
-        {/* Social Auth */}
-        <div className="grid grid-cols-1 gap-3">
+        {/* Footer Link */}
+        <p className="text-center mt-6 text-sm text-text-secondary">
+          {isSignUp ? 'Déjà un compte ?' : "Vous n'avez pas de compte ?"}
           <button
-            onClick={() => handleOAuth('github')}
-            className="btn btn-ghost justify-center py-2.5 rounded-xl gap-3"
+            onClick={() => setIsSignUp(!isSignUp)}
+            className="ml-1.5 text-brand hover:underline font-medium transition-all"
           >
-            <Github className="w-4 h-4" />
-            <span>GitHub</span>
+            {isSignUp ? 'Se connecter' : "S'inscrire"}
           </button>
-        </div>
+        </p>
       </div>
-
-      {/* Footer Link */}
-      <p className="text-center mt-6 text-sm text-text-secondary">
-        {isSignUp ? 'Déjà un compte ?' : "Vous n'avez pas de compte ?"}
-        <button
-          onClick={() => setIsSignUp(!isSignUp)}
-          className="ml-1.5 text-brand hover:underline font-medium transition-all"
-        >
-          {isSignUp ? 'Se connecter' : "S'inscrire"}
-        </button>
-      </p>
     </>
   )
 }
