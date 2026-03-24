@@ -4,8 +4,10 @@ import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap } from 'lucide-reac
 import { useMapStore, geocodingToCity } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export function Header() {
+  const router          = useRouter()
   const setAIPanelOpen  = useMapStore(s => s.setAIPanelOpen)
   const isAIPanelOpen   = useMapStore(s => s.isAIPanelOpen)
   const weather         = useTrafficStore(s => s.weather)
@@ -62,6 +64,7 @@ export function Header() {
 
         {/* Alerts */}
         <button
+          onClick={() => router.push('/incidents')}
           className="btn-icon relative"
           title="Incidents actifs"
           aria-label="Incidents actifs"
