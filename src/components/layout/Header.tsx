@@ -166,9 +166,6 @@ function CitySearchBar() {
   const inputRef              = useRef<HTMLInputElement>(null)
   const containerRef          = useRef<HTMLDivElement>(null)
 
-  // Early return after ALL hooks (useState, useRef, useMapStore) are declared
-  if (lockedCityId) return <LockedCityBadge />
-
   useEffect(() => {
     if (!open) { setQuery(''); setResults([]); return }
     inputRef.current?.focus()
@@ -215,6 +212,9 @@ function CitySearchBar() {
     if (open) document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
+
+  // Early return after ALL hooks are declared
+  if (lockedCityId) return <LockedCityBadge />
 
   const select = async (c: {
     name: string; lat: number; lng: number; country: string
