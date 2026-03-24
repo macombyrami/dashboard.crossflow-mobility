@@ -20,11 +20,19 @@ const METRICS = [
 
 export function TrafficChart() {
   const city        = useMapStore(s => s.city)
-  const realHistory = useKPIHistoryStore(s => s.getForCity(city.id, 48))
+  const snapshots   = useKPIHistoryStore(s => s.snapshots)
+  const realHistory = useMemo(() => {
+    const BUCKET_MS = 30 * 60 * 1000
+    const cutoff    = Date.now() - 7 * 24 * 60 * 60 * 1000
+    return snapshots
+      .filter(s => s.cityId === city.id && s.bucketKey * BUCKET_MS > cutoff)
+      .sort((a, b) => a.bucketKey - b.bucketKey)
+      .slice(-48)
+  }, [snapshots, city.id])
   const synth       = useMemo(() => generateKPIHistory(city, 48), [city])
 
   // Use real history when we have at least 2 points, otherwise fall back to synthetic
-  const data = realHistory.length >= 2 ? realHistory : synth
+  const data = realHistory.length >= 4 ? realHistory : synth
 
   // Show every 4th label
   const labeledData = data.map((d, i) => ({ ...d, label: i % 4 === 0 ? d.time : '' }))

@@ -47,6 +47,7 @@ export interface City {
 
 export interface TrafficSegment {
   id:               string
+  roadType?:        string   // motorway | trunk | primary | secondary | tertiary
   coordinates:      [number, number][] // [lng, lat][]
   speedKmh:         number
   freeFlowSpeedKmh: number

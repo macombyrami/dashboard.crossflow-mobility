@@ -2,7 +2,7 @@
 import dynamic from 'next/dynamic'
 import { ModeSelector } from '@/components/map/controls/ModeSelector'
 import { LayerControls } from '@/components/map/controls/LayerControls'
-import { MapLegend } from '@/components/map/controls/MapLegend'
+import { MapLegend } from '@/components/map/MapLegend'
 import { EdgeDetailPanel } from '@/components/map/panels/EdgeDetailPanel'
 import { ZoneStatsPanel } from '@/components/map/panels/ZoneStatsPanel'
 import { SimulationPanel } from '@/components/simulation/SimulationPanel'
@@ -80,9 +80,7 @@ export default function MapPage() {
         )}
 
         {/* Map legend */}
-        <div className="absolute bottom-16 right-4 z-10 pointer-events-none hidden xs:block">
-          <MapLegend />
-        </div>
+        <MapLegend />
 
         {/* Edge detail panel */}
         {mode !== 'simulate' && <EdgeDetailPanel />}

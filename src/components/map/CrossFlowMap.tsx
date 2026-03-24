@@ -8,8 +8,8 @@ import { useSimulationStore } from '@/store/simulationStore'
 import { platformConfig } from '@/config/platform.config'
 import { congestionColor } from '@/lib/utils/congestion'
 import { generateTrafficSnapshot, generateIncidents, generateTrafficFromOSMRoads } from '@/lib/engine/traffic.engine'
-import { fetchRoads } from '@/lib/api/overpass'
-import type { OSMRoad } from '@/lib/api/overpass'
+import { fetchRoads, fetchTrafficPOIs } from '@/lib/api/overpass'
+import type { OSMRoad, OSMPOIPoint } from '@/lib/api/overpass'
 import {
   hasKey,
   getTrafficFlowTileUrl,
@@ -38,6 +38,7 @@ const TOMTOM_INC              = 'tomtom-incidents'
 const BOUNDARY_SOURCE         = 'city-boundary'
 const ZONE_SOURCE             = 'cf-zone'
 const ZONE_DRAFT_SOURCE       = 'cf-zone-draft'
+const POI_SOURCE              = 'cf-pois'
 
 // CartoDB Voyager Dark — completely free, no key, beautiful dark style
 const CARTO_DARK_STYLE: maplibregl.StyleSpecification = {
@@ -62,11 +63,24 @@ const CARTO_DARK_STYLE: maplibregl.StyleSpecification = {
   ],
 }
 
+function computeRoadWidth(roadType: string | undefined, level: import('@/types').CongestionLevel): number {
+  const base: Record<string, number> = {
+    motorway: 7, motorway_link: 5, trunk: 6, trunk_link: 4,
+    primary: 4.5, primary_link: 3, secondary: 3, secondary_link: 2.5,
+    tertiary: 2, tertiary_link: 1.5,
+  }
+  const mult: Record<import('@/types').CongestionLevel, number> = {
+    free: 0.9, slow: 1.1, congested: 1.3, critical: 1.5,
+  }
+  return Math.round((base[roadType ?? ''] ?? 2.5) * (mult[level] ?? 1) * 10) / 10
+}
+
 export function CrossFlowMap() {
   const mapRef          = useRef<maplibregl.Map | null>(null)
   const containerRef    = useRef<HTMLDivElement>(null)
   const popupRef        = useRef<maplibregl.Popup | null>(null)
   const osmRoadsRef     = useRef<Map<string, OSMRoad[]>>(new Map())
+  const osmPoisRef      = useRef<Map<string, OSMPOIPoint[]>>(new Map())
   const refreshDataRef  = useRef<() => void>(() => {})
   const [mapLoaded, setMapLoaded] = useState(false)
 
@@ -249,15 +263,37 @@ export function CrossFlowMap() {
 
   useEffect(() => {
     if (!mapLoaded) return
-    if (osmRoadsRef.current.has(city.id)) return
-    fetchRoads(city.bbox, ['motorway', 'trunk', 'primary', 'secondary', 'tertiary'])
-      .then(roads => {
-        if (roads.length > 0) {
-          osmRoadsRef.current.set(city.id, roads.slice(0, 600))
-          // Re-render now that real road geometries are available
-          refreshDataRef.current()
-        }
+
+    // Load OSM roads for real geometry
+    if (!osmRoadsRef.current.has(city.id)) {
+      fetchRoads(city.bbox, ['motorway', 'trunk', 'primary', 'secondary', 'tertiary'])
+        .then(roads => {
+          if (roads.length > 0) {
+            osmRoadsRef.current.set(city.id, roads.slice(0, 600))
+            refreshDataRef.current()
+          }
+        })
+    }
+
+    // Load POIs (traffic signals, bus stops, subway entrances) independently
+    if (!osmPoisRef.current.has(city.id)) {
+      fetchTrafficPOIs(city.bbox).then(pois => {
+        if (!pois.length) return
+        osmPoisRef.current.set(city.id, pois)
+        const map = mapRef.current
+        if (!map) return
+        const src = map.getSource(POI_SOURCE) as maplibregl.GeoJSONSource | undefined
+        if (!src) return
+        src.setData({
+          type: 'FeatureCollection',
+          features: pois.map(poi => ({
+            type:       'Feature' as const,
+            geometry:   { type: 'Point' as const, coordinates: [poi.lng, poi.lat] },
+            properties: { id: poi.id, type: poi.type, name: poi.name },
+          })),
+        })
       })
+    }
   }, [city.id, mapLoaded]) // eslint-disable-line
 
   // ─── Fly to city ─────────────────────────────────────────────────────
@@ -328,9 +364,11 @@ export function CrossFlowMap() {
             const congestion = jamFactorToCongestion(s.jamFactor)
             const freeFlow   = s.freeFlow   > 0 ? s.freeFlow   : 50
             const speed      = s.speed      > 0 ? s.speed      : freeFlow * (1 - congestion * 0.85)
+            const roadType   = freeFlow > 100 ? 'motorway' : freeFlow > 80 ? 'trunk' : freeFlow > 55 ? 'primary' : freeFlow > 35 ? 'secondary' : 'tertiary'
             const length     = estimateSegmentLength(s.coords)
             return {
               id:               `here-${city.id}-${i}`,
+              roadType,
               coordinates:      s.coords,
               speedKmh:         Math.round(speed),
               freeFlowSpeedKmh: Math.round(freeFlow),
@@ -416,7 +454,7 @@ export function CrossFlowMap() {
           speed:     seg.speedKmh,
           level:     seg.level,
           color:     congestionColor(seg.congestionScore),
-          width:     platformConfig.traffic.lineWidths[seg.level],
+          width:     computeRoadWidth(seg.roadType, seg.level),
           realData:  seg.id.startsWith('here-') || seg.id.includes('-osm-'),
         },
       })),
@@ -538,7 +576,7 @@ export function CrossFlowMap() {
             speed:     seg.speedKmh,
             level,
             color:     congestionColor(simCongestion),
-            width:     platformConfig.traffic.lineWidths[level],
+            width:     computeRoadWidth(seg.roadType, level),
             realData:  seg.id.startsWith('here-') || seg.id.includes('-osm-'),
           },
         }
@@ -562,7 +600,7 @@ export function CrossFlowMap() {
               speed:     seg.speedKmh,
               level:     seg.level,
               color:     congestionColor(seg.congestionScore),
-              width:     platformConfig.traffic.lineWidths[seg.level],
+              width:     computeRoadWidth(seg.roadType, seg.level),
               realData:  seg.id.startsWith('here-') || seg.id.includes('-osm-'),
             },
           })),
@@ -674,7 +712,7 @@ function initStaticSources(map: maplibregl.Map) {
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint:  {
       'line-color':   ['get', 'color'],
-      'line-width':   ['*', ['get', 'width'], 3], // Glow is wider
+      'line-width': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.5, ['get', 'width']], 13, ['*', 2, ['get', 'width']], 17, ['*', 3, ['get', 'width']]],
       'line-opacity': [
         'interpolate', ['linear'], ['zoom'],
         10, 0.05,
@@ -692,7 +730,7 @@ function initStaticSources(map: maplibregl.Map) {
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint:  {
       'line-color':   ['get', 'color'],
-      'line-width':   ['get', 'width'],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.4, ['get', 'width']], 13, ['get', 'width'], 17, ['*', 1.4, ['get', 'width']]],
       // realData=true → HERE/OSM segments (on real roads) → fully visible
       // realData=false → synthetic grid → barely visible
       'line-opacity': ['case', ['boolean', ['get', 'realData'], false], 0.88, 0.08],
@@ -769,6 +807,57 @@ function initStaticSources(map: maplibregl.Map) {
       'text-color':      '#F5F5F7',
       'text-halo-color': 'rgba(8, 9, 11, 0.8)',
       'text-halo-width': 2,
+    },
+  })
+
+  // ── POI Overlay (traffic signals, bus stops, subway) ──────────────────
+  map.addSource(POI_SOURCE, { type: 'geojson', data: emptyFC })
+
+  // Traffic signals — yellow dots
+  map.addLayer({
+    id:      POI_SOURCE + '-signals',
+    type:    'circle',
+    source:  POI_SOURCE,
+    minzoom: 13,
+    filter:  ['==', ['get', 'type'], 'traffic_signals'],
+    paint:   {
+      'circle-radius':        ['interpolate', ['linear'], ['zoom'], 13, 3, 16, 6, 18, 9],
+      'circle-color':         '#FFD600',
+      'circle-opacity':       0.95,
+      'circle-stroke-width':  1.5,
+      'circle-stroke-color':  '#08090B',
+    },
+  })
+
+  // Bus stops — blue dots
+  map.addLayer({
+    id:      POI_SOURCE + '-bus-stops',
+    type:    'circle',
+    source:  POI_SOURCE,
+    minzoom: 14,
+    filter:  ['==', ['get', 'type'], 'bus_stop'],
+    paint:   {
+      'circle-radius':        ['interpolate', ['linear'], ['zoom'], 14, 3, 17, 6],
+      'circle-color':         '#3B82F6',
+      'circle-opacity':       0.85,
+      'circle-stroke-width':  1,
+      'circle-stroke-color':  '#08090B',
+    },
+  })
+
+  // Subway entrances — purple rings
+  map.addLayer({
+    id:      POI_SOURCE + '-subway',
+    type:    'circle',
+    source:  POI_SOURCE,
+    minzoom: 13,
+    filter:  ['==', ['get', 'type'], 'subway_entrance'],
+    paint:   {
+      'circle-radius':        ['interpolate', ['linear'], ['zoom'], 13, 4, 17, 9],
+      'circle-color':         '#A855F7',
+      'circle-opacity':       1,
+      'circle-stroke-width':  2,
+      'circle-stroke-color':  '#08090B',
     },
   })
 }

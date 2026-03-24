@@ -258,6 +258,7 @@ export function generateTrafficFromOSMRoads(city: City, osmRoads: OSMRoad[]): Tr
 
     segments.push({
       id:               `${city.id}-osm-${osmRoad.id}-${idx}`,
+      roadType:         osmRoad.highway,
       coordinates:      osmRoad.coords,
       speedKmh:         Math.round(speedKmh),
       freeFlowSpeedKmh: freeFlow,
