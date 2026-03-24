@@ -74,6 +74,10 @@ interface MapStore {
   finalizeZone: () => void
   clearZone:    () => void
 
+  // Locked city (set from Supabase user_metadata.default_city after login)
+  lockedCityId:    string | null
+  setLockedCity:   (id: string | null) => void
+
   // UI
   isPanelOpen:   boolean
   setPanelOpen:  (open: boolean) => void
@@ -161,6 +165,9 @@ export const useMapStore = create<MapStore>()(
       zonePolygon:    null,
       finalizeZone:   () => set(s => s.zoneDraft.length >= 3 ? { zonePolygon: s.zoneDraft, zoneDraft: [] } : {}),
       clearZone:      () => set({ zonePolygon: null, zoneDraft: [], zoneActive: false }),
+
+      lockedCityId:   null,
+      setLockedCity:  (id) => set({ lockedCityId: id }),
 
       isPanelOpen:    false,
       setPanelOpen:   (open) => set({ isPanelOpen: open }),
