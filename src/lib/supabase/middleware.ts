@@ -39,6 +39,15 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // An account is considered onboarded if:
+  // - the explicit flag is set, OR
+  // - it already has a default_city (account predates onboarding feature)
+  function isOnboardingDone(u: typeof user): boolean {
+    if (!u) return false
+    const meta = u.user_metadata ?? {}
+    return meta.onboarding_completed === true || Boolean(meta.default_city)
+  }
+
   const pathname = request.nextUrl.pathname
   const isPublic = pathname.startsWith('/login') || pathname.startsWith('/auth')
   const isOnboarding = pathname.startsWith('/onboarding')
@@ -50,16 +59,15 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && isPublic) {
-    const onboardingDone = user.user_metadata?.onboarding_completed === true
+    const needsOnboarding = !isOnboardingDone(user)
     const url = request.nextUrl.clone()
-    url.pathname = onboardingDone ? '/map' : '/onboarding'
+    url.pathname = needsOnboarding ? '/onboarding' : '/map'
     return NextResponse.redirect(url)
   }
 
-  // Authenticated user not yet onboarded → force onboarding
+  // Authenticated user not yet onboarded → force onboarding (only for brand-new accounts)
   if (user && !isOnboarding && !isPublic) {
-    const onboardingDone = user.user_metadata?.onboarding_completed === true
-    if (!onboardingDone) {
+    if (!isOnboardingDone(user)) {
       const url = request.nextUrl.clone()
       url.pathname = '/onboarding'
       return NextResponse.redirect(url)

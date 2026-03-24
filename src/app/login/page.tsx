@@ -45,7 +45,9 @@ function LoginForm() {
           password,
         })
         if (error) throw error
-        router.push('/map')
+        // Full page reload so the server-side middleware sees the new session cookie
+        window.location.href = '/map'
+        return
       }
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message || 'Une erreur est survenue' })
