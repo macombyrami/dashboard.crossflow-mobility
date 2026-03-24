@@ -39,26 +39,31 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
+  const pathname = request.nextUrl.pathname
+  const isPublic = pathname.startsWith('/login') || pathname.startsWith('/auth')
+  const isOnboarding = pathname.startsWith('/onboarding')
+
+  if (!user && !isPublic) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  if (
-    user &&
-    (request.nextUrl.pathname.startsWith('/login') ||
-     request.nextUrl.pathname.startsWith('/auth'))
-  ) {
-    // authenticated user trying to access login page
+  if (user && isPublic) {
+    const onboardingDone = user.user_metadata?.onboarding_completed === true
     const url = request.nextUrl.clone()
-    url.pathname = '/map'
+    url.pathname = onboardingDone ? '/map' : '/onboarding'
     return NextResponse.redirect(url)
+  }
+
+  // Authenticated user not yet onboarded → force onboarding
+  if (user && !isOnboarding && !isPublic) {
+    const onboardingDone = user.user_metadata?.onboarding_completed === true
+    if (!onboardingDone) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/onboarding'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

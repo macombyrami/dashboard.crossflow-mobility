@@ -7,6 +7,8 @@
  * Complément idéal à TomTom (couverture 80+ pays)
  */
 
+import { hereFlowLimiter, hereIncidentsLimiter } from '@/lib/utils/rateLimiter'
+
 const BASE = 'https://data.traffic.hereapi.com/v7'
 
 function getKey(): string {
@@ -52,6 +54,7 @@ export async function fetchHereFlow(
   const key = getKey()
   if (!key) return []
 
+  await hereFlowLimiter.acquire()
   const [west, south, east, north] = bbox
   try {
     const res = await fetch(
@@ -95,6 +98,7 @@ export async function fetchHereIncidents(
   const key = getKey()
   if (!key) return []
 
+  await hereIncidentsLimiter.acquire()
   const [west, south, east, north] = bbox
   try {
     const res = await fetch(

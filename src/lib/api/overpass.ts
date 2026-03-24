@@ -10,6 +10,8 @@
  * - Zones piétonnes
  */
 
+import { overpassLimiter } from '@/lib/utils/rateLimiter'
+
 const OVERPASS_BASE = 'https://overpass-api.de/api/interpreter'
 
 export interface OSMRoad {
@@ -61,6 +63,7 @@ export async function fetchRoads(
   `
 
   try {
+    await overpassLimiter.acquire()
     const res = await fetch(OVERPASS_BASE, {
       method:  'POST',
       headers: { 'Content-Type': 'text/plain' },
