@@ -23,11 +23,13 @@ export interface UrbanEvent {
   category:    'concert' | 'sport' | 'manifestation' | 'exposition' | 'marché' | 'congrès' | 'autre'
   startDate:   string
   endDate:     string
-  location:    { lat: number; lng: number; address: string }
+  location:    { lat: number; lng: number; address: string; district?: string }
   attendance:  number     // estimated attendance
   radius:      number     // impact radius in meters
   trafficScore: number    // 0-1 local traffic impact
-  source:      'paris-opendata' | 'predicthq'
+  impactLabel?: string    // "Léger", "Moyen", "Fort"
+  trafficIncrease?: number // +28% etc.
+  source:      'paris-opendata' | 'predicthq' | 'crossflow-engine'
 }
 
 // ─── Paris Open Data events ───────────────────────────────────────────────

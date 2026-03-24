@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap, Lock, Settings } from 'lucide-react'
 import { useMapStore, geocodingToCity } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
+import { CITIES }       from '@/config/cities.config'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -110,10 +111,8 @@ const PRESET_CITIES = [
 ]
 
 function countryFlag(code: string) {
-  if (code === 'FR') return '🇫🇷'
-  if (code === 'GB') return '🇬🇧'
-  if (code === 'DE') return '🇩🇪'
-  return '🌍'
+  const city = CITIES.find(c => c.countryCode === code)
+  return city?.flag ?? '🌍'
 }
 
 // Fetch city boundary polygon from Nominatim
@@ -156,16 +155,19 @@ function CitySearchBar() {
   const lockedCityId    = useMapStore(s => s.lockedCityId)
   const city            = useMapStore(s => s.city)
   const setCity         = useMapStore(s => s.setCity)
-
-  // When the user has a locked city, show a read-only badge
-  if (lockedCityId) return <LockedCityBadge />
   const setCityBoundary = useMapStore(s => s.setCityBoundary)
+
+  // Move hooks before conditional returns
   const [open, setOpen]       = useState(false)
   const [query, setQuery]     = useState('')
   const [results, setResults] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  
   const inputRef              = useRef<HTMLInputElement>(null)
   const containerRef          = useRef<HTMLDivElement>(null)
+
+  // Early return after ALL hooks (useState, useRef, useMapStore) are declared
+  if (lockedCityId) return <LockedCityBadge />
 
   useEffect(() => {
     if (!open) { setQuery(''); setResults([]); return }
@@ -295,18 +297,19 @@ function CitySearchBar() {
             {!loading && !query && (
               <>
                 <div className="px-3 pt-2 pb-1">
-                  <span className="text-[10px] uppercase tracking-wider text-text-muted font-semibold">Villes récentes</span>
+                  <span className="text-[10px] uppercase tracking-wider text-text-muted font-semibold">Villes disponibles</span>
                 </div>
-                {PRESET_CITIES.slice(0, 5).map(c => (
+                {CITIES.map(c => (
                   <button
-                    key={c.name}
-                    onClick={() => select({ ...c, geojson: null })}
+                    key={c.id}
+                    onClick={() => select({ ...c, lat: c.center.lat, lng: c.center.lng, geojson: null })}
                     className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-bg-elevated transition-colors duration-100 text-left"
                   >
                     <div className="w-6 h-6 rounded-md bg-bg-subtle flex items-center justify-center shrink-0">
-                      <span className="text-[11px]">{countryFlag(c.country)}</span>
+                      <span className="text-[11px]">{c.flag}</span>
                     </div>
                     <span className="text-[13px] text-text-primary">{c.name}</span>
+                    <span className="ml-auto text-[10px] text-text-muted">{c.country}</span>
                   </button>
                 ))}
               </>

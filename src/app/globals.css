@@ -342,6 +342,11 @@ body {
   padding-bottom: max(env(safe-area-inset-bottom), 8px);
 }
 
+/* ─── Swipe Utility ────────────────────────────────────────────────────── */
+.touch-none-horizontal {
+  touch-action: pan-y !important;
+}
+
 /* ─── Print / PDF export ───────────────────────────────────────────────── */
 .print-hidden { /* use on nav, sidebars, buttons during print */ }
 
