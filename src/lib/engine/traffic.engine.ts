@@ -18,6 +18,15 @@ import type { OSMRoad } from '@/lib/api/overpass'
 import { platformConfig } from '@/config/platform.config'
 import { scoreToCongestionLevel } from '@/lib/utils/congestion'
 
+// Import enriched data (optional/conditional)
+let parisNetwork: any[] = []
+try {
+  parisNetwork = require('@/lib/data/paris_network.json')
+} catch (e) {
+  // Fallback if file not yet generated
+  parisNetwork = []
+}
+
 // ─── Modal split normalizer (ensures sum = exactly 1.00) ──────────────────
 
 type ModalSplit = { car: number; metro: number; bus: number; bike: number; pedestrian: number }
@@ -65,9 +74,21 @@ function co2GPerKm(congestion: number): number {
 interface RawSegment {
   coords: [number, number][]
   type:   'main' | 'secondary' | 'highway'
+  id?:    string
+  name?:  string
 }
 
 function generateCityRoads(city: City): RawSegment[] {
+  // Use enriched Paris network if available
+  if (city.id === 'paris' && parisNetwork.length > 0) {
+    return parisNetwork.map(s => ({
+      id: s.id,
+      name: s.name,
+      coords: s.coords,
+      type: s.type === 'motorway' ? 'highway' : 'main'
+    }))
+  }
+
   const rng = seededRng(cityTimeSeed(city.id + '_roads', 0) + 42)
   const [west, south, east, north] = city.bbox
   const latSpan = north - south

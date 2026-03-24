@@ -1,9 +1,10 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { BrainCircuit, Send, Loader2, X, Sparkles, ChevronDown, Zap } from 'lucide-react'
+import { BrainCircuit, Send, Loader2, X, Sparkles, ChevronDown, Zap, Map as MapIcon } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { cn } from '@/lib/utils/cn'
+import { isPointInPolygon, isSegmentInPolygon } from '@/lib/utils/spatial'
 
 import { useTranslation } from '@/lib/hooks/useTranslation'
 
@@ -27,17 +28,15 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
   ]
 
   const QUICK_PROMPTS = locale === 'fr' ? [
-    'Analyse le trafic actuel',
-    'Quelles optimisations suggères-tu ?',
-    'Pourquoi cette congestion ?',
-    'Prédis le trafic dans 1h',
-    'Propose un scénario de simulation',
+    'Analyse la zone sélectionnée',
+    'Optimise ce quartier',
+    'Pourquoi cette congestion ici ?',
+    'Prévision pour cette zone',
   ] : [
-    'Analyze current traffic',
-    'What optimizations do you suggest?',
-    'Why this congestion?',
-    'Predict traffic in 1h',
-    'Propose a simulation scenario',
+    'Analyze selected zone',
+    'Optimize this neighborhood',
+    'Why this congestion here?',
+    'Forecast for this area',
   ]
 
   const [model,     setModel]     = useState(MODELS[0].id)
@@ -47,7 +46,9 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
   const inputRef  = useRef<HTMLTextAreaElement>(null)
 
   const city               = useMapStore(s => s.city)
+  const zonePolygon        = useMapStore(s => s.zonePolygon)
   const kpis               = useTrafficStore(s => s.kpis)
+  const snapshot           = useTrafficStore(s => s.snapshot)
   const incidents          = useTrafficStore(s => s.incidents)
   const openMeteoWeather   = useTrafficStore(s => s.openMeteoWeather)
   const airQuality         = useTrafficStore(s => s.airQuality)
@@ -57,33 +58,57 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const buildContext = () => ({
-    cityName:        city.name,
-    country:         city.country,
-    congestionRate:  kpis?.congestionRate,
-    avgTravelMin:    kpis?.avgTravelMin,
-    pollutionIndex:  kpis?.pollutionIndex,
-    activeIncidents: kpis?.activeIncidents,
-    dataSource:      dataSource === 'live' ? 'TomTom Live' : 'CrossFlow Engine',
-    weather: openMeteoWeather ? {
-      emoji:         openMeteoWeather.weatherEmoji,
-      description:   openMeteoWeather.weatherLabel,
-      temp:          openMeteoWeather.temp,
-      windKmh:       openMeteoWeather.windSpeedKmh,
-      visibilityKm:  Math.round(openMeteoWeather.visibilityM / 100) / 10,
-      precipMm:      openMeteoWeather.precipitationMm,
-      snowDepthCm:   openMeteoWeather.snowDepthCm,
-      trafficImpact: openMeteoWeather.trafficImpact,
-    } : undefined,
-    airQuality: airQuality ? {
-      aqiEU:         airQuality.aqiEuropean,
-      level:         airQuality.level,
-      pm25:          airQuality.pm25,
-      no2:           airQuality.no2,
-      trafficImpact: airQuality.trafficImpact,
-    } : undefined,
-    topIncidents: incidents.slice(0, 3).map(i => `${i.severity}: ${i.title} (${i.address})`),
-  })
+  const buildContext = () => {
+    // If a zone is active, we provide localized context
+    let zoneContext = undefined
+    if (zonePolygon && snapshot) {
+      const zoneSegments = snapshot.segments.filter(s => isSegmentInPolygon(s.coordinates, zonePolygon))
+      const zoneIncidents = incidents.filter(i => isPointInPolygon([i.location.lng, i.location.lat], zonePolygon))
+      
+      const avgCongestion = zoneSegments.length > 0
+        ? zoneSegments.reduce((sum, s) => sum + s.congestionScore, 0) / zoneSegments.length
+        : 0
+
+      zoneContext = {
+        active:      true,
+        segmentCount: zoneSegments.length,
+        incidentCount: zoneIncidents.length,
+        avgCongestion,
+        topIncidents: zoneIncidents.slice(0, 3).map(i => `${i.severity}: ${i.title}`),
+        // Just names of streets in the zone
+        streets: Array.from(new Set(zoneSegments.map(s => s.name).filter(Boolean))).slice(0, 10)
+      }
+    }
+
+    return {
+      cityName:        city.name,
+      country:         city.country,
+      congestionRate:  kpis?.congestionRate,
+      avgTravelMin:    kpis?.avgTravelMin,
+      pollutionIndex:  kpis?.pollutionIndex,
+      activeIncidents: kpis?.activeIncidents,
+      dataSource:      dataSource === 'live' ? 'TomTom Live' : 'CrossFlow Engine',
+      zone:            zoneContext,
+      weather: openMeteoWeather ? {
+        emoji:         openMeteoWeather.weatherEmoji,
+        description:   openMeteoWeather.weatherLabel,
+        temp:          openMeteoWeather.temp,
+        windKmh:       openMeteoWeather.windSpeedKmh,
+        visibilityKm:  Math.round(openMeteoWeather.visibilityM / 100) / 10,
+        precipMm:      openMeteoWeather.precipitationMm,
+        snowDepthCm:   openMeteoWeather.snowDepthCm,
+        trafficImpact: openMeteoWeather.trafficImpact,
+      } : undefined,
+      airQuality: airQuality ? {
+        aqiEU:         airQuality.aqiEuropean,
+        level:         airQuality.level,
+        pm25:          airQuality.pm25,
+        no2:           airQuality.no2,
+        trafficImpact: airQuality.trafficImpact,
+      } : undefined,
+      topIncidents: incidents.slice(0, 3).map(i => `${i.severity}: ${i.title} (${i.address})`),
+    }
+  }
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return
