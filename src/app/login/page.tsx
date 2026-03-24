@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Zap, Mail, Lock, Loader2, ArrowRight, Github } from 'lucide-react'
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -64,6 +64,113 @@ export default function LoginPage() {
   }
 
   return (
+    <>
+      {/* Auth Card */}
+      <div className="glass-card p-8 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-brand/30 to-transparent" />
+        
+        <div className="mb-6">
+          <h2 className="heading-2 mb-1">{isSignUp ? 'Créer un compte' : 'Bienvenue'}</h2>
+          <p className="text-text-secondary text-sm">
+            {isSignUp ? 'Rejoignez la plateforme CrossFlow' : 'Connectez-vous pour accéder au dashboard'}
+          </p>
+        </div>
+
+        <form onSubmit={handleAuth} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="label ml-1">Email</label>
+            <div className="relative group">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-brand transition-colors" />
+              <input
+                type="email"
+                required
+                placeholder="nom@entreprise.com"
+                className="w-full bg-bg-elevated border border-bg-border rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-brand/50 transition-all"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="label ml-1">Mot de passe</label>
+            <div className="relative group">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-brand transition-colors" />
+              <input
+                type="password"
+                required
+                placeholder="••••••••"
+                className="w-full bg-bg-elevated border border-bg-border rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-brand/50 transition-all"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {message && (
+            <div className={`text-xs p-3 rounded-lg border flex items-start gap-2 animate-scale-in ${
+              message.type === 'error' 
+                ? 'bg-traffic-critical/10 border-traffic-critical/20 text-traffic-critical'
+                : 'bg-brand/10 border-brand/20 text-brand'
+            }`}>
+              <div className={`w-1 h-1 rounded-full mt-1.5 shrink-0 ${message.type === 'error' ? 'bg-traffic-critical' : 'bg-brand'}`} />
+              {message.text}
+            </div>
+          )}
+
+          <button
+            disabled={loading}
+            className="w-full btn btn-primary justify-center py-3 rounded-xl mt-2 group"
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <>
+                <span>{isSignUp ? 'S\'inscrire' : 'Se connecter'}</span>
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* Divider */}
+        <div className="relative my-8">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-bg-border"></div>
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-[#121318] px-2 text-text-muted">Ou continuer avec</span>
+          </div>
+        </div>
+
+        {/* Social Auth */}
+        <div className="grid grid-cols-1 gap-3">
+          <button
+            onClick={() => handleOAuth('github')}
+            className="btn btn-ghost justify-center py-2.5 rounded-xl gap-3"
+          >
+            <Github className="w-4 h-4" />
+            <span>GitHub</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Footer Link */}
+      <p className="text-center mt-6 text-sm text-text-secondary">
+        {isSignUp ? 'Déjà un compte ?' : "Vous n'avez pas de compte ?"}
+        <button
+          onClick={() => setIsSignUp(!isSignUp)}
+          className="ml-1.5 text-brand hover:underline font-medium transition-all"
+        >
+          {isSignUp ? 'Se connecter' : "S'inscrire"}
+        </button>
+      </p>
+    </>
+  )
+}
+
+export default function LoginPage() {
+  return (
     <div className="min-h-screen bg-bg-base flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background Orbs */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand/5 blur-[120px] rounded-full" />
@@ -79,106 +186,13 @@ export default function LoginPage() {
           <p className="text-text-secondary text-sm">Gestion intelligente de la mobilité urbaine</p>
         </div>
 
-        {/* Auth Card */}
-        <div className="glass-card p-8 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-brand/30 to-transparent" />
-          
-          <div className="mb-6">
-            <h2 className="heading-2 mb-1">{isSignUp ? 'Créer un compte' : 'Bienvenue'}</h2>
-            <p className="text-text-secondary text-sm">
-              {isSignUp ? 'Rejoignez la plateforme CrossFlow' : 'Connectez-vous pour accéder au dashboard'}
-            </p>
+        <Suspense fallback={
+          <div className="glass-card p-8 flex items-center justify-center min-h-[400px]">
+            <Loader2 className="w-8 h-8 animate-spin text-brand" />
           </div>
-
-          <form onSubmit={handleAuth} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="label ml-1">Email</label>
-              <div className="relative group">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-brand transition-colors" />
-                <input
-                  type="email"
-                  required
-                  placeholder="nom@entreprise.com"
-                  className="w-full bg-bg-elevated border border-bg-border rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-brand/50 transition-all"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="label ml-1">Mot de passe</label>
-              <div className="relative group">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-brand transition-colors" />
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  className="w-full bg-bg-elevated border border-bg-border rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-brand/50 transition-all"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {message && (
-              <div className={`text-xs p-3 rounded-lg border flex items-start gap-2 animate-scale-in ${
-                message.type === 'error' 
-                  ? 'bg-traffic-critical/10 border-traffic-critical/20 text-traffic-critical'
-                  : 'bg-brand/10 border-brand/20 text-brand'
-              }`}>
-                <div className={`w-1 h-1 rounded-full mt-1.5 shrink-0 ${message.type === 'error' ? 'bg-traffic-critical' : 'bg-brand'}`} />
-                {message.text}
-              </div>
-            )}
-
-            <button
-              disabled={loading}
-              className="w-full btn btn-primary justify-center py-3 rounded-xl mt-2 group"
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <span>{isSignUp ? 'Sinscrire' : 'Se connecter'}</span>
-                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Divider */}
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-bg-border"></div>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-[#121318] px-2 text-text-muted">Ou continuer avec</span>
-            </div>
-          </div>
-
-          {/* Social Auth */}
-          <div className="grid grid-cols-1 gap-3">
-            <button
-              onClick={() => handleOAuth('github')}
-              className="btn btn-ghost justify-center py-2.5 rounded-xl gap-3"
-            >
-              <Github className="w-4 h-4" />
-              <span>GitHub</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Footer Link */}
-        <p className="text-center mt-6 text-sm text-text-secondary">
-          {isSignUp ? 'Déjà un compte ?' : "Vous n'avez pas de compte ?"}
-          <button
-            onClick={() => setIsSignUp(!isSignUp)}
-            className="ml-1.5 text-brand hover:underline font-medium transition-all"
-          >
-            {isSignUp ? 'Se connecter' : "S'inscrire"}
-          </button>
-        </p>
+        }>
+          <LoginForm />
+        </Suspense>
       </div>
     </div>
   )
