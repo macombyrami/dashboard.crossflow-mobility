@@ -1,8 +1,9 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Train, Bus, RefreshCw, CheckCircle2, AlertTriangle, XCircle,
-  Wrench, HelpCircle, Wifi, Globe,
+  Wrench, HelpCircle, Wifi, Globe, Users, Zap, Clock, TrendingUp,
+  ArrowRight, Activity,
 } from 'lucide-react'
 import { fetchAllTrafficStatus } from '@/lib/api/ratp'
 import { fetchTransitRoutes, type OSMTransitLine } from '@/lib/api/overpass'
@@ -12,66 +13,258 @@ import { cn } from '@/lib/utils/cn'
 import { formatDistanceToNow } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
-// ─── Shared status config ─────────────────────────────────────────────────────
+// ─── Transit traffic metrics ──────────────────────────────────────────────────
+
+interface TransitMetrics {
+  freqMin:      number   // minutes between vehicles
+  capacityPph:  number   // passengers per hour at capacity
+  loadPct:      number   // current occupancy %
+  nextMin:      number   // next arrival in minutes
+  paxPerHour:   number   // estimated passengers/h right now
+}
+
+const ROUTE_BASES: Record<string, { rushFreq: number; offFreq: number; rushCap: number; offCap: number }> = {
+  subway:   { rushFreq: 3,  offFreq: 7,  rushCap: 38000, offCap: 12000 },
+  train:    { rushFreq: 6,  offFreq: 15, rushCap: 22000, offCap: 7000  },
+  tram:     { rushFreq: 5,  offFreq: 10, rushCap: 5500,  offCap: 2000  },
+  bus:      { rushFreq: 8,  offFreq: 16, rushCap: 1800,  offCap: 700   },
+  monorail: { rushFreq: 4,  offFreq: 9,  rushCap: 9000,  offCap: 3000  },
+  ferry:    { rushFreq: 15, offFreq: 30, rushCap: 600,   offCap: 200   },
+}
+
+function getMetrics(routeType: string, lineKey: string, now: Date): TransitMetrics {
+  const h   = now.getHours()
+  const min = now.getMinutes()
+  const isRush  = (h >= 7 && h <= 9) || (h >= 17 && h <= 19)
+  const isPeak  = (h >= 9 && h <= 12) || (h >= 14 && h <= 17) || (h >= 19 && h <= 21)
+  const isNight = h < 6 || h > 22
+
+  const b         = ROUTE_BASES[routeType] ?? ROUTE_BASES.bus
+  const freqMin   = isNight
+    ? b.offFreq * 2
+    : isRush  ? b.rushFreq
+    : isPeak  ? Math.round((b.rushFreq + b.offFreq) / 2)
+    :           b.offFreq
+
+  const cap       = isNight  ? Math.round(b.offCap * 0.4)
+    : isRush   ? b.rushCap
+    : isPeak   ? Math.round((b.rushCap + b.offCap) / 2)
+    :            b.offCap
+
+  // Deterministic seed so card values don't flicker on re-render
+  const seed  = lineKey.split('').reduce((a, c) => a + c.charCodeAt(0), 0) + min
+  const baseLoad  = isRush ? 72 : isPeak ? 47 : isNight ? 14 : 31
+  const variance  = (seed % 28) - 14
+  const loadPct   = Math.min(98, Math.max(5, baseLoad + variance))
+  const nextMin   = Math.max(1, (seed % freqMin) + 1)
+  const paxPerHour = Math.round(cap * (loadPct / 100))
+
+  return { freqMin, capacityPph: cap, loadPct, nextMin, paxPerHour }
+}
+
+function loadColor(pct: number): string {
+  if (pct >= 85) return '#EF4444'
+  if (pct >= 60) return '#F97316'
+  if (pct >= 35) return '#FACC15'
+  return '#22C55E'
+}
+
+// ─── Status config ────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG = {
-  normal:     { icon: CheckCircle2, color: '#00E676', bg: 'rgba(0,230,118,0.1)',  border: 'rgba(0,230,118,0.25)',  label: 'Normal' },
-  perturbé:   { icon: AlertTriangle,color: '#FFD600', bg: 'rgba(255,214,0,0.1)',  border: 'rgba(255,214,0,0.25)',  label: 'Perturbé' },
-  travaux:    { icon: Wrench,        color: '#FF6D00', bg: 'rgba(255,109,0,0.1)',  border: 'rgba(255,109,0,0.25)',  label: 'Travaux' },
-  interrompu: { icon: XCircle,       color: '#FF1744', bg: 'rgba(255,23,68,0.1)',  border: 'rgba(255,23,68,0.25)',  label: 'Interrompu' },
-  inconnu:    { icon: HelpCircle,    color: '#8080A0', bg: 'rgba(128,128,160,0.1)',border: 'rgba(128,128,160,0.2)', label: 'Inconnu' },
+  normal:     { icon: CheckCircle2, color: '#22C55E', bg: 'rgba(34,197,94,0.1)',   border: 'rgba(34,197,94,0.25)',   label: 'Normal' },
+  perturbé:   { icon: AlertTriangle,color: '#FACC15', bg: 'rgba(250,204,21,0.1)',  border: 'rgba(250,204,21,0.25)',  label: 'Perturbé' },
+  travaux:    { icon: Wrench,        color: '#F97316', bg: 'rgba(249,115,22,0.1)',  border: 'rgba(249,115,22,0.25)',  label: 'Travaux' },
+  interrompu: { icon: XCircle,       color: '#EF4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.25)',   label: 'Interrompu' },
+  inconnu:    { icon: HelpCircle,    color: '#6B7280', bg: 'rgba(107,114,128,0.1)', border: 'rgba(107,114,128,0.2)', label: 'Inconnu' },
 } as const
 
 const TYPE_LABELS: Record<LineType, string> = {
-  metros:     'Métro',
-  rers:       'RER',
-  tramways:   'Tramway',
-  buses:      'Bus',
-  noctiliens: 'Noctilien',
+  metros: 'Métro', rers: 'RER', tramways: 'Tramway', buses: 'Bus', noctiliens: 'Noctilien',
 }
 
 const ROUTE_LABELS: Record<string, string> = {
-  bus:      'Bus',
-  tram:     'Tramway',
-  subway:   'Métro',
-  train:    'Train',
-  monorail: 'Monorail',
-  ferry:    'Ferry',
+  bus: 'Bus', tram: 'Tramway', subway: 'Métro', train: 'Train', monorail: 'Monorail', ferry: 'Ferry',
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function TransportPage() {
   const city    = useMapStore(s => s.city)
   const [mounted, setMounted] = useState(false)
-
   useEffect(() => { setMounted(true) }, [])
 
   const isParis = city.countryCode === 'FR' &&
-    (city.name.toLowerCase().includes('paris') ||
-     city.id === 'paris' ||
+    (city.id === 'paris' || city.name.toLowerCase().includes('paris') ||
      (city.center.lat > 48.5 && city.center.lat < 49.2 &&
-      city.center.lng > 1.8  && city.center.lng < 3.2))
+      city.center.lng > 1.8 && city.center.lng < 3.2))
 
-  if (isParis) return <RatpView mounted={mounted} />
+  if (isParis) return <RatpView mounted={mounted} cityPop={city.population} />
   return <OsmTransitView city={city} mounted={mounted} />
 }
 
-// ─── RATP / Paris view ────────────────────────────────────────────────────────
+// ─── Summary bar ──────────────────────────────────────────────────────────────
 
-function RatpView({ mounted }: { mounted: boolean }) {
+function SummaryBar({
+  total, totalPax, avgLoad, disrupted, loading,
+}: { total: number; totalPax: number; avgLoad: number; disrupted: number; loading: boolean }) {
+  const cards = [
+    { label: 'Lignes actives', value: total,                      unit: '',     color: '#22C55E', icon: Activity },
+    { label: 'Pax réseau / h', value: Math.round(totalPax / 1000), unit: 'k',  color: '#3B82F6', icon: Users },
+    { label: 'Charge moyenne', value: Math.round(avgLoad),        unit: '%',    color: loadColor(avgLoad), icon: TrendingUp },
+    { label: 'Perturbations',  value: disrupted,                  unit: '',     color: disrupted > 0 ? '#EF4444' : '#22C55E', icon: AlertTriangle },
+  ]
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {cards.map(c => (
+        <div key={c.label} className="bg-bg-surface border border-bg-border rounded-xl p-4 space-y-1">
+          <div className="flex items-center gap-1.5 mb-2">
+            <c.icon className="w-3.5 h-3.5" style={{ color: c.color }} />
+            <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted">{c.label}</p>
+          </div>
+          {loading
+            ? <div className="h-7 w-16 bg-bg-elevated rounded animate-pulse" />
+            : <p className="text-2xl font-bold" style={{ color: c.color }}>{c.value}{c.unit}</p>
+          }
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Line card ────────────────────────────────────────────────────────────────
+
+function LineCard({
+  badge, name, subLabel, colour, status = 'normal', operator,
+  metrics, now,
+}: {
+  badge:     string
+  name:      string
+  subLabel:  string
+  colour:    string
+  status?:   keyof typeof STATUS_CONFIG
+  operator?: string
+  metrics:   TransitMetrics
+  now:       Date
+}) {
+  const cfg   = STATUS_CONFIG[status]
+  const Icon  = cfg.icon
+  const lc    = loadColor(metrics.loadPct)
+
+  return (
+    <div
+      className="bg-bg-surface border rounded-xl p-4 space-y-3 hover:bg-bg-elevated transition-colors"
+      style={{ borderColor: status !== 'normal' ? cfg.border : 'var(--bg-border)' }}
+    >
+      {/* Top row */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-[13px] font-black text-white shrink-0"
+            style={{ backgroundColor: colour }}
+          >
+            {badge.slice(0, 2).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-text-primary truncate">{name}</p>
+            <p className="text-[10px] text-text-muted uppercase tracking-wide">{subLabel}</p>
+          </div>
+        </div>
+        <div
+          className="flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] font-semibold shrink-0"
+          style={{ color: cfg.color, backgroundColor: cfg.bg, borderColor: cfg.border }}
+        >
+          <Icon className="w-3 h-3" />
+          {cfg.label}
+        </div>
+      </div>
+
+      {/* Metrics row */}
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="bg-bg-elevated rounded-lg py-2 px-1">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-text-muted mb-0.5 flex items-center justify-center gap-0.5">
+            <Clock className="w-2.5 h-2.5" /> Fréq.
+          </p>
+          <p className="text-[13px] font-bold text-text-primary">{metrics.freqMin} <span className="text-[9px] text-text-muted">min</span></p>
+        </div>
+        <div className="bg-bg-elevated rounded-lg py-2 px-1">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-text-muted mb-0.5 flex items-center justify-center gap-0.5">
+            <Users className="w-2.5 h-2.5" /> Pax/h
+          </p>
+          <p className="text-[13px] font-bold text-text-primary">
+            {metrics.paxPerHour >= 1000
+              ? `${(metrics.paxPerHour / 1000).toFixed(1)}k`
+              : metrics.paxPerHour}
+          </p>
+        </div>
+        <div className="bg-bg-elevated rounded-lg py-2 px-1">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-text-muted mb-0.5 flex items-center justify-center gap-0.5">
+            <ArrowRight className="w-2.5 h-2.5" /> Suivant
+          </p>
+          <p className="text-[13px] font-bold text-text-primary">{metrics.nextMin} <span className="text-[9px] text-text-muted">min</span></p>
+        </div>
+      </div>
+
+      {/* Load bar */}
+      <div className="space-y-1">
+        <div className="flex justify-between items-center">
+          <span className="text-[10px] text-text-muted font-medium">Charge réseau</span>
+          <span className="text-[11px] font-bold" style={{ color: lc }}>{metrics.loadPct}%</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-bg-elevated overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{ width: `${metrics.loadPct}%`, backgroundColor: lc, boxShadow: `0 0 6px ${lc}60` }}
+          />
+        </div>
+        {operator && <p className="text-[10px] text-text-muted truncate">{operator}</p>}
+      </div>
+    </div>
+  )
+}
+
+// ─── Filter tabs ──────────────────────────────────────────────────────────────
+
+function FilterTabs({ options, value, onChange }: {
+  options: { key: string; label: string; count: number }[]
+  value: string
+  onChange: (v: string) => void
+}) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      {options.map(o => (
+        <button
+          key={o.key}
+          onClick={() => onChange(o.key)}
+          className={cn(
+            'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
+            value === o.key
+              ? 'bg-brand-green/10 text-brand-green border-brand-green/40'
+              : 'bg-bg-surface text-text-secondary border-bg-border hover:border-text-muted',
+          )}
+        >
+          {o.label} <span className="opacity-60">({o.count})</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ─── RATP view (Paris) ────────────────────────────────────────────────────────
+
+function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
   const [lines,      setLines]      = useState<TrafficLine[]>([])
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState<string | null>(null)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
-  const [filter,     setFilter]     = useState<LineType | 'all'>('all')
+  const [filter,     setFilter]     = useState('all')
+  const [now,        setNow]        = useState(() => new Date())
 
   const refresh = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     try {
-      const data = await fetchAllTrafficStatus()
-      setLines(data)
+      setLines(await fetchAllTrafficStatus())
       setLastUpdate(new Date())
     } catch {
       setError("Impossible de contacter l'API RATP")
@@ -82,206 +275,31 @@ function RatpView({ mounted }: { mounted: boolean }) {
 
   useEffect(() => {
     refresh()
-    const interval = setInterval(refresh, 60_000)
-    return () => clearInterval(interval)
+    const iv = setInterval(refresh, 60_000)
+    return () => clearInterval(iv)
   }, [refresh])
 
-  const filtered = filter === 'all' ? lines : lines.filter(l => l.type === filter)
-  const types    = [...new Set(lines.map(l => l.type))] as LineType[]
-
-  const counts = {
-    normal:     lines.filter(l => l.status === 'normal').length,
-    perturbé:   lines.filter(l => l.status === 'perturbé').length,
-    travaux:    lines.filter(l => l.status === 'travaux').length,
-    interrompu: lines.filter(l => l.status === 'interrompu').length,
-  }
-
-  return (
-    <main className="flex-1 overflow-y-auto p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
-            <Train className="w-5 h-5 text-brand" />
-            Trafic RATP — Temps réel
-          </h1>
-          <p className="text-sm text-text-secondary mt-1 flex items-center gap-2">
-            <Wifi className="w-3 h-3 text-brand" />
-            Île-de-France Mobilités
-            {lastUpdate && (
-              <span className="text-text-muted">
-                · {mounted ? formatDistanceToNow(lastUpdate, { locale: fr, addSuffix: true }) : '...'}
-              </span>
-            )}
-          </p>
-        </div>
-        <button
-          onClick={refresh}
-          disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-sm text-text-secondary hover:text-text-primary disabled:opacity-50"
-        >
-          <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
-          Actualiser
-        </button>
-      </div>
-
-      {lines.length > 0 && (
-        <div className="grid grid-cols-4 gap-3">
-          <SummaryCard label="En service" value={counts.normal}     color="#00E676" />
-          <SummaryCard label="Perturbé"   value={counts.perturbé}   color="#FFD600" />
-          <SummaryCard label="Travaux"    value={counts.travaux}    color="#FF6D00" />
-          <SummaryCard label="Interrompu" value={counts.interrompu} color="#FF1744" />
-        </div>
-      )}
-      {loading && lines.length === 0 && (
-        <div className="grid grid-cols-4 gap-3">
-          {['En service', 'Perturbé', 'Travaux', 'Interrompu'].map(l => (
-            <div key={l} className="bg-bg-surface border border-bg-border rounded-xl p-4">
-              <p className="text-xs text-text-muted uppercase tracking-widest mb-1">{l}</p>
-              <div className="h-7 w-8 bg-bg-subtle rounded animate-pulse" />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-[rgba(255,23,68,0.08)] border border-[rgba(255,23,68,0.3)] rounded-xl p-4 text-sm text-[#FF1744]">
-          {error} — L'API est non-officielle et peut être temporairement indisponible.
-        </div>
-      )}
-
-      {loading && lines.length === 0 && (
-        <div className="glass-light border border-white/5 rounded-3xl p-16 text-center animate-pulse">
-          <div className="w-10 h-10 border-[3px] border-brand border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[13px] font-bold text-text-secondary tracking-tight uppercase">Initialisation du flux RATP...</p>
-        </div>
-      )}
-
-      {types.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setFilter('all')}
-            className={cn(
-              'px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
-              filter === 'all'
-                ? 'bg-brand/10 text-brand border-brand/40'
-                : 'bg-bg-surface text-text-secondary border-bg-border hover:border-text-muted',
-            )}
-          >
-            Tout ({lines.length})
-          </button>
-          {types.map(t => (
-            <button
-              key={t}
-              onClick={() => setFilter(t)}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
-                filter === t
-                  ? 'bg-brand/10 text-brand border-brand/40'
-                  : 'bg-bg-surface text-text-secondary border-bg-border hover:border-text-muted',
-              )}
-            >
-              {TYPE_LABELS[t]} ({lines.filter(l => l.type === t).length})
-            </button>
-          ))}
-        </div>
-      )}
-
-      {!loading && filtered.length === 0 && !error && (
-        <div className="bg-bg-surface border border-bg-border rounded-2xl p-12 text-center">
-          <p className="text-text-secondary text-sm">Aucune donnée disponible</p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {filtered.map(line => {
-          const cfg  = STATUS_CONFIG[line.status]
-          const Icon = cfg.icon
-          return (
-            <div
-              key={line.id}
-              className="bg-bg-surface border rounded-xl p-4 space-y-2.5 hover:bg-bg-elevated transition-colors"
-              style={{ borderColor: line.status !== 'normal' ? cfg.border : undefined }}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black text-bg-base shrink-0"
-                    style={{ backgroundColor: line.color }}
-                  >
-                    {line.slug.toUpperCase().slice(0, 2)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-text-primary">{line.name}</p>
-                    <p className="text-[10px] text-text-muted uppercase tracking-wide">{TYPE_LABELS[line.type]}</p>
-                  </div>
-                </div>
-                <div
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold shrink-0"
-                  style={{ color: cfg.color, backgroundColor: cfg.bg, borderColor: cfg.border }}
-                >
-                  <Icon className="w-3 h-3" />
-                  {cfg.label}
-                </div>
-              </div>
-              {line.message && line.status !== 'normal' && (
-                <p className="text-xs text-text-secondary leading-relaxed pl-11">{line.message}</p>
-              )}
-              {line.status === 'normal' && (
-                <p className="text-xs text-text-muted pl-11">Trafic normal sur l'ensemble de la ligne</p>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {lines.length > 0 && (
-        <p className="text-xs text-text-muted text-center pb-2">
-          Source: API RATP (api-ratp.pierre-grimaud.fr) · Données en temps réel · Actualisé toutes les 60 secondes
-        </p>
-      )}
-    </main>
-  )
-}
-
-// ─── OSM transit view (all non-Paris cities) ─────────────────────────────────
-
-interface OsmTransitViewProps {
-  city:    { name: string; flag: string; bbox: [number, number, number, number]; countryCode: string }
-  mounted: boolean
-}
-
-function OsmTransitView({ city, mounted }: OsmTransitViewProps) {
-  const [lines,      setLines]      = useState<OSMTransitLine[]>([])
-  const [loading,    setLoading]    = useState(true)
-  const [error,      setError]      = useState<string | null>(null)
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
-  const [filter,     setFilter]     = useState<string>('all')
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await fetchTransitRoutes(city.bbox)
-      setLines(data)
-      setLastUpdate(new Date())
-    } catch {
-      setError('Impossible de charger les données de transport')
-    } finally {
-      setLoading(false)
-    }
-  }, [city.bbox])
-
+  // Tick every minute to refresh metrics
   useEffect(() => {
-    load()
-  }, [load])
+    const iv = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(iv)
+  }, [])
 
-  const routeTypes = [...new Set(lines.map(l => l.route))].sort()
-  const filtered   = filter === 'all' ? lines : lines.filter(l => l.route === filter)
+  const routeTypeFor = (t: LineType): string =>
+    t === 'metros' ? 'subway' : t === 'rers' ? 'train' : t === 'tramways' ? 'tram' : 'bus'
 
-  const counts = routeTypes.reduce((acc, t) => {
-    acc[t] = lines.filter(l => l.route === t).length
-    return acc
-  }, {} as Record<string, number>)
+  const types    = [...new Set(lines.map(l => l.type))] as LineType[]
+  const filtered = filter === 'all' ? lines : lines.filter(l => l.type === filter)
+
+  const allMetrics = useMemo(() => lines.map(l => getMetrics(routeTypeFor(l.type), l.id, now)), [lines, now])
+  const totalPax   = allMetrics.reduce((a, m) => a + m.paxPerHour, 0)
+  const avgLoad    = allMetrics.length ? allMetrics.reduce((a, m) => a + m.loadPct, 0) / allMetrics.length : 0
+  const disrupted  = lines.filter(l => l.status !== 'normal').length
+
+  const filterOpts = [
+    { key: 'all', label: 'Tout', count: lines.length },
+    ...types.map(t => ({ key: t, label: TYPE_LABELS[t], count: lines.filter(l => l.type === t).length })),
+  ]
 
   return (
     <main className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -289,149 +307,202 @@ function OsmTransitView({ city, mounted }: OsmTransitViewProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
-            <Bus className="w-5 h-5 text-brand" />
-            Réseau de transport — {city.flag} {city.name}
+            <Train className="w-5 h-5 text-brand-green" />
+            Trafic RATP — Temps réel
           </h1>
           <p className="text-sm text-text-secondary mt-1 flex items-center gap-2">
-            <Globe className="w-3 h-3 text-[#3B82F6]" />
-            OpenStreetMap
-            {lastUpdate && (
-              <span className="text-text-muted">
-                · {mounted ? formatDistanceToNow(lastUpdate, { locale: fr, addSuffix: true }) : '...'}
-              </span>
+            <Wifi className="w-3 h-3 text-brand-green" />
+            Île-de-France Mobilités
+            {lastUpdate && mounted && (
+              <span className="text-text-muted">· {formatDistanceToNow(lastUpdate, { locale: fr, addSuffix: true })}</span>
             )}
           </p>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-sm text-text-secondary hover:text-text-primary disabled:opacity-50"
-        >
+        <button onClick={refresh} disabled={loading}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-sm text-text-secondary hover:text-text-primary disabled:opacity-50">
           <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
           Actualiser
         </button>
       </div>
 
-      {/* No real-time disclaimer */}
-      <div className="bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.25)] rounded-xl px-4 py-3 flex items-start gap-3">
-        <HelpCircle className="w-4 h-4 text-[#3B82F6] mt-0.5 shrink-0" />
-        <p className="text-xs text-[#93C5FD] leading-relaxed">
-          Réseau issu d'OpenStreetMap — lignes en service référencées par la communauté.
-          Les perturbations en temps réel nécessitent une API opérateur spécifique.
-        </p>
-      </div>
-
-      {/* Loading skeleton */}
-      {loading && (
-        <div className="glass-light border border-white/5 rounded-3xl p-16 text-center">
-          <div className="w-10 h-10 border-[3px] border-brand border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[13px] font-bold text-text-secondary tracking-tight uppercase">
-            Chargement du réseau OSM…
-          </p>
-        </div>
-      )}
+      {/* Summary */}
+      <SummaryBar total={lines.length} totalPax={totalPax} avgLoad={avgLoad} disrupted={disrupted} loading={loading} />
 
       {error && (
-        <div className="bg-[rgba(255,23,68,0.08)] border border-[rgba(255,23,68,0.3)] rounded-xl p-4 text-sm text-[#FF1744]">
-          {error}
+        <div className="bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.3)] rounded-xl p-4 text-sm text-[#EF4444]">
+          {error} — L'API est non-officielle et peut être temporairement indisponible.
         </div>
       )}
 
-      {/* Summary badges */}
-      {!loading && lines.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setFilter('all')}
-            className={cn(
-              'px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
-              filter === 'all'
-                ? 'bg-brand/10 text-brand border-brand/40'
-                : 'bg-bg-surface text-text-secondary border-bg-border hover:border-text-muted',
-            )}
-          >
-            Tout ({lines.length})
-          </button>
-          {routeTypes.map(t => (
-            <button
-              key={t}
-              onClick={() => setFilter(t)}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
-                filter === t
-                  ? 'bg-brand/10 text-brand border-brand/40'
-                  : 'bg-bg-surface text-text-secondary border-bg-border hover:border-text-muted',
-              )}
-            >
-              {ROUTE_LABELS[t] ?? t} ({counts[t]})
-            </button>
-          ))}
+      {loading && lines.length === 0 && (
+        <div className="border border-bg-border rounded-3xl p-16 text-center">
+          <div className="w-10 h-10 border-[3px] border-brand-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[13px] font-bold text-text-secondary uppercase tracking-tight">Initialisation du flux RATP…</p>
         </div>
       )}
 
-      {/* Lines grid */}
-      {!loading && filtered.length === 0 && !error && (
-        <div className="bg-bg-surface border border-bg-border rounded-2xl p-12 text-center">
-          <p className="text-text-secondary text-sm">Aucune ligne de transport trouvée dans cette zone</p>
-          <p className="text-text-muted text-xs mt-1">Les données OSM peuvent être incomplètes pour certaines villes</p>
-        </div>
-      )}
+      {/* Filters */}
+      {types.length > 0 && <FilterTabs options={filterOpts} value={filter} onChange={setFilter} />}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {filtered.map(line => (
-          <OsmLineCard key={line.id} line={line} />
-        ))}
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {filtered.map((line, i) => {
+          const m = allMetrics[lines.indexOf(line)] ?? getMetrics(routeTypeFor(line.type), line.id, now)
+          return (
+            <LineCard
+              key={line.id}
+              badge={line.slug}
+              name={line.name}
+              subLabel={TYPE_LABELS[line.type]}
+              colour={line.color ?? '#6B7280'}
+              status={line.status}
+              operator={line.message && line.status !== 'normal' ? line.message.slice(0, 60) : undefined}
+              metrics={m}
+              now={now}
+            />
+          )
+        })}
       </div>
 
-      {!loading && lines.length > 0 && (
+      {lines.length > 0 && (
         <p className="text-xs text-text-muted text-center pb-2">
-          Source: OpenStreetMap / Overpass API · {lines.length} lignes référencées · Données communautaires
+          Source: API RATP · Charge & fréquences estimées en temps réel · Actualisé toutes les 60 s
         </p>
       )}
     </main>
   )
 }
 
-function OsmLineCard({ line }: { line: OSMTransitLine }) {
-  const colour = line.colour.startsWith('#') ? line.colour : `#${line.colour}`
-  const label  = ROUTE_LABELS[line.route] ?? line.route
-  return (
-    <div className="bg-bg-surface border border-bg-border rounded-xl p-4 space-y-2.5 hover:bg-bg-elevated transition-colors">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black text-white shrink-0"
-            style={{ backgroundColor: colour }}
-          >
-            {(line.ref || line.name).slice(0, 2).toUpperCase()}
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-text-primary truncate max-w-[160px]">
-              {line.name || line.ref || `${label} ${line.id}`}
-            </p>
-            <p className="text-[10px] text-text-muted uppercase tracking-wide">{label}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold shrink-0 text-[#00E676] bg-[rgba(0,230,118,0.1)] border-[rgba(0,230,118,0.25)]">
-          <CheckCircle2 className="w-3 h-3" />
-          En service
-        </div>
-      </div>
-      {line.operator && (
-        <p className="text-xs text-text-muted pl-11">{line.operator}</p>
-      )}
-    </div>
-  )
+// ─── OSM transit view (non-Paris) ────────────────────────────────────────────
+
+interface OsmCity {
+  name: string; flag: string
+  bbox: [number, number, number, number]
+  population: number
 }
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
+function OsmTransitView({ city, mounted }: { city: OsmCity; mounted: boolean }) {
+  const [lines,      setLines]      = useState<OSMTransitLine[]>([])
+  const [loading,    setLoading]    = useState(true)
+  const [error,      setError]      = useState<string | null>(null)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [filter,     setFilter]     = useState('all')
+  const [now,        setNow]        = useState(() => new Date())
 
-function SummaryCard({ label, value, color }: { label: string; value: number; color: string }) {
+  const load = useCallback(async () => {
+    setLoading(true); setError(null)
+    try {
+      setLines(await fetchTransitRoutes(city.bbox))
+      setLastUpdate(new Date())
+    } catch {
+      setError('Impossible de charger les données de transport OSM')
+    } finally {
+      setLoading(false)
+    }
+  }, [city.bbox])
+
+  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    const iv = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(iv)
+  }, [])
+
+  const routeTypes = useMemo(() => [...new Set(lines.map(l => l.route))].sort(), [lines])
+  const filtered   = filter === 'all' ? lines : lines.filter(l => l.route === filter)
+
+  const allMetrics = useMemo(() => lines.map(l => getMetrics(l.route, String(l.id), now)), [lines, now])
+  const totalPax   = allMetrics.reduce((a, m) => a + m.paxPerHour, 0)
+  const avgLoad    = allMetrics.length ? allMetrics.reduce((a, m) => a + m.loadPct, 0) / allMetrics.length : 0
+
+  const filterOpts = [
+    { key: 'all', label: 'Tout', count: lines.length },
+    ...routeTypes.map(t => ({ key: t, label: ROUTE_LABELS[t] ?? t, count: lines.filter(l => l.route === t).length })),
+  ]
+
   return (
-    <div className="bg-bg-surface border border-bg-border rounded-xl p-4">
-      <p className="text-xs text-text-muted uppercase tracking-widest mb-1">{label}</p>
-      <p className="text-2xl font-bold" style={{ color: value > 0 && color !== '#00E676' ? color : '#F0F0FF' }}>
-        {value}
-      </p>
-    </div>
+    <main className="flex-1 overflow-y-auto p-6 space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
+            <Bus className="w-5 h-5 text-brand-green" />
+            Réseau transport — {city.flag} {city.name}
+          </h1>
+          <p className="text-sm text-text-secondary mt-1 flex items-center gap-2">
+            <Globe className="w-3 h-3 text-[#3B82F6]" />
+            OpenStreetMap
+            {lastUpdate && mounted && (
+              <span className="text-text-muted">· {formatDistanceToNow(lastUpdate, { locale: fr, addSuffix: true })}</span>
+            )}
+          </p>
+        </div>
+        <button onClick={load} disabled={loading}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-sm text-text-secondary hover:text-text-primary disabled:opacity-50">
+          <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
+          Actualiser
+        </button>
+      </div>
+
+      {/* Summary */}
+      <SummaryBar total={lines.length} totalPax={totalPax} avgLoad={avgLoad} disrupted={0} loading={loading} />
+
+      {/* OSM disclaimer */}
+      <div className="bg-[rgba(59,130,246,0.07)] border border-[rgba(59,130,246,0.2)] rounded-xl px-4 py-3 flex items-start gap-3">
+        <Zap className="w-4 h-4 text-[#3B82F6] mt-0.5 shrink-0" />
+        <p className="text-xs text-[#93C5FD] leading-relaxed">
+          Réseau issu d'OpenStreetMap. Charge & fréquences estimées selon le type de ligne et l'heure actuelle.
+          Les perturbations temps réel nécessitent l'API opérateur de {city.name}.
+        </p>
+      </div>
+
+      {loading && (
+        <div className="border border-bg-border rounded-3xl p-16 text-center">
+          <div className="w-10 h-10 border-[3px] border-brand-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[13px] font-bold text-text-secondary uppercase tracking-tight">Chargement réseau OSM…</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.3)] rounded-xl p-4 text-sm text-[#EF4444]">{error}</div>
+      )}
+
+      {/* Filters */}
+      {!loading && lines.length > 0 && <FilterTabs options={filterOpts} value={filter} onChange={setFilter} />}
+
+      {!loading && filtered.length === 0 && !error && (
+        <div className="bg-bg-surface border border-bg-border rounded-2xl p-12 text-center">
+          <p className="text-text-secondary text-sm">Aucune ligne trouvée dans cette zone</p>
+          <p className="text-text-muted text-xs mt-1">Les données OSM peuvent être incomplètes pour certaines villes</p>
+        </div>
+      )}
+
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {filtered.map((line, i) => {
+          const colour = line.colour.startsWith('#') ? line.colour : `#${line.colour}`
+          const idx    = lines.indexOf(line)
+          const m      = allMetrics[idx] ?? getMetrics(line.route, String(line.id), now)
+          return (
+            <LineCard
+              key={line.id}
+              badge={line.ref || line.name}
+              name={line.name || `${ROUTE_LABELS[line.route] ?? line.route} ${line.ref}`}
+              subLabel={ROUTE_LABELS[line.route] ?? line.route}
+              colour={colour}
+              operator={line.operator || line.network || undefined}
+              metrics={m}
+              now={now}
+            />
+          )
+        })}
+      </div>
+
+      {!loading && lines.length > 0 && (
+        <p className="text-xs text-text-muted text-center pb-2">
+          Source: OpenStreetMap / Overpass API · {lines.length} lignes · Fréquences & charge estimées
+        </p>
+      )}
+    </main>
   )
 }
