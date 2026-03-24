@@ -81,6 +81,16 @@ function buildSystemPrompt(ctx?: CityContext): string {
       ? `\n- **Stats ville**: pop. ${ctx.cityStats.population?.toLocaleString('fr-FR') ?? '—'}, densité ${ctx.cityStats.density?.toLocaleString('fr-FR') ?? '—'} hab/km²`
       : ''
 
+    const zoneLine = ctx.zone?.active
+      ? `\n\n### ANALYSE DE ZONE (Focus Localisé)
+- **Zone active**: OUI (l'utilisateur analyse un secteur spécifique)
+- **Segments dans la zone**: ${ctx.zone.segmentCount}
+- **Congestion moyenne zone**: ${Math.round(ctx.zone.avgCongestion * 100)}%
+- **Incidents dans la zone**: ${ctx.zone.incidentCount}
+- **Rues principales analysées**: ${ctx.zone.streets?.join(', ') || 'n/a'}
+${ctx.zone.topIncidents?.length ? `- **Incidents locaux**: ${ctx.zone.topIncidents.join('; ')}` : ''}`
+      : ''
+
     contextBlock = `
 ## Contexte temps réel — ${ctx.cityName}${ctx.country ? `, ${ctx.country}` : ''}
 
@@ -89,7 +99,7 @@ function buildSystemPrompt(ctx?: CityContext): string {
 - **Temps de trajet moyen**: ${ctx.avgTravelMin ?? '—'} min
 - **Indice pollution**: ${ctx.pollutionIndex ?? '—'} / 10
 - **Incidents actifs**: ${ctx.activeIncidents ?? 0}
-- **Source données trafic**: ${ctx.dataSource ?? 'synthétique'}${weatherLine}${aqLine}${cityStatsLine}
+- **Source données trafic**: ${ctx.dataSource ?? 'synthétique'}${weatherLine}${aqLine}${cityStatsLine}${zoneLine}
 `
   }
 
@@ -112,6 +122,7 @@ ${contextBlock}
 - Markdown avec titres, puces et **gras** pour les points clés
 - Pense en ingénieur de terrain, propose des mesures concrètes
 - Réponds en français sauf si demandé autrement
+- **IMPORTANT**: Si une zone est active, focalise ton analyse prioritairement sur les données de cette zone.
 
 Si aucun contexte de ville n'est fourni, réponds en mode général sur la mobilité urbaine.`
 }
@@ -126,6 +137,14 @@ interface CityContext {
   pollutionIndex?:  number
   activeIncidents?: number
   dataSource?:      string
+  zone?: {
+    active:         boolean
+    segmentCount:   number
+    incidentCount:  number
+    avgCongestion:  number
+    topIncidents?:  string[]
+    streets?:       string[]
+  }
   weather?: {
     emoji:         string
     description:   string

@@ -22,3 +22,8 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# crossflow data
+data/
+outputs/
+scripts/
