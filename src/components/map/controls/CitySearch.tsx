@@ -96,7 +96,7 @@ export function CitySearch() {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute top-full mt-3 left-0 w-[340px] glass rounded-apple shadow-apple z-50 animate-fade-in overflow-hidden border border-white/10">
+        <div className="absolute top-full mt-3 left-0 w-[calc(100vw-32px)] sm:w-[340px] glass rounded-apple shadow-apple z-50 animate-fade-in overflow-hidden border border-white/10">
           {/* Search input */}
           <div className="p-4 border-b border-white/5">
             <div className="flex items-center gap-3 bg-white/5 rounded-apple px-4 py-3 border border-white/5 focus-within:border-brand-green/30 transition-all duration-300 shadow-inner">

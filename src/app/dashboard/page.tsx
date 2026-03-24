@@ -118,26 +118,26 @@ export default function DashboardPage() {
   const pollDelta   = ((seed % 31) - 15) / 10
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto p-6 sm:p-8 space-y-8">
+    <main className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 space-y-6 sm:space-y-8">
       {/* Title & Stats Summary */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6">
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-1.5 h-6 bg-brand rounded-full shadow-glow" />
-            <h1 className="text-2xl font-bold text-white tracking-tight">
+          <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
+            <div className="w-1 h-5 sm:w-1.5 sm:h-6 bg-brand rounded-full shadow-glow" />
+            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
               {city.flag} {city.name}
             </h1>
           </div>
-          <p className="text-[13px] font-medium text-text-secondary flex items-center gap-2">
-            {t('dashboard.title')} · <span className="text-text-muted">{t('dashboard.updated')} · {city.timezone}</span>
+          <p className="text-[11px] sm:text-[13px] font-medium text-text-secondary flex flex-wrap items-center gap-2">
+            {t('dashboard.title')} · <span className="text-text-muted">{t('dashboard.updated')}</span>
             {dataSource === 'live' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand/10 border border-brand/30 text-brand text-[10px] font-bold uppercase tracking-wider">
-                <Zap className="w-2.5 h-2.5" />HERE Live
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-brand/10 border border-brand/30 text-brand text-[9px] font-bold uppercase tracking-wider">
+                <Zap className="w-2 h-2" />Live
               </span>
             )}
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <button
             onClick={() => exportToPdf(`CrossFlow — ${city.name} Dashboard`)}
             className="print-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-xs text-text-secondary hover:text-text-primary"
@@ -164,7 +164,7 @@ export default function DashboardPage() {
         congWarn ? "bg-gradient-to-r from-orange-500/20 to-transparent" :
                   "bg-gradient-to-r from-brand/20 to-transparent"
       )}>
-        <div className="glass-light px-6 py-4 rounded-[14px] flex items-center gap-4 border border-white/5">
+        <div className="glass-light px-4 sm:px-6 py-3 sm:py-4 rounded-[14px] flex items-center gap-3 sm: gap-4 border border-white/5">
           <div className="relative">
             <div className={cn(
               "w-3 h-3 rounded-full shadow-glow animate-pulse",
@@ -192,15 +192,15 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-8 pr-2">
+          <div className="flex items-center gap-4 sm:gap-8 pr-1 sm:pr-2">
             <div className="flex flex-col items-end">
-              <p className="text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Efficacité</p>
-              <p className="text-[15px] font-bold text-white tabular-nums">{Math.round(kpis.networkEfficiency * 100)}%</p>
+              <p className="text-[8px] sm:text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Efficacité</p>
+              <p className="text-[13px] sm:text-[15px] font-bold text-white tabular-nums">{Math.round(kpis.networkEfficiency * 100)}%</p>
             </div>
-            <div className="w-[1px] h-8 bg-white/5 hidden sm:block" />
-            <div className="flex-col items-end hidden sm:flex">
-              <p className="text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Impact Météo</p>
-              <p className={cn("text-[13px] font-bold tabular-nums", openMeteoWeather?.trafficImpact === 'none' ? 'text-brand' : 'text-orange-500')}>
+            <div className="w-[1px] h-6 sm:h-8 bg-white/5 hidden xs:block" />
+            <div className="flex-col items-end hidden xs:flex">
+              <p className="text-[8px] sm:text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Impact Météo</p>
+              <p className={cn("text-[11px] sm:text-[13px] font-bold tabular-nums", openMeteoWeather?.trafficImpact === 'none' ? 'text-brand' : 'text-orange-500')}>
                 {openMeteoWeather?.trafficImpact.toUpperCase() || 'N/A'}
               </p>
             </div>
@@ -296,8 +296,8 @@ function EfficiencyBar({ label, value, color = '#22C55E' }: { label: string; val
   return (
     <div className="space-y-2 mb-4 group">
       <div className="flex justify-between items-end">
-        <span className="text-[11px] font-bold text-text-muted uppercase tracking-[0.1em]">{label}</span>
-        <span className="text-[13px] font-bold tabular-nums" style={{ color }}>{Math.round(value * 100)}%</span>
+        <span className="text-[10px] sm:text-[11px] font-bold text-text-muted uppercase tracking-[0.1em]">{label}</span>
+        <span className="text-[12px] sm:text-[13px] font-bold tabular-nums" style={{ color }}>{Math.round(value * 100)}%</span>
       </div>
       <div className="h-2 rounded-full bg-white/5 overflow-hidden shadow-inner">
         <div

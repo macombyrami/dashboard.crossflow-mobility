@@ -96,7 +96,7 @@ export default function OnboardingPage() {
 
       <div className="space-y-3">
         <label className="text-[12px] font-bold uppercase tracking-wider text-text-muted">Votre profil</label>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {ROLES.map(r => (
             <button
               key={r.id}
@@ -162,7 +162,7 @@ export default function OnboardingPage() {
         <p className="text-text-secondary">CrossFlow réunit trafic temps réel, IA prédictive et simulation en une seule interface.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {FEATURES.map((f, i) => (
           <div
             key={i}
@@ -273,14 +273,14 @@ export default function OnboardingPage() {
                 i === step ? 'opacity-100' : i < step ? 'opacity-60' : 'opacity-30',
               )}>
                 <div className={cn(
-                  'w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-all',
+                  'w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-[11px] font-bold transition-all',
                   i < step  ? 'bg-brand-green text-black' :
                   i === step ? 'bg-brand-green/20 border border-brand-green/60 text-brand-green' :
                   'bg-bg-elevated border border-bg-border text-text-muted',
                 )}>
                   {i < step ? '✓' : i + 1}
                 </div>
-                <span className={cn('text-[12px] font-medium hidden sm:block', i === step ? 'text-text-primary' : 'text-text-muted')}>{label}</span>
+                <span className={cn('text-[11px] sm:text-[12px] font-medium hidden xs:block', i === step ? 'text-text-primary' : 'text-text-muted')}>{label}</span>
               </div>
               {i < steps.length - 1 && (
                 <ChevronRight className="w-3.5 h-3.5 text-text-muted/40 flex-shrink-0" />
