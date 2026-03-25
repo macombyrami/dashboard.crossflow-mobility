@@ -4,11 +4,12 @@ import { SimulationResults } from '@/components/simulation/SimulationResults'
 import { SytadinFeed } from '@/components/simulation/SytadinFeed'
 import { PredictiveStatus } from '@/components/simulation/PredictiveStatus'
 import { IdfNetworkStats } from '@/components/simulation/IdfNetworkStats'
+import { MiroFishPanel } from '@/components/simulation/MiroFishPanel'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { generateCityKPIs, generateIncidents } from '@/lib/engine/traffic.engine'
 import { useEffect, useState } from 'react'
-import { GitBranch, Info, Rss } from 'lucide-react'
+import { Brain, GitBranch, Info, Rss } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useTranslation } from '@/lib/hooks/useTranslation'
 
@@ -17,7 +18,7 @@ const CrossFlowMap = dynamic(
   { ssr: false, loading: () => <div className="w-full h-full bg-bg-surface" /> },
 )
 
-type RightTab = 'results' | 'social'
+type RightTab = 'results' | 'social' | 'mirofish'
 
 export default function SimulationPage() {
   const { t } = useTranslation()
@@ -44,7 +45,7 @@ export default function SimulationPage() {
           <div className="flex items-start gap-2.5 bg-[rgba(41,121,255,0.08)] border border-[rgba(41,121,255,0.2)] rounded-xl p-3">
             <Info className="w-3.5 h-3.5 text-[#2979FF] shrink-0 mt-0.5" />
             <p className="text-xs text-[#2979FF] leading-relaxed">
-              Select a scenario, configure parameters, and run to see the impact on <strong>{city.name}</strong>&apos;s network.
+              Sélectionnez un scénario, configurez les paramètres, puis lancez pour voir l'impact sur le réseau de <strong>{city.name}</strong>.
             </p>
           </div>
 
@@ -83,6 +84,17 @@ export default function SimulationPage() {
             {t('simulation.results')}
           </button>
           <button
+            onClick={() => setRightTab('mirofish')}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-semibold transition-colors border-b-2 ${
+              rightTab === 'mirofish'
+                ? 'border-purple-400 text-purple-400 bg-purple-400/5'
+                : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
+            }`}
+          >
+            <Brain className="w-3.5 h-3.5" />
+            IA Agents
+          </button>
+          <button
             onClick={() => setRightTab('social')}
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-semibold transition-colors border-b-2 ${
               rightTab === 'social'
@@ -100,6 +112,10 @@ export default function SimulationPage() {
           {rightTab === 'results' ? (
             <div className="h-full overflow-y-auto p-4">
               <SimulationResults />
+            </div>
+          ) : rightTab === 'mirofish' ? (
+            <div className="h-full overflow-y-auto p-4">
+              <MiroFishPanel />
             </div>
           ) : (
             <SytadinFeed />

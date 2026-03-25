@@ -6,8 +6,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const BACKEND_URL = process.env.PREDICTIVE_BACKEND_URL ?? 'http://localhost:8000'
 
-async function proxy(req: NextRequest, { params }: { params: { path: string[] } }) {
-  const path = params.path.join('/')
+async function proxy(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const { path: pathSegments } = await context.params
+  const path = pathSegments.join('/')
   const search = req.nextUrl.search
   const url = `${BACKEND_URL}/${path}${search}`
 

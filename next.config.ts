@@ -4,9 +4,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   compress: true,
   poweredByHeader: false,
-  // TypeScript checked by IDE/CI — skip during build to avoid OOM on low-RAM machines
+  // TypeScript + ESLint checked by IDE/CI — skip during build to avoid OOM on low-RAM machines
   typescript: { ignoreBuildErrors: true },
-  eslint:     { ignoreDuringBuilds: true },
   async headers() {
     return [
       {
