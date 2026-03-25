@@ -2,16 +2,15 @@
 import { CheckCircle2, XCircle, Wifi, AlertCircle } from 'lucide-react'
 import { hasKey as hasTomTom } from '@/lib/api/tomtom'
 import { hasKey as hasHERE } from '@/lib/api/here'
-import { hasKey as hasNavitia } from '@/lib/api/navitia'
 import { cn } from '@/lib/utils/cn'
 
 export function IntegrationStatus() {
   const integrations = [
-    { label: 'TomTom (Traffic Index)', status: hasTomTom() ? 'live' : 'demo', provider: 'TomTom' },
-    { label: 'HERE (Flow Data)',      status: hasHERE()   ? 'live' : 'demo', provider: 'HERE Technologies' },
-    { label: 'Navitia (Disruptions)', status: hasNavitia() ? 'live' : 'demo', provider: 'Kisio Digital' },
-    { label: 'RATP (Real-time)',      status: 'live', provider: 'Pierre-Grimaud RATP API' }, // Community API
-    { label: 'OpenMeteo (Weather)',   status: 'live', provider: 'Open-Meteo' }, // No key required
+    { label: 'TomTom (Traffic Index)',   status: hasTomTom() ? 'live' : 'demo', provider: 'TomTom' },
+    { label: 'HERE (Flow Data)',         status: hasHERE()   ? 'live' : 'demo', provider: 'HERE Technologies' },
+    { label: 'PRIM IDFM (Perturbations)', status: 'live', provider: 'Île-de-France Mobilités' },
+    { label: 'RATP (Trafic RT)',         status: 'live', provider: 'API RATP communautaire' },
+    { label: 'OpenMeteo (Météo)',        status: 'live', provider: 'Open-Meteo' },
   ]
 
   return (
