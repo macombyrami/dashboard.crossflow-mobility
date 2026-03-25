@@ -46,6 +46,7 @@
 
 html {
   height: 100%;
+  /* Let SwipeNavigation motion.div handle overflow per page */
   overflow: hidden;
   background: var(--bg-base);
 }
@@ -339,8 +340,12 @@ body {
 
 /* ─── Mobile safe area ─────────────────────────────────────────────────── */
 .pb-safe {
-  padding-bottom: max(env(safe-area-inset-bottom), 8px);
+  padding-bottom: calc(max(env(safe-area-inset-bottom), 8px) + var(--nav-h));
 }
+
+/* ─── No-scrollbar (hide scrollbar, keep functionality) ─────────────────── */
+.no-scrollbar          { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
 /* ─── Swipe Utility ────────────────────────────────────────────────────── */
 .touch-none-horizontal {

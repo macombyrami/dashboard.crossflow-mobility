@@ -1,20 +1,43 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { Calendar, MapPin, Users, TrendingUp, ChevronRight } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
+import { Calendar, MapPin, Users, TrendingUp, ChevronRight, Navigation, Ticket, Zap } from 'lucide-react'
 import { fetchNearbyEvents } from '@/lib/api/events'
 import type { UrbanEvent } from '@/lib/api/events'
-import { generateEventsForCity } from '@/lib/engine/events.engine'
+import { generateEventsForCity, computeProximityImpact } from '@/lib/engine/events.engine'
 import { useMapStore } from '@/store/mapStore'
 import { cn } from '@/lib/utils/cn'
 
-const CATEGORY_CONFIG: Record<UrbanEvent['category'], { emoji: string; color: string; bg: string }> = {
-  concert:        { emoji: '🎵', color: '#AF52DE', bg: 'rgba(175,82,222,0.12)' },
-  sport:          { emoji: '⚽', color: '#0A84FF', bg: 'rgba(10,132,255,0.12)' },
-  manifestation:  { emoji: '📢', color: '#FF453A', bg: 'rgba(255,69,58,0.12)'  },
-  exposition:     { emoji: '🏛️', color: '#64D2FF', bg: 'rgba(100,210,255,0.12)' },
-  marché:         { emoji: '🛒', color: '#FFD60A', bg: 'rgba(255,214,10,0.12)'  },
-  congrès:        { emoji: '🏛️', color: '#FF9F0A', bg: 'rgba(255,159,10,0.12)'  },
-  autre:          { emoji: '📍', color: '#8E8E93', bg: 'rgba(142,142,147,0.12)'},
+// ─── Config ───────────────────────────────────────────────────────────────
+
+type Category = UrbanEvent['category'] | 'all'
+
+const TABS: { key: Category; label: string; emoji: string }[] = [
+  { key: 'all',          label: 'Tous',      emoji: '🗂' },
+  { key: 'concert',      label: 'Concerts',   emoji: '🎵' },
+  { key: 'festival',     label: 'Festivals',  emoji: '🎪' },
+  { key: 'sport',        label: 'Sports',     emoji: '⚽' },
+  { key: 'manifestation',label: 'Manifs',     emoji: '📢' },
+  { key: 'exposition',   label: 'Expos',      emoji: '🏛️' },
+  { key: 'congrès',      label: 'Congrès',    emoji: '🎙' },
+]
+
+const CATEGORY_CONFIG: Record<string, { emoji: string; color: string; bg: string }> = {
+  concert:        { emoji: '🎵', color: '#AF52DE', bg: 'rgba(175,82,222,0.14)' },
+  festival:       { emoji: '🎪', color: '#FF6B35', bg: 'rgba(255,107,53,0.14)'  },
+  sport:          { emoji: '⚽', color: '#0A84FF', bg: 'rgba(10,132,255,0.14)'  },
+  manifestation:  { emoji: '📢', color: '#FF453A', bg: 'rgba(255,69,58,0.14)'   },
+  exposition:     { emoji: '🏛️', color: '#64D2FF', bg: 'rgba(100,210,255,0.14)' },
+  marché:         { emoji: '🛒', color: '#FFD60A', bg: 'rgba(255,214,10,0.14)'  },
+  congrès:        { emoji: '🎙', color: '#FF9F0A', bg: 'rgba(255,159,10,0.14)'  },
+  autre:          { emoji: '📍', color: '#8E8E93', bg: 'rgba(142,142,147,0.14)' },
+}
+
+const SOURCE_BADGE: Record<UrbanEvent['source'], { label: string; color: string }> = {
+  'paris-opendata':  { label: 'Paris OD',    color: '#0062FF' },
+  'openagenda':      { label: 'OpenAgenda',  color: '#6C47FF' },
+  'predicthq':       { label: 'PredictHQ',   color: '#22C55E' },
+  'ticketmaster':    { label: 'Ticketmaster',color: '#00A8E8' },
+  'crossflow-engine':{ label: 'CrossFlow',   color: '#FF9F0A' },
 }
 
 function formatDate(dateStr: string): string {
@@ -22,29 +45,44 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
+function severityColor(score: number) {
+  if (score > 0.75) return { text: '#FF3B30', bg: 'rgba(255,59,48,0.12)',  border: 'rgba(255,59,48,0.25)' }
+  if (score > 0.5)  return { text: '#FF9F0A', bg: 'rgba(255,159,10,0.12)', border: 'rgba(255,159,10,0.25)' }
+  if (score > 0.25) return { text: '#FFD60A', bg: 'rgba(255,214,10,0.10)', border: 'rgba(255,214,10,0.20)' }
+  return              { text: '#22C55E', bg: 'rgba(34,197,94,0.10)',  border: 'rgba(34,197,94,0.20)' }
+}
+
+// ─── Props ────────────────────────────────────────────────────────────────
+
 interface EventsWidgetProps {
-  lat:      number
-  lng:      number
+  lat:       number
+  lng:       number
   radiusKm?: number
   maxItems?: number
 }
 
-export function EventsWidget({ lat, lng, radiusKm = 15, maxItems = 6 }: EventsWidgetProps) {
-  const city = useMapStore(s => s.city)
+// ─── Component ────────────────────────────────────────────────────────────
+
+export function EventsWidget({ lat, lng, radiusKm = 15, maxItems = 8 }: EventsWidgetProps) {
+  const city                = useMapStore(s => s.city)
   const [events, setEvents] = useState<UrbanEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<Category>('all')
 
   useEffect(() => {
     let cancelled = false
     const load = async () => {
       setLoading(true)
-      // Try live, then fallback/append simulation for "more data" as requested
-      const live = await fetchNearbyEvents(lat, lng, radiusKm)
-      const simulated = generateEventsForCity(city)
-      
+      const [live, simulated] = await Promise.all([
+        fetchNearbyEvents(lat, lng, radiusKm),
+        Promise.resolve(generateEventsForCity(city)),
+      ])
+
       if (!cancelled) {
-        // Merge and prioritize featured/high impact
-        const all = [...live, ...simulated].sort((a, b) => (b.trafficScore || 0) - (a.trafficScore || 0))
+        // Merge: live first, then simulated as fallback (avoid duplicates by title)
+        const liveIds = new Set(live.map(e => e.title.toLowerCase().slice(0, 20)))
+        const extras  = simulated.filter(e => !liveIds.has(e.title.toLowerCase().slice(0, 20)))
+        const all     = [...live, ...extras].sort((a, b) => (b.trafficScore || 0) - (a.trafficScore || 0))
         setEvents(all.slice(0, maxItems))
         setLoading(false)
       }
@@ -53,120 +91,231 @@ export function EventsWidget({ lat, lng, radiusKm = 15, maxItems = 6 }: EventsWi
     return () => { cancelled = true }
   }, [lat, lng, radiusKm, maxItems, city])
 
+  // ─── Filtered events by active tab ────────────────────────────────────
+
+  const filtered = useMemo(() => {
+    if (activeTab === 'all') return events
+    return events.filter(e => e.category === activeTab)
+  }, [events, activeTab])
+
+  // ─── Count by category for badge ──────────────────────────────────────
+
+  const countByCategory = useMemo(() => {
+    const m: Partial<Record<Category, number>> = { all: events.length }
+    for (const e of events) {
+      m[e.category] = (m[e.category] ?? 0) + 1
+    }
+    return m
+  }, [events])
+
+  // ─── Loading skeleton ─────────────────────────────────────────────────
+
   if (loading) {
     return (
       <div className="glass-card p-6 rounded-[24px] border border-white/5 animate-pulse">
-        <div className="h-6 w-48 bg-white/5 rounded-lg mb-6" />
-        <div className="space-y-4">
-          {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-white/5 rounded-2xl" />)}
+        <div className="h-6 w-48 bg-white/5 rounded-lg mb-4" />
+        <div className="flex gap-2 mb-4">
+          {[1,2,3,4].map(i => <div key={i} className="h-7 w-20 bg-white/5 rounded-full" />)}
+        </div>
+        <div className="space-y-3">
+          {[1,2,3,4].map(i => <div key={i} className="h-20 bg-white/5 rounded-2xl" />)}
         </div>
       </div>
     )
   }
 
-  // Group by district for better organization
-  const groupedEvents = events.reduce((acc, event) => {
-    const d = event.location.district || 'Général'
-    if (!acc[d]) acc[d] = []
-    acc[d].push(event)
-    return acc
-  }, {} as Record<string, UrbanEvent[]>)
-
   return (
     <div className="glass-card rounded-[24px] border border-white/5 overflow-hidden flex flex-col shadow-apple h-full">
+
       {/* Header */}
-      <div className="px-6 pt-6 pb-4">
-        <div className="flex items-center justify-between mb-1">
+      <div className="px-5 pt-5 pb-3">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-1.5 h-4.5 bg-brand rounded-full shadow-glow" />
-            <h2 className="text-[13px] font-bold text-text-muted uppercase tracking-[0.18em]">Événements à proximité</h2>
+            <div className="w-1.5 h-5 bg-brand rounded-full shadow-glow" />
+            <h2 className="text-[13px] font-bold text-text-muted uppercase tracking-[0.18em]">
+              Événements à proximité
+            </h2>
           </div>
-          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-secondary tabular-nums">
-            {events.length}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-secondary tabular-nums">
+              {events.length}
+            </span>
+            <span className="text-[10px] font-bold text-text-muted flex items-center gap-1">
+              <Navigation className="w-3 h-3" />{radiusKm}km
+            </span>
+          </div>
+        </div>
+
+        {/* Category Tabs */}
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+          {TABS.map(tab => {
+            const count = countByCategory[tab.key]
+            if (!count && tab.key !== 'all') return null
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={cn(
+                  'flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all duration-200 border',
+                  activeTab === tab.key
+                    ? 'bg-brand/15 border-brand/30 text-brand'
+                    : 'bg-white/5 border-white/5 text-text-muted hover:border-white/15 hover:text-text-secondary'
+                )}
+              >
+                <span>{tab.emoji}</span>
+                <span>{tab.label}</span>
+                {count && count > 0 && (
+                  <span className={cn(
+                    'text-[9px] px-1.5 py-0 rounded-full font-bold tabular-nums',
+                    activeTab === tab.key ? 'bg-brand/25 text-brand' : 'bg-white/10 text-text-muted'
+                  )}>{count}</span>
+                )}
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      {/* Events Scroll Area */}
-      <div className="flex-1 overflow-y-auto px-1 custom-scrollbar pb-4">
-        {Object.entries(groupedEvents).map(([district, distEvents]) => (
-          <div key={district} className="mb-4">
-            <div className="px-5 mb-2">
-              <span className="text-[10px] font-bold text-brand uppercase tracking-widest">{district}</span>
-            </div>
-            
-            <div className="space-y-1">
-              {distEvents.map(evt => {
-                const cfg = CATEGORY_CONFIG[evt.category]
-                return (
-                  <button 
-                    key={evt.id} 
-                    className="w-full text-left px-5 py-3 group hover:bg-white/5 transition-all duration-200 relative"
-                  >
-                    <div className="flex items-start gap-4">
-                      {/* Icon */}
-                      <div className="w-10 h-10 rounded-[14px] flex items-center justify-center text-xl flex-shrink-0 mt-0.5 shadow-sm transition-transform group-hover:scale-110" style={{ backgroundColor: cfg.bg }}>
-                        {cfg.emoji}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <h3 className="text-[14px] font-bold text-white truncate group-hover:text-brand transition-colors">{evt.title}</h3>
-                        </div>
-
-                        <div className="flex flex-col gap-1">
-                          <p className="text-[12px] font-medium text-text-secondary">
-                            {formatDate(evt.startDate)}
-                          </p>
-                          <div className="flex items-center gap-3 text-[11px] text-text-muted font-medium">
-                            <span className="flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              ~{evt.attendance} pers.
-                            </span>
-                            {evt.location.address && (
-                              <span className="flex items-center gap-1 truncate max-w-[180px]">
-                                <MapPin className="w-3 h-3" />
-                                {evt.location.address}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Impact Info */}
-                      <div className="flex flex-col items-end gap-1.5 flex-shrink-0 pt-0.5">
-                        <span className={cn(
-                          "text-[10px] font-bold px-2 py-0.5 rounded-lg border",
-                          evt.trafficScore > 0.6 ? "text-red-500 border-red-500/20 bg-red-500/10" :
-                          evt.trafficScore > 0.3 ? "text-orange-500 border-orange-500/20 bg-orange-500/10" :
-                          "text-brand border-brand/20 bg-brand/10"
-                        )}>
-                          {evt.impactLabel || 'Impact léger'}
-                        </span>
-                        <div className="flex items-center gap-1.5 font-bold text-[12px] text-white tabular-nums">
-                          <TrendingUp className="w-3 h-3 text-brand" />
-                          +{evt.trafficIncrease || Math.round(evt.trafficScore * 100)}%
-                        </div>
-                      </div>
-
-                      <ChevronRight className="w-4 h-4 text-text-muted mt-4 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+      {/* Events List */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-1 pb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-2 text-text-muted">
+            <span className="text-3xl">📭</span>
+            <p className="text-[12px] font-medium">Aucun événement dans cette catégorie</p>
           </div>
-        ))}
+        ) : (
+          <div className="space-y-1">
+            {filtered.map(evt => {
+              const cfg    = CATEGORY_CONFIG[evt.category] ?? CATEGORY_CONFIG['autre']
+              const impact = computeProximityImpact(evt, lat, lng)
+              const sc     = severityColor(evt.proximityScore ?? evt.trafficScore)
+              const srcBadge = SOURCE_BADGE[evt.source]
+              return (
+                <EventCard
+                  key={evt.id}
+                  evt={evt}
+                  cfg={cfg}
+                  impact={impact}
+                  sc={sc}
+                  srcBadge={srcBadge}
+                />
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Footer */}
-      <div className="mt-auto px-6 py-4 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
-        <span className="text-[10px] font-bold text-text-muted uppercase tracking-[0.1em]">Source: PredictHQ</span>
-        <div className="flex items-center gap-1.5">
+      <div className="px-5 py-3 border-t border-white/5 bg-white/[0.02] flex items-center justify-between gap-3 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          {(['paris-opendata', 'openagenda', 'predicthq', 'ticketmaster'] as const)
+            .filter(src => events.some(e => e.source === src))
+            .map(src => {
+              const badge = SOURCE_BADGE[src]
+              return (
+                <span key={src} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md border"
+                  style={{ color: badge.color, borderColor: `${badge.color}30`, background: `${badge.color}10` }}>
+                  {badge.label}
+                </span>
+              )
+            })}
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-          <span className="text-[10px] font-bold text-text-muted uppercase tracking-[0.1em]">Rayon {radiusKm}km</span>
+          <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Live IDF</span>
         </div>
       </div>
     </div>
+  )
+}
+
+// ─── Single Event Card ────────────────────────────────────────────────────
+
+interface EventCardProps {
+  evt:      UrbanEvent
+  cfg:      { emoji: string; color: string; bg: string }
+  impact:   ReturnType<typeof computeProximityImpact>
+  sc:       ReturnType<typeof severityColor>
+  srcBadge: { label: string; color: string }
+}
+
+function EventCard({ evt, cfg, impact, sc, srcBadge }: EventCardProps) {
+  return (
+    <button
+      className="w-full text-left px-4 py-3 group hover:bg-white/[0.04] active:bg-white/[0.06] transition-all duration-200 rounded-2xl"
+    >
+      <div className="flex items-start gap-3">
+        {/* Category icon */}
+        <div
+          className="w-10 h-10 rounded-[14px] flex items-center justify-center text-xl flex-shrink-0 mt-0.5 shadow-sm transition-transform group-hover:scale-110"
+          style={{ backgroundColor: cfg.bg }}
+        >
+          {cfg.emoji}
+        </div>
+
+        {/* Main info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-0.5">
+            <h3 className="text-[13px] font-bold text-white truncate group-hover:text-brand transition-colors leading-tight">
+              {evt.title}
+            </h3>
+          </div>
+
+          {/* Date + venue */}
+          <p className="text-[11px] font-medium text-text-secondary mb-1 truncate">
+            {evt.venue ? `${evt.venue} · ` : ''}{formatDate(evt.startDate)}
+          </p>
+
+          {/* Impact row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Proximity persons */}
+            {impact.impactPersonnes > 0 && (
+              <span className="flex items-center gap-1 text-[10px] font-bold text-text-muted">
+                <Users className="w-3 h-3" />
+                ~{impact.impactPersonnes.toLocaleString('fr-FR')} pers. &lt;1km
+              </span>
+            )}
+            {/* Distance */}
+            {evt.distanceKm !== undefined && (
+              <span className="flex items-center gap-1 text-[10px] font-medium text-text-muted">
+                <MapPin className="w-3 h-3" />
+                {evt.distanceKm} km
+              </span>
+            )}
+            {/* Ticket link */}
+            {evt.ticketUrl && (
+              <span className="flex items-center gap-1 text-[10px] text-brand/70 font-medium">
+                <Ticket className="w-3 h-3" />Billets
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right side: impact badge + traffic delta */}
+        <div className="flex flex-col items-end gap-1.5 flex-shrink-0 pt-0.5">
+          {/* Impact badge */}
+          <span
+            className="text-[10px] font-bold px-2 py-0.5 rounded-lg border"
+            style={{ color: sc.text, background: sc.bg, borderColor: sc.border }}
+          >
+            {evt.impactLabel ?? 'Impact léger'}
+          </span>
+
+          {/* Traffic delta */}
+          <div className="flex items-center gap-1 font-bold text-[12px] text-white tabular-nums">
+            <TrendingUp className="w-3 h-3" style={{ color: sc.text }} />
+            +{evt.trafficIncrease ?? Math.round(evt.trafficScore * 100)}%
+          </div>
+
+          {/* Source badge */}
+          <span className="text-[9px] font-bold px-1.5 py-0 rounded-md"
+            style={{ color: srcBadge.color }}>
+            {srcBadge.label}
+          </span>
+        </div>
+
+        <ChevronRight className="w-4 h-4 text-text-muted mt-4 opacity-0 group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0 flex-shrink-0" />
+      </div>
+    </button>
   )
 }

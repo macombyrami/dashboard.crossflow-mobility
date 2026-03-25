@@ -5,7 +5,7 @@ import { Rss, ExternalLink, Twitter } from 'lucide-react'
 
 export default function SocialPage() {
   return (
-    <div className="flex flex-1 flex-col lg:flex-row h-full overflow-hidden">
+    <div className="flex flex-col lg:flex-row min-h-full overflow-hidden">
 
       {/* ── Left: info + réseau IDF ── */}
       <div className="w-full lg:w-72 shrink-0 border-b lg:border-b-0 lg:border-r border-bg-border flex flex-col max-h-[45vh] lg:max-h-full overflow-hidden">

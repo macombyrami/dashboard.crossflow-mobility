@@ -58,7 +58,7 @@ export default function SettingsPage() {
   const currentCity = CITIES.find(c => c.id === (lockedCityId ?? selectedCity))
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 max-w-2xl mx-auto w-full">
+    <main className="min-h-full p-6 space-y-6 max-w-2xl mx-auto w-full pb-safe">
 
       {/* Header */}
       <div className="flex items-center gap-3">

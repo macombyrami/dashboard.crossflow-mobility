@@ -302,7 +302,7 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
   ]
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
+    <main className="min-h-full p-6 space-y-5 pb-safe">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

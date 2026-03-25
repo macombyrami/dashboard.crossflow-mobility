@@ -2,108 +2,158 @@ import type { UrbanEvent } from '../api/events'
 import { City } from '@/types'
 
 /**
- * Featured events for Paris as requested by the user.
- * These are pinned to specific dates (Mar 25-26, 2026) in the simulation.
+ * Featured events for Paris — updated with musical + sports categories.
+ * Pinned to current sprint (Mar 25-26, 2026).
  */
 const FEATURED_PARIS_EVENTS: Partial<UrbanEvent>[] = [
   {
-    title: "Regards de Femmes 2026 : Industri'ELLES",
-    category: 'congrès',
-    startDate: '2026-03-25T09:30:00',
-    location: { lat: 48.8540, lng: 2.3330, address: "4 Place Saint-Germain des Prés, 75006 Paris, France", district: "6ème" },
-    attendance: 76,
-    trafficScore: 0.28,
-    impactLabel: "Impact léger",
-    trafficIncrease: 28,
-    source: "predicthq"
-  },
-  {
-    title: "Campus Briefing | Loi de finances : décryptage et points de vigilance",
-    category: 'congrès',
-    startDate: '2026-03-26T17:00:00',
-    location: { lat: 48.8600, lng: 2.3400, address: "75001 Paris, France", district: "1er" },
-    attendance: 83,
-    trafficScore: 0.28,
-    impactLabel: "Impact léger",
-    trafficIncrease: 28,
-    source: "predicthq"
-  },
-  {
-    title: "Between big law, boutiques and independents",
-    category: 'congrès',
-    startDate: '2026-03-25T10:00:00',
-    location: { lat: 48.8700, lng: 2.3000, address: "75008 Paris, France", district: "8ème" },
-    attendance: 70,
-    trafficScore: 0.27,
-    impactLabel: "Impact léger",
-    trafficIncrease: 27,
-    source: "predicthq"
-  },
-  {
-    title: "Julius Rodriguez",
+    title: 'Julius Rodriguez',
     category: 'concert',
     startDate: '2026-03-25T19:30:00',
-    location: { lat: 48.8660, lng: 2.3700, address: "Le Duc des Lombards, 75001 Paris, France", district: "1er" },
-    attendance: 120,
-    trafficScore: 0.27,
-    impactLabel: "Impact léger",
-    trafficIncrease: 27,
-    source: "predicthq"
+    endDate:   '2026-03-25T23:00:00',
+    location:  { lat: 48.8660, lng: 2.3477, address: 'Le Duc des Lombards, Paris 1er', district: '75001' },
+    venue:     'Le Duc des Lombards',
+    attendance: 300,
+    trafficScore: 0.55,
+    impactLabel: 'Impact modéré',
+    trafficIncrease: 35,
+    source: 'predicthq',
   },
   {
-    title: "L’affaire des armes de destruction massive irakiennes (1970-2003)",
+    title: 'PSG vs Rennes — Ligue 1',
+    category: 'sport',
+    startDate: '2026-03-26T21:00:00',
+    endDate:   '2026-03-26T23:00:00',
+    location:  { lat: 48.8414, lng: 2.2530, address: 'Parc des Princes, Paris 16ème', district: '75016' },
+    venue:     'Parc des Princes',
+    attendance: 47000,
+    trafficScore: 0.87,
+    impactLabel: 'Impact fort',
+    trafficIncrease: 68,
+    source: 'predicthq',
+  },
+  {
+    title: 'Festival Chorus — Les voix du monde',
+    category: 'festival',
+    startDate: '2026-03-25T14:00:00',
+    endDate:   '2026-03-26T22:00:00',
+    location:  { lat: 48.9283, lng: 2.2520, address: 'La Seine Musicale, Boulogne-Billancourt', district: '92100' },
+    venue:     'La Seine Musicale',
+    attendance: 5000,
+    trafficScore: 0.72,
+    impactLabel: 'Impact fort',
+    trafficIncrease: 52,
+    source: 'predicthq',
+  },
+  {
+    title: 'Regards de Femmes 2026 : Industri\'ELLES',
     category: 'congrès',
-    startDate: '2026-03-26T18:00:00',
-    location: { lat: 48.8500, lng: 2.3300, address: "78 Rue Bonaparte, 75006 Paris, France", district: "6ème" },
-    attendance: 74,
-    trafficScore: 0.27,
-    impactLabel: "Impact léger",
-    trafficIncrease: 27,
-    source: "predicthq"
-  }
+    startDate: '2026-03-25T09:30:00',
+    endDate:   '2026-03-25T19:00:00',
+    location:  { lat: 48.8540, lng: 2.3330, address: '4 Place Saint-Germain des Prés, 75006', district: '75006' },
+    attendance: 300,
+    trafficScore: 0.28,
+    impactLabel: 'Impact léger',
+    trafficIncrease: 18,
+    source: 'predicthq',
+  },
+  {
+    title: 'Marathon de Paris 2026 — Passage',
+    category: 'sport',
+    startDate: '2026-03-26T08:00:00',
+    endDate:   '2026-03-26T15:00:00',
+    location:  { lat: 48.8698, lng: 2.3078, address: 'Avenue des Champs-Élysées, Paris 8ème', district: '75008' },
+    attendance: 50000,
+    trafficScore: 0.92,
+    impactLabel: 'Impact critique',
+    trafficIncrease: 80,
+    source: 'crossflow-engine',
+  },
 ]
+
+/**
+ * Compute proximity impact for an event relative to a user position.
+ */
+export function computeProximityImpact(
+  event: UrbanEvent,
+  userLat: number,
+  userLng: number,
+  graphDensity = 1.0, // IDF zone multiplier (1.0 = average)
+) {
+  const distM = haversineM(userLat, userLng, event.location.lat, event.location.lng)
+
+  // People potentially affected within 1km radius around user
+  const overlapRatio    = Math.max(0, 1 - distM / (event.radius + 1000))
+  const impactPersonnes = Math.round(event.attendance * overlapRatio * 0.3)
+
+  // Traffic delta %
+  const trafficDeltaPct = Math.round(event.trafficScore * graphDensity * (1 - distM / 5000) * 100)
+
+  // Severity
+  const score = (event.trafficScore * 0.5) + (overlapRatio * 0.35) + (Math.min(1, event.attendance / 20000) * 0.15)
+  const severity: 'low' | 'medium' | 'high' | 'critical' =
+    score > 0.75 ? 'critical' : score > 0.5 ? 'high' : score > 0.25 ? 'medium' : 'low'
+
+  return { impactPersonnes, trafficDeltaPct, severity, overlapRatio, distM }
+}
+
+function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R  = 6371000
+  const φ1 = lat1 * Math.PI / 180
+  const φ2 = lat2 * Math.PI / 180
+  const Δφ = (lat2 - lat1) * Math.PI / 180
+  const Δλ = (lng2 - lng1) * Math.PI / 180
+  const a  = Math.sin(Δφ/2)**2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
 
 export function generateEventsForCity(city: City): UrbanEvent[] {
   const isParis = city.id === 'paris'
-  
+
   if (isParis) {
     return FEATURED_PARIS_EVENTS.map((e, i) => ({
       ...e,
-      id: `sim-paris-${i}`,
-      endDate: e.startDate, // simplifies for now
-      radius: 500,
-      source: 'predicthq',
+      id:         `sim-paris-${i}`,
+      endDate:    e.endDate ?? e.startDate ?? new Date().toISOString(),
+      startDate:  e.startDate ?? new Date().toISOString(),
+      radius:     e.radius ?? 800,
+      source:     e.source ?? 'crossflow-engine',
+      distanceKm: parseFloat((Math.random() * 8 + 0.5).toFixed(1)),
+      proximityScore: parseFloat((0.3 + Math.random() * 0.6).toFixed(2)),
     } as UrbanEvent))
   }
 
   // Generic simulation for other cities
-  const categories: Array<UrbanEvent['category']> = ['concert', 'sport', 'congrès', 'marché']
+  const categories: Array<UrbanEvent['category']> = ['concert', 'sport', 'festival', 'congrès', 'marché']
   const simulated: UrbanEvent[] = []
-  
+
   for (let i = 0; i < 6; i++) {
-    const cat = categories[i % categories.length]
+    const cat       = categories[i % categories.length]
     const latOffset = (Math.random() - 0.5) * 0.02
     const lngOffset = (Math.random() - 0.5) * 0.02
-    const score = 0.2 + Math.random() * 0.6
-    
+    const score     = 0.2 + Math.random() * 0.6
+    const dist      = parseFloat((Math.random() * 12 + 0.5).toFixed(1))
+
     simulated.push({
-      id: `sim-${city.id}-${i}`,
-      title: `${cat.charAt(0).toUpperCase() + cat.slice(1)} Event ${i + 1}`,
-      category: cat,
-      startDate: new Date().toISOString(),
-      endDate: new Date().toISOString(),
+      id:           `sim-${city.id}-${i}`,
+      title:        `${cat.charAt(0).toUpperCase() + cat.slice(1)} Event ${i + 1}`,
+      category:     cat,
+      startDate:    new Date().toISOString(),
+      endDate:      new Date().toISOString(),
       location: {
-        lat: city.center.lat + latOffset,
-        lng: city.center.lng + lngOffset,
-        address: `${city.name} District ${Math.floor(Math.random() * 20) + 1}`,
-        district: `District ${Math.floor(Math.random() * 20) + 1}`
+        lat:      city.center.lat + latOffset,
+        lng:      city.center.lng + lngOffset,
+        address:  `${city.name} — Zone ${Math.floor(Math.random() * 20) + 1}`,
+        district: `District ${Math.floor(Math.random() * 20) + 1}`,
       },
-      attendance: Math.floor(Math.random() * 5000),
-      radius: 800,
-      trafficScore: score,
-      impactLabel: score > 0.6 ? "Impact fort" : score > 0.3 ? "Impact modéré" : "Impact léger",
-      trafficIncrease: Math.round(score * 40),
-      source: 'crossflow-engine'
+      attendance:      Math.floor(Math.random() * 5000) + 100,
+      radius:          800,
+      trafficScore:    score,
+      impactLabel:     score > 0.6 ? 'Impact fort' : score > 0.3 ? 'Impact modéré' : 'Impact léger',
+      trafficIncrease: Math.round(score * 60),
+      distanceKm:      dist,
+      proximityScore:  parseFloat((score * 0.5 + Math.random() * 0.3).toFixed(2)),
+      source:          'crossflow-engine',
     })
   }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { getAuthCallbackUrl } from '@/lib/utils/url'
 import { Zap, Mail, Lock, Loader2, ArrowRight } from 'lucide-react'
 
 function LoginForm() {
@@ -34,7 +35,8 @@ function LoginForm() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            // ✅ Toujours utiliser le domaine de production — jamais window.location.origin
+            emailRedirectTo: getAuthCallbackUrl('/map'),
           },
         })
         if (error) throw error

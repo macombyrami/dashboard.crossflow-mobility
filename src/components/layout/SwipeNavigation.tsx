@@ -63,7 +63,8 @@ export function SwipeNavigation({ children }: { children: React.ReactNode }) {
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: direction > 0 ? '-40%' : direction < 0 ? '40%' : 0, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 340, damping: 32, mass: 0.9 }}
-          className="flex-1 flex flex-col min-h-0 w-full absolute inset-0"
+          className="flex-1 flex flex-col min-h-0 w-full absolute inset-0 overflow-y-auto overflow-x-hidden"
+          style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {children}
         </motion.div>
