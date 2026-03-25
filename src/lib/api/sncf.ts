@@ -10,7 +10,7 @@
 const BASE_V2 = 'https://data.sncf.com/api/explore/v2.1/catalog/datasets'
 
 function hasNavitiaKey(): boolean {
-  return process.env.NEXT_PUBLIC_NAVITIA_ENABLED === 'true'
+  return false // Navitia supprimé — utiliser PRIM IDFM ou SNCF Open Data
 }
 
 export interface SNCFTrainStatus {
