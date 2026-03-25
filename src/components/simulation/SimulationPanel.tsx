@@ -1,12 +1,13 @@
 'use client'
 import { useState } from 'react'
-import { Play, Ban, TrafficCone, Bike, Gauge, Train, Calendar, ChevronDown, CheckCircle2 } from 'lucide-react'
+import { Play, Ban, TrafficCone, Bike, Gauge, Train, Calendar, Cpu } from 'lucide-react'
 import { useSimulationStore } from '@/store/simulationStore'
 import { useMapStore } from '@/store/mapStore'
 import { runSimulation } from '@/lib/engine/simulation.engine'
 import { platformConfig } from '@/config/platform.config'
 import { cn } from '@/lib/utils/cn'
-import type { ScenarioType } from '@/types'
+import { predictiveApi, scenarioToEventType, scenarioRadius } from '@/lib/api/predictive'
+import type { ScenarioType, SimulationResult } from '@/types'
 
 import { useTranslation } from '@/lib/hooks/useTranslation'
 
@@ -19,26 +20,75 @@ const ICONS: Record<ScenarioType, typeof Play> = {
   event:            Calendar,
 }
 
+/** Try to apply the scenario on the predictive backend and return route delta. */
+async function runPredictiveStrategy(
+  cityCenter: { lat: number; lng: number },
+  scenarioType: ScenarioType,
+  scenarioName: string,
+  magnitude: number,
+) {
+  const health = await predictiveApi.health()
+  if (!health?.online || !health?.graph_loaded) return undefined
+
+  // Reset previous state, then apply scenario
+  await predictiveApi.resetSimulation()
+  const eventType = scenarioToEventType(scenarioType)
+  const radius    = scenarioRadius(scenarioType, magnitude)
+  await predictiveApi.addEvent(cityCenter, eventType, radius, scenarioName)
+
+  // Compare a representative route (city center → ~500 m NE)
+  const start = cityCenter
+  const end   = { lat: cityCenter.lat + 0.005, lng: cityCenter.lng + 0.005 }
+  const cmp   = await predictiveApi.compareRoutes(start, end)
+
+  if (!cmp.delta) return undefined
+  return {
+    normal:    { total_distance_m: cmp.normal.total_distance_m, total_time_s: cmp.normal.total_time_s },
+    simulated: { total_distance_m: cmp.simulated.total_distance_m, total_time_s: cmp.simulated.total_time_s },
+    delta:     cmp.delta,
+  }
+}
+
 export function SimulationPanel() {
   const { t } = useTranslation()
   const city          = useMapStore(s => s.city)
   const store         = useSimulationStore()
-  const [expanded, setExpanded] = useState<string | null>(null)
-
   const scenarioTypes = platformConfig.simulation.scenarioTypes
   const cfg           = platformConfig.simulation.scenarioConfig
+
+  const [backendActive, setBackendActive] = useState(false)
 
   const handleRun = async () => {
     if (store.isRunning) return
     store.setRunning(true)
     store.setProgress(0)
     store.setCurrentResult(null)
+    setBackendActive(false)
 
     try {
       const scenario = store.buildScenario()
-      const result   = await runSimulation(city, scenario, (pct) => store.setProgress(pct))
-      store.addResult(result)
-      store.setCurrentResult(result)
+
+      // 1. Try predictive backend (non-blocking fallback)
+      let predictive: SimulationResult['predictive'] | undefined
+      try {
+        predictive = await runPredictiveStrategy(
+          city.center,
+          store.scenarioType,
+          scenario.name,
+          store.magnitude,
+        )
+        if (predictive) setBackendActive(true)
+      } catch {
+        // Backend unavailable — graceful degradation to synthetic engine
+      }
+
+      // 2. Run synthetic engine for KPI metrics (always)
+      const result = await runSimulation(city, scenario, (pct) => store.setProgress(pct))
+
+      const finalResult: SimulationResult = predictive ? { ...result, predictive } : result
+
+      store.addResult(finalResult)
+      store.setCurrentResult(finalResult)
     } finally {
       store.setRunning(false)
     }
@@ -193,6 +243,13 @@ export function SimulationPanel() {
           </>
         )}
       </button>
+
+      {backendActive && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-green/10 border border-brand-green/25 text-brand-green text-[10px] font-semibold">
+          <Cpu className="w-3 h-3" />
+          Moteur prédictif OSM activé
+        </div>
+      )}
 
       {store.isRunning && (
         <div className="h-1.5 rounded-full bg-bg-subtle overflow-hidden">

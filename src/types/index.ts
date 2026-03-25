@@ -155,6 +155,12 @@ export interface SimulationResult {
   }
   alternativePaths: number
   completedAt?: string
+  /** Route comparison from the FastAPI predictive backend (optional) */
+  predictive?: {
+    normal:    { total_distance_m: number; total_time_s: number }
+    simulated: { total_distance_m: number; total_time_s: number }
+    delta:     { distance_m: number; time_s: number; avoided_edges: string[]; added_edges: string[] }
+  }
 }
 
 // ─── KPIs ─────────────────────────────────────────────────────────────────────
