@@ -417,7 +417,13 @@ export function CrossFlowMap() {
   useEffect(() => {
     if (!mapLoaded || cityBoundary) return
     fetchCityBoundary(city.name, city.country).then(b => {
-      if (b) setCityBoundary(b)
+      if (b) {
+        setCityBoundary({
+          type: 'Feature',
+          geometry: b,
+          properties: {}
+        } as GeoJSON.Feature)
+      }
     })
   }, [mapLoaded]) // eslint-disable-line
 
@@ -560,9 +566,32 @@ export function CrossFlowMap() {
     src.setData({ type: 'FeatureCollection', features: [] }) // clear while loading
     if (!city.bbox) return
 
-    fetchCityDistricts(city.bbox).then(fc => {
+    fetchCityDistricts(city.center.lat, city.center.lng).then(districts => {
       const s = map.getSource(DISTRICTS_SOURCE) as maplibregl.GeoJSONSource | undefined
-      if (s) s.setData(fc)
+      if (s) {
+        const fc: GeoJSON.FeatureCollection = {
+          type: 'FeatureCollection',
+          features: districts.map(d => ({
+            type: 'Feature',
+            geometry: {
+              type: 'Polygon',
+              coordinates: [[
+                [d.bbox[0], d.bbox[1]],
+                [d.bbox[2], d.bbox[1]],
+                [d.bbox[2], d.bbox[3]],
+                [d.bbox[0], d.bbox[3]],
+                [d.bbox[0], d.bbox[1]]
+              ]]
+            },
+            properties: {
+              name: d.name,
+              density: Math.random() * 0.8 + 0.1, // Fake density between 10% and 90%
+              admin_level: 9
+            }
+          }))
+        }
+        s.setData(fc)
+      }
     })
   }, [city, mapLoaded]) // eslint-disable-line
 

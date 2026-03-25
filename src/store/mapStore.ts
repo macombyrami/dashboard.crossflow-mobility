@@ -104,7 +104,13 @@ export const useMapStore = create<MapStore>()(
         set({ cityBoundary: null })
         const boundary = await fetchCityBoundary(city.name, city.country)
         if (boundary) {
-          set({ cityBoundary: boundary })
+          set({
+            cityBoundary: {
+              type: 'Feature',
+              geometry: boundary,
+              properties: {}
+            } as GeoJSON.Feature
+          })
         }
       },
       setCityBoundary: (boundary) => set({ cityBoundary: boundary }),

@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import aiData from '@/lib/data/ai.json'
+import appData from '@/lib/data/app.json'
 
 const OPENROUTER_BASE = aiData.openrouter.baseUrl
 const DEFAULT_MODEL   = aiData.openrouter.defaultModel
