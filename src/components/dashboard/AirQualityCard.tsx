@@ -43,11 +43,11 @@ export function AirQualityCard({ aq }: { aq: AirQuality }) {
         <PollutantItem label="SO₂"    value={aq.so2}   unit="µg/m³" warn={aq.so2 > 20}   />
       </div>
 
-      {/* Traffic impact */}
+      {/* Traffic impact from air pollution (distinct from weather impact) */}
       {aq.trafficImpact > 0 && (
         <div className="flex items-center justify-between bg-bg-subtle rounded-xl px-3 py-2">
-          <span className="text-xs text-text-muted">Impact trafic (pollution)</span>
-          <span className="text-xs font-semibold text-[#FF6D00]">+{Math.round(aq.trafficImpact * 100)}% congestion</span>
+          <span className="text-xs text-text-muted">Pollution → congestion estimée</span>
+          <span className="text-xs font-semibold text-[#FF6D00]">+{Math.round(aq.trafficImpact * 100)}%</span>
         </div>
       )}
 

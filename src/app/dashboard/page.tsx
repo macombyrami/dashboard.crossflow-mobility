@@ -199,9 +199,9 @@ export default function DashboardPage() {
             </div>
             <div className="w-[1px] h-6 sm:h-8 bg-white/5 hidden xs:block" />
             <div className="flex-col items-end hidden xs:flex">
-              <p className="text-[8px] sm:text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Impact Météo</p>
+              <p className="text-[8px] sm:text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Météo → Trafic</p>
               <p className={cn("text-[11px] sm:text-[13px] font-bold tabular-nums", openMeteoWeather?.trafficImpact === 'none' ? 'text-brand' : 'text-orange-500')}>
-                {openMeteoWeather?.trafficImpact.toUpperCase() || 'N/A'}
+                {openMeteoWeather?.trafficImpact === 'none' ? 'Aucun' : openMeteoWeather?.trafficImpact.toUpperCase() || 'N/A'}
               </p>
             </div>
           </div>
@@ -235,7 +235,7 @@ export default function DashboardPage() {
           sub="Avg trip duration"
         />
         <KPICard
-          label={t('dashboard.pollution')}
+          label="Congestion-Pollution"
           value={kpis.pollutionIndex.toFixed(1)}
           unit="/ 10"
           delta={pollDelta}
@@ -244,7 +244,7 @@ export default function DashboardPage() {
           icon={Wind}
           color={pollColor}
           warning={pollWarn}
-          sub={pollutionLabel(kpis.pollutionIndex).label}
+          sub={`Indice trafic · ${pollutionLabel(kpis.pollutionIndex).label}`}
         />
         <KPICard
           label={t('dashboard.active_incidents')}

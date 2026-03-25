@@ -188,10 +188,11 @@ out geom;`
       let ring: [number, number][] | null = null
 
       if (el.type === 'way' && el.geometry?.length >= 3) {
-        ring = el.geometry.map((p: any) => [p.lon, p.lat] as [number, number])
-        if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) {
-          ring.push(ring[0])
+        const coords: [number, number][] = el.geometry.map((p: any) => [p.lon, p.lat] as [number, number])
+        if (coords[0][0] !== coords[coords.length - 1][0] || coords[0][1] !== coords[coords.length - 1][1]) {
+          coords.push(coords[0])
         }
+        ring = coords
       } else if (el.type === 'relation') {
         const outerWays = (el.members ?? []).filter((m: any) => m.role === 'outer' && m.geometry?.length)
         if (outerWays.length === 0) continue

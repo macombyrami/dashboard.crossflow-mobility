@@ -5,7 +5,14 @@ import { SeverityPill } from '@/components/ui/SeverityPill'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { generateIncidents, generateCityKPIs } from '@/lib/engine/traffic.engine'
-import { generateSytadinKPIs, generateSytadinTravelTimes, injectSytadinIncidents } from '@/lib/engine/sytadin.engine'
+import {
+  fetchSytadinKPIs,
+  generateSytadinKPIs,
+  generateSytadinTravelTimes,
+  fetchAndInjectSytadinIncidents,
+  injectSytadinIncidents,
+  isIdfCity,
+} from '@/lib/engine/sytadin.engine'
 import { exportToCsv } from '@/lib/utils/export'
 import { formatDistanceToNow } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -40,14 +47,19 @@ export default function IncidentsPage() {
     setMounted(true)
   }, [])
 
-  const refresh = () => {
-    if (city.id === 'paris') {
-      const sytadinKpi = generateSytadinKPIs(city)
-      setSytadinData(sytadinKpi)
+  const refresh = async () => {
+    if (isIdfCity(city)) {
+      // Try live Sytadin data first, fall back to synthetic
+      const [kpi] = await Promise.all([
+        fetchSytadinKPIs().catch(() => generateSytadinKPIs(city)),
+      ])
+      setSytadinData(kpi)
       setTravelTimes(generateSytadinTravelTimes())
-      
-      const baseIncidents = dataSource === 'live' ? incidents : generateIncidents(city)
-      setIncidents(injectSytadinIncidents(city, baseIncidents))
+
+      const base = dataSource === 'live' ? incidents : generateIncidents(city)
+      const merged = await fetchAndInjectSytadinIncidents(city, base)
+        .catch(() => injectSytadinIncidents(city, base))
+      setIncidents(merged)
     } else {
       setSytadinData(null)
       setTravelTimes([])
@@ -55,7 +67,7 @@ export default function IncidentsPage() {
         setIncidents(generateIncidents(city))
       }
     }
-    
+
     if (dataSource !== 'live') {
       setKPIs(generateCityKPIs(city))
     }
@@ -64,7 +76,7 @@ export default function IncidentsPage() {
 
   useEffect(() => {
     refresh()
-    const interval = setInterval(refresh, 60_000)
+    const interval = setInterval(refresh, 180_000) // 3 min — matches Sytadin refresh rate
     return () => clearInterval(interval)
   }, [city.id, dataSource]) // eslint-disable-line
 
@@ -130,8 +142,8 @@ export default function IncidentsPage() {
         </div>
       </div>
 
-      {/* Sytadin Dashboard (Paris Only) */}
-      {city.id === 'paris' && sytadinData && (
+      {/* Sytadin Dashboard (IDF cities) */}
+      {isIdfCity(city) && sytadinData && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-slide-up" style={{ animationDelay: '0.1s' }}>
           {/* Main KPI */}
           <div className="lg:col-span-1 glass-card p-6 flex flex-col justify-between relative overflow-hidden group">
@@ -139,9 +151,23 @@ export default function IncidentsPage() {
               <Zap className="w-16 h-16 text-brand" />
             </div>
             <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
                 <span className="text-[11px] font-bold text-brand uppercase tracking-[0.2em]">Sytadin — IDF</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+                {sytadinData.source === 'live' ? (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-brand/10 border border-brand/30 text-brand uppercase tracking-wider">
+                    Live sytadin.fr
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-muted uppercase tracking-wider">
+                    Estimé
+                  </span>
+                )}
+                {sytadinData.degraded && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 uppercase tracking-wider">
+                    Mode dégradé
+                  </span>
+                )}
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-5xl font-bold text-white tabular-nums">{sytadinData.totalCongestionKm}</span>
