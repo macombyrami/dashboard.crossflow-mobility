@@ -12,6 +12,7 @@ import type { TrafficLine, LineType } from '@/lib/api/ratp'
 import { cn } from '@/lib/utils/cn'
 import { formatDistanceToNow } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import transportData from '@/lib/data/transport.json'
 
 // ─── Transit traffic metrics ──────────────────────────────────────────────────
 
@@ -23,14 +24,8 @@ interface TransitMetrics {
   paxPerHour:   number   // estimated passengers/h right now
 }
 
-const ROUTE_BASES: Record<string, { rushFreq: number; offFreq: number; rushCap: number; offCap: number }> = {
-  subway:   { rushFreq: 3,  offFreq: 7,  rushCap: 38000, offCap: 12000 },
-  train:    { rushFreq: 6,  offFreq: 15, rushCap: 22000, offCap: 7000  },
-  tram:     { rushFreq: 5,  offFreq: 10, rushCap: 5500,  offCap: 2000  },
-  bus:      { rushFreq: 8,  offFreq: 16, rushCap: 1800,  offCap: 700   },
-  monorail: { rushFreq: 4,  offFreq: 9,  rushCap: 9000,  offCap: 3000  },
-  ferry:    { rushFreq: 15, offFreq: 30, rushCap: 600,   offCap: 200   },
-}
+const ROUTE_BASES: Record<string, { rushFreq: number; offFreq: number; rushCap: number; offCap: number }> =
+  transportData.routeBases
 
 function getMetrics(routeType: string, lineKey: string, now: Date): TransitMetrics {
   const h   = now.getHours()
@@ -79,13 +74,11 @@ const STATUS_CONFIG = {
   inconnu:    { icon: HelpCircle,    color: '#6B7280', bg: 'rgba(107,114,128,0.1)', border: 'rgba(107,114,128,0.2)', label: 'Inconnu' },
 } as const
 
-const TYPE_LABELS: Record<LineType, string> = {
-  metros: 'Métro', rers: 'RER', tramways: 'Tramway', buses: 'Bus', noctiliens: 'Noctilien',
-}
+const TYPE_LABELS: Record<LineType, string> = Object.fromEntries(
+  Object.entries(transportData.networkCategories).map(([k, v]) => [k, v.label])
+) as Record<LineType, string>
 
-const ROUTE_LABELS: Record<string, string> = {
-  bus: 'Bus', tram: 'Tramway', subway: 'Métro', train: 'Train', monorail: 'Monorail', ferry: 'Ferry',
-}
+const ROUTE_LABELS: Record<string, string> = transportData.typeLabels
 
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

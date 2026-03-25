@@ -8,6 +8,8 @@ import { Brain, Zap, Users, TrendingUp, AlertTriangle, CheckCircle, RotateCcw, C
 import { useMiroFish, CONFIG_MODES, type ModeSimulation } from '@/hooks/useMiroFish'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
+import appData from '@/lib/data/app.json'
+import aiData from '@/lib/data/ai.json'
 import { useSimulationStore } from '@/store/simulationStore'
 import { cn } from '@/lib/utils/cn'
 import type { MiroFishResult } from '@/app/api/simulation/mirofish/route'
@@ -152,7 +154,7 @@ function PanneauConfig({
         </div>
         <div>
           <p className="text-sm font-bold text-white">Simulation IA Multi-Agents</p>
-          <p className="text-[10px] text-purple-300/70">MiroFish × CrossFlow · OpenAI GPT-OSS 120B (Free)</p>
+          <p className="text-[10px] text-purple-300/70">MiroFish × {appData.name} · {aiData.openrouter.miroFishModel}</p>
         </div>
       </div>
 

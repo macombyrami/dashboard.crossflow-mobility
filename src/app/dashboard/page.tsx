@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Activity, Clock, Wind, AlertTriangle, Network, Zap, Download } from 'lucide-react'
 import { KPICard } from '@/components/dashboard/KPICard'
 import { cn } from '@/lib/utils/cn'
+import appData from '@/lib/data/app.json'
 import { TrafficChart } from '@/components/dashboard/TrafficChart'
 import { IncidentFeed } from '@/components/dashboard/IncidentFeed'
 import { ModalSplitChart } from '@/components/dashboard/ModalSplitChart'
@@ -139,7 +140,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-3 sm:gap-4">
           <button
-            onClick={() => exportToPdf(`CrossFlow — ${city.name} Dashboard`)}
+            onClick={() => exportToPdf(`${appData.name} — ${city.name} Dashboard`)}
             className="print-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-xs text-text-secondary hover:text-text-primary"
           >
             <Download className="w-3.5 h-3.5" />

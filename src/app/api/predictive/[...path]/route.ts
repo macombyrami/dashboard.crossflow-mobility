@@ -3,8 +3,7 @@
  * Forwards all /api/predictive/* requests to the Python server.
  */
 import { NextRequest, NextResponse } from 'next/server'
-
-const BACKEND_URL = process.env.PREDICTIVE_BACKEND_URL ?? 'http://localhost:8000'
+import { BACKEND_URL } from '@/lib/app-config'
 
 async function proxy(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path: pathSegments } = await context.params

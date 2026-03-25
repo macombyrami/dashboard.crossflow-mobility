@@ -14,10 +14,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import personasData from '@/lib/data/personas.json'
 import aiData from '@/lib/data/ai.json'
+import appData from '@/lib/data/app.json'
 
 const OPENROUTER_BASE = aiData.openrouter.baseUrl
 const MODEL           = aiData.openrouter.miroFishModel
-const APP_URL         = process.env.NEXT_PUBLIC_APP_URL ?? 'https://myaccount.crossflow-mobility.com'
+const APP_URL         = process.env.NEXT_PUBLIC_APP_URL ?? appData.url
 const ZEP_BASE        = aiData.zep.baseUrl
 const X_TITLE         = aiData.openrouter.miroFishXTitle
 

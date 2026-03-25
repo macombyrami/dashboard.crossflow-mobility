@@ -3,8 +3,7 @@
  * Returns { online: boolean, ...backendInfo }
  */
 import { NextResponse } from 'next/server'
-
-const BACKEND_URL = process.env.PREDICTIVE_BACKEND_URL ?? 'http://localhost:8000'
+import { BACKEND_URL } from '@/lib/app-config'
 
 export async function GET() {
   try {

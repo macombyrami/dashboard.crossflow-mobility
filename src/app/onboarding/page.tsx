@@ -8,56 +8,26 @@ import {
   Car, CheckCircle2, ChevronRight, PenLine,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
+import type { LucideIcon } from 'lucide-react'
+import onboardingData from '@/lib/data/onboarding.json'
+import appData from '@/lib/data/app.json'
+
+// ─── Icon map ─────────────────────────────────────────────────────────────────
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  MapPin, Layers, PenLine, Brain, BarChart3, Car,
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Role = 'city_planner' | 'researcher' | 'operator' | 'other'
 
-const ROLES: { id: Role; label: string; emoji: string; desc: string }[] = [
-  { id: 'city_planner', label: 'Planificateur urbain',  emoji: '🏙️', desc: 'Gestion de la mobilité en ville' },
-  { id: 'researcher',   label: 'Chercheur / Analyste',  emoji: '🔬', desc: 'Études de flux et données trafic' },
-  { id: 'operator',     label: 'Opérateur transport',   emoji: '🚌', desc: 'Gestion de réseaux TC' },
-  { id: 'other',        label: 'Autre / Curieux',       emoji: '🌍', desc: 'Je découvre CrossFlow' },
-]
+const ROLES = onboardingData.roles as { id: Role; label: string; emoji: string; desc: string }[]
 
-const FEATURES = [
-  {
-    icon:  MapPin,
-    color: '#22C55E',
-    title: 'Carte trafic temps réel',
-    desc:  'Segments colorés sur les vraies rues avec données HERE & TomTom. Zoom, clic sur une route pour la vitesse instantanée.',
-  },
-  {
-    icon:  Layers,
-    color: '#3B82F6',
-    title: '3 modes de heatmap',
-    desc:  'Visualisez la congestion, le nombre de passages ou les émissions CO₂ par zone. Activez le calque Heatmap dans les contrôles.',
-  },
-  {
-    icon:  PenLine,
-    color: '#FACC15',
-    title: 'Outil Zone',
-    desc:  'Dessinez un polygone sur la carte et obtenez instantanément les stats agrégées : congestion, flux véhicules, CO₂ moyen.',
-  },
-  {
-    icon:  Brain,
-    color: '#A855F7',
-    title: 'Prévisions IA +30 min',
-    desc:  'Anticipez l\'évolution du trafic sur les 30 prochaines minutes. Passez en mode Prévision dans le sélecteur en haut.',
-  },
-  {
-    icon:  BarChart3,
-    color: '#F97316',
-    title: 'Dashboard KPIs',
-    desc:  'Météo réelle, qualité de l\'air, congestion globale, vitesse moyenne et modal split — tout en un coup d\'œil.',
-  },
-  {
-    icon:  Car,
-    color: '#EF4444',
-    title: 'Simulation de scénarios',
-    desc:  'Fermez une rue, ajoutez une piste cyclable ou réduisez la vitesse et mesurez l\'impact sur le réseau.',
-  },
-]
+const FEATURES = onboardingData.features.map(f => ({
+  ...f,
+  icon: ICON_MAP[f.iconName],
+}))
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -68,20 +38,20 @@ export default function OnboardingPage() {
   const [step,      setStep]      = useState(0) // 0=welcome, 1=city, 2=features, 3=done
   const [name,      setName]      = useState('')
   const [role,      setRole]      = useState<Role | null>(null)
-  const [cityId,    setCityId]    = useState('paris')
+  const [cityId,    setCityId]    = useState(onboardingData.defaultCityId)
   const [loading,   setLoading]   = useState(false)
 
   const selectedCity = CITIES.find(c => c.id === cityId) ?? CITIES[0]
 
-  const steps = ['Bienvenue', 'Votre ville', 'Fonctionnalités', 'C\'est parti !']
+  const steps = onboardingData.steps
 
   // ─── Step 0 : Welcome + name + role ────────────────────────────────────────
 
   const step0 = (
     <div className="space-y-10 animate-slide-up">
       <div className="space-y-3">
-        <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Bienvenue sur CrossFlow</h1>
-        <p className="text-[15px] font-medium text-text-secondary leading-relaxed">La plateforme de mobilité urbaine intelligente. Quelques secondes pour personnaliser votre expérience.</p>
+        <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{onboardingData.copy.welcomeTitle.replace('{appName}', appData.name)}</h1>
+        <p className="text-[15px] font-medium text-text-secondary leading-relaxed">{onboardingData.copy.welcomeDesc}</p>
       </div>
 
       <div className="space-y-3">
@@ -126,7 +96,7 @@ export default function OnboardingPage() {
     <div className="space-y-8 animate-slide-up">
       <div className="space-y-3">
         <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Votre ville principale</h2>
-        <p className="text-[15px] font-medium text-text-secondary leading-relaxed">CrossFlow s'adapte à chaque ville. Choisissez celle que vous gérez ou analysez en priorité.</p>
+        <p className="text-[15px] font-medium text-text-secondary leading-relaxed">{onboardingData.copy.cityDesc.replace('{appName}', appData.name)}</p>
       </div>
 
       <div className="grid gap-3 max-h-[420px] overflow-y-auto pr-2 custom-scrollbar">
@@ -163,7 +133,7 @@ export default function OnboardingPage() {
     <div className="space-y-8 animate-slide-up">
       <div className="space-y-3">
         <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Ce que vous pouvez faire</h2>
-        <p className="text-[15px] font-medium text-text-secondary leading-relaxed">CrossFlow réunit trafic temps réel, IA prédictive et simulation en une seule interface.</p>
+        <p className="text-[15px] font-medium text-text-secondary leading-relaxed">{onboardingData.copy.featuresDesc.replace('{appName}', appData.name)}</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -198,7 +168,7 @@ export default function OnboardingPage() {
           Tout est prêt{name ? `, ${name}` : ''} !
         </h2>
         <p className="text-[15px] font-medium text-text-secondary leading-relaxed max-w-md mx-auto">
-          CrossFlow est configuré sur <span className="text-brand font-bold tracking-tight">{selectedCity.flag} {selectedCity.name}</span> —
+          {onboardingData.copy.readyDesc.replace('{appName}', appData.name).replace('{city}', '')}<span className="text-brand font-bold tracking-tight">{selectedCity.flag} {selectedCity.name}</span> —
           votre centre opérationnel principal.
         </p>
       </div>
@@ -267,7 +237,7 @@ export default function OnboardingPage() {
           <div className="w-9 h-9 rounded-xl bg-brand-green flex items-center justify-center">
             <Zap className="w-5 h-5 text-black" strokeWidth={2.5} />
           </div>
-          <span className="text-lg font-bold text-text-primary">CrossFlow</span>
+          <span className="text-lg font-bold text-text-primary">{appData.name}</span>
         </div>
 
         {/* Step progress */}
@@ -319,7 +289,7 @@ export default function OnboardingPage() {
               {loading ? (
                 <span className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
               ) : step === 3 ? (
-                <><Zap className="w-5 h-5 fill-black" /> Lancer CrossFlow</>
+                <><Zap className="w-5 h-5 fill-black" /> {onboardingData.copy.launchButton.replace('{appName}', appData.name)}</>
               ) : (
                 <>Suivant <ArrowRight className="w-5 h-5" /></>
               )}

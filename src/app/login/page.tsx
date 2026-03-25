@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getAuthCallbackUrl } from '@/lib/utils/url'
 import { Zap, Mail, Lock, Loader2, ArrowRight } from 'lucide-react'
+import appData from '@/lib/data/app.json'
 
 function LoginForm() {
   const [email, setEmail] = useState('')
@@ -68,7 +69,7 @@ function LoginForm() {
         <div className="mb-6">
           <h2 className="heading-2 mb-1">{isSignUp ? 'Créer un compte' : 'Bienvenue'}</h2>
           <p className="text-text-secondary text-sm">
-            {isSignUp ? 'Rejoignez la plateforme CrossFlow' : 'Connectez-vous pour accéder au dashboard'}
+            {isSignUp ? `Rejoignez la plateforme ${appData.name}` : 'Connectez-vous pour accéder au dashboard'}
           </p>
         </div>
 
@@ -157,8 +158,8 @@ export default function LoginPage() {
           <div className="w-14 h-14 rounded-2xl bg-brand flex items-center justify-center shadow-[0_0_40px_rgba(34,197,94,0.3)] mb-4">
             <Zap className="w-8 h-8 text-black" strokeWidth={2.5} />
           </div>
-          <h1 className="display text-center mb-1">CrossFlow</h1>
-          <p className="text-text-secondary text-sm">Gestion intelligente de la mobilité urbaine</p>
+          <h1 className="display text-center mb-1">{appData.name}</h1>
+          <p className="text-text-secondary text-sm">{appData.description}</p>
         </div>
 
         <Suspense fallback={

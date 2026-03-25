@@ -5,10 +5,11 @@
  *   1. NEXT_PUBLIC_APP_URL (défini en prod sur Vercel)
  *   2. VERCEL_URL (injecté automatiquement par Vercel, sans https://)
  *   3. window.location.origin (client-side dev fallback)
- *   4. http://localhost:3000 (ultime fallback SSR)
+ *   4. DEV_FALLBACK_URL from app-config (ultime fallback SSR)
  *
  * ⚠️  Ne jamais exposer de secrets ici — tout est NEXT_PUBLIC_*.
  */
+import { DEV_FALLBACK_URL } from '@/lib/app-config'
 
 export function getBaseUrl(): string {
   // 1. Variable explicite en production (toujours prioritaire)
@@ -28,7 +29,7 @@ export function getBaseUrl(): string {
   }
 
   // 4. SSR dev fallback
-  return 'http://localhost:3000'
+  return DEV_FALLBACK_URL
 }
 
 /**

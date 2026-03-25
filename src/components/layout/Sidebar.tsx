@@ -4,21 +4,24 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
+import type { LucideIcon } from 'lucide-react'
 import {
   Map, LayoutDashboard, TrendingUp, Activity,
   GitBranch, AlertTriangle, Settings, Zap,
   LogOut, UserCircle, Loader2, Rss,
 } from 'lucide-react'
+import navData from '@/lib/data/navigation.json'
+import appData from '@/lib/data/app.json'
 
-const NAV_ITEMS = [
-  { href: '/map',        icon: Map,             label: 'Carte',      description: 'Trafic temps réel', ariaLabel: 'Carte du trafic en temps réel' },
-  { href: '/dashboard',  icon: LayoutDashboard, label: 'Tableau',    description: 'Métriques & KPIs',  ariaLabel: 'Tableau de bord et métriques KPI' },
-  { href: '/prediction', icon: TrendingUp,      label: 'Prévisions', description: 'Modèle prédictif', ariaLabel: 'Prévisions et modèle prédictif' },
-  { href: '/simulation', icon: GitBranch,       label: 'Simulation', description: 'Scénarios',        ariaLabel: 'Simulation de scénarios de trafic' },
-  { href: '/transport',  icon: Activity,        label: 'Transport',  description: 'Réseau TC',        ariaLabel: 'Réseau de transport en commun' },
-  { href: '/incidents',  icon: AlertTriangle,   label: 'Incidents',  description: 'Alertes actives',  ariaLabel: 'Alertes et incidents actifs' },
-  { href: '/social',     icon: Rss,             label: 'Social',     description: '@Sytadin · IDF',   ariaLabel: 'Feed social trafic Île-de-France' },
-]
+const ICON_MAP: Record<string, LucideIcon> = {
+  Map, LayoutDashboard, TrendingUp, Activity,
+  GitBranch, AlertTriangle, Rss,
+}
+
+const NAV_ITEMS = navData.map(item => ({
+  ...item,
+  icon: ICON_MAP[item.iconName],
+}))
 
 export function Sidebar() {
   const pathname    = usePathname()
@@ -69,7 +72,7 @@ export function Sidebar() {
           </div>
         </div>
         <div>
-          <div className="text-[14px] font-bold text-text-primary tracking-tight leading-none">CrossFlow</div>
+          <div className="text-[14px] font-bold text-text-primary tracking-tight leading-none">{appData.name}</div>
           <div className="text-[10px] font-bold text-text-muted mt-1 leading-none uppercase tracking-widest">Smart City</div>
         </div>
       </div>

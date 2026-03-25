@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { USER_AGENT_FULL } from '@/lib/app-config'
 
 const ENDPOINTS = {
   alerts:     'https://www.sytadin.fr/refreshed/alert_block.jsp.html',
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
   try {
     const res = await fetch(url, {
       headers: {
-        'User-Agent':      'CrossFlow-Mobility/1.0 (traffic dashboard; contact@crossflow-mobility.com)',
+        'User-Agent':      USER_AGENT_FULL,
         'Accept-Language': 'fr-FR,fr;q=0.9',
         'Accept':          'text/html,application/xhtml+xml',
       },

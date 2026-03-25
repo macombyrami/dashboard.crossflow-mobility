@@ -5,8 +5,8 @@ import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { cn } from '@/lib/utils/cn'
 import { isPointInPolygon, isSegmentInPolygon } from '@/lib/utils/spatial'
-
 import { useTranslation } from '@/lib/hooks/useTranslation'
+import appData from '@/lib/data/app.json'
 
 interface Message {
   role:    'user' | 'assistant'
@@ -87,7 +87,7 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
       avgTravelMin:    kpis?.avgTravelMin,
       pollutionIndex:  kpis?.pollutionIndex,
       activeIncidents: kpis?.activeIncidents,
-      dataSource:      dataSource === 'live' ? 'TomTom Live' : 'CrossFlow Engine',
+      dataSource:      dataSource === 'live' ? 'TomTom Live' : `${appData.name} Engine`,
       zone:            zoneContext,
       weather: openMeteoWeather ? {
         emoji:         openMeteoWeather.weatherEmoji,
@@ -163,7 +163,7 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
             <BrainCircuit className="w-3.5 h-3.5 text-brand-green" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-text-primary">CrossFlow AI</p>
+            <p className="text-sm font-semibold text-text-primary">{appData.name} AI</p>
             <p className="text-[10px] text-text-muted">via OpenRouter</p>
           </div>
         </div>
