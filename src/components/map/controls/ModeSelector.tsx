@@ -23,16 +23,16 @@ export function ModeSelector() {
             key={id}
             onClick={() => setMode(id)}
             className={cn(
-              'flex items-center gap-2.5 px-5 py-2 rounded-apple text-[13px] font-semibold transition-all duration-300 relative group overflow-hidden',
+              'flex items-center gap-2.5 px-5 py-2 rounded-apple text-[13px] font-semibold transition-all duration-300 relative group overflow-hidden border-2',
               active
-                ? 'bg-brand-green text-bg-base shadow-glow'
-                : 'text-text-secondary hover:text-white hover:bg-white/5',
+                ? 'bg-brand-green/30 text-white shadow-glow border-white'
+                : 'text-text-secondary hover:text-white hover:bg-white/5 border-transparent',
             )}
           >
-            <Icon className={cn("w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110", active ? "text-bg-base" : "text-text-muted group-hover:text-text-secondary")} />
+            <Icon className={cn("w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110", active ? "text-white" : "text-text-muted group-hover:text-text-secondary")} />
             <div className="flex flex-col items-start translate-y-[-1px]">
-               <span className="tracking-tight leading-none">{label}</span>
-               <span className={cn('text-[9px] font-bold uppercase tracking-wider mt-1 opacity-60', active ? 'text-bg-base' : 'text-text-muted')}>
+               <span className="tracking-tight leading-none text-white">{label}</span>
+               <span className={cn('text-[9px] font-bold uppercase tracking-wider mt-1 transition-opacity', active ? 'text-white opacity-90' : 'text-text-muted opacity-60')}>
                  {sublabel}
                </span>
             </div>
