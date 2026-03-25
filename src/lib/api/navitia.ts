@@ -1,15 +1,11 @@
 /**
- * Navitia API — Transport multimodal
- * Gratuit avec inscription · Pas de CB
- * https://www.navitia.io — Obtenir une clé: navitia.io/register
+ * Transport multimodal IDF — remplace Navitia (offre freemium supprimée)
+ * Source: PRIM Île-de-France Mobilités (officiel, clé IDFM_API_KEY)
  *
- * Couvre: France entière, Europe (30+ pays)
- * Données: horaires, perturbations, itinéraires, arrêts
+ * Exports identiques à l'ancienne API Navitia pour éviter toute migration.
  */
 
-export function hasKey(): boolean {
-  return process.env.NEXT_PUBLIC_NAVITIA_ENABLED === 'true'
-}
+// ─── Types (compatibilité Navitia) ────────────────────────────────────────────
 
 export interface NavitiaDisruption {
   id:          string
@@ -38,133 +34,48 @@ export interface NavitiaDeparture {
   direction:     string
   departureTime: string
   realtime:      boolean
-  delay:         number // seconds
+  delay:         number
 }
 
-// ─── Region detection ──────────────────────────────────────────────────────
+// ─── Key check ────────────────────────────────────────────────────────────────
 
-function getCoverageForCoords(lat: number, lng: number): string {
-  // France
-  if (lat > 41 && lat < 52 && lng > -6 && lng < 10)  return 'fr-idf'
-  // Île-de-France specifically
-  if (lat > 48.1 && lat < 49.3 && lng > 1.4 && lng < 3.6) return 'fr-idf'
-  // UK
-  if (lat > 49 && lat < 61 && lng > -8 && lng < 2)   return 'gb-london'
-  // Default Europe
-  return 'fr-idf'
+export function hasKey(): boolean {
+  // PRIM IDFM remplace Navitia — clé serveur, toujours active si configurée
+  return typeof window !== 'undefined' // côté client on assume actif (clé serveur)
+    ? true
+    : Boolean(process.env.IDFM_API_KEY)
 }
 
-// ─── Disruptions in area ───────────────────────────────────────────────────
+// ─── Disruptions via PRIM (proxy /api/prim-disruptions) ──────────────────────
 
 export async function fetchDisruptions(
   lat: number,
   lng: number,
-  radiusM = 5000,
+  _radiusM = 5000,
 ): Promise<NavitiaDisruption[]> {
-  if (!hasKey()) return []
+  // PRIM couvre toute l'IDF — on filtre sur la zone Paris/IDF
+  const isIDF = lat > 48.1 && lat < 49.3 && lng > 1.4 && lng < 3.6
+  if (!isIDF) return []
 
-  const coverage = getCoverageForCoords(lat, lng)
   try {
-    const res = await fetch(
-      `/api/navitia/coverage/${coverage}/disruptions?count=50&since=${new Date().toISOString()}`,
-      { signal: AbortSignal.timeout(6000) },
-    )
+    const res = await fetch('/api/prim-disruptions', {
+      signal: AbortSignal.timeout(8000),
+    })
     if (!res.ok) return []
     const data = await res.json()
-
-    return (data.disruptions ?? [])
-      .filter((d: any) => d.status === 'active')
-      .map((d: any): NavitiaDisruption => ({
-        id:       d.id,
-        status:   d.status,
-        severity: {
-          name:     d.severity?.name ?? 'Inconnu',
-          effect:   d.severity?.effect ?? '',
-          color:    `#${d.severity?.color ?? 'FF6D00'}`,
-          priority: d.severity?.priority ?? 5,
-        },
-        title:    d.messages?.[0]?.text ?? 'Perturbation',
-        message:  d.messages?.[1]?.text ?? d.messages?.[0]?.text ?? '',
-        lines:    (d.impacted_objects ?? [])
-          .filter((o: any) => o.pt_object?.embedded_type === 'line')
-          .map((o: any) => ({
-            id:    o.pt_object.id,
-            name:  o.pt_object.line?.name ?? '',
-            code:  o.pt_object.line?.code ?? '',
-            color: `#${o.pt_object.line?.color ?? '8080A0'}`,
-            mode:  o.pt_object.line?.physical_modes?.[0]?.name ?? '',
-          })),
-        startDate: d.application_periods?.[0]?.begin ?? '',
-        endDate:   d.application_periods?.[0]?.end   ?? '',
-        updatedAt: d.updated_at ?? '',
-      }))
-      .slice(0, 20)
+    return (data.disruptions ?? []) as NavitiaDisruption[]
   } catch {
     return []
   }
 }
 
-// ─── Next departures from nearest stop ────────────────────────────────────
+// ─── Next departures ──────────────────────────────────────────────────────────
+// PRIM stop-monitoring nécessite un MonitoringRef STIF (résolution par coords non supportée)
+// → Utiliser fetchNextPassages() dans ratp.ts pour les passages RATP.
 
 export async function fetchNextDepartures(
-  lat: number,
-  lng: number,
+  _lat: number,
+  _lng: number,
 ): Promise<NavitiaDeparture[]> {
-  if (!hasKey()) return []
-
-  const coverage = getCoverageForCoords(lat, lng)
-  try {
-    const res = await fetch(
-      `/api/navitia/coverage/${coverage}/coords/${lng};${lat}/departures?count=10&duration=3600`,
-      { signal: AbortSignal.timeout(6000) },
-    )
-    if (!res.ok) return []
-    const data = await res.json()
-
-    return (data.departures ?? []).map((d: any): NavitiaDeparture => {
-      const route   = d.route ?? {}
-      const line    = route.line ?? {}
-      const display = d.display_informations ?? {}
-      const st      = d.stop_date_time ?? {}
-
-      const baseTime = st.base_departure_date_time ?? ''
-      const realTime = st.departure_date_time ?? ''
-      const delay    = parseTimeDiff(baseTime, realTime)
-
-      return {
-        line: {
-          id:      line.id ?? '',
-          name:    display.headsign ?? line.name ?? '',
-          code:    display.label ?? line.code ?? '',
-          color:   `#${display.color ?? line.color ?? '8080A0'}`,
-          mode:    display.physical_mode ?? '',
-          network: display.network ?? '',
-        },
-        stopName:      d.stop_point?.name ?? '',
-        direction:     display.direction ?? '',
-        departureTime: formatNavitiaTime(realTime),
-        realtime:      st.data_freshness === 'realtime',
-        delay,
-      }
-    })
-  } catch {
-    return []
-  }
-}
-
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
-function formatNavitiaTime(navitiaDate: string): string {
-  // Format: 20240323T143000 → 14:30
-  if (!navitiaDate || navitiaDate.length < 15) return '--:--'
-  const h = navitiaDate.slice(9, 11)
-  const m = navitiaDate.slice(11, 13)
-  return `${h}:${m}`
-}
-
-function parseTimeDiff(base: string, real: string): number {
-  if (!base || !real) return 0
-  const parse = (s: string) =>
-    parseInt(s.slice(9, 11)) * 3600 + parseInt(s.slice(11, 13)) * 60 + parseInt(s.slice(13, 15))
-  return parse(real) - parse(base)
+  return []
 }
