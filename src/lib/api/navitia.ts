@@ -7,14 +7,8 @@
  * Données: horaires, perturbations, itinéraires, arrêts
  */
 
-const BASE = 'https://api.navitia.io/v1'
-
-function getKey(): string {
-  return process.env.NEXT_PUBLIC_NAVITIA_API_KEY ?? ''
-}
-
 export function hasKey(): boolean {
-  return Boolean(getKey())
+  return process.env.NEXT_PUBLIC_NAVITIA_ENABLED === 'true'
 }
 
 export interface NavitiaDisruption {
@@ -67,18 +61,13 @@ export async function fetchDisruptions(
   lng: number,
   radiusM = 5000,
 ): Promise<NavitiaDisruption[]> {
-  const key = getKey()
-  if (!key) return []
+  if (!hasKey()) return []
 
   const coverage = getCoverageForCoords(lat, lng)
   try {
     const res = await fetch(
-      `${BASE}/coverage/${coverage}/disruptions?count=50&since=${new Date().toISOString()}`,
-      {
-        headers: { Authorization: key },
-        signal:  AbortSignal.timeout(6000),
-        next:    { revalidate: 60 },
-      },
+      `/api/navitia/coverage/${coverage}/disruptions?count=50&since=${new Date().toISOString()}`,
+      { signal: AbortSignal.timeout(6000) },
     )
     if (!res.ok) return []
     const data = await res.json()
@@ -121,18 +110,13 @@ export async function fetchNextDepartures(
   lat: number,
   lng: number,
 ): Promise<NavitiaDeparture[]> {
-  const key = getKey()
-  if (!key) return []
+  if (!hasKey()) return []
 
   const coverage = getCoverageForCoords(lat, lng)
   try {
     const res = await fetch(
-      `${BASE}/coverage/${coverage}/coords/${lng};${lat}/departures?count=10&duration=3600`,
-      {
-        headers: { Authorization: key },
-        signal:  AbortSignal.timeout(6000),
-        next:    { revalidate: 30 },
-      },
+      `/api/navitia/coverage/${coverage}/coords/${lng};${lat}/departures?count=10&duration=3600`,
+      { signal: AbortSignal.timeout(6000) },
     )
     if (!res.ok) return []
     const data = await res.json()

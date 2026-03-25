@@ -44,7 +44,7 @@ export const platformConfig = {
   api: {
     tomtom: {
       baseUrl:  platformData.api.tomtom.baseUrl,
-      apiKey:   process.env.NEXT_PUBLIC_TOMTOM_API_KEY ?? '',
+      // apiKey removed — now server-side only via /api/tomtom/* proxies
       flowZoom: platformData.api.tomtom.flowZoom,
       tileSize: platformData.api.tomtom.tileSize,
     },

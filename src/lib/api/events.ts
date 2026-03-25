@@ -4,7 +4,7 @@
  *   - Que faire à Paris (opendata.paris.fr) — GRATUIT · Aucune clé
  *   - OpenAgenda IDF (openagenda.com/api)   — GRATUIT · Aucune clé
  *   - PredictHQ (predicthq.com)             — GRATUIT 100 req/jour avec clé
- *   - Ticketmaster Discovery API            — GRATUIT avec clé (NEXT_PUBLIC_TICKETMASTER_API_KEY)
+ *   - Ticketmaster Discovery API            — GRATUIT avec clé (TICKETMASTER_API_KEY server-side)
  *
  * Impact: concerts, matchs, manifs, congrès → pics de trafic localisés
  */
@@ -12,15 +12,12 @@
 const PARIS_EVENTS_BASE = 'https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/que-faire-a-paris-/records'
 const OPENAGENDA_BASE   = 'https://api.openagenda.com/v2/events'
 
-function getPredictHQKey(): string {
-  return process.env.NEXT_PUBLIC_PREDICTHQ_API_KEY ?? ''
-}
-function getTicketmasterKey(): string {
-  return process.env.NEXT_PUBLIC_TICKETMASTER_API_KEY ?? ''
+export function hasPredictHQKey(): boolean {
+  return process.env.NEXT_PUBLIC_PREDICTHQ_ENABLED === 'true'
 }
 
-export function hasPredictHQKey(): boolean {
-  return Boolean(getPredictHQKey())
+function hasTicketmasterKey(): boolean {
+  return process.env.NEXT_PUBLIC_TICKETMASTER_ENABLED === 'true'
 }
 
 export interface UrbanEvent {
@@ -172,48 +169,29 @@ export async function fetchTicketmasterEvents(
   lng: number,
   radiusKm = 15,
 ): Promise<UrbanEvent[]> {
-  const key = getTicketmasterKey()
-  if (!key) return []
+  if (!hasTicketmasterKey()) return []
 
   try {
-    const today    = new Date().toISOString().slice(0, 16) + ':00Z'
-    const in14days = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 16) + ':00Z'
-
-    const params = new URLSearchParams({
-      apikey:          key,
-      latlong:         `${lat},${lng}`,
-      radius:          radiusKm.toString(),
-      unit:            'km',
-      startDateTime:   today,
-      endDateTime:     in14days,
-      countryCode:     'FR',
-      sort:            'relevance,desc',
-      size:            '20',
+    const res = await fetch(`/api/events/ticketmaster?lat=${lat}&lng=${lng}&radius=${radiusKm}`, {
+      signal: AbortSignal.timeout(8_000),
     })
-
-    const res = await fetch(
-      `https://app.ticketmaster.com/discovery/v2/events.json?${params}`,
-      { signal: AbortSignal.timeout(6000), next: { revalidate: 3600 } },
-    )
     if (!res.ok) return []
-    const data = await res.json()
-    const raw  = data._embedded?.events ?? []
+    const raw = await res.json()
 
-    return raw.map((e: any): UrbanEvent => {
+    return (raw ?? []).map((e: any): UrbanEvent => {
       const venue = e._embedded?.venues?.[0]
       const elat  = parseFloat(venue?.location?.latitude  ?? lat)
       const elng  = parseFloat(venue?.location?.longitude ?? lng)
       const cat   = mapTicketmasterCategory(e.classifications?.[0]?.segment?.name ?? '')
       const dist  = haversine(lat, lng, elat, elng) / 1000
       return {
-        id:           `tm-${e.id}`,
-        title:         e.name,
-        category:      cat,
-        startDate:     e.dates?.start?.dateTime ?? e.dates?.start?.localDate ?? new Date().toISOString(),
-        endDate:       e.dates?.end?.dateTime   ?? e.dates?.start?.dateTime  ?? new Date().toISOString(),
+        id:        `tm-${e.id}`,
+        title:     e.name,
+        category:  cat,
+        startDate: e.dates?.start?.dateTime ?? e.dates?.start?.localDate ?? new Date().toISOString(),
+        endDate:   e.dates?.end?.dateTime   ?? e.dates?.start?.dateTime  ?? new Date().toISOString(),
         location: {
-          lat:      elat,
-          lng:      elng,
+          lat: elat, lng: elng,
           address:  venue ? `${venue.name}, ${venue.city?.name}` : 'France',
           district: venue?.postalCode,
         },
@@ -238,34 +216,16 @@ export async function fetchPredictHQEvents(
   lng: number,
   radiusKm = 10,
 ): Promise<UrbanEvent[]> {
-  const key = getPredictHQKey()
-  if (!key) return []
+  if (!hasPredictHQKey()) return []
 
   try {
-    const today   = new Date().toISOString().slice(0, 10)
-    const in7days = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
-
-    const params = new URLSearchParams({
-      'within':    `${radiusKm}km@${lat},${lng}`,
-      'start.gte': today,
-      'start.lte': in7days,
-      'sort':      '-rank',
-      'limit':     '20',
-      'category':  'concerts,sports,expos,community,conferences,disasters,public-holidays',
+    const res = await fetch(`/api/events/predicthq?lat=${lat}&lng=${lng}&radius=${radiusKm}`, {
+      signal: AbortSignal.timeout(8_000),
     })
-
-    const res = await fetch(
-      `https://api.predicthq.com/v1/events/?${params}`,
-      {
-        headers: { Authorization: `Bearer ${key}` },
-        signal:  AbortSignal.timeout(6000),
-        next:    { revalidate: 3600 },
-      },
-    )
     if (!res.ok) return []
-    const data = await res.json()
+    const results = await res.json()
 
-    return (data.results ?? []).map((e: any): UrbanEvent => {
+    return (results ?? []).map((e: any): UrbanEvent => {
       const [elng, elat] = e.location ?? [lng, lat]
       const cat  = mapPHQCategory(e.category)
       const dist = haversine(lat, lng, elat, elng) / 1000

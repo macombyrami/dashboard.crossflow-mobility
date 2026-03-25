@@ -4,7 +4,7 @@
  * https://openrouteservice.org
  *
  * Clé gratuite: openrouteservice.org/dev/#/login
- * Env: NEXT_PUBLIC_ORS_API_KEY
+ * Key is now server-side only — accessed via /api/ors/* proxy
  *
  * Données:
  * - Isochrones (zones accessibles en N minutes)
@@ -13,14 +13,8 @@
  * - Données d'élévation pour impact vélo
  */
 
-const BASE = 'https://api.openrouteservice.org'
-
-function getKey(): string {
-  return process.env.NEXT_PUBLIC_ORS_API_KEY ?? ''
-}
-
 export function hasORSKey(): boolean {
-  return Boolean(getKey())
+  return process.env.NEXT_PUBLIC_ORS_ENABLED === 'true'
 }
 
 export type ORSProfile = 'driving-car' | 'driving-hgv' | 'cycling-regular' | 'cycling-electric' | 'foot-walking' | 'foot-hiking'
@@ -58,18 +52,14 @@ export async function fetchIsochrone(
   rangesMin: number[] = [5, 10, 15],
   profile: ORSProfile = 'driving-car',
 ): Promise<Isochrone | null> {
-  const key = getKey()
-  if (!key) return null
+  if (!hasORSKey()) return null
 
   try {
     const res = await fetch(
-      `${BASE}/v2/isochrones/${profile}`,
+      `/api/ors/v2/isochrones/${profile}`,
       {
         method: 'POST',
-        headers: {
-          Authorization:  key,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           locations:  [[lng, lat]],
           range:      rangesMin.map(m => m * 60),  // → seconds
@@ -78,7 +68,6 @@ export async function fetchIsochrone(
           attributes: ['area', 'reachfactor'],
         }),
         signal: AbortSignal.timeout(8000),
-        next:   { revalidate: 300 },
       },
     )
     if (!res.ok) return null
@@ -102,18 +91,14 @@ export async function fetchRoute(
   to:   [number, number],
   profile: ORSProfile = 'driving-car',
 ): Promise<RouteResult | null> {
-  const key = getKey()
-  if (!key) return null
+  if (!hasORSKey()) return null
 
   try {
     const res = await fetch(
-      `${BASE}/v2/directions/${profile}/geojson`,
+      `/api/ors/v2/directions/${profile}/geojson`,
       {
         method: 'POST',
-        headers: {
-          Authorization:  key,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           coordinates:  [from, to],
           instructions: true,
@@ -121,7 +106,6 @@ export async function fetchRoute(
           extra_info:   ['waytype', 'surface'],
         }),
         signal: AbortSignal.timeout(8000),
-        next:   { revalidate: 120 },
       },
     )
     if (!res.ok) return null
@@ -163,26 +147,21 @@ export async function fetchMatrix(
   locations: [number, number][],  // [lng, lat][]
   profile: ORSProfile = 'driving-car',
 ): Promise<MatrixResult | null> {
-  const key = getKey()
-  if (!key) return null
+  if (!hasORSKey()) return null
   if (locations.length < 2 || locations.length > 50) return null
 
   try {
     const res = await fetch(
-      `${BASE}/v2/matrix/${profile}`,
+      `/api/ors/v2/matrix/${profile}`,
       {
         method: 'POST',
-        headers: {
-          Authorization:  key,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           locations,
           metrics:  ['duration', 'distance'],
           resolve_locations: false,
         }),
         signal: AbortSignal.timeout(10000),
-        next:   { revalidate: 300 },
       },
     )
     if (!res.ok) return null
@@ -208,25 +187,20 @@ export interface ElevationPoint {
 export async function fetchElevation(
   coords: [number, number][],  // [lng, lat][]
 ): Promise<ElevationPoint[]> {
-  const key = getKey()
-  if (!key) return []
+  if (!hasORSKey()) return []
 
   try {
     const res = await fetch(
-      `${BASE}/elevation/line`,
+      `/api/ors/elevation/line`,
       {
         method: 'POST',
-        headers: {
-          Authorization:  key,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           format_in:  'geojson',
           geometry:   { coordinates: coords, type: 'LineString' },
           format_out: 'geojson',
         }),
         signal: AbortSignal.timeout(6000),
-        next:   { revalidate: 86400 },
       },
     )
     if (!res.ok) return []

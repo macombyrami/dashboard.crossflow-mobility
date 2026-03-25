@@ -9,14 +9,8 @@
 
 import { hereFlowLimiter, hereIncidentsLimiter } from '@/lib/utils/rateLimiter'
 
-const BASE = 'https://data.traffic.hereapi.com/v7'
-
-function getKey(): string {
-  return process.env.NEXT_PUBLIC_HERE_API_KEY ?? ''
-}
-
 export function hasKey(): boolean {
-  return Boolean(getKey())
+  return process.env.NEXT_PUBLIC_HERE_ENABLED === 'true'
 }
 
 export interface HereFlowSegment {
@@ -51,23 +45,19 @@ export interface HereIncident {
 export async function fetchHereFlow(
   bbox: [number, number, number, number],
 ): Promise<HereFlowSegment[]> {
-  const key = getKey()
-  if (!key) return []
+  if (!hasKey()) return []
 
   await hereFlowLimiter.acquire()
   const [west, south, east, north] = bbox
   try {
     const res = await fetch(
-      `${BASE}/flow?locationReferencing=shape&in=bbox:${west},${south},${east},${north}&apiKey=${key}`,
-      {
-        signal: AbortSignal.timeout(8000),
-        next:   { revalidate: 30 },
-      },
+      `/api/here/flow?bbox=${west},${south},${east},${north}`,
+      { signal: AbortSignal.timeout(8000) },
     )
     if (!res.ok) return []
-    const data = await res.json()
+    const results = await res.json()
 
-    return (data.results ?? []).map((r: any): HereFlowSegment => {
+    return (results ?? []).map((r: any): HereFlowSegment => {
       const loc   = r.location ?? {}
       const flow  = r.currentFlow ?? {}
       const shape = loc.shape?.links?.flatMap((l: any) =>
@@ -95,22 +85,17 @@ export async function fetchHereFlow(
 export async function fetchHereIncidents(
   bbox: [number, number, number, number],
 ): Promise<HereIncident[]> {
-  const key = getKey()
-  if (!key) return []
+  if (!hasKey()) return []
 
   await hereIncidentsLimiter.acquire()
   const [west, south, east, north] = bbox
   try {
     const res = await fetch(
-      `https://incidents.traffic.ls.hereapi.com/traffic/6.3/incidents.json?bbox=${north},${west},${south},${east}&criticality=minor,major,critical&apiKey=${key}`,
-      {
-        signal: AbortSignal.timeout(8000),
-        next:   { revalidate: 60 },
-      },
+      `/api/here/incidents?bbox=${west},${south},${east},${north}`,
+      { signal: AbortSignal.timeout(8000) },
     )
     if (!res.ok) return []
-    const data = await res.json()
-    const items = data.TRAFFIC_ITEMS?.TRAFFIC_ITEM ?? []
+    const items = await res.json()
 
     return (Array.isArray(items) ? items : [items]).map((item: any): HereIncident => {
       const loc  = item.LOCATION?.GEO_NODE ?? {}
