@@ -6,39 +6,19 @@ import type { UrbanEvent } from '@/lib/api/events'
 import { generateEventsForCity, computeProximityImpact } from '@/lib/engine/events.engine'
 import { useMapStore } from '@/store/mapStore'
 import { cn } from '@/lib/utils/cn'
+import eventsData from '@/lib/data/events.json'
 
 // ─── Config ───────────────────────────────────────────────────────────────
 
 type Category = UrbanEvent['category'] | 'all'
 
-const TABS: { key: Category; label: string; emoji: string }[] = [
-  { key: 'all',          label: 'Tous',      emoji: '🗂' },
-  { key: 'concert',      label: 'Concerts',   emoji: '🎵' },
-  { key: 'festival',     label: 'Festivals',  emoji: '🎪' },
-  { key: 'sport',        label: 'Sports',     emoji: '⚽' },
-  { key: 'manifestation',label: 'Manifs',     emoji: '📢' },
-  { key: 'exposition',   label: 'Expos',      emoji: '🏛️' },
-  { key: 'congrès',      label: 'Congrès',    emoji: '🎙' },
-]
+const TABS = eventsData.tabs as { key: Category; label: string; emoji: string }[]
 
-const CATEGORY_CONFIG: Record<string, { emoji: string; color: string; bg: string }> = {
-  concert:        { emoji: '🎵', color: '#AF52DE', bg: 'rgba(175,82,222,0.14)' },
-  festival:       { emoji: '🎪', color: '#FF6B35', bg: 'rgba(255,107,53,0.14)'  },
-  sport:          { emoji: '⚽', color: '#0A84FF', bg: 'rgba(10,132,255,0.14)'  },
-  manifestation:  { emoji: '📢', color: '#FF453A', bg: 'rgba(255,69,58,0.14)'   },
-  exposition:     { emoji: '🏛️', color: '#64D2FF', bg: 'rgba(100,210,255,0.14)' },
-  marché:         { emoji: '🛒', color: '#FFD60A', bg: 'rgba(255,214,10,0.14)'  },
-  congrès:        { emoji: '🎙', color: '#FF9F0A', bg: 'rgba(255,159,10,0.14)'  },
-  autre:          { emoji: '📍', color: '#8E8E93', bg: 'rgba(142,142,147,0.14)' },
-}
+const CATEGORY_CONFIG: Record<string, { emoji: string; color: string; bg: string }> =
+  eventsData.categoryConfig
 
-const SOURCE_BADGE: Record<UrbanEvent['source'], { label: string; color: string }> = {
-  'paris-opendata':  { label: 'Paris OD',    color: '#0062FF' },
-  'openagenda':      { label: 'OpenAgenda',  color: '#6C47FF' },
-  'predicthq':       { label: 'PredictHQ',   color: '#22C55E' },
-  'ticketmaster':    { label: 'Ticketmaster',color: '#00A8E8' },
-  'crossflow-engine':{ label: 'CrossFlow',   color: '#FF9F0A' },
-}
+const SOURCE_BADGE: Record<UrbanEvent['source'], { label: string; color: string }> =
+  eventsData.sourceBadge as Record<UrbanEvent['source'], { label: string; color: string }>
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr)
@@ -46,10 +26,11 @@ function formatDate(dateStr: string): string {
 }
 
 function severityColor(score: number) {
-  if (score > 0.75) return { text: '#FF3B30', bg: 'rgba(255,59,48,0.12)',  border: 'rgba(255,59,48,0.25)' }
-  if (score > 0.5)  return { text: '#FF9F0A', bg: 'rgba(255,159,10,0.12)', border: 'rgba(255,159,10,0.25)' }
-  if (score > 0.25) return { text: '#FFD60A', bg: 'rgba(255,214,10,0.10)', border: 'rgba(255,214,10,0.20)' }
-  return              { text: '#22C55E', bg: 'rgba(34,197,94,0.10)',  border: 'rgba(34,197,94,0.20)' }
+  const t = eventsData.severityThresholds
+  if (score > t.high.min)   return { text: t.high.text,   bg: t.high.bg,   border: t.high.border   }
+  if (score > t.medium.min) return { text: t.medium.text, bg: t.medium.bg, border: t.medium.border }
+  if (score > t.low.min)    return { text: t.low.text,    bg: t.low.bg,    border: t.low.border    }
+  return                           { text: t.none.text,   bg: t.none.bg,   border: t.none.border   }
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────
