@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useMapStore } from '@/store/mapStore'
 import { CITIES } from '@/config/cities.config'
-import { Settings, MapPin, User, LogOut, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react'
+import { Settings, MapPin, User, LogOut, CheckCircle2, Loader2, ShieldCheck, Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 
@@ -20,6 +20,7 @@ export default function SettingsPage() {
   const [saving,       setSaving]       = useState(false)
   const [saved,        setSaved]        = useState(false)
   const [signingOut,   setSigningOut]   = useState(false)
+  const [search,       setSearch]       = useState('')
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -56,6 +57,12 @@ export default function SettingsPage() {
 
   const meta        = user?.user_metadata ?? {}
   const currentCity = CITIES.find(c => c.id === (lockedCityId ?? selectedCity))
+  const filteredCities = search.trim()
+    ? CITIES.filter(c =>
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.country.toLowerCase().includes(search.toLowerCase()),
+      )
+    : CITIES
 
   return (
     <main className="min-h-full p-6 space-y-6 max-w-2xl mx-auto w-full pb-safe">
@@ -126,8 +133,31 @@ export default function SettingsPage() {
             Votre tableau de bord et votre carte sont verrouillés sur cette ville. Vous pouvez en choisir une autre ici.
           </p>
 
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Rechercher une ville…"
+              className="w-full bg-bg-elevated border border-bg-border rounded-xl pl-9 pr-9 py-2.5 text-[13px] text-text-primary placeholder-text-muted outline-none focus:border-brand/50 transition-colors"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
           <div className="grid gap-2 max-h-[380px] overflow-y-auto pr-1">
-            {CITIES.map(c => (
+            {filteredCities.length === 0 && (
+              <p className="text-[13px] text-text-muted text-center py-6">Aucune ville trouvée pour « {search} »</p>
+            )}
+            {filteredCities.map(c => (
               <button
                 key={c.id}
                 onClick={() => setSelectedCity(c.id)}
@@ -149,6 +179,9 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
+          {search && filteredCities.length > 0 && (
+            <p className="text-[11px] text-text-muted">{filteredCities.length} ville{filteredCities.length > 1 ? 's' : ''} trouvée{filteredCities.length > 1 ? 's' : ''}</p>
+          )}
 
           <div className="flex items-center gap-3 pt-1">
             <button
