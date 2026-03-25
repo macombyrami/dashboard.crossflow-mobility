@@ -5,7 +5,7 @@
  * Lignes: Métro, RER, Tramway, Bus, Noctilien
  */
 
-const BASE = 'https://api-ratp.pierre-grimaud.fr/v4'
+const BASE = 'https://api-ratp.pierre-grimaud.fr/v3'
 
 export type LineType = 'metros' | 'rers' | 'tramways' | 'buses' | 'noctiliens'
 
@@ -46,14 +46,13 @@ export async function fetchAllTrafficStatus(): Promise<TrafficLine[]> {
   await Promise.allSettled(
     types.map(async (type) => {
       try {
-        const res  = await fetch(`${BASE}/traffic/${type}`, {
+        const res = await fetch(`${BASE}/traffic/${type}`, {
           next: { revalidate: 60 },
           signal: AbortSignal.timeout(5000),
         })
         if (!res.ok) return
         const data = await res.json()
-        const lines = data?.result?.metros ?? data?.result?.rers ??
-                      data?.result?.tramways ?? data?.result?.buses ?? []
+        const lines = data?.result?.[type] ?? []
 
         for (const line of lines) {
           const slug     = line.line ?? line.slug ?? ''

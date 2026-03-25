@@ -7,29 +7,48 @@ import { cn } from '@/lib/utils/cn'
 
 type SocialTab = 'sytadin' | 'ratp' | 'community'
 
-// ─── Dummy RATP Data ─────────────────────────────────────────────────────────
-
-const RATP_ALERTS = [
-  { id: 1, line: 'RER A', type: 'critical', msg: 'Trafic interrompu entre La Défense et Auber. Panne de signalisation. Reprise estimée à 21h30.', time: 'il y a 5 min' },
-  { id: 2, line: 'Ligne 4', type: 'high', msg: 'Trafic très perturbé sur l\'ensemble de la ligne suite à un bagage abandonné à Châtelet.', time: 'il y a 12 min' },
-  { id: 3, line: 'RER B', type: 'medium', msg: 'Trafic ralenti d\'Aulnay vers Paris. Incident voyageur à La Plaine.', time: 'il y a 25 min' },
-  { id: 4, line: 'Ligne 1', type: 'low', msg: 'Trafic régulier sur l\'ensemble de la ligne.', time: 'il y a 1h' }
-]
+// ─── RATP Feed ───────────────────────────────────────────────────────────────
+import { fetchAllTrafficStatus, type TrafficLine } from '@/lib/api/ratp'
+import { formatDistanceToNow } from 'date-fns'
+import { fr } from 'date-fns/locale'
 
 const RATP_COLORS: Record<string, string> = {
-  'RER A': '#E32938',
-  'RER B': '#4B92DA',
-  'Ligne 1': '#FFCC00',
-  'Ligne 4': '#B63D8F'
+  // Métro
+  '1': '#FFCD00', '2': '#003CA6', '3': '#837902', '3b': '#6EC4E8',
+  '4': '#CF009E', '5': '#FF7E2E', '6': '#6ECA97', '7': '#FA9ABA',
+  '7b': '#6ECA97', '8': '#E19BDF', '9': '#B6BD00', '10': '#C9910A',
+  '11': '#704B1C', '12': '#007852', '13': '#6EC4E8', '14': '#62259D',
+  // RER
+  'A': '#E2231A', 'B': '#47A0D5', 'C': '#FFCD00', 'D': '#00814F', 'E': '#C04191',
+  // Tram
+  'T1': '#E85D0E', 'T2': '#2E67B1', 'T3a': '#65AE30', 'T3b': '#65AE30',
+  'T4': '#E2231A', 'T5': '#694394', 'T6': '#FF7F00', 'T7': '#AA57A7',
+  'T8': '#E2231A', 'T9': '#00A1E0', 'T10': '#004B9B', 'T11': '#00A99D',
+  'T12': '#E85D0E', 'T13': '#00A1E0',
 }
 
 function RatpFeed() {
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [alerts, setAlerts] = useState<TrafficLine[]>([])
   
-  const refresh = () => {
+  const refresh = async () => {
     setLoading(true)
-    setTimeout(() => setLoading(false), 800)
+    try {
+      const lines = await fetchAllTrafficStatus()
+      const disrupted = lines.filter(l => l.status !== 'normal' && l.status !== 'inconnu')
+      setAlerts(disrupted)
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
   }
+
+  useEffect(() => {
+    refresh()
+    const iv = setInterval(refresh, 60000)
+    return () => clearInterval(iv)
+  }, [])
 
   return (
     <div className="flex flex-col h-full bg-bg-base/50">
@@ -43,43 +62,93 @@ function RatpFeed() {
             <p className="text-[10px] text-text-muted">Réseau ferré francilien</p>
           </div>
         </div>
-        <button onClick={refresh} className="p-1.5 rounded-lg hover:bg-bg-elevated transition-colors text-text-muted">
+        <button onClick={refresh} className="p-1.5 rounded-lg hover:bg-bg-elevated transition-colors text-text-muted disabled:opacity-50">
           <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {RATP_ALERTS.map(alert => (
-          <div key={alert.id} className="rounded-2xl border border-bg-border bg-bg-surface p-4 flex gap-3 hover:border-text-muted/30 transition-colors">
-            <div 
-              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-bold text-white text-xs"
-              style={{ backgroundColor: RATP_COLORS[alert.line] ?? '#555' }}
-            >
-              {alert.line.replace('Ligne ', '').replace('RER ', '')}
-            </div>
-            <div className="flex-1 space-y-1 mt-0.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-text-primary">{alert.line}</span>
-                <span className="text-[10px] text-text-muted">{alert.time}</span>
-              </div>
-              <p className="text-xs text-text-secondary leading-relaxed">{alert.msg}</p>
-            </div>
+        {loading && alerts.length === 0 ? (
+          <div className="text-center p-8">
+            <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-xs text-text-muted">Chargement du trafic RATP...</p>
           </div>
-        ))}
+        ) : alerts.length === 0 ? (
+          <div className="text-center p-8 bg-brand-green/5 rounded-2xl border border-brand-green/20">
+            <p className="text-sm font-bold text-brand-green mb-1">Trafic Normal</p>
+            <p className="text-xs text-text-muted">Aucune perturbation majeure signalée sur le réseau.</p>
+          </div>
+        ) : (
+          alerts.map(alert => (
+            <div key={alert.id} className="rounded-2xl border border-bg-border bg-bg-surface p-4 flex gap-3 hover:border-text-muted/30 transition-colors">
+              <div 
+                className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-bold text-white text-xs"
+                style={{ backgroundColor: RATP_COLORS[alert.slug.toUpperCase()] ?? '#555' }}
+              >
+                {alert.slug.toUpperCase()}
+              </div>
+              <div className="flex-1 space-y-1 mt-0.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-text-primary">{alert.name}</span>
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase",
+                    alert.status === 'interrompu' ? 'bg-red-500/10 text-red-500' :
+                    alert.status === 'travaux' ? 'bg-orange-500/10 text-orange-500' :
+                    'bg-yellow-500/10 text-yellow-500'
+                  )}>
+                    {alert.status}
+                  </span>
+                </div>
+                <p className="text-xs text-text-secondary leading-relaxed">{alert.message}</p>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )
 }
 
-// ─── Dummy Community Data ────────────────────────────────────────────────────
+// ─── Community Feed ────────────────────────────────────────────────────────────
+import { useMapStore } from '@/store/mapStore'
+import { generateIncidents } from '@/lib/engine/traffic.engine'
 
-const COMMUNITY_POSTS = [
-  { id: 1, user: 'Alex75', avatar: 'https://i.pravatar.cc/100?u=1', type: 'accident', msg: 'Accident moto impliquant un scooter sous le tunnel de La Défense direction Paris. Ça commence à bouchonner sévère !', likes: 12, time: 'il y a 2 min', location: 'N13 - Courbevoie' },
-  { id: 2, user: 'Marie_Velo', avatar: 'https://i.pravatar.cc/100?u=2', type: 'info', msg: 'Attention la piste cyclable Sébastopol est bloquée par des travaux non signalés au niveau des Halles.', likes: 34, time: 'il y a 15 min', location: 'Bd de Sébastopol' },
-  { id: 3, user: 'UberProIDF', avatar: 'https://i.pravatar.cc/100?u=3', type: 'congestion', msg: 'Boulevard Périphérique extérieur totalement à l\'arrêt depuis la Porte de Montreuil. Évitez le secteur.', likes: 8, time: 'il y a 41 min', location: 'BP Ext - Porte de Vincennes' },
-]
+const USERS = ['Alex75', 'Marie_Velo', 'UberProIDF', 'Sam_Moto', 'Luc_Scoot']
 
 function CommunityFeed() {
+  const city = useMapStore(s => s.city)
+  const [loading, setLoading] = useState(true)
+  const [posts, setPosts] = useState<any[]>([])
+
+  const refresh = () => {
+    setLoading(true)
+    setTimeout(() => {
+      const incidents = generateIncidents(city)
+      // Map incidents to community posts UI
+      const mapped = incidents.slice(0, 10).map((inc, i) => {
+        const uIdx = (inc.id.charCodeAt(inc.id.length-1) || 0) % USERS.length
+        return {
+          id: inc.id,
+          user: USERS[uIdx],
+          avatar: `https://i.pravatar.cc/100?u=${uIdx + 1}`,
+          type: inc.type,
+          msg: `${inc.title}. ${inc.description}`,
+          time: new Date(inc.startedAt),
+          location: inc.address.split('—')[0]?.trim() || inc.address
+        }
+      })
+      
+      // Sort newest first
+      setPosts(mapped.sort((a,b) => b.time.getTime() - a.time.getTime()))
+      setLoading(false)
+    }, 400)
+  }
+
+  useEffect(() => {
+    refresh()
+    const iv = setInterval(refresh, 120000)
+    return () => clearInterval(iv)
+  }, [city.id])
   return (
     <div className="flex flex-col h-full bg-bg-base/50">
       <div className="px-5 py-4 border-b border-bg-border flex items-center justify-between bg-bg-surface">
@@ -95,21 +164,33 @@ function CommunityFeed() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {COMMUNITY_POSTS.map(post => (
-          <div key={post.id} className="rounded-2xl border border-bg-border bg-bg-surface p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <img src={post.avatar} alt={post.user} className="w-6 h-6 rounded-full" />
-                <span className="text-xs font-semibold text-text-primary">{post.user}</span>
-                <span className="text-[10px] text-text-muted">{post.time}</span>
+        {loading ? (
+          <div className="text-center p-8">
+            <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-xs text-text-muted">Chargement des signalements...</p>
+          </div>
+        ) : posts.length === 0 ? (
+          <div className="text-center p-8 border border-bg-border border-dashed rounded-2xl bg-bg-surface/50">
+            <p className="text-sm font-bold text-text-primary mb-1">Aucun signalement</p>
+            <p className="text-xs text-text-muted">La communauté n'a signalé aucun incident majeur dans ce secteur.</p>
+          </div>
+        ) : (
+          posts.map(post => (
+            <div key={post.id} className="rounded-2xl border border-bg-border bg-bg-surface p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <img src={post.avatar} alt={post.user} className="w-6 h-6 rounded-full" />
+                  <span className="text-xs font-semibold text-text-primary">{post.user}</span>
+                  <span className="text-[10px] text-text-muted">{formatDistanceToNow(post.time, { locale: fr, addSuffix: true })}</span>
+                </div>
+              </div>
+              <p className="text-xs text-text-secondary leading-relaxed">{post.msg}</p>
+              <div className="flex items-center gap-1 text-[10px] font-medium text-brand bg-brand/10 w-fit px-2 py-0.5 rounded-full">
+                <MapPin className="w-3 h-3" /> {post.location}
               </div>
             </div>
-            <p className="text-xs text-text-secondary leading-relaxed">{post.msg}</p>
-            <div className="flex items-center gap-1 text-[10px] font-medium text-brand bg-brand/10 w-fit px-2 py-0.5 rounded-full">
-              <MapPin className="w-3 h-3" /> {post.location}
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   )
