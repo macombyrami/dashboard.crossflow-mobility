@@ -248,6 +248,7 @@ function FilterTabs({ options, value, onChange }: {
 
 function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
   const [lines,      setLines]      = useState<TrafficLine[]>([])
+  const [hasPrim,    setHasPrim]    = useState(false)
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState<string | null>(null)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
@@ -257,6 +258,11 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
   const refresh = useCallback(async () => {
     setLoading(true); setError(null)
     try {
+      // Récupère aussi le flag hasPrim du proxy
+      const res  = await fetch('/api/ratp-traffic', { signal: AbortSignal.timeout(10000) })
+      if (!res.ok) throw new Error(`${res.status}`)
+      const data = await res.json()
+      setHasPrim(data.hasPrim ?? false)
       setLines(await fetchAllTrafficStatus())
       setLastUpdate(new Date())
     } catch {
@@ -303,9 +309,14 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
             <Train className="w-5 h-5 text-brand-green" />
             Trafic RATP — Temps réel
           </h1>
-          <p className="text-sm text-text-secondary mt-1 flex items-center gap-2">
+          <p className="text-sm text-text-secondary mt-1 flex items-center gap-2 flex-wrap">
             <Wifi className="w-3 h-3 text-brand-green" />
             Île-de-France Mobilités
+            {hasPrim && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[rgba(34,197,94,0.15)] text-brand-green border border-brand-green/30 uppercase tracking-wide">
+                PRIM officiel
+              </span>
+            )}
             {lastUpdate && mounted && (
               <span className="text-text-muted">· {formatDistanceToNow(lastUpdate, { locale: fr, addSuffix: true })}</span>
             )}
@@ -359,7 +370,10 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
 
       {lines.length > 0 && (
         <p className="text-xs text-text-muted text-center pb-2">
-          Source: API RATP · Charge & fréquences estimées en temps réel · Actualisé toutes les 60 s
+          {hasPrim
+            ? 'Source: PRIM IDFM (officiel) + API RATP · Perturbations temps réel · Actualisé toutes les 60 s'
+            : 'Source: API RATP · Charge & fréquences estimées en temps réel · Actualisé toutes les 60 s'
+          }
         </p>
       )}
     </main>
