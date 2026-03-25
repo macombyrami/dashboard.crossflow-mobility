@@ -115,7 +115,7 @@ export async function buildPredictiveContext(
       value:  `Perturbations TC (Lignes: ${activeLines.join(', ')})`,
       impact: 'negative',
       factor: transportFactor,
-      source: 'Navitia',
+      source: 'PRIM IDFM',
     })
   }
 
