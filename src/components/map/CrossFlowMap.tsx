@@ -821,6 +821,94 @@ export function CrossFlowMap() {
     }
   }, [currentResult, snapshot, mapLoaded]) // eslint-disable-line
 
+  // ─── IDF real road network overlay (simulation mode) ──────────────────
+
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return
+    const map = mapRef.current
+    const IDF_SOURCE = 'cf-idf-roads'
+
+    const removeIdfLayer = () => {
+      if (map.getLayer(IDF_SOURCE + '-lines')) map.removeLayer(IDF_SOURCE + '-lines')
+      if (map.getLayer(IDF_SOURCE + '-labels')) map.removeLayer(IDF_SOURCE + '-labels')
+      if (map.getSource(IDF_SOURCE)) map.removeSource(IDF_SOURCE)
+    }
+
+    if (!currentResult) {
+      removeIdfLayer()
+      return
+    }
+
+    // Compute bbox from current map bounds (or city center fallback)
+    const bounds = map.getBounds()
+    const bbox = [
+      bounds.getWest(), bounds.getSouth(),
+      bounds.getEast(), bounds.getNorth(),
+    ].map(v => Math.round(v * 1000) / 1000).join(',')
+
+    const url = `/api/idf-roads?frc=1,2,3&bbox=${bbox}&limit=800`
+
+    fetch(url, { cache: 'force-cache' })
+      .then(r => r.ok ? r.json() : null)
+      .then((geojson: GeoJSON.FeatureCollection | null) => {
+        if (!geojson || !map.isStyleLoaded()) return
+
+        // Add or update source
+        const existingSrc = map.getSource(IDF_SOURCE) as maplibregl.GeoJSONSource | undefined
+        if (existingSrc) {
+          existingSrc.setData(geojson)
+        } else {
+          map.addSource(IDF_SOURCE, { type: 'geojson', data: geojson })
+
+          // Color by FRC
+          map.addLayer({
+            id:     IDF_SOURCE + '-lines',
+            type:   'line',
+            source: IDF_SOURCE,
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint:  {
+              'line-color': [
+                'match', ['get', 'frc'],
+                1, '#FF1744',   // autoroutes
+                2, '#FF6D00',   // nationales
+                3, '#FFB300',   // artères
+                '#4CAF50',      // default
+              ],
+              'line-width': [
+                'interpolate', ['linear'], ['zoom'],
+                8,  ['match', ['get', 'frc'], 1, 2, 2, 1.5, 1],
+                13, ['match', ['get', 'frc'], 1, 4, 2, 3, 2],
+                17, ['match', ['get', 'frc'], 1, 6, 2, 5, 3],
+              ],
+              'line-opacity': 0.55,
+            },
+          }, TRAFFIC_SOURCE + '-lines') // insert below traffic layer
+
+          map.addLayer({
+            id:        IDF_SOURCE + '-labels',
+            type:      'symbol',
+            source:    IDF_SOURCE,
+            minzoom:   13,
+            layout:    {
+              'symbol-placement': 'line',
+              'text-field':       ['get', 'roadName'],
+              'text-size':        10,
+              'text-max-angle':   30,
+            },
+            paint: {
+              'text-color': '#ffffff',
+              'text-halo-color': '#000000',
+              'text-halo-width': 1,
+              'text-opacity': 0.7,
+            },
+          })
+        }
+      })
+      .catch(() => {})
+
+    return removeIdfLayer
+  }, [currentResult, mapLoaded]) // eslint-disable-line
+
   // ─── Layer visibility ─────────────────────────────────────────────────
 
   useEffect(() => {
