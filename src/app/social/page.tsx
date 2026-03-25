@@ -1,6 +1,6 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { Rss, Twitter, Train, Users, AlertTriangle, RefreshCw, MapPin, Search } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Rss, Twitter, Train, Users, AlertTriangle, RefreshCw, MapPin, Search, Wrench, Ban } from 'lucide-react'
 import { SytadinFeed } from '@/components/simulation/SytadinFeed'
 import { IdfNetworkStats } from '@/components/simulation/IdfNetworkStats'
 import { cn } from '@/lib/utils/cn'
@@ -9,8 +9,6 @@ type SocialTab = 'sytadin' | 'ratp' | 'community'
 
 // ─── RATP Feed ───────────────────────────────────────────────────────────────
 import { fetchAllTrafficStatus, type TrafficLine } from '@/lib/api/ratp'
-import { formatDistanceToNow } from 'date-fns'
-import { fr } from 'date-fns/locale'
 
 const RATP_COLORS: Record<string, string> = {
   // Métro
@@ -111,85 +109,161 @@ function RatpFeed() {
 
 // ─── Community Feed ────────────────────────────────────────────────────────────
 import { useMapStore } from '@/store/mapStore'
-import { generateIncidents } from '@/lib/engine/traffic.engine'
 
-const USERS = ['Alex75', 'Marie_Velo', 'UberProIDF', 'Sam_Moto', 'Luc_Scoot']
+interface RealIncident {
+  id:          string
+  title:       string
+  type:        'accident' | 'travaux' | 'fermeture' | 'événement' | 'congestion' | 'incident'
+  severity:    'low' | 'medium' | 'high' | 'critical'
+  address:     string
+  district?:   string
+  lat:         number
+  lng:         number
+  startDate?:  string
+  endDate?:    string
+  source:      'paris-opendata' | 'here' | 'dirif'
+  sourceLabel: string
+}
+
+const SEVERITY_COLORS: Record<RealIncident['severity'], string> = {
+  critical: '#FF1744',
+  high:     '#FF6D00',
+  medium:   '#FFB300',
+  low:      '#00E676',
+}
+
+const TYPE_ICONS: Record<string, React.ElementType> = {
+  travaux:    Wrench,
+  fermeture:  Ban,
+  accident:   AlertTriangle,
+  incident:   AlertTriangle,
+  événement:  MapPin,
+  congestion: AlertTriangle,
+}
+
+function formatDateRange(start?: string, end?: string): string {
+  if (!start) return ''
+  const s   = new Date(start)
+  const fmt = (d: Date) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  if (!end) return `depuis le ${fmt(s)}`
+  const e = new Date(end)
+  if (s.toDateString() === e.toDateString()) return `le ${fmt(s)}`
+  return `du ${fmt(s)} au ${fmt(e)}`
+}
 
 function CommunityFeed() {
   const city = useMapStore(s => s.city)
-  const [loading, setLoading] = useState(true)
-  const [posts, setPosts] = useState<any[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [incidents, setIncidents] = useState<RealIncident[]>([])
 
-  const refresh = () => {
+  const refresh = async () => {
     setLoading(true)
-    setTimeout(() => {
-      const incidents = generateIncidents(city)
-      // Map incidents to community posts UI
-      const mapped = incidents.slice(0, 10).map((inc, i) => {
-        const uIdx = (inc.id.charCodeAt(inc.id.length-1) || 0) % USERS.length
-        return {
-          id: inc.id,
-          user: USERS[uIdx],
-          avatar: `https://i.pravatar.cc/100?u=${uIdx + 1}`,
-          type: inc.type,
-          msg: `${inc.title}. ${inc.description}`,
-          time: new Date(inc.startedAt),
-          location: inc.address.split('—')[0]?.trim() || inc.address
-        }
-      })
-      
-      // Sort newest first
-      setPosts(mapped.sort((a,b) => b.time.getTime() - a.time.getTime()))
+    try {
+      const res = await fetch(
+        `/api/social/incidents?lat=${city.center.lat}&lng=${city.center.lng}`,
+      )
+      if (res.ok) {
+        const data = await res.json()
+        setIncidents(data ?? [])
+      }
+    } catch {
+      // ignore
+    } finally {
       setLoading(false)
-    }, 400)
+    }
   }
 
   useEffect(() => {
     refresh()
-    const iv = setInterval(refresh, 120000)
+    const iv = setInterval(refresh, 120_000)
     return () => clearInterval(iv)
-  }, [city.id])
+  }, [city.id]) // eslint-disable-line
+
   return (
     <div className="flex flex-col h-full bg-bg-base/50">
       <div className="px-5 py-4 border-b border-bg-border flex items-center justify-between bg-bg-surface">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-brand flex items-center justify-center">
-            <Users className="w-3.5 h-3.5 text-white" />
+            <AlertTriangle className="w-3.5 h-3.5 text-white" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-text-primary">Rapports Communautaires</h2>
-            <p className="text-[10px] text-text-muted">Alertes en temps réel des usagers</p>
+            <h2 className="text-sm font-semibold text-text-primary">Incidents Signalés</h2>
+            <p className="text-[10px] text-text-muted">OpenData Paris · HERE Traffic</p>
           </div>
         </div>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="p-1.5 rounded-lg hover:bg-bg-elevated transition-colors text-text-muted disabled:opacity-50"
+        >
+          <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {loading ? (
+        {loading && incidents.length === 0 ? (
           <div className="text-center p-8">
             <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-xs text-text-muted">Chargement des signalements...</p>
+            <p className="text-xs text-text-muted">Chargement des incidents…</p>
           </div>
-        ) : posts.length === 0 ? (
-          <div className="text-center p-8 border border-bg-border border-dashed rounded-2xl bg-bg-surface/50">
-            <p className="text-sm font-bold text-text-primary mb-1">Aucun signalement</p>
-            <p className="text-xs text-text-muted">La communauté n'a signalé aucun incident majeur dans ce secteur.</p>
+        ) : incidents.length === 0 ? (
+          <div className="text-center p-8 bg-brand-green/5 rounded-2xl border border-brand-green/20">
+            <p className="text-sm font-bold text-brand-green mb-1">Aucun incident actif</p>
+            <p className="text-xs text-text-muted">Aucun incident signalé sur le secteur.</p>
           </div>
         ) : (
-          posts.map(post => (
-            <div key={post.id} className="rounded-2xl border border-bg-border bg-bg-surface p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <img src={post.avatar} alt={post.user} className="w-6 h-6 rounded-full" />
-                  <span className="text-xs font-semibold text-text-primary">{post.user}</span>
-                  <span className="text-[10px] text-text-muted">{formatDistanceToNow(post.time, { locale: fr, addSuffix: true })}</span>
+          incidents.map(inc => {
+            const Icon    = TYPE_ICONS[inc.type] ?? AlertTriangle
+            const color   = SEVERITY_COLORS[inc.severity]
+            const dateStr = formatDateRange(inc.startDate, inc.endDate)
+            return (
+              <div
+                key={inc.id}
+                className="rounded-2xl border border-bg-border bg-bg-surface p-4 space-y-2.5 hover:border-text-muted/30 transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                    style={{ backgroundColor: `${color}18` }}
+                  >
+                    <Icon className="w-4 h-4" style={{ color }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-text-primary leading-tight line-clamp-2">
+                      {inc.title}
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      <span className="flex items-center gap-1 text-[10px] text-text-muted">
+                        <MapPin className="w-2.5 h-2.5" />
+                        {inc.address}{inc.district ? ` — ${inc.district}` : ''}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ color, backgroundColor: `${color}18` }}
+                  >
+                    {inc.type.charAt(0).toUpperCase() + inc.type.slice(1)}
+                  </span>
+                  <span
+                    className={cn(
+                      'text-[10px] font-semibold px-2 py-0.5 rounded-full border',
+                      inc.source === 'paris-opendata'
+                        ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                        : 'text-orange-400 bg-orange-500/10 border-orange-500/20',
+                    )}
+                  >
+                    {inc.sourceLabel}
+                  </span>
+                  {dateStr && (
+                    <span className="text-[10px] text-text-muted">{dateStr}</span>
+                  )}
                 </div>
               </div>
-              <p className="text-xs text-text-secondary leading-relaxed">{post.msg}</p>
-              <div className="flex items-center gap-1 text-[10px] font-medium text-brand bg-brand/10 w-fit px-2 py-0.5 rounded-full">
-                <MapPin className="w-3 h-3" /> {post.location}
-              </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
     </div>
@@ -261,17 +335,17 @@ export default function SocialPage() {
             </div>
           </button>
 
-          <button 
+          <button
             onClick={() => setActiveTab('community')}
             className={cn(
               "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-xs font-semibold w-full text-left",
               activeTab === 'community' ? "bg-brand/10 text-brand border border-brand/20" : "text-text-secondary hover:bg-bg-elevated border border-transparent"
             )}
           >
-            <Users className="w-4 h-4" />
+            <AlertTriangle className="w-4 h-4" />
             <div className="flex-1">
-              <span>Communauté Waze</span>
-              {activeTab === 'community' && <p className="text-[9px] font-normal mt-0.5 opacity-80">Signalements usagers</p>}
+              <span>Incidents Signalés</span>
+              {activeTab === 'community' && <p className="text-[9px] font-normal mt-0.5 opacity-80">OpenData + HERE Traffic</p>}
             </div>
           </button>
         </div>
