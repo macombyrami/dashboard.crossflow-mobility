@@ -15,7 +15,7 @@ export function Header() {
   const incidents       = useTrafficStore(s => s.incidents)
   const [time, setTime] = useState('')
 
-  const incidentCount = incidents?.filter(i => i.severity === 'high' || i.severity === 'critical').length ?? 0
+  const incidentCount = incidents?.length ?? 0
 
   useEffect(() => {
     const tick = () => {
