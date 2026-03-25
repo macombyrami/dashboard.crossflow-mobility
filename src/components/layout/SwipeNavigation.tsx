@@ -10,6 +10,7 @@ const NAV_ROUTES = [
   '/simulation',
   '/transport',
   '/incidents',
+  '/social',
 ]
 
 export function SwipeNavigation({ children }: { children: React.ReactNode }) {

@@ -1,15 +1,15 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Map, LayoutDashboard, AlertTriangle, Activity, Settings } from 'lucide-react'
+import { Map, LayoutDashboard, AlertTriangle, Rss, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 const TABS = [
-  { href: '/map',        icon: Map,             label: 'Carte',     ariaLabel: 'Carte du trafic en temps réel' },
-  { href: '/dashboard',  icon: LayoutDashboard, label: 'Tableau',   ariaLabel: 'Tableau de bord et métriques' },
-  { href: '/incidents',  icon: AlertTriangle,   label: 'Incidents', ariaLabel: 'Alertes et incidents actifs' },
-  { href: '/transport',  icon: Activity,        label: 'Transport', ariaLabel: 'Réseau de transport en commun' },
-  { href: '/settings',   icon: Settings,        label: 'Réglages',  ariaLabel: 'Paramètres et configuration' },
+  { href: '/map',       icon: Map,             label: 'Carte',     ariaLabel: 'Carte du trafic en temps réel' },
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Tableau',   ariaLabel: 'Tableau de bord et métriques' },
+  { href: '/incidents', icon: AlertTriangle,   label: 'Incidents', ariaLabel: 'Alertes et incidents actifs' },
+  { href: '/social',    icon: Rss,             label: 'Social',    ariaLabel: 'Feed social trafic IDF' },
+  { href: '/settings',  icon: Settings,        label: 'Réglages',  ariaLabel: 'Paramètres et configuration' },
 ]
 
 export function BottomNav() {

@@ -7,16 +7,17 @@ import { cn } from '@/lib/utils/cn'
 import {
   Map, LayoutDashboard, TrendingUp, Activity,
   GitBranch, AlertTriangle, Settings, Zap,
-  LogOut, UserCircle, Loader2,
+  LogOut, UserCircle, Loader2, Rss,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { href: '/map',        icon: Map,             label: 'Carte',      description: 'Trafic temps réel',  ariaLabel: 'Carte du trafic en temps réel' },
-  { href: '/dashboard',  icon: LayoutDashboard, label: 'Tableau',    description: 'Métriques & KPIs',   ariaLabel: 'Tableau de bord et métriques KPI' },
-  { href: '/prediction', icon: TrendingUp,      label: 'Prévisions', description: 'Modèle prédictif',  ariaLabel: 'Prévisions et modèle prédictif' },
-  { href: '/simulation', icon: GitBranch,       label: 'Simulation', description: 'Scénarios',         ariaLabel: 'Simulation de scénarios de trafic' },
-  { href: '/transport',  icon: Activity,        label: 'Transport',  description: 'Réseau TC',         ariaLabel: 'Réseau de transport en commun' },
-  { href: '/incidents',  icon: AlertTriangle,   label: 'Incidents',  description: 'Alertes actives',   ariaLabel: 'Alertes et incidents actifs' },
+  { href: '/map',        icon: Map,             label: 'Carte',      description: 'Trafic temps réel', ariaLabel: 'Carte du trafic en temps réel' },
+  { href: '/dashboard',  icon: LayoutDashboard, label: 'Tableau',    description: 'Métriques & KPIs',  ariaLabel: 'Tableau de bord et métriques KPI' },
+  { href: '/prediction', icon: TrendingUp,      label: 'Prévisions', description: 'Modèle prédictif', ariaLabel: 'Prévisions et modèle prédictif' },
+  { href: '/simulation', icon: GitBranch,       label: 'Simulation', description: 'Scénarios',        ariaLabel: 'Simulation de scénarios de trafic' },
+  { href: '/transport',  icon: Activity,        label: 'Transport',  description: 'Réseau TC',        ariaLabel: 'Réseau de transport en commun' },
+  { href: '/incidents',  icon: AlertTriangle,   label: 'Incidents',  description: 'Alertes actives',  ariaLabel: 'Alertes et incidents actifs' },
+  { href: '/social',     icon: Rss,             label: 'Social',     description: '@Sytadin · IDF',   ariaLabel: 'Feed social trafic Île-de-France' },
 ]
 
 export function Sidebar() {
