@@ -1,0 +1,9 @@
+[
+  { "href": "/map",        "iconName": "Map",             "label": "Carte",      "description": "Trafic temps réel", "ariaLabel": "Carte du trafic en temps réel"          },
+  { "href": "/dashboard",  "iconName": "LayoutDashboard", "label": "Tableau",    "description": "Métriques & KPIs",  "ariaLabel": "Tableau de bord et métriques KPI"       },
+  { "href": "/prediction", "iconName": "TrendingUp",      "label": "Prévisions", "description": "Modèle prédictif", "ariaLabel": "Prévisions et modèle prédictif"         },
+  { "href": "/simulation", "iconName": "GitBranch",       "label": "Simulation", "description": "Scénarios",        "ariaLabel": "Simulation de scénarios de trafic"      },
+  { "href": "/transport",  "iconName": "Activity",        "label": "Transport",  "description": "Réseau TC",        "ariaLabel": "Réseau de transport en commun"          },
+  { "href": "/incidents",  "iconName": "AlertTriangle",   "label": "Incidents",  "description": "Alertes actives",  "ariaLabel": "Alertes et incidents actifs"            },
+  { "href": "/social",     "iconName": "Rss",             "label": "Social",     "description": "@Sytadin · IDF",   "ariaLabel": "Feed social trafic Île-de-France"       }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "role":         "Automobiliste domicile-travail",
+    "emoji":        "🚗",
+    "proportion":   0.40,
+    "comportement": "Évite les bouchons, suit les apps GPS, sensible au temps de trajet"
+  },
+  {
+    "role":         "Livreur colis / coursier",
+    "emoji":        "📦",
+    "proportion":   0.10,
+    "comportement": "Contraintes horaires strictes, cherche à se garer, prend des risques"
+  },
+  {
+    "role":         "Usager transports en commun",
+    "emoji":        "🚇",
+    "proportion":   0.30,
+    "comportement": "Réagit aux perturbations RATP, peut marcher 15 min, multimodal"
+  },
+  {
+    "role":         "Cycliste urbain",
+    "emoji":        "🚲",
+    "proportion":   0.12,
+    "comportement": "Évite les axes rapides, sensible à la météo, utilise les pistes cyclables"
+  },
+  {
+    "role":         "Piéton / touriste",
+    "emoji":        "🚶",
+    "proportion":   0.08,
+    "comportement": "Se déplace à pied, traversées imprévisibles, flux concentré sur les zones touristiques"
+  }
+]

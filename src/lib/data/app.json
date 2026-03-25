@@ -1,0 +1,21 @@
+{
+  "name":        "CrossFlow",
+  "fullName":    "CrossFlow Mobility",
+  "tagline":     "Smart City",
+  "description": "Gestion intelligente de la mobilité urbaine",
+  "metaTitle":   "CrossFlow Mobility | Dashboard AI et Intelligence Urbaine",
+  "metaDescription": "Pilotez votre mobilité urbaine avec l'IA CrossFlow. Analyse en temps réel, prédictions de trafic et gestion intelligente des incidents pour les smart cities.",
+  "ogTitle":     "CrossFlow Mobility Dashboard",
+  "ogDescription": "Analyse prédictive et monitoring en temps réel de la mobilité urbaine.",
+  "twitterTitle": "CrossFlow Mobility | Dashboard AI",
+  "twitterDescription": "Intelligence urbaine et monitoring de trafic en temps réel.",
+  "author":      "CrossFlow Team",
+  "locale":      "fr_FR",
+  "lang":        "fr",
+  "themeColor":  "#08090B",
+  "url":         "https://myaccount.crossflow-mobility.com",
+  "ogImageUrl":  "https://crossflow-mobility.com/og-image.jpg",
+  "twitterImageUrl": "https://crossflow-mobility.com/twitter-image.jpg",
+  "keywords": ["mobilité urbaine", "smart city", "intelligence artificielle", "trafic temps réel", "prédiction routière", "gestion urbaine"],
+  "userAgent":   "CrossFlow-Mobility/1.0"
+}
