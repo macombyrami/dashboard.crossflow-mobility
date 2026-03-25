@@ -7,8 +7,25 @@ import { useTrafficStore } from '@/store/trafficStore'
 import { useSimulationStore } from '@/store/simulationStore'
 import { platformConfig } from '@/config/platform.config'
 import { congestionColor } from '@/lib/utils/congestion'
-import { generateTrafficSnapshot, generateIncidents, generateTrafficFromOSMRoads } from '@/lib/engine/traffic.engine'
-import { fetchRoads, fetchTrafficPOIs, fetchRouteGeometries } from '@/lib/api/overpass'
+import {
+  generateTrafficSnapshot,
+  generateIncidents,
+  generateTrafficFromOSMRoads,
+  generateCityKPIs,
+  generateTrafficFromIdfGeoJSON,
+} from '@/lib/engine/traffic.engine'
+import {
+  fetchRoads,
+  fetchTrafficPOIs,
+  fetchRouteGeometries
+} from '@/lib/api/overpass'
+import {
+  fetchSytadinKPIs,
+  generateSytadinKPIs,
+  generateSytadinTravelTimes,
+  fetchAndInjectSytadinIncidents,
+  isIdfCity,
+} from '@/lib/engine/sytadin.engine'
 import type { OSMRoad, OSMPOIPoint, OSMRouteGeometry } from '@/lib/api/overpass'
 import { simulateTransitVehicles } from '@/lib/engine/transit.engine'
 import {
@@ -107,6 +124,7 @@ export function CrossFlowMap() {
   const setOpenMeteoWeather   = useTrafficStore(s => s.setOpenMeteoWeather)
   const setAirQuality         = useTrafficStore(s => s.setAirQuality)
   const setDataSource         = useTrafficStore(s => s.setDataSource)
+  const dataSource            = useTrafficStore(s => s.dataSource)
 
   const currentResult = useSimulationStore(s => s.currentResult)
 
@@ -557,7 +575,7 @@ export function CrossFlowMap() {
     const useHere    = hereHasKey()
     const useTomTom  = useLiveData
 
-    // ── 1. Fetch HERE real traffic flow (real geometry + real speed) ──────
+    // ── 1. Determine base snapshot (Synthetic or Multi-source) ────────────
     let snapshot = (() => {
       const osmRoads = osmRoadsRef.current.get(city.id)
       return osmRoads && osmRoads.length > 0
@@ -565,6 +583,26 @@ export function CrossFlowMap() {
         : generateTrafficSnapshot(city)
     })()
 
+    // ── 2. Regional Scaling — Load real IDF network if applicable ────────
+    if (isIdfCity(city) && dataSource === 'synthetic') {
+      try {
+        const bounds = map.getBounds()
+        const bboxStr = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
+          .map(v => Math.round(v * 1000) / 1000).join(',')
+        
+        const res = await fetch(`/api/idf-roads?bbox=${bboxStr}&limit=1200&frc=1,2,3,4`)
+        if (res.ok) {
+          const idfGeojson = await res.json()
+          if (idfGeojson.features?.length > 0) {
+            snapshot = generateTrafficFromIdfGeoJSON(city, idfGeojson)
+          }
+        }
+      } catch (err) {
+        console.warn('[CrossFlowMap] Failed to scale IDF network, using fallback grid.', err)
+      }
+    }
+
+    // ── 3. Overlay real-time HERE traffic if available ────────────────────
     if (useHere) {
       const hereFlow = await fetchHereFlow(city.bbox)
       if (hereFlow.length > 0) {
@@ -749,7 +787,7 @@ export function CrossFlowMap() {
       visibility:    omWeather.visibilityM,
       trafficImpact: omWeather.trafficImpact,
     } : null)
-  }, [city, mapLoaded, useLiveData, setSnapshot, setIncidents, setWeather, setOpenMeteoWeather, setAirQuality, setDataSource])
+  }, [city, mapLoaded, useLiveData, setSnapshot, setIncidents, setWeather, setOpenMeteoWeather, setAirQuality, setDataSource, dataSource])
 
   // Keep refreshDataRef in sync so OSM loader can call it after roads are cached
   useEffect(() => { refreshDataRef.current = refreshData }, [refreshData])

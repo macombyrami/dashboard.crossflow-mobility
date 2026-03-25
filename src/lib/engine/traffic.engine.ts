@@ -311,6 +311,87 @@ export function generateTrafficFromOSMRoads(city: City, osmRoads: OSMRoad[]): Tr
   }
 }
 
+// ─── IDF / Local GeoJSON traffic generator ───────────────────────────────────
+
+export function generateTrafficFromIdfGeoJSON(city: City, geojson: any): TrafficSnapshot {
+  const now  = new Date()
+  const hour = now.getHours()
+  const isWE = now.getDay() === 0 || now.getDay() === 6
+  const rng  = seededRng(cityTimeSeed(city.id))
+
+  const baseCongestion = Math.min(1, baseCongestionForHour(hour, isWE))
+  const segments: TrafficSegment[] = []
+  const heatmap: HeatmapPoint[] = []
+  const heatmapPassages: HeatmapPoint[] = []
+  const heatmapCo2: HeatmapPoint[] = []
+
+  const features = (geojson.features || []) as any[]
+
+  features.forEach((f, idx) => {
+    const p = f.properties
+    const coords = f.geometry.coordinates as [number, number][]
+
+    // Map FRC to segment type
+    let segType: 'main' | 'secondary' | 'highway'
+    const frc = p.frc ?? 5
+    if (frc <= 2)      segType = 'highway'
+    else if (frc <= 3) segType = 'main'
+    else               segType = 'secondary'
+
+    const midPt = coords[Math.floor(coords.length / 2)]
+    const distFromCenter = Math.sqrt(
+      Math.pow((midPt[0] - city.center.lng) / 0.2, 2) +
+      Math.pow((midPt[1] - city.center.lat) / 0.2, 2),
+    )
+
+    const spatial = Math.max(0, 1 - distFromCenter * 0.7)
+    const noise   = (rng() - 0.5) * 0.2
+    let congestion = Math.max(0, Math.min(1, baseCongestion * spatial + noise))
+
+    if (segType === 'highway') {
+      congestion = Math.max(0, Math.min(1, congestion * 0.85 + rng() * 0.15))
+    }
+
+    const freeFlow = segType === 'highway' ? 110 : segType === 'main' ? 50 : 30
+    const speedKmh = Math.max(5, freeFlow * (1 - congestion * 0.88))
+    const level    = scoreToCongestionLevel(congestion)
+    const length   = (p.miles || 0.1) * 1609.34
+    const flowVph  = Math.round((freeFlow - speedKmh) * 45 + rng() * 150)
+
+    segments.push({
+      id:               `idf-${p.id || idx}`,
+      name:             p.roadName || p.roadNumber,
+      roadType:         segType === 'highway' ? 'motorway' : segType === 'main' ? 'primary' : 'tertiary',
+      coordinates:      coords,
+      speedKmh:         Math.round(speedKmh),
+      freeFlowSpeedKmh: freeFlow,
+      congestionScore:  Math.round(congestion * 100) / 100,
+      level,
+      flowVehiclesPerHour: flowVph,
+      travelTimeSeconds:   Math.round((length / 1000) / speedKmh * 3600),
+      length:           Math.round(length),
+      mode:             'car',
+      lastUpdated:      now.toISOString(),
+    })
+
+    for (let i = 0; i < coords.length; i += 2) {
+      const pt = coords[i]
+      heatmap.push({ lng: pt[0], lat: pt[1], intensity: congestion })
+      heatmapPassages.push({ lng: pt[0], lat: pt[1], intensity: Math.min(1, flowVph / 2200) })
+      heatmapCo2.push({ lng: pt[0], lat: pt[1], intensity: co2GPerKm(congestion) / 320 })
+    }
+  })
+
+  return {
+    cityId:    city.id,
+    segments,
+    heatmap,
+    heatmapPassages,
+    heatmapCo2,
+    fetchedAt: now.toISOString(),
+  }
+}
+
 // ─── Prediction generator ─────────────────────────────────────────────────
 
 export function generatePrediction(city: City, horizonMinutes = 30): Prediction {

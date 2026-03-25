@@ -36,9 +36,26 @@ interface IdfSegment {
   coordinates: [number, number][]  // [lng, lat][]
 }
 
-// ── Module-level cache ───────────────────────────────────────────────────────
+// ── Spatial Grid Index (Spatial Hash) ───────────────────────────────────────
 
+const GRID_SIZE = 0.05 // degrees (~5.5km)
 let _segments: IdfSegment[] | null = null
+const _grid: Map<string, IdfSegment[]> = new Map()
+
+function getGridKeys(bbox: [number, number, number, number]): string[] {
+  const keys: string[] = []
+  const x1 = Math.floor(bbox[0] / GRID_SIZE)
+  const y1 = Math.floor(bbox[1] / GRID_SIZE)
+  const x2 = Math.floor(bbox[2] / GRID_SIZE)
+  const y2 = Math.floor(bbox[3] / GRID_SIZE)
+
+  for (let x = x1; x <= x2; x++) {
+    for (let y = y1; y <= y2; y++) {
+      keys.push(`${x},${y}`)
+    }
+  }
+  return keys
+}
 
 function loadSegments(): IdfSegment[] {
   if (_segments) return _segments
@@ -48,17 +65,21 @@ function loadSegments(): IdfSegment[] {
     'data/data_IledeFrance/maprelease-geojson/extracted/France_Ile_de_France.geojson',
   )
 
-  console.log('[idf-roads] Parsing GeoJSON… (one-time, ~2-5s)')
+  if (!fs.existsSync(filePath)) {
+    console.error(`[idf-roads] Dataset not found at ${filePath}`)
+    return []
+  }
+
+  console.log('[idf-roads] Parsing 143MB GeoJSON…')
   const raw = fs.readFileSync(filePath, 'utf8')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const geojson = JSON.parse(raw) as { features: any[] }
 
   _segments = geojson.features.map(f => {
     const p = f.properties
-    return {
-      id:         String(p.XDSegID ?? p.OID ?? ''),
+    const seg: IdfSegment = {
+      id:         String(p.XDSegID ?? p.OID ?? Math.random()),
       frc:        parseInt(p.FRC ?? '5', 10),
-      roadName:   p.RoadName ?? '',
+      roadName:   p.RoadName ?? p.FullRoadName ?? 'Voie sans nom',
       roadNumber: p.RoadNumber ?? '',
       roadList:   p.RoadList ?? '',
       county:     p.County ?? '',
@@ -71,10 +92,19 @@ function loadSegments(): IdfSegment[] {
       endLat:     parseFloat(p.EndLat ?? '0'),
       endLng:     parseFloat(p.EndLong ?? '0'),
       coordinates: f.geometry?.coordinates ?? [],
-    } as IdfSegment
+    }
+
+    // Index by starting point
+    const gx = Math.floor(seg.startLng / GRID_SIZE)
+    const gy = Math.floor(seg.startLat / GRID_SIZE)
+    const key = `${gx},${gy}`
+    if (!_grid.has(key)) _grid.set(key, [])
+    _grid.get(key)!.push(seg)
+
+    return seg
   })
 
-  console.log(`[idf-roads] Loaded ${_segments.length} segments.`)
+  console.log(`[idf-roads] Indexed ${_segments.length} segments in ${_grid.size} spatial cells.`)
   return _segments
 }
 
@@ -88,7 +118,7 @@ export async function GET(req: NextRequest) {
     : null
 
   const countyFilter = sp.get('county')?.toLowerCase() ?? null
-  const limit        = Math.min(parseInt(sp.get('limit') ?? '500', 10), 2000)
+  const limit        = Math.min(parseInt(sp.get('limit') ?? '800', 10), 3000)
   const minMiles     = parseFloat(sp.get('minMiles') ?? '0')
 
   let bbox: [number, number, number, number] | null = null
@@ -97,14 +127,35 @@ export async function GET(req: NextRequest) {
     if (parts.length === 4) bbox = parts as [number, number, number, number]
   }
 
-  const segments = loadSegments()
-  const results: IdfSegment[] = []
+  const allSegments = loadSegments()
+  let pool: IdfSegment[] = allSegments
 
-  for (const seg of segments) {
+  // Optimized spatial lookup if bbox is provided
+  if (bbox) {
+    pool = []
+    const keys = getGridKeys(bbox)
+    const seen = new Set<string>()
+    for (const key of keys) {
+      const cell = _grid.get(key)
+      if (cell) {
+        for (const s of cell) {
+          if (!seen.has(s.id)) {
+            pool.push(s)
+            seen.add(s.id)
+          }
+        }
+      }
+    }
+  }
+
+  const results: IdfSegment[] = []
+  for (const seg of pool) {
     if (results.length >= limit) break
+    
+    // Quick FRC check first
     if (frcFilter && !frcFilter.has(seg.frc)) continue
-    if (countyFilter && !seg.county.toLowerCase().includes(countyFilter)) continue
-    if (seg.miles < minMiles) continue
+    
+    // BBox check second
     if (bbox) {
       const [minLng, minLat, maxLng, maxLat] = bbox
       if (
@@ -112,12 +163,20 @@ export async function GET(req: NextRequest) {
         seg.startLat < minLat || seg.startLat > maxLat
       ) continue
     }
+
+    if (countyFilter && !seg.county.toLowerCase().includes(countyFilter)) continue
+    if (seg.miles < minMiles) continue
+    
     results.push(seg)
   }
 
-  // Convert to GeoJSON FeatureCollection
-  const geojson = {
+  return NextResponse.json({
     type: 'FeatureCollection',
+    metadata: {
+      totalFound:  results.length,
+      searchedIn:  pool.length,
+      gridCells:   bbox ? getGridKeys(bbox).length : 0
+    },
     features: results.map(seg => ({
       type: 'Feature',
       geometry: {
@@ -132,12 +191,9 @@ export async function GET(req: NextRequest) {
         county:     seg.county,
         miles:      seg.miles,
         lanes:      seg.lanes,
-        bearing:    seg.bearing,
       },
     })),
-  }
-
-  return NextResponse.json(geojson, {
-    headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=600' },
+  }, {
+    headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60' },
   })
 }
