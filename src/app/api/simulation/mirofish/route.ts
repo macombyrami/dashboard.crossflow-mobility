@@ -12,11 +12,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import personasData from '@/lib/data/personas.json'
+import aiData from '@/lib/data/ai.json'
 
-const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
-const MODEL           = 'openai/gpt-oss-120b:free'
+const OPENROUTER_BASE = aiData.openrouter.baseUrl
+const MODEL           = aiData.openrouter.miroFishModel
 const APP_URL         = process.env.NEXT_PUBLIC_APP_URL ?? 'https://myaccount.crossflow-mobility.com'
-const ZEP_BASE        = 'https://api.getzep.com/api/v2'
+const ZEP_BASE        = aiData.zep.baseUrl
+const X_TITLE         = aiData.openrouter.miroFishXTitle
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,6 +57,10 @@ export interface MiroFishResult {
   scoreImpact:      number   // 0-100
   termineeA:        string
 }
+
+// ─── Personas ─────────────────────────────────────────────────────────────────
+
+const PERSONAS = personasData
 
 // ─── Zep Cloud — mémoire des agents ──────────────────────────────────────────
 
@@ -97,7 +104,7 @@ async function sauvegarderMemoireZep(simId: string, role: string, message: strin
 async function appelLLM(
   prompt: string,
   systemPrompt: string,
-  maxTokens = 800,
+  maxTokens = aiData.miroFish.maxTokensDefault,
 ): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) throw new Error('OPENROUTER_API_KEY manquant')
@@ -108,7 +115,7 @@ async function appelLLM(
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type':  'application/json',
       'HTTP-Referer':  APP_URL,
-      'X-Title':       'CrossFlow MiroFish',
+      'X-Title':       X_TITLE,
     },
     body: JSON.stringify({
       model:       MODEL,
@@ -116,7 +123,7 @@ async function appelLLM(
         { role: 'system', content: systemPrompt },
         { role: 'user',   content: prompt },
       ],
-      temperature: 0.7,
+      temperature: aiData.miroFish.temperature,
       max_tokens:  maxTokens,
     }),
   })
@@ -129,41 +136,6 @@ async function appelLLM(
   const data = await res.json()
   return data.choices?.[0]?.message?.content ?? ''
 }
-
-// ─── Personas mobilité ────────────────────────────────────────────────────────
-
-const PERSONAS = [
-  {
-    role:         'Automobiliste domicile-travail',
-    emoji:        '🚗',
-    proportion:   0.40,
-    comportement: 'Évite les bouchons, suit les apps GPS, sensible au temps de trajet',
-  },
-  {
-    role:         'Livreur colis / coursier',
-    emoji:        '📦',
-    proportion:   0.10,
-    comportement: 'Contraintes horaires strictes, cherche à se garer, prend des risques',
-  },
-  {
-    role:         'Usager transports en commun',
-    emoji:        '🚇',
-    proportion:   0.30,
-    comportement: 'Réagit aux perturbations RATP, peut marcher 15 min, multimodal',
-  },
-  {
-    role:         'Cycliste urbain',
-    emoji:        '🚲',
-    proportion:   0.12,
-    comportement: 'Évite les axes rapides, sensible à la météo, utilise les pistes cyclables',
-  },
-  {
-    role:         'Piéton / touriste',
-    emoji:        '🚶',
-    proportion:   0.08,
-    comportement: 'Se déplace à pied, traversées imprévisibles, flux concentré sur les zones touristiques',
-  },
-]
 
 // ─── Simuler un agent ─────────────────────────────────────────────────────────
 
@@ -193,7 +165,7 @@ En tant que ${persona.role}, réponds en JSON avec exactement ces champs :
 }`
 
   try {
-    const raw = await appelLLM(prompt, systeme, 300)
+    const raw = await appelLLM(prompt, systeme, aiData.miroFish.maxTokensAgent)
 
     // Extraire le JSON de la réponse
     const jsonMatch = raw.match(/\{[\s\S]*\}/)
@@ -270,7 +242,7 @@ Génère un rapport JSON avec exactement cette structure :
 }`
 
   try {
-    const raw = await appelLLM(prompt, systeme, 900)
+    const raw = await appelLLM(prompt, systeme, aiData.miroFish.maxTokensReport)
     const jsonMatch = raw.match(/\{[\s\S]*\}/)
     const parsed    = jsonMatch ? JSON.parse(jsonMatch[0]) : null
 
@@ -310,9 +282,11 @@ export async function POST(req: NextRequest) {
     await creerSessionZep(simId)
 
     // Sélectionner les personas à simuler selon nbAgents
-    const nb         = seed.nbAgents ?? 50
-    const personnages = nb <= 50  ? PERSONAS.slice(0, 3) :
-                        nb <= 200 ? PERSONAS.slice(0, 4) : PERSONAS
+    const nb          = seed.nbAgents ?? 50
+    const tiers       = aiData.miroFish.agentSelectionTiers
+    const personasCount = nb <= tiers.small.maxAgents  ? tiers.small.personasCount :
+                          nb <= tiers.medium.maxAgents ? tiers.medium.personasCount : tiers.large.personasCount
+    const personnages = PERSONAS.slice(0, personasCount)
 
     // Simuler les agents en parallèle par lots (éviter rate-limit)
     const insights: AgentInsight[] = []

@@ -1,12 +1,12 @@
 /**
  * OpenRouter AI — Server-side route
- * Default model: openai/gpt-oss-120b:free
  * Key stays server-side (never exposed to browser)
  */
 import { NextRequest, NextResponse } from 'next/server'
+import aiData from '@/lib/data/ai.json'
 
-const OPENROUTER_BASE    = 'https://openrouter.ai/api/v1'
-const DEFAULT_MODEL      = 'google/gemini-2.0-flash-001'
+const OPENROUTER_BASE = aiData.openrouter.baseUrl
+const DEFAULT_MODEL   = aiData.openrouter.defaultModel
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENROUTER_API_KEY
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type':  'application/json',
         'HTTP-Referer':  process.env.NEXT_PUBLIC_APP_URL ?? 'https://myaccount.crossflow-mobility.com',
-        'X-Title':       'CrossFlow Mobility',
+        'X-Title':       aiData.openrouter.xTitle,
       },
       body: JSON.stringify({
         model,
@@ -37,8 +37,8 @@ export async function POST(req: NextRequest) {
           { role: 'system', content: systemPrompt },
           ...messages,
         ],
-        temperature: 0.65,
-        max_tokens:  1200,
+        temperature: aiData.main.temperature,
+        max_tokens:  aiData.main.maxTokens,
         stream:      false,
       }),
     })
