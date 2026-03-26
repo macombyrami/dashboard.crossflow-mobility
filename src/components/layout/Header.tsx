@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap, Lock, AlertTriangle, Clock } from 'lucide-react'
 import { useMapStore, geocodingToCity } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
@@ -17,13 +17,30 @@ const SEVERITY_COLOR: Record<string, string> = {
   low:      '#00E676',
 }
 
+// Isolated clock — re-renders only itself every 10s, not the whole Header
+const LiveClock = memo(function LiveClock() {
+  const [time, setTime] = useState('')
+  useEffect(() => {
+    const tick = () => {
+      setTime(new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
+    }
+    tick()
+    const id = setInterval(tick, 10000)
+    return () => clearInterval(id)
+  }, [])
+  return (
+    <div className="hidden md:flex items-center px-2.5 py-1.5 rounded-lg bg-bg-elevated/60 border border-bg-border/50">
+      <span className="text-[13px] font-medium text-text-secondary mono tabular-nums">{time}</span>
+    </div>
+  )
+})
+
 export function Header() {
   const router          = useRouter()
   const setAIPanelOpen  = useMapStore(s => s.setAIPanelOpen)
   const isAIPanelOpen   = useMapStore(s => s.isAIPanelOpen)
   const weather         = useTrafficStore(s => s.weather)
   const incidents       = useTrafficStore(s => s.incidents)
-  const [time, setTime]           = useState('')
   const [alertOpen, setAlertOpen] = useState(false)
   const alertRef                  = useRef<HTMLDivElement>(null)
 
@@ -39,16 +56,6 @@ export function Header() {
     if (alertOpen) document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [alertOpen])
-
-  useEffect(() => {
-    const tick = () => {
-      const now = new Date()
-      setTime(now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
-    }
-    tick()
-    const id = setInterval(tick, 10000)
-    return () => clearInterval(id)
-  }, [])
 
   return (
     <header
@@ -81,10 +88,8 @@ export function Header() {
           </div>
         )}
 
-        {/* Clock — md+ only */}
-        <div className="hidden md:flex items-center px-2.5 py-1.5 rounded-lg bg-bg-elevated/60 border border-bg-border/50">
-          <span className="text-[13px] font-medium text-text-secondary mono tabular-nums">{time}</span>
-        </div>
+        {/* Clock — md+ only (isolated component, re-renders independently) */}
+        <LiveClock />
 
         {/* Alerts dropdown */}
         <div ref={alertRef} className="relative">

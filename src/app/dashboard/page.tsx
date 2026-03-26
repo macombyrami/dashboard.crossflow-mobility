@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, memo } from 'react'
 import { Activity, Clock, Wind, AlertTriangle, Network, Zap, Download } from 'lucide-react'
 import { KPICard } from '@/components/dashboard/KPICard'
 import { cn } from '@/lib/utils/cn'
@@ -113,11 +113,16 @@ export default function DashboardPage() {
   const pollWarn   = kpis.pollutionIndex >= targets.pollution_index.warning
   const pollColor  = pollutionLabel(kpis.pollutionIndex).color
 
-  // Stable deltas (seeded by city + minute, but only after mount to avoid #418)
-  const seed = mounted ? (city.id.charCodeAt(0) + new Date().getMinutes()) : city.id.charCodeAt(0)
-  const congDelta   = ((seed % 21) - 10) / 10
-  const travelDelta = ((seed % 11) - 5)  / 10
-  const pollDelta   = ((seed % 31) - 15) / 10
+  // Stable deltas — recompute only when city changes or on mount (not every minute)
+  const { congDelta, travelDelta, pollDelta } = useMemo(() => {
+    const seed = mounted ? (city.id.charCodeAt(0) + new Date().getMinutes()) : city.id.charCodeAt(0)
+    return {
+      congDelta:   ((seed % 21) - 10) / 10,
+      travelDelta: ((seed % 11) - 5)  / 10,
+      pollDelta:   ((seed % 31) - 15) / 10,
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city.id, mounted])
 
   return (
     <main className="min-h-full p-4 sm:p-8 space-y-6 sm:space-y-8 pb-safe">
@@ -294,7 +299,9 @@ export default function DashboardPage() {
   )
 }
 
-function EfficiencyBar({ label, value, color = '#22C55E' }: { label: string; value: number; color?: string }) {
+const EfficiencyBar = memo(function EfficiencyBar({
+  label, value, color = '#22C55E',
+}: { label: string; value: number; color?: string }) {
   return (
     <div className="space-y-2 mb-4 group">
       <div className="flex justify-between items-end">
@@ -303,10 +310,10 @@ function EfficiencyBar({ label, value, color = '#22C55E' }: { label: string; val
       </div>
       <div className="h-2 rounded-full bg-white/5 overflow-hidden shadow-inner">
         <div
-          className="h-full rounded-full transition-all duration-1000 ease-out"
+          className="h-full rounded-full transition-[width] duration-700 ease-out"
           style={{ width: `${value * 100}%`, backgroundColor: color, boxShadow: `0 0 12px ${color}40` }}
         />
       </div>
     </div>
   )
-}
+})

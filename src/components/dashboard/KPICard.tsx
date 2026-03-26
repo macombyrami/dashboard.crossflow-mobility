@@ -1,4 +1,5 @@
 'use client'
+import { memo } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { MetricDelta } from '@/components/ui/MetricDelta'
 import { useTranslation } from '@/lib/hooks/useTranslation'
@@ -19,20 +20,20 @@ interface Props {
   className?: string
 }
 
-export function KPICard({
+function KPICardInner({
   label, value, unit, delta, deltaUnit = '%', inverse = false,
   icon: Icon, color = '#22C55E', warning, critical, sub, className,
 }: Props) {
   const { t } = useTranslation()
   return (
     <div className={cn(
-      'glass-card p-5 sm:p-6 space-y-5 hover:shadow-apple transition-all duration-500 relative group overflow-hidden animate-scale-in',
+      'glass-card p-5 sm:p-6 space-y-5 hover:shadow-apple relative group overflow-hidden animate-scale-in',
       className,
     )}>
       {/* Background Glow Overlay (Apple-style subtle vibrancy) */}
-      <div 
-        className="absolute -top-12 -right-12 w-40 h-40 blur-[100px] opacity-10 transition-opacity group-hover:opacity-25" 
-        style={{ backgroundColor: color }} 
+      <div
+        className="absolute -top-12 -right-12 w-40 h-40 blur-[100px] opacity-10 transition-opacity duration-500 group-hover:opacity-25 pointer-events-none"
+        style={{ backgroundColor: color, willChange: 'opacity' }}
       />
 
       <div className="flex items-center justify-between relative z-10">
@@ -67,3 +68,5 @@ export function KPICard({
     </div>
   )
 }
+
+export const KPICard = memo(KPICardInner)

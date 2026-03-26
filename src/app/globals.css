@@ -90,17 +90,21 @@ body {
   -webkit-backdrop-filter: blur(24px) saturate(190%);
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 18px;
-  box-shadow: 
+  box-shadow:
     0 2px 4px rgba(0,0,0,0.1),
     0 12px 32px rgba(0,0,0,0.35),
     inset 0 1px 0 rgba(255,255,255,0.04);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow   0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              transform    0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .glass-card:hover {
   border-color: rgba(255,255,255,0.12);
-  transform: translateY(-2px);
-  box-shadow: 
+  transform: translateY(-2px) translateZ(0);
+  box-shadow:
     0 4px 8px rgba(0,0,0,0.2),
     0 16px 48px rgba(0,0,0,0.45),
     inset 0 1px 0 rgba(255,255,255,0.08);
@@ -263,6 +267,13 @@ body {
 .traffic-flow {
   stroke-dasharray: 10 10;
   animation: flow-line 1s linear infinite;
+  will-change: stroke-dashoffset;
+}
+
+/* GPU-accelerated animated elements */
+.animate-pulse,
+.animate-live-dot {
+  will-change: opacity, box-shadow;
 }
 
 /* ─── Layout Shell ─────────────────────────────────────────────────────── */
@@ -341,6 +352,13 @@ body {
 /* ─── Mobile safe area ─────────────────────────────────────────────────── */
 .pb-safe {
   padding-bottom: calc(max(env(safe-area-inset-bottom), 8px) + var(--nav-h));
+}
+
+/* Desktop: no bottom nav, only minimal safe area */
+@media (min-width: 1024px) {
+  .pb-safe {
+    padding-bottom: 16px;
+  }
 }
 
 /* ─── No-scrollbar (hide scrollbar, keep functionality) ─────────────────── */

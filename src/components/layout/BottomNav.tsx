@@ -5,14 +5,14 @@ import { Map, LayoutDashboard, AlertTriangle, Rss, Settings, TrendingUp, Cpu, Bu
 import { cn } from '@/lib/utils/cn'
 
 const TABS = [
-  { href: '/map',        icon: Map,             label: 'Carte',     ariaLabel: 'Carte du trafic en temps réel' },
-  { href: '/dashboard',  icon: LayoutDashboard, label: 'Tableau',   ariaLabel: 'Tableau de bord' },
-  { href: '/prediction', icon: TrendingUp,      label: 'Prévisions',ariaLabel: 'Prévisions de trafic' },
-  { href: '/simulation', icon: Cpu,             label: 'Simul.',    ariaLabel: 'Simulation de scénarios' },
-  { href: '/transport',  icon: Bus,             label: 'Transp.',   ariaLabel: 'Transports en commun' },
-  { href: '/incidents',  icon: AlertTriangle,   label: 'Alertes',   ariaLabel: 'Incidents actifs' },
-  { href: '/social',     icon: Rss,             label: 'Social',    ariaLabel: 'Feed social' },
-  { href: '/settings',   icon: Settings,        label: 'Param.',    ariaLabel: 'Paramètres' },
+  { href: '/map',        icon: Map,             label: 'Carte',     ariaLabel: 'Carte du trafic en temps réel', primary: true  },
+  { href: '/dashboard',  icon: LayoutDashboard, label: 'Tableau',   ariaLabel: 'Tableau de bord',              primary: true  },
+  { href: '/prediction', icon: TrendingUp,      label: 'Prévisions',ariaLabel: 'Prévisions de trafic',         primary: true  },
+  { href: '/simulation', icon: Cpu,             label: 'Simul.',    ariaLabel: 'Simulation de scénarios',      primary: false },
+  { href: '/transport',  icon: Bus,             label: 'Transp.',   ariaLabel: 'Transports en commun',         primary: true  },
+  { href: '/incidents',  icon: AlertTriangle,   label: 'Alertes',   ariaLabel: 'Incidents actifs',             primary: true  },
+  { href: '/social',     icon: Rss,             label: 'Social',    ariaLabel: 'Feed social',                  primary: false },
+  { href: '/settings',   icon: Settings,        label: 'Param.',    ariaLabel: 'Paramètres',                   primary: false },
 ]
 
 export function BottomNav() {
@@ -31,7 +31,7 @@ export function BottomNav() {
       }}
     >
       <div className="flex h-[60px]" role="list">
-        {TABS.map(({ href, icon: Icon, label, ariaLabel }) => {
+        {TABS.map(({ href, icon: Icon, label, ariaLabel, primary }) => {
           const active = pathname === href || (href !== '/' && pathname.startsWith(href))
           return (
             <Link
@@ -41,7 +41,11 @@ export function BottomNav() {
               aria-label={ariaLabel}
               aria-current={active ? 'page' : undefined}
               className={cn(
+                // On xs (<375px) hide secondary tabs → 5 primary tabs at ~75px each
+                // On sm+ show all 8 tabs
                 'flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-inset rounded-lg',
+                !primary && !active && 'hidden xs:flex',
+                !primary && active  && 'flex',   // always show active tab even if secondary
               )}
             >
               <div className={cn(
