@@ -2,6 +2,23 @@
 import { Wind } from 'lucide-react'
 import type { AirQuality } from '@/lib/api/openmeteo'
 
+// Short labels for 38px-wide forecast cells (#10 — "acce" truncation fix)
+const LEVEL_SHORT: Record<string, string> = {
+  'Good':           'Bon',
+  'Fair':           'OK',
+  'Moderate':       'Moy.',
+  'Poor':           'Mvs',
+  'Very Poor':      'T.mvs',
+  'Extremely Poor': 'Extr.',
+  'Acceptable':     'OK',
+  'Bon':            'Bon',
+  'Mauvais':        'Mvs',
+  'Très mauvais':   'T.mvs',
+}
+function levelShort(level: string): string {
+  return LEVEL_SHORT[level] ?? level.slice(0, 4)
+}
+
 export function AirQualityCard({ aq }: { aq: AirQuality }) {
   return (
     <div className="bg-bg-surface border border-bg-border rounded-2xl p-5 space-y-4">
@@ -60,7 +77,7 @@ export function AirQualityCard({ aq }: { aq: AirQuality }) {
               <div key={i} className="flex flex-col items-center gap-0.5 min-w-[38px] bg-bg-subtle rounded-lg px-1.5 py-2">
                 <span className="text-[9px] text-text-muted">{h.time}</span>
                 <span className="text-[11px] font-bold" style={{ color: h.color }}>{h.aqi}</span>
-                <span className="text-[8px]" style={{ color: h.color }}>{h.level.slice(0, 4)}</span>
+                <span className="text-[8px]" style={{ color: h.color }}>{levelShort(h.level)}</span>
               </div>
             ))}
           </div>

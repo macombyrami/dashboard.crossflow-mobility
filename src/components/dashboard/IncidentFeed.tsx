@@ -6,6 +6,19 @@ import { formatDistanceToNow } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils/cn'
 
+// French labels for incident types — covers both lower and uppercase from various sources (#26)
+const TYPE_LABELS: Record<string, string> = {
+  accident:   'Accident',
+  roadwork:   'Travaux',
+  ROADWORK:   'Travaux',
+  congestion: 'Congestion',
+  CONGESTION: 'Congestion',
+  anomaly:    'Anomalie IA',
+  ANOMALY:    'Anomalie IA',
+  event:      'Événement',
+  EVENT:      'Événement',
+}
+
 export function IncidentFeed({ maxItems = 5 }: { maxItems?: number }) {
   const incidents = useTrafficStore(s => s.incidents)
   const sorted    = [...incidents]
@@ -51,7 +64,7 @@ export function IncidentFeed({ maxItems = 5 }: { maxItems?: number }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-2">
                   <SeverityPill severity={inc.severity} size="sm" />
-                  <span className="text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] opacity-60 group-hover:opacity-100 transition-opacity">{inc.type}</span>
+                  <span className="text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] opacity-60 group-hover:opacity-100 transition-opacity">{TYPE_LABELS[inc.type] ?? inc.type}</span>
                 </div>
                 <p className="text-[14px] font-bold text-white truncate group-hover:text-brand-green transition-colors">{inc.title}</p>
                 <div className="flex items-center gap-4 mt-2.5">

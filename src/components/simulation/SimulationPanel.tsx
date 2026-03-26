@@ -210,13 +210,26 @@ export function SimulationPanel() {
         </div>
       </div>
 
-      {/* Impact preview */}
-      {impact && (
+      {/* Impact preview — only shown after the simulation has been run at least once,
+           or as indicative estimate when user has changed parameters (#21) */}
+      {impact && !store.isRunning && store.currentResult === null && (
+        <div className="bg-bg-surface border border-bg-border rounded-2xl p-5 space-y-3 opacity-70">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">{t('simulation.estimated_impact')}</p>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-muted uppercase tracking-wider">Indicatif</span>
+          </div>
+          <ImpactRow label={t('dashboard.congestion')}  value={impact.congestion * store.magnitude} unit="pts" />
+          <ImpactRow label={t('dashboard.travel_time')} value={impact.travelTime * store.magnitude} unit="%" />
+          <ImpactRow label={t('dashboard.pollution')}   value={impact.pollution  * store.magnitude} unit="pts" />
+          <p className="text-[10px] text-text-muted">Lancez la simulation pour obtenir des résultats précis.</p>
+        </div>
+      )}
+      {impact && store.currentResult !== null && (
         <div className="bg-bg-surface border border-bg-border rounded-2xl p-5 space-y-3">
           <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">{t('simulation.estimated_impact')}</p>
-          <ImpactRow label={t('dashboard.congestion')}     value={impact.congestion * store.magnitude} unit="pts" />
+          <ImpactRow label={t('dashboard.congestion')}  value={impact.congestion * store.magnitude} unit="pts" />
           <ImpactRow label={t('dashboard.travel_time')} value={impact.travelTime * store.magnitude} unit="%" />
-          <ImpactRow label={t('dashboard.pollution')}       value={impact.pollution  * store.magnitude} unit="pts" />
+          <ImpactRow label={t('dashboard.pollution')}   value={impact.pollution  * store.magnitude} unit="pts" />
         </div>
       )}
 

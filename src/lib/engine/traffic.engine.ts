@@ -136,26 +136,27 @@ function generateCityRoads(city: City): RawSegment[] {
 
 // ─── Congestion pattern (realistic time-of-day) ───────────────────────────
 
-function baseCongestionForHour(hour: number, isWeekend: boolean): number {
+// rng is required — always pass a seeded generator to guarantee stable values (#8)
+function baseCongestionForHour(hour: number, isWeekend: boolean, rng: () => number): number {
   if (isWeekend) {
-    if (hour < 8)  return 0.05 + Math.random() * 0.05
-    if (hour < 12) return 0.20 + Math.random() * 0.10
-    if (hour < 16) return 0.30 + Math.random() * 0.15
-    if (hour < 20) return 0.25 + Math.random() * 0.10
-    return 0.10 + Math.random() * 0.05
+    if (hour < 8)  return 0.05 + rng() * 0.05
+    if (hour < 12) return 0.20 + rng() * 0.10
+    if (hour < 16) return 0.30 + rng() * 0.15
+    if (hour < 20) return 0.25 + rng() * 0.10
+    return 0.10 + rng() * 0.05
   }
   // Weekday
-  if (hour < 6)  return 0.03 + Math.random() * 0.03
-  if (hour < 8)  return 0.30 + Math.random() * 0.20  // morning rush
-  if (hour < 9)  return 0.65 + Math.random() * 0.25  // peak
-  if (hour < 10) return 0.50 + Math.random() * 0.20
-  if (hour < 12) return 0.35 + Math.random() * 0.15
-  if (hour < 13) return 0.45 + Math.random() * 0.15  // lunch
-  if (hour < 16) return 0.30 + Math.random() * 0.10
-  if (hour < 17) return 0.50 + Math.random() * 0.20
-  if (hour < 19) return 0.70 + Math.random() * 0.25  // evening rush
-  if (hour < 21) return 0.45 + Math.random() * 0.15
-  return 0.15 + Math.random() * 0.10
+  if (hour < 6)  return 0.03 + rng() * 0.03
+  if (hour < 8)  return 0.30 + rng() * 0.20  // morning rush
+  if (hour < 9)  return 0.65 + rng() * 0.25  // peak
+  if (hour < 10) return 0.50 + rng() * 0.20
+  if (hour < 12) return 0.35 + rng() * 0.15
+  if (hour < 13) return 0.45 + rng() * 0.15  // lunch
+  if (hour < 16) return 0.30 + rng() * 0.10
+  if (hour < 17) return 0.50 + rng() * 0.20
+  if (hour < 19) return 0.70 + rng() * 0.25  // evening rush
+  if (hour < 21) return 0.45 + rng() * 0.15
+  return 0.15 + rng() * 0.10
 }
 
 // ─── Main snapshot generator ──────────────────────────────────────────────
@@ -166,7 +167,7 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
   const isWE = now.getDay() === 0 || now.getDay() === 6
   const rng  = seededRng(cityTimeSeed(city.id))
 
-  const baseCongestion = Math.min(1, baseCongestionForHour(hour, isWE))
+  const baseCongestion = Math.min(1, baseCongestionForHour(hour, isWE, rng))
   const roads = generateCityRoads(city)
   const segments: TrafficSegment[] = []
   const heatmap: HeatmapPoint[] = []
@@ -237,7 +238,7 @@ export function generateTrafficFromOSMRoads(city: City, osmRoads: OSMRoad[]): Tr
   const isWE = now.getDay() === 0 || now.getDay() === 6
   const rng  = seededRng(cityTimeSeed(city.id))
 
-  const baseCongestion = Math.min(1, baseCongestionForHour(hour, isWE))
+  const baseCongestion = Math.min(1, baseCongestionForHour(hour, isWE, rng))
   const segments: TrafficSegment[] = []
   const heatmap: HeatmapPoint[] = []
   const heatmapPassages: HeatmapPoint[] = []
@@ -319,7 +320,7 @@ export function generateTrafficFromIdfGeoJSON(city: City, geojson: any): Traffic
   const isWE = now.getDay() === 0 || now.getDay() === 6
   const rng  = seededRng(cityTimeSeed(city.id))
 
-  const baseCongestion = Math.min(1, baseCongestionForHour(hour, isWE))
+  const baseCongestion = Math.min(1, baseCongestionForHour(hour, isWE, rng))
   const segments: TrafficSegment[] = []
   const heatmap: HeatmapPoint[] = []
   const heatmapPassages: HeatmapPoint[] = []
@@ -514,7 +515,7 @@ export function generateKPIHistory(city: City, points = 48) {
     const rng  = seededRng(cityTimeSeed(city.id + '_hist_' + i) + i * 997)
     const hour = date.getHours()
     const isWE = date.getDay() === 0 || date.getDay() === 6
-    const base = baseCongestionForHour(hour, isWE)
+    const base = baseCongestionForHour(hour, isWE, rng)
     return {
       time:          date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
       congestion:    Math.round(Math.min(1, base + (rng() - 0.5) * 0.1) * 100),

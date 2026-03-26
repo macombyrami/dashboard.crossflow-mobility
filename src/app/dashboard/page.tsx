@@ -258,7 +258,7 @@ export default function DashboardPage() {
           value={incidents.length}
           icon={AlertTriangle}
           color={incidents.length > 5 ? '#FF6D00' : '#FFD600'}
-          sub="Accidents + works"
+          sub="Accidents + travaux"
         />
       </div>
 
@@ -274,10 +274,10 @@ export default function DashboardPage() {
               <div className="w-1.5 h-4.5 bg-brand rounded-full shadow-glow" />
               <p className="text-[11px] font-bold text-text-muted uppercase tracking-[0.18em]">{t('dashboard.performance')}</p>
             </div>
-            <EfficiencyBar label="Main roads"       value={kpis.networkEfficiency * 0.9 + 0.1} />
-            <EfficiencyBar label="Public transit"   value={0.78}  color="#0A84FF" />
-            <EfficiencyBar label="Cycle network"    value={0.85}  color="#30D158" />
-            <EfficiencyBar label="Pedestrian zones" value={0.92}  color="#AF52DE" />
+            <EfficiencyBar label="Axes majeurs"          value={kpis.networkEfficiency * 0.9 + 0.1} />
+            <EfficiencyBar label="Transports en commun" value={0.78}  color="#0A84FF" />
+            <EfficiencyBar label="Pistes cyclables"     value={0.85}  color="#30D158" />
+            <EfficiencyBar label="Zones piétonnes"      value={0.92}  color="#AF52DE" />
           </div>
         </div>
       </div>

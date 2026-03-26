@@ -15,6 +15,7 @@ export const translations = {
       calculating: 'Calcul...',
       recalculate: 'Recalculer',
       name: 'Nom',
+      yesterday: 'hier',
     },
     nav: {
       map: 'Carte Live',
@@ -96,6 +97,7 @@ export const translations = {
       calculating: 'Calculating...',
       recalculate: 'Recalculate',
       name: 'Name',
+      yesterday: 'yesterday',
     },
     nav: {
       map: 'Live Map',

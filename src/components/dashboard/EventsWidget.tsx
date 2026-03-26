@@ -221,9 +221,13 @@ interface EventCardProps {
 }
 
 function EventCard({ evt, cfg, impact, sc, srcBadge }: EventCardProps) {
+  const isPast = new Date(evt.startDate) < new Date()
   return (
     <button
-      className="w-full text-left px-4 py-3 group hover:bg-white/[0.04] active:bg-white/[0.06] transition-all duration-200 rounded-2xl"
+      className={cn(
+        'w-full text-left px-4 py-3 group hover:bg-white/[0.04] active:bg-white/[0.06] transition-all duration-200 rounded-2xl',
+        isPast && 'opacity-50',
+      )}
     >
       <div className="flex items-start gap-3">
         {/* Category icon */}
@@ -240,6 +244,12 @@ function EventCard({ evt, cfg, impact, sc, srcBadge }: EventCardProps) {
             <h3 className="text-[13px] font-bold text-white truncate group-hover:text-brand transition-colors leading-tight">
               {evt.title}
             </h3>
+            {/* Past event badge (#13) */}
+            {isPast && (
+              <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-muted uppercase tracking-wider">
+                Passé
+              </span>
+            )}
           </div>
 
           {/* Date + venue */}

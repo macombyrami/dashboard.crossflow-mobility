@@ -38,10 +38,10 @@ export default function PredictionPage() {
     f <= 1.4  ? '#FF6D00' : '#FF1744'
 
   const factorLabel = (f: number) =>
-    f <= 0.7  ? 'Very Low Traffic' :
-    f <= 0.95 ? 'Light Traffic' :
-    f <= 1.1  ? 'Normal Traffic' :
-    f <= 1.4  ? 'Heavy Traffic' : 'Major Congestion'
+    f <= 0.7  ? 'Trafic très fluide' :
+    f <= 0.95 ? 'Trafic léger' :
+    f <= 1.1  ? 'Trafic normal' :
+    f <= 1.4  ? 'Trafic chargé' : 'Congestion majeure'
 
   return (
     <main className="min-h-full p-4 sm:p-6 space-y-6 pb-safe">
@@ -75,7 +75,7 @@ export default function PredictionPage() {
             <div className="bg-bg-surface border border-bg-border rounded-2xl p-8 sm:p-12 text-center">
               <RefreshCw className="w-8 h-8 text-brand-green animate-spin mx-auto mb-3" />
               <p className="text-sm text-text-secondary">{t('common.calculating')}...</p>
-              <p className="text-xs text-text-muted mt-1">Calendar · Events · Weather · Sun</p>
+              <p className="text-xs text-text-muted mt-1">Calendrier · Événements · Météo · Saisonnalité</p>
             </div>
           )}
 
@@ -90,8 +90,8 @@ export default function PredictionPage() {
                   </span>
                 </div>
                 <p className="text-xs text-text-muted mb-4">
-                  Multiplied congestion factor based on context.
-                  <span className="hidden sm:inline text-text-secondary"> ×1,00 = normal · &lt;1,00 = lighter · &gt;1,00 = heavier</span>
+                  Multiplicateur de congestion basé sur le contexte.
+                  <span className="hidden sm:inline text-text-secondary"> ×1,00 = normal · &lt;1,00 = plus fluide · &gt;1,00 = plus chargé</span>
                 </p>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
                   <div className="text-4xl sm:text-5xl font-bold" style={{ color: factorColor(ctx.totalFactor) }}>
@@ -103,7 +103,7 @@ export default function PredictionPage() {
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       <p className="text-xs text-text-muted">
-                        Result of {ctx.signals.length} {t('prediction.signals').toLowerCase()}
+                        Issu de {ctx.signals.length} {t('prediction.signals').toLowerCase()}
                       </p>
                       <span className="w-1 h-1 rounded-full bg-bg-border" />
                       <div className={cn(
@@ -112,19 +112,19 @@ export default function PredictionPage() {
                         ctx.pressureLevel === 'MEDIUM' ? "bg-orange-500/10 text-orange-500 border border-orange-500/20" :
                         "bg-brand-green/10 text-brand-green border border-brand-green/20"
                       )}>
-                        {ctx.pressureLevel} RISK (Scoring: {ctx.pressureScore.toFixed(2)})
+                        {ctx.pressureLevel === 'HIGH' ? 'RISQUE ÉLEVÉ' : ctx.pressureLevel === 'MEDIUM' ? 'RISQUE MODÉRÉ' : 'RISQUE FAIBLE'} (Score : {ctx.pressureScore.toFixed(2)})
                       </div>
                     </div>
                   </div>
                 </div>
                 {/* Factor breakdown bar */}
                 <div className="mt-6 space-y-2">
-                  <FactorBar label="Calendar"     value={ctx.calendarFactor} icon={Calendar} />
-                  <FactorBar label="Events"       value={ctx.eventFactor}    icon={Users}    />
-                  <FactorBar label="Transport"    value={ctx.transportFactor} icon={Train}    />
-                  <FactorBar label="Weather"      value={ctx.weatherFactor}  icon={Cloud}    />
-                  <FactorBar label="Air Quality"  value={ctx.aqFactor}       icon={Zap}      />
-                  <FactorBar label="Seasonality"  value={ctx.seasonFactor}   icon={Sun}      />
+                  <FactorBar label="Calendrier"       value={ctx.calendarFactor}  icon={Calendar} />
+                  <FactorBar label="Événements"       value={ctx.eventFactor}     icon={Users}    />
+                  <FactorBar label="Transports"       value={ctx.transportFactor} icon={Train}    />
+                  <FactorBar label="Météo"            value={ctx.weatherFactor}   icon={Cloud}    />
+                  <FactorBar label="Qualité de l'air" value={ctx.aqFactor}        icon={Zap}      />
+                  <FactorBar label="Saisonnalité"     value={ctx.seasonFactor}    icon={Sun}      />
                 </div>
               </div>
 
@@ -194,7 +194,7 @@ export default function PredictionPage() {
                           ? 'bg-[rgba(255,109,0,0.08)] text-[#FF6D00]'
                           : 'bg-bg-subtle text-text-muted',
                       )}>
-                        {s.impact === 'positive' ? '▼ reduced' : s.impact === 'negative' ? '▲ increased' : '→ neutral'}
+                        {s.impact === 'positive' ? '▼ réduit' : s.impact === 'negative' ? '▲ augmenté' : '→ neutre'}
                       </span>
                     </div>
                   ))}
@@ -226,7 +226,7 @@ export default function PredictionPage() {
               <EventsWidget lat={city.center.lat} lng={city.center.lng} radiusKm={20} maxItems={8} />
 
               <p className="text-[10px] text-text-muted text-right italic">
-                Computed at {new Date(ctx.computedAt).toLocaleTimeString()}
+                Calculé à {new Date(ctx.computedAt).toLocaleTimeString('fr-FR')}
               </p>
             </>
           )}

@@ -39,6 +39,7 @@ export default function IncidentsPage() {
   const [filter, setFilter] = useState<IncidentSeverity | 'all'>('all')
   const [lastRefresh, setLastRefresh] = useState(new Date())
   const [mounted, setMounted] = useState(false)
+  const [csvExported, setCsvExported] = useState(false)
 
   // Sytadin state (for Paris only)
   const [sytadinData, setSytadinData] = useState<any>(null)
@@ -80,22 +81,27 @@ export default function IncidentsPage() {
     return () => clearInterval(interval)
   }, [city.id, dataSource]) // eslint-disable-line
 
+  // Normalize severity to lowercase to handle Sytadin uppercase values (#25)
+  const normSeverity = (s: string): IncidentSeverity =>
+    (s.toLowerCase() as IncidentSeverity)
+
   const filtered = useMemo(() => {
     return [...incidents]
-      .filter(i => filter === 'all' || i.severity === filter)
+      .filter(i => filter === 'all' || normSeverity(i.severity) === filter)
       .sort((a, b) => {
         if (a.source === 'Sytadin' && b.source !== 'Sytadin') return -1
         if (a.source !== 'Sytadin' && b.source === 'Sytadin') return 1
-        return SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
+        return (SEVERITY_ORDER[normSeverity(a.severity)] ?? 3) - (SEVERITY_ORDER[normSeverity(b.severity)] ?? 3)
       })
   }, [incidents, filter])
 
+  // Use normSeverity for counts to match filter behavior (#25)
   const counts = {
     all:      incidents.length,
-    critical: incidents.filter(i => i.severity === 'critical').length,
-    high:     incidents.filter(i => i.severity === 'high').length,
-    medium:   incidents.filter(i => i.severity === 'medium').length,
-    low:      incidents.filter(i => i.severity === 'low').length,
+    critical: incidents.filter(i => normSeverity(i.severity) === 'critical').length,
+    high:     incidents.filter(i => normSeverity(i.severity) === 'high').length,
+    medium:   incidents.filter(i => normSeverity(i.severity) === 'medium').length,
+    low:      incidents.filter(i => normSeverity(i.severity) === 'low').length,
   }
 
   const FILTERS: { id: IncidentSeverity | 'all'; label: string }[] = [
@@ -122,15 +128,19 @@ export default function IncidentsPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => exportToCsv(
-              `incidents-${city.id}-${new Date().toISOString().slice(0, 10)}`,
-              ['ID', 'Type', 'Sévérité', 'Titre', 'Adresse', 'Source', 'Début'],
-              incidents.map(i => [i.id, i.type, i.severity, i.title, i.address, i.source, i.startedAt]),
-            )}
+            onClick={() => {
+              exportToCsv(
+                `incidents-${city.id}-${new Date().toISOString().slice(0, 10)}`,
+                ['ID', 'Type', 'Sévérité', 'Titre', 'Adresse', 'Source', 'Début'],
+                incidents.map(i => [i.id, i.type, i.severity, i.title, i.address, i.source, i.startedAt]),
+              )
+              setCsvExported(true)
+              setTimeout(() => setCsvExported(false), 3000)
+            }}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-brand/40 transition-all text-sm font-semibold text-text-secondary hover:text-white group"
           >
-            <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
-            Exporter CSV
+            <Download className={cn('w-4 h-4 transition-transform', csvExported ? 'text-brand' : 'group-hover:-translate-y-0.5')} />
+            {csvExported ? `${incidents.length} lignes exportées ✓` : 'Exporter CSV'}
           </button>
           <button
             onClick={refresh}

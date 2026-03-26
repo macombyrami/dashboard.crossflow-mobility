@@ -27,16 +27,18 @@ const RATP_COLORS: Record<string, string> = {
 
 function RatpFeed() {
   const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState(false)
   const [alerts, setAlerts] = useState<TrafficLine[]>([])
-  
+
   const refresh = async () => {
     setLoading(true)
+    setError(false)
     try {
       const lines = await fetchAllTrafficStatus()
       const disrupted = lines.filter(l => l.status !== 'normal' && l.status !== 'inconnu')
       setAlerts(disrupted)
     } catch {
-      // ignore
+      setError(true)
     } finally {
       setLoading(false)
     }
@@ -70,6 +72,12 @@ function RatpFeed() {
           <div className="text-center p-8">
             <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-3" />
             <p className="text-xs text-text-muted">Chargement du trafic RATP...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center p-8 rounded-2xl border border-orange-500/20 bg-orange-500/5">
+            <p className="text-sm font-bold text-orange-400 mb-1">Service temporairement indisponible</p>
+            <p className="text-xs text-text-muted mb-3">L'API RATP ne répond pas. Réessayez dans quelques instants.</p>
+            <button onClick={refresh} className="text-xs text-brand font-semibold hover:underline">Réessayer</button>
           </div>
         ) : alerts.length === 0 ? (
           <div className="text-center p-8 bg-brand-green/5 rounded-2xl border border-brand-green/20">
@@ -276,7 +284,7 @@ function CommunityFeed() {
 export default function SocialPage() {
   const [activeTab, setActiveTab] = useState<SocialTab>('sytadin')
 
-  useEffect(() => { document.title = 'Social — Trafic IDF | CrossFlow' }, [])
+  useEffect(() => { document.title = 'Flux Social — Alertes IDF | CrossFlow' }, [])
 
   return (
     <div className="flex flex-col lg:flex-row min-h-full overflow-hidden bg-bg-base">
