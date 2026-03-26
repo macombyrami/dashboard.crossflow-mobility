@@ -38,7 +38,7 @@ export function IncidentFeed({ maxItems = 5 }: { maxItems?: number }) {
         <div className="flex items-center gap-2">
            <div className="w-2 h-2 rounded-full bg-brand-green shadow-glow animate-pulse" />
            <span className="text-[11px] font-bold text-text-muted bg-white/5 px-2.5 py-1 rounded-full border border-white/5">
-             {incidents.length}
+             {sorted.length}{incidents.length > maxItems ? `/${incidents.length}` : ''}
            </span>
         </div>
       </div>
