@@ -11,6 +11,18 @@ import { Settings, MapPin, User, LogOut, CheckCircle2, Loader2, ShieldCheck, Sea
 import { cn } from '@/lib/utils/cn'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 
+const ROLE_LABELS: Record<string, string> = {
+  'city_planner':    'Planificateur urbain',
+  'city planner':    'Planificateur urbain',
+  'admin':           'Administrateur',
+  'analyst':         'Analyste',
+  'operator':        'Opérateur',
+  'viewer':          'Observateur',
+  'manager':         'Gestionnaire',
+  'traffic_officer': 'Agent de circulation',
+  'engineer':        'Ingénieur',
+}
+
 export default function SettingsPage() {
   useEffect(() => { document.title = 'Paramètres | CrossFlow' }, [])
   const router        = useRouter()
@@ -101,7 +113,7 @@ export default function SettingsPage() {
                 <p className="text-[13px] text-text-secondary truncate">{user.email}</p>
                 {meta.role && (
                   <p className="text-[11px] text-text-muted mt-0.5 capitalize">
-                    {String(meta.role).replace('_', ' ')}
+                    {ROLE_LABELS[String(meta.role)] ?? String(meta.role).replace('_', ' ')}
                   </p>
                 )}
               </div>

@@ -12,8 +12,9 @@ interface BackendHealth {
 }
 
 export function PredictiveStatus() {
-  const [health, setHealth]   = useState<BackendHealth | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [health,       setHealth]       = useState<BackendHealth | null>(null)
+  const [loading,      setLoading]      = useState(true)
+  const [graphLoading, setGraphLoading] = useState(false)
 
   const check = async () => {
     setLoading(true)
@@ -21,6 +22,7 @@ export function PredictiveStatus() {
       const res = await fetch('/api/predictive/health')
       const data: BackendHealth = await res.json()
       setHealth(data)
+      return data
     } catch {
       setHealth({ online: false })
     } finally {
@@ -29,13 +31,24 @@ export function PredictiveStatus() {
   }
 
   const loadGraph = async () => {
+    setGraphLoading(true)
     try {
       await fetch('/api/predictive/graph/load-gennevilliers', { method: 'POST' })
       setTimeout(check, 3000)
-    } catch { /* ignore */ }
+    } catch { /* ignore */ } finally {
+      setGraphLoading(false)
+    }
   }
 
-  useEffect(() => { check() }, [])
+  useEffect(() => {
+    check().then(data => {
+      // Auto-load graph if backend is online but graph not yet loaded
+      if (data?.online && !data?.graph_loaded) {
+        loadGraph()
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   if (!health && loading) return (
     <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-surface border border-bg-border">
@@ -119,9 +132,13 @@ export function PredictiveStatus() {
       {!health.graph_loaded && (
         <button
           onClick={loadGraph}
-          className="w-full text-xs bg-brand-green/10 text-brand-green border border-brand-green/30 rounded-lg py-2 hover:bg-brand-green/20 transition-colors font-semibold"
+          disabled={graphLoading}
+          className="w-full text-xs bg-brand-green/10 text-brand-green border border-brand-green/30 rounded-lg py-2 hover:bg-brand-green/20 transition-colors font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60"
         >
-          Charger le graphe OSM
+          {graphLoading
+            ? <><RefreshCw className="w-3 h-3 animate-spin" />Chargement du graphe…</>
+            : 'Charger le graphe OSM'
+          }
         </button>
       )}
     </div>

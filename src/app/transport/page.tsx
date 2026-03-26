@@ -104,8 +104,8 @@ export default function TransportPage() {
 // ─── Summary bar ──────────────────────────────────────────────────────────────
 
 function SummaryBar({
-  total, totalPax, avgLoad, disrupted, loading,
-}: { total: number; totalPax: number; avgLoad: number; disrupted: number; loading: boolean }) {
+  total, totalPax, avgLoad, disrupted, loading, unavailable = false,
+}: { total: number; totalPax: number; avgLoad: number; disrupted: number; loading: boolean; unavailable?: boolean }) {
   const cards = [
     { label: 'Lignes actives', value: total,                      unit: '',     color: '#22C55E', icon: Activity },
     { label: 'Pax réseau / h', value: Math.round(totalPax / 1000), unit: 'k',  color: '#3B82F6', icon: Users },
@@ -122,7 +122,9 @@ function SummaryBar({
           </div>
           {loading
             ? <div className="h-7 w-16 bg-bg-elevated rounded animate-pulse" />
-            : <p className="text-2xl font-bold" style={{ color: c.color }}>{c.value}{c.unit}</p>
+            : unavailable
+              ? <p className="text-2xl font-bold text-text-muted">—</p>
+              : <p className="text-2xl font-bold" style={{ color: c.color }}>{c.value}{c.unit}</p>
           }
         </div>
       ))}
@@ -334,7 +336,7 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
       </div>
 
       {/* Summary */}
-      <SummaryBar total={lines.length} totalPax={totalPax} avgLoad={avgLoad} disrupted={disrupted} loading={loading} />
+      <SummaryBar total={lines.length} totalPax={totalPax} avgLoad={avgLoad} disrupted={disrupted} loading={loading} unavailable={!!error && lines.length === 0} />
 
       {error && (
         <div className="bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.3)] rounded-xl p-4 text-sm text-[#EF4444]">
@@ -456,7 +458,7 @@ function OsmTransitView({ city, mounted }: { city: OsmCity; mounted: boolean }) 
       </div>
 
       {/* Summary */}
-      <SummaryBar total={lines.length} totalPax={totalPax} avgLoad={avgLoad} disrupted={0} loading={loading} />
+      <SummaryBar total={lines.length} totalPax={totalPax} avgLoad={avgLoad} disrupted={0} loading={loading} unavailable={!!error && lines.length === 0} />
 
       {/* OSM disclaimer */}
       <div className="bg-[rgba(59,130,246,0.07)] border border-[rgba(59,130,246,0.2)] rounded-xl px-4 py-3 flex items-start gap-3">

@@ -621,7 +621,8 @@ export function CrossFlowMap() {
             },
             properties: {
               name: d.name,
-              density: Math.random() * 0.8 + 0.1, // Fake density between 10% and 90%
+              // Deterministic density from district name hash (avoids flickering)
+              density: ((d.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) * 2654435761) >>> 0) / 4294967296 * 0.8 + 0.1,
               admin_level: 9
             }
           }))
@@ -1108,7 +1109,16 @@ export function CrossFlowMap() {
   }, [zoneDraft, zonePolygon, mapLoaded])
 
   return (
-    <div ref={containerRef} className="w-full h-full" />
+    <div className="w-full h-full relative">
+      <div ref={containerRef} className="w-full h-full" />
+      {/* Loading overlay — fades out once map tiles are ready */}
+      {!mapLoaded && (
+        <div className="absolute inset-0 bg-bg-surface flex flex-col items-center justify-center gap-4 pointer-events-none z-10">
+          <div className="w-10 h-10 border-[3px] border-brand-green border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">Chargement de la carte…</p>
+        </div>
+      )}
+    </div>
   )
 }
 
