@@ -85,8 +85,9 @@ export default function PredictionPage() {
               <div className="bg-bg-surface border border-bg-border rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-sm font-semibold text-text-primary">{t('prediction.factor')}</p>
-                  <span className="text-xs text-text-muted">
+                  <span className="text-xs text-text-muted" title={ctx.confidence <= 0.5 ? 'Confiance limitée : données météo / événements indisponibles' : undefined}>
                     {t('prediction.confidence')}: {Math.round(ctx.confidence * 100)}%
+                    {ctx.confidence <= 0.5 && <span className="ml-1 text-[10px] text-[#FFB300]" title="Sources de données limitées">⚠</span>}
                   </span>
                 </div>
                 <p className="text-xs text-text-muted mb-4">
