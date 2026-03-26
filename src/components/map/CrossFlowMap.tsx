@@ -336,6 +336,42 @@ export function CrossFlowMap() {
       if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
     })
 
+    // Click on Incidents
+    map.on('click', INCIDENT_SOURCE + '-circles', (e) => {
+      if (zoneActiveRef.current) return
+      const feat = e.features?.[0]
+      if (!feat) return
+      const p = feat.properties as any
+      const color = p.color || '#FFD600'
+      const severity = (p.severity || 'medium').toUpperCase()
+      
+      popupRef.current?.remove()
+      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '240px', className: 'apple-popup' })
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div class="glass" style="padding:16px; border-radius:18px; color:white; border:1px solid ${color}40;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <div style="width:8px; height:8px; border-radius:50%; background:${color}; box-shadow:0 0 8px ${color};"></div>
+              <span style="font-size:10px; font-weight:700; color:${color}; text-transform:uppercase; tracking:0.1em;">${severity}</span>
+            </div>
+            <h3 style="margin:0 0 6px 0; font-size:15px; font-weight:700;">${p.title}</h3>
+            <p style="margin:0; font-size:11px; color:#86868B; line-height:1.4;">Signalé à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
+            <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between;">
+               <span style="font-size:9px; color:#424245;">ID: ${p.id.slice(0,8)}</span>
+               <span style="font-size:10px; font-weight:600; color:#22C55E;">Détails &rarr;</span>
+            </div>
+          </div>
+        `)
+        .addTo(map)
+    })
+
+    map.on('mouseenter', INCIDENT_SOURCE + '-circles', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = 'pointer'
+    })
+    map.on('mouseleave', INCIDENT_SOURCE + '-circles', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
+    })
+
     // Click on Heatmap Points (using the points rendered as transparent circles for interaction)
     const handleHeatmapClick = (mode: HeatmapMode, color: string, unit: string) => (e: any) => {
       const feat = e.features?.[0]

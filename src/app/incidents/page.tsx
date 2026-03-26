@@ -4,6 +4,7 @@ import { AlertTriangle, RefreshCw, MapPin, Clock, Zap, Download, TrendingUp, Tre
 import { SeverityPill } from '@/components/ui/SeverityPill'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
+import { useTranslation } from '@/lib/hooks/useTranslation'
 import { generateIncidents, generateCityKPIs } from '@/lib/engine/traffic.engine'
 import {
   fetchSytadinKPIs,
@@ -43,9 +44,8 @@ export default function IncidentsPage() {
   const [sytadinData, setSytadinData] = useState<any>(null)
   const [travelTimes, setTravelTimes] = useState<any[]>([])
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => { document.title = `Incidents — ${city.name} | CrossFlow` }, [city.name])
 
   const refresh = async () => {
     if (isIdfCity(city)) {

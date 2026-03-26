@@ -7,6 +7,9 @@ import {
 } from 'lucide-react'
 import { fetchAllTrafficStatus } from '@/lib/api/ratp'
 import { fetchTransitRoutes, type OSMTransitLine } from '@/lib/api/overpass'
+import { useTranslation } from '@/lib/hooks/useTranslation'
+import type { Metadata } from 'next'
+
 import { useMapStore } from '@/store/mapStore'
 import type { TrafficLine, LineType } from '@/lib/api/ratp'
 import { cn } from '@/lib/utils/cn'
@@ -87,6 +90,7 @@ export default function TransportPage() {
   const city    = useMapStore(s => s.city)
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
+  useEffect(() => { document.title = `Transports — ${city.name} | CrossFlow` }, [city.name])
 
   const isParis = city.countryCode === 'FR' &&
     (city.id === 'paris' || city.name.toLowerCase().includes('paris') ||

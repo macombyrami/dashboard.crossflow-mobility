@@ -109,6 +109,7 @@ function RatpFeed() {
 
 // ─── Community Feed ────────────────────────────────────────────────────────────
 import { useMapStore } from '@/store/mapStore'
+import type { Metadata } from 'next'
 
 interface RealIncident {
   id:          string
@@ -274,6 +275,8 @@ function CommunityFeed() {
 
 export default function SocialPage() {
   const [activeTab, setActiveTab] = useState<SocialTab>('sytadin')
+
+  useEffect(() => { document.title = 'Social — Trafic IDF | CrossFlow' }, [])
 
   return (
     <div className="flex flex-col lg:flex-row min-h-full overflow-hidden bg-bg-base">

@@ -13,6 +13,8 @@ import { useTranslation } from '@/lib/hooks/useTranslation'
 export default function PredictionPage() {
   const { t } = useTranslation()
   const city             = useMapStore(s => s.city)
+
+  useEffect(() => { document.title = `Prévisions — ${city.name} | CrossFlow` }, [city.name])
   const weather          = useTrafficStore(s => s.openMeteoWeather)
   const airQuality       = useTrafficStore(s => s.airQuality)
   const [ctx, setCtx]    = useState<PredictiveContext | null>(null)

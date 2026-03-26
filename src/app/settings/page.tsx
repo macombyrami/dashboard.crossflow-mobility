@@ -1,6 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslation } from '@/lib/hooks/useTranslation'
+import type { Metadata } from 'next'
+
 import { createClient } from '@/lib/supabase/client'
 import { useMapStore } from '@/store/mapStore'
 import { CITIES } from '@/config/cities.config'
@@ -9,6 +12,7 @@ import { cn } from '@/lib/utils/cn'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 export default function SettingsPage() {
+  useEffect(() => { document.title = 'Paramètres | CrossFlow' }, [])
   const router        = useRouter()
   const supabase      = createClient()
   const setCity       = useMapStore(s => s.setCity)

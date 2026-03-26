@@ -1,11 +1,21 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap, Lock, Settings } from 'lucide-react'
+import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap, Lock, AlertTriangle, Clock } from 'lucide-react'
 import { useMapStore, geocodingToCity } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { CITIES }       from '@/config/cities.config'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { cn } from '@/lib/utils/cn'
+import { formatDistanceToNow } from 'date-fns'
+import { fr } from 'date-fns/locale'
+
+const SEVERITY_COLOR: Record<string, string> = {
+  critical: '#FF1744',
+  high:     '#FF6D00',
+  medium:   '#FFB300',
+  low:      '#00E676',
+}
 
 export function Header() {
   const router          = useRouter()
@@ -13,9 +23,22 @@ export function Header() {
   const isAIPanelOpen   = useMapStore(s => s.isAIPanelOpen)
   const weather         = useTrafficStore(s => s.weather)
   const incidents       = useTrafficStore(s => s.incidents)
-  const [time, setTime] = useState('')
+  const [time, setTime]           = useState('')
+  const [alertOpen, setAlertOpen] = useState(false)
+  const alertRef                  = useRef<HTMLDivElement>(null)
 
   const incidentCount = incidents?.length ?? 0
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (alertRef.current && !alertRef.current.contains(e.target as Node)) {
+        setAlertOpen(false)
+      }
+    }
+    if (alertOpen) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [alertOpen])
 
   useEffect(() => {
     const tick = () => {
@@ -63,20 +86,103 @@ export function Header() {
           <span className="text-[13px] font-medium text-text-secondary mono tabular-nums">{time}</span>
         </div>
 
-        {/* Alerts */}
-        <button
-          onClick={() => router.push('/incidents')}
-          className="btn-icon relative"
-          title="Incidents actifs"
-          aria-label="Incidents actifs"
-        >
-          <Bell className="w-[18px] h-[18px]" strokeWidth={1.75} />
-          {incidentCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-traffic-critical text-white text-[9px] font-bold leading-4 text-center tabular-nums">
-              {incidentCount > 9 ? '9+' : incidentCount}
-            </span>
+        {/* Alerts dropdown */}
+        <div ref={alertRef} className="relative">
+          <button
+            onClick={() => setAlertOpen(o => !o)}
+            className={cn('btn-icon relative', alertOpen && 'bg-bg-elevated')}
+            title="Incidents actifs"
+            aria-label="Incidents actifs"
+            aria-expanded={alertOpen}
+          >
+            <Bell className="w-[18px] h-[18px]" strokeWidth={1.75} />
+            {incidentCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-traffic-critical text-white text-[9px] font-bold leading-4 text-center tabular-nums">
+                {incidentCount > 9 ? '9+' : incidentCount}
+              </span>
+            )}
+          </button>
+
+          {alertOpen && (
+            <div
+              className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-bg-border overflow-hidden z-50 animate-scale-in"
+              style={{
+                background:          'rgba(18,20,26,0.97)',
+                backdropFilter:      'blur(24px)',
+                WebkitBackdropFilter:'blur(24px)',
+                boxShadow:           '0 20px 48px rgba(0,0,0,0.6)',
+              }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-bg-border">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-3.5 h-3.5 text-brand" strokeWidth={2} />
+                  <span className="text-[12px] font-bold text-text-primary uppercase tracking-wider">
+                    Alertes actives
+                  </span>
+                  {incidentCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-traffic-critical/20 text-traffic-critical text-[10px] font-bold">
+                      {incidentCount}
+                    </span>
+                  )}
+                </div>
+                <button onClick={() => setAlertOpen(false)} className="text-text-muted hover:text-text-secondary transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Incident list */}
+              <div className="max-h-72 overflow-y-auto">
+                {incidentCount === 0 ? (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-[13px] font-semibold text-text-primary mb-1">Tout est fluide</p>
+                    <p className="text-[11px] text-text-muted">Aucun incident actif détecté.</p>
+                  </div>
+                ) : (
+                  incidents
+                    .slice()
+                    .sort((a, b) => {
+                      const order = { critical: 0, high: 1, medium: 2, low: 3 }
+                      return (order[a.severity] ?? 3) - (order[b.severity] ?? 3)
+                    })
+                    .slice(0, 6)
+                    .map(inc => (
+                      <div
+                        key={inc.id}
+                        className="flex items-start gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors border-b border-bg-border/50 last:border-0"
+                      >
+                        <div
+                          className="mt-0.5 w-2 h-2 rounded-full shrink-0"
+                          style={{ background: SEVERITY_COLOR[inc.severity] ?? '#FFD600', boxShadow: `0 0 6px ${SEVERITY_COLOR[inc.severity] ?? '#FFD600'}` }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[12px] font-semibold text-text-primary truncate leading-snug">{inc.title}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] text-text-muted truncate max-w-[140px]">{inc.address}</span>
+                            <span className="text-text-muted/40">·</span>
+                            <div className="flex items-center gap-1 text-[10px] text-text-muted shrink-0">
+                              <Clock className="w-2.5 h-2.5" />
+                              {formatDistanceToNow(new Date(inc.startedAt), { locale: fr, addSuffix: true })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                )}
+              </div>
+
+              {/* Footer CTA */}
+              <div className="px-4 py-2.5 border-t border-bg-border">
+                <button
+                  onClick={() => { router.push('/incidents'); setAlertOpen(false) }}
+                  className="w-full text-[11px] font-bold text-brand hover:text-brand/80 transition-colors text-center"
+                >
+                  Voir tous les incidents →
+                </button>
+              </div>
+            </div>
           )}
-        </button>
+        </div>
 
         {/* AI Assistant */}
         <button

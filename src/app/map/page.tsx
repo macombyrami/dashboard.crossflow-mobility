@@ -15,6 +15,7 @@ import { generateCityKPIs } from '@/lib/engine/traffic.engine'
 import { hasKey } from '@/lib/api/tomtom'
 import { useEffect } from 'react'
 import { useTranslation } from '@/lib/hooks/useTranslation'
+import type { Metadata } from 'next'
 
 const CrossFlowMap = dynamic(
   () => import('@/components/map/CrossFlowMap').then(m => ({ default: m.CrossFlowMap })),
@@ -24,6 +25,8 @@ const CrossFlowMap = dynamic(
 export default function MapPage() {
   const { t } = useTranslation()
   const city           = useMapStore(s => s.city)
+
+  useEffect(() => { document.title = `Carte — ${city.name} | CrossFlow` }, [city.name])
   const mode           = useMapStore(s => s.mode)
   const isAIPanelOpen  = useMapStore(s => s.isAIPanelOpen)
   const setAIPanelOpen = useMapStore(s => s.setAIPanelOpen)
@@ -59,7 +62,10 @@ export default function MapPage() {
         {mode === 'live' && (
           <div className="absolute bottom-16 left-4 z-10 pointer-events-none">
             <div className="bg-bg-surface/85 border border-bg-border rounded-lg px-3 py-2 backdrop-blur-sm">
-              <LiveIndicator label={isLive ? `${t('common.live')} · TomTom` : `${t('common.live')} · ${t('common.demo')}`} color={isLive ? '#00E676' : '#8080A0'} />
+              <LiveIndicator 
+                label={isLive ? `MODE LIVE · TOMTOM` : `MODE DÉMO · SIMULÉ`} 
+                color={isLive ? '#00E676' : '#FFD600'} 
+              />
             </div>
           </div>
         )}

@@ -21,6 +21,8 @@ import { platformConfig } from '@/config/platform.config'
 import { pollutionLabel } from '@/lib/utils/congestion'
 import type { CityKPIs, TrafficSnapshot } from '@/types'
 
+import type { Metadata } from 'next'
+
 function kpisFromSnapshot(cityId: string, snapshot: TrafficSnapshot, incidentCount: number, base: CityKPIs): CityKPIs {
   const segs = snapshot.segments
   if (!segs.length) return base
@@ -56,9 +58,8 @@ export default function DashboardPage() {
   const addSnapshot  = useKPIHistoryStore(s => s.addSnapshot)
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => { document.title = `Tableau de bord — ${city.name} | CrossFlow` }, [city.name])
 
   // Synthetic KPIs + incidents baseline (only when no live data)
   useEffect(() => {
@@ -249,9 +250,9 @@ export default function DashboardPage() {
         />
         <KPICard
           label={t('dashboard.active_incidents')}
-          value={kpis.activeIncidents}
+          value={incidents.length}
           icon={AlertTriangle}
-          color={kpis.activeIncidents > 5 ? '#FF6D00' : '#FFD600'}
+          color={incidents.length > 5 ? '#FF6D00' : '#FFD600'}
           sub="Accidents + works"
         />
       </div>

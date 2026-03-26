@@ -1,15 +1,18 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Map, LayoutDashboard, AlertTriangle, Rss, Settings } from 'lucide-react'
+import { Map, LayoutDashboard, AlertTriangle, Rss, Settings, TrendingUp, Cpu, Bus } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 const TABS = [
-  { href: '/map',       icon: Map,             label: 'Carte',     ariaLabel: 'Carte du trafic en temps réel' },
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Tableau',   ariaLabel: 'Tableau de bord et métriques' },
-  { href: '/incidents', icon: AlertTriangle,   label: 'Incidents', ariaLabel: 'Alertes et incidents actifs' },
-  { href: '/social',    icon: Rss,             label: 'Social',    ariaLabel: 'Feed social trafic IDF' },
-  { href: '/settings',  icon: Settings,        label: 'Réglages',  ariaLabel: 'Paramètres et configuration' },
+  { href: '/map',        icon: Map,             label: 'Carte',     ariaLabel: 'Carte du trafic en temps réel' },
+  { href: '/dashboard',  icon: LayoutDashboard, label: 'Tableau',   ariaLabel: 'Tableau de bord' },
+  { href: '/prediction', icon: TrendingUp,      label: 'Prévisions',ariaLabel: 'Prévisions de trafic' },
+  { href: '/simulation', icon: Cpu,             label: 'Simul.',    ariaLabel: 'Simulation de scénarios' },
+  { href: '/transport',  icon: Bus,             label: 'Transp.',   ariaLabel: 'Transports en commun' },
+  { href: '/incidents',  icon: AlertTriangle,   label: 'Alertes',   ariaLabel: 'Incidents actifs' },
+  { href: '/social',     icon: Rss,             label: 'Social',    ariaLabel: 'Feed social' },
+  { href: '/settings',   icon: Settings,        label: 'Param.',    ariaLabel: 'Paramètres' },
 ]
 
 export function BottomNav() {
@@ -42,12 +45,12 @@ export function BottomNav() {
               )}
             >
               <div className={cn(
-                'relative flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-200',
+                'relative flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-200',
                 active ? 'bg-brand/15' : '',
               )}>
                 <Icon
                   className={cn(
-                    'w-[22px] h-[22px] transition-all duration-200',
+                    'w-[18px] h-[18px] transition-all duration-200',
                     active ? 'text-brand' : 'text-text-muted',
                   )}
                   strokeWidth={active ? 2.25 : 1.75}
@@ -55,7 +58,7 @@ export function BottomNav() {
                 />
               </div>
               <span className={cn(
-                'text-[10px] leading-none transition-colors duration-200',
+                'text-[8.5px] leading-none transition-colors duration-200',
                 active ? 'text-brand font-medium' : 'text-text-muted',
               )}>
                 {label}

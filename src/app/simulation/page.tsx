@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react'
 import { Brain, GitBranch, Info, Rss } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useTranslation } from '@/lib/hooks/useTranslation'
+import type { Metadata } from 'next'
 
 const CrossFlowMap = dynamic(
   () => import('@/components/map/CrossFlowMap').then(m => ({ default: m.CrossFlowMap })),
@@ -23,6 +24,8 @@ type RightTab = 'results' | 'social' | 'mirofish'
 export default function SimulationPage() {
   const { t } = useTranslation()
   const city         = useMapStore(s => s.city)
+
+  useEffect(() => { document.title = `Simulation — ${city.name} | CrossFlow` }, [city.name])
   const setKPIs      = useTrafficStore(s => s.setKPIs)
   const setIncidents = useTrafficStore(s => s.setIncidents)
   const [rightTab, setRightTab] = useState<RightTab>('results')

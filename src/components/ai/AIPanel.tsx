@@ -22,7 +22,9 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
   const MODELS = [
     { id: 'google/gemini-2.0-flash-001',            label: 'Gemini 2.0 Flash',  note: t('ai.model_note_fast') },
     { id: 'google/gemini-flash-1.5',               label: 'Gemini Flash 1.5',  note: t('ai.model_note_fast') },
+    { id: 'anthropic/claude-sonnet-4-5',           label: 'Claude Sonnet',     note: t('ai.model_note_powerful') },
     { id: 'anthropic/claude-haiku',                label: 'Claude Haiku',      note: t('ai.model_note_balanced') },
+    { id: 'openai/gpt-4o',                         label: 'GPT-4o',            note: t('ai.model_note_powerful') },
     { id: 'openai/gpt-4o-mini',                    label: 'GPT-4o mini',       note: t('ai.model_note_fast') },
     { id: 'meta-llama/llama-3.1-8b-instruct:free', label: 'Llama 3.1 8B',     note: t('ai.model_note_free') },
   ]

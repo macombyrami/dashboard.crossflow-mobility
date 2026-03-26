@@ -30,7 +30,7 @@ export function LayerControls() {
   return (
     <div className={cn(
       "glass rounded-apple p-4 space-y-2 shadow-apple border border-white/5 transition-all duration-300",
-      collapsed ? "w-12 h-12 p-0 flex items-center justify-center overflow-hidden min-w-0" : "min-w-[180px]"
+      collapsed ? "w-12 h-12 p-0 flex items-center justify-center overflow-hidden min-w-0" : "min-w-[180px] max-h-[calc(100vh-160px)] overflow-y-auto custom-scrollbar"
     )}>
       {collapsed ? (
         <button 

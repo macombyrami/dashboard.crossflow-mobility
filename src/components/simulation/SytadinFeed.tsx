@@ -15,8 +15,9 @@ interface SocialPost {
 }
 
 interface FeedData {
-  posts: SocialPost[]
+  posts:     SocialPost[]
   fetchedAt: string
+  degraded?: boolean
 }
 
 const SEVERITY_CONFIG = {
@@ -116,20 +117,21 @@ function PostCard({ post }: { post: SocialPost }) {
 }
 
 export function SytadinFeed() {
-  const [data, setData]       = useState<FeedData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState(false)
+  const [data, setData]             = useState<FeedData | null>(null)
+  const [loading, setLoading]       = useState(true)
+  const [staleError, setStaleError] = useState(false)   // error on refresh, but stale data still shown
 
   const fetchFeed = useCallback(async () => {
     setLoading(true)
-    setError(false)
     try {
       const res = await fetch('/api/social/sytadin')
       if (!res.ok) throw new Error('fetch error')
       const json: FeedData = await res.json()
       setData(json)
+      setStaleError(false)
     } catch {
-      setError(true)
+      // Keep existing data visible — only show error if we have nothing at all
+      setStaleError(true)
     } finally {
       setLoading(false)
     }
@@ -178,6 +180,25 @@ export function SytadinFeed() {
         </div>
       </div>
 
+      {/* Stale-data warning banner */}
+      {staleError && data && (
+        <div className="px-4 py-2 bg-orange-500/10 border-b border-orange-500/20 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle className="w-3 h-3 text-orange-400 shrink-0" />
+            <span className="text-[10px] text-orange-400 font-medium">Données en cache · {timeAgo(data.fetchedAt)}</span>
+          </div>
+          <button onClick={fetchFeed} className="text-[10px] text-orange-400 hover:underline">Réessayer</button>
+        </div>
+      )}
+
+      {/* Degraded-mode badge */}
+      {data?.degraded && !staleError && (
+        <div className="px-4 py-1.5 bg-yellow-500/8 border-b border-yellow-500/15 flex items-center gap-1.5">
+          <Info className="w-3 h-3 text-yellow-400 shrink-0" />
+          <span className="text-[10px] text-yellow-400 font-medium">Mode dégradé — données estimées (Sytadin.fr inaccessible)</span>
+        </div>
+      )}
+
       {/* Severity summary bar */}
       {data && !loading && (
         <div className="px-4 py-2.5 border-b border-bg-border flex items-center gap-3">
@@ -219,7 +240,7 @@ export function SytadinFeed() {
           </div>
         )}
 
-        {error && !loading && (
+        {staleError && !data && !loading && (
           <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
             <AlertTriangle className="w-8 h-8 text-text-muted" />
             <div>
@@ -235,11 +256,11 @@ export function SytadinFeed() {
           </div>
         )}
 
-        {!loading && !error && data?.posts.map(post => (
+        {!loading && data?.posts.map(post => (
           <PostCard key={post.id} post={post} />
         ))}
 
-        {!loading && !error && data?.posts.length === 0 && (
+        {!loading && !staleError && data?.posts.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
             <Info className="w-8 h-8 text-text-muted" />
             <p className="text-xs text-text-muted">Aucune alerte trafic pour le moment.</p>
