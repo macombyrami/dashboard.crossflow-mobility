@@ -519,13 +519,18 @@ export function CrossFlowMap() {
     if (!mapLoaded) return
     if (osmRoutesRef.current.has(city.id)) return
 
-    // Fetch subway + tram + bus routes with real geometry (max 60)
-    fetchRouteGeometries(city.bbox, ['subway', 'tram', 'bus'], 60).then(routes => {
+    // Fetch metro/tram first (always), then supplement with bus routes.
+    // Two separate calls ensures metro lines are never cut off by bus-route count.
+    const loadRoutes = async () => {
+      const priority = await fetchRouteGeometries(city.bbox, ['subway', 'tram', 'train'], 30)
+      const bus      = await fetchRouteGeometries(city.bbox, ['bus'], 40)
+      const routes   = [...priority, ...bus]
       if (!routes.length) return
       osmRoutesRef.current.set(city.id, routes)
       updateVehicleSource()
       updateTransitRoutesSource(ratpStatusRef.current)
-    })
+    }
+    loadRoutes()
   }, [city.id, mapLoaded]) // eslint-disable-line
 
   // ─── Metro stations with line labels ─────────────────────────────────

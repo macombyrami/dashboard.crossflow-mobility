@@ -12,7 +12,10 @@
 
 import { overpassLimiter } from '@/lib/utils/rateLimiter'
 
-const OVERPASS_BASE = 'https://overpass-api.de/api/interpreter'
+// Route through our server proxy (caches 1h, avoids browser rate-limits + CORS)
+const OVERPASS_BASE = typeof window !== 'undefined'
+  ? '/api/overpass'
+  : 'https://overpass-api.de/api/interpreter'
 
 export interface OSMRoad {
   id:       number
@@ -242,14 +245,20 @@ export async function fetchMetroStations(
   bbox: [number, number, number, number],
 ): Promise<MetroStation[]> {
   const [west, south, east, north] = bbox
+  // Fetch stations + route relations (for line→station mapping)
+  // Also include RER (route=train, network~RATP) and tram stops
   const query = `
-    [out:json][timeout:30];
+    [out:json][timeout:40];
     (
       node["railway"="station"]["station"="subway"](${south},${west},${north},${east});
+      node["railway"="station"]["station"="light_rail"](${south},${west},${north},${east});
       node["public_transport"="stop_position"]["subway"="yes"](${south},${west},${north},${east});
+      node["public_transport"="stop_position"]["tram"="yes"](${south},${west},${north},${east});
       relation["type"="route"]["route"="subway"](${south},${west},${north},${east});
+      relation["type"="route"]["route"="tram"](${south},${west},${north},${east});
+      relation["type"="route"]["route"="train"]["network"~"RATP|SNCF|Transilien|RER",i](${south},${west},${north},${east});
     );
-    out body qt 800;
+    out body qt 2000;
   `
   try {
     await overpassLimiter.acquire()
@@ -257,7 +266,7 @@ export async function fetchMetroStations(
       method:  'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body:    `data=${encodeURIComponent(query)}`,
-      signal:  AbortSignal.timeout(25000),
+      signal:  AbortSignal.timeout(40000),
     })
     if (!res.ok) return []
     const data = await res.json()
@@ -378,10 +387,10 @@ export async function fetchRouteGeometries(
   maxRoutes = 30,
 ): Promise<OSMRouteGeometry[]> {
   const [west, south, east, north] = bbox
-  // Prioritise metro + tram (fewer routes, better geometry), then bus
   const types = routeTypes.join('|')
+  // Sort by route type priority: subway/tram first, then others
   const query = `
-    [out:json][timeout:35];
+    [out:json][timeout:40];
     (
       relation["type"="route"]["route"~"^(${types})$"](${south},${west},${north},${east});
     );
@@ -394,7 +403,7 @@ export async function fetchRouteGeometries(
       method:  'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body:    `data=${encodeURIComponent(query)}`,
-      signal:  AbortSignal.timeout(20000),
+      signal:  AbortSignal.timeout(40000),
     })
     if (!res.ok) return []
     const data = await res.json()
