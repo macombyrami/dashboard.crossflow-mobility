@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 
 import { Rss, Twitter, Train, Users, AlertTriangle, RefreshCw, MapPin, Search, Wrench, Ban } from 'lucide-react'
 import { SytadinFeed } from '@/components/simulation/SytadinFeed'
@@ -410,11 +410,14 @@ function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
       const mapped = (data ?? []).map((item: any) => {
         const dist = calculateDistance(city.center.lat, city.center.lng, item.lat, item.lng)
         
-        // Refine location context (esp. for Paris arrondissements)
+        // Refine location context (esp. for Paris arrondissements and Secteur nomenclature)
         let loc = item.district || item.address || ''
-        if (loc.match(/^750\d{2}$/)) {
-          const arr = parseInt(loc.slice(3))
-          loc = arr === 1 ? 'Paris 1er' : `Paris ${arr}e`
+        const arrMatch = loc.match(/(?:750|Secteur\s+|Arrondissement\s+|Arr\.\s*)(\d{1,2})/i)
+        if (arrMatch) {
+          const arr = parseInt(arrMatch[1])
+          if (arr >= 1 && arr <= 20) {
+            loc = arr === 1 ? 'Paris 1er' : `Paris ${arr}e`
+          }
         }
 
         return {

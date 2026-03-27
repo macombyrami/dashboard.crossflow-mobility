@@ -9,11 +9,12 @@ import { SimulationPanel } from '@/components/simulation/SimulationPanel'
 import { SimulationResults } from '@/components/simulation/SimulationResults'
 import { AIPanel } from '@/components/ai/AIPanel'
 import { LiveIndicator } from '@/components/ui/LiveIndicator'
+import { CityPulseHUD } from '@/components/dashboard/CityPulseHUD'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { generateCityKPIs } from '@/lib/engine/traffic.engine'
 import { hasKey } from '@/lib/api/tomtom'
-import { useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useTranslation } from '@/lib/hooks/useTranslation'
 import type { Metadata } from 'next'
 
@@ -51,8 +52,11 @@ export default function MapPage() {
       <div className="flex-1 relative overflow-hidden">
         <CrossFlowMap />
 
-        {/* Mode selector — top center */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+        {/* City Pulse HUD — top center */}
+        <CityPulseHUD />
+
+        {/* Mode selector — top center (offset below HUD) */}
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
           <ModeSelector />
         </div>
 

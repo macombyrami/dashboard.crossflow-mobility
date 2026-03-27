@@ -1,6 +1,6 @@
 'use client'
-import { useState, useMemo } from 'react'
-import { Lightbulb, Info, AlertTriangle, ArrowRight, Zap, Target, Leaf } from 'lucide-react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
+import { BrainCircuit, Send, Loader2, X, Sparkles, ChevronDown, Zap, Lightbulb, Info, AlertTriangle, ArrowRight, Target, Leaf } from 'lucide-react'
 import { useTrafficStore } from '@/store/trafficStore'
 import { cn } from '@/lib/utils/cn'
 
@@ -96,7 +96,7 @@ export function DecisionHub() {
             </div>
 
             {/* Insight Alerts */}
-            {incidents.filter(i => i.severity === 'critical' || i.severity === 'major').map(inc => (
+            {incidents.filter(i => i.severity === 'critical' || (i as any).severity === 'major' || (i as any).severity === 'high').map(inc => (
               <div key={inc.id} className="flex gap-3 p-3 rounded-xl bg-red-500/5 border border-red-500/10">
                 <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
                 <p className="text-[11px] text-text-secondary leading-snug">
