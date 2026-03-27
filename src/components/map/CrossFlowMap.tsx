@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
+
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMapStore } from '@/store/mapStore'
@@ -7,6 +8,9 @@ import { useTrafficStore } from '@/store/trafficStore'
 import { useSimulationStore } from '@/store/simulationStore'
 import { platformConfig } from '@/config/platform.config'
 import { congestionColor } from '@/lib/utils/congestion'
+import { VehicleInfoCard } from '@/components/map/VehicleInfoCard'
+import { VehicleFilterPanel } from '@/components/map/VehicleFilterPanel'
+
 import {
   generateTrafficSnapshot,
   generateIncidents,
@@ -64,6 +68,33 @@ const VEHICLES_SOURCE         = 'cf-vehicles'
 const METRO_STATIONS_SOURCE   = 'cf-metro-stations'
 const TRANSIT_ROUTES_SOURCE   = 'cf-transit-routes'
 
+// ─── Popup helpers ────────────────────────────────────────────────────────
+
+/** Return black or white text depending on background luminance */
+function textOnBg(hex: string): string {
+  const h = hex.replace('#', '')
+  if (h.length < 6) return '#000'
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? '#000' : '#fff'
+}
+
+/** Cardinal direction label from bearing in degrees */
+function bearingLabel(deg: number): string {
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO']
+  return dirs[Math.round(deg / 45) % 8]
+}
+
+const TYPE_LABEL: Record<string, string> = {
+  subway:   'Métro',
+  tram:     'Tramway',
+  bus:      'Bus',
+  train:    'RER / Train',
+  ferry:    'Ferry',
+  monorail: 'Monorail',
+}
+
 // CartoDB Voyager Dark — completely free, no key, beautiful dark style
 const CARTO_DARK_STYLE: maplibregl.StyleSpecification = {
   version: 8,
@@ -110,7 +141,13 @@ export function CrossFlowMap() {
   const ratpStatusRef     = useRef<Map<string, string>>(new Map())
   const ratpDisruptedRef  = useRef<Set<string>>(new Set())
   const refreshDataRef  = useRef<() => void>(() => {})
+  const liveVehiclesRef = useRef<import('@/lib/engine/transit.engine').TransitVehicle[]>([])
+  const rafRef          = useRef<number | null>(null)
+  const lastVehicleUpdateRef = useRef<number>(0)
   const [mapLoaded, setMapLoaded] = useState(false)
+  const [selectedVehicle, setSelectedVehicleState] = useState<import('@/lib/engine/transit.engine').TransitVehicle | null>(null)
+  const [vehicleCount, setVehicleCount] = useState(0)
+
 
   const city            = useMapStore(s => s.city)
   const cityBoundary    = useMapStore(s => s.cityBoundary)
@@ -123,6 +160,14 @@ export function CrossFlowMap() {
   const zoneDraft       = useMapStore(s => s.zoneDraft)
   const zonePolygon     = useMapStore(s => s.zonePolygon)
   const addZonePoint    = useMapStore(s => s.addZonePoint)
+  // Vehicle selection / tracking
+  const selectedVehicleId  = useMapStore(s => s.selectedVehicleId)
+  const setSelectedVehicle = useMapStore(s => s.setSelectedVehicle)
+  const isTrackingVehicle  = useMapStore(s => s.isTrackingVehicle)
+  const setTrackingVehicle = useMapStore(s => s.setTrackingVehicle)
+  const vehicleTypeFilter  = useMapStore(s => s.vehicleTypeFilter)
+  const vehicleSearchQuery = useMapStore(s => s.vehicleSearchQuery)
+
 
   const snapshot              = useTrafficStore(s => s.snapshot)
   const setSnapshot           = useTrafficStore(s => s.setSnapshot)
@@ -138,10 +183,19 @@ export function CrossFlowMap() {
   const useLiveData = hasKey()
 
   // Refs to avoid stale closures in map click handler
-  const zoneActiveRef    = useRef(zoneActive)
-  const addZonePointRef  = useRef(addZonePoint)
+  const zoneActiveRef         = useRef(zoneActive)
+  const addZonePointRef       = useRef(addZonePoint)
+  const setSelectedVehicleRef = useRef(setSelectedVehicle)
+  const vehicleTypeFilterRef  = useRef(vehicleTypeFilter)
+  const vehicleSearchRef      = useRef(vehicleSearchQuery)
+  const isTrackingRef         = useRef(isTrackingVehicle)
   useEffect(() => { zoneActiveRef.current = zoneActive }, [zoneActive])
   useEffect(() => { addZonePointRef.current = addZonePoint }, [addZonePoint])
+  useEffect(() => { setSelectedVehicleRef.current = setSelectedVehicle }, [setSelectedVehicle])
+  useEffect(() => { vehicleTypeFilterRef.current = vehicleTypeFilter }, [vehicleTypeFilter])
+  useEffect(() => { vehicleSearchRef.current = vehicleSearchQuery }, [vehicleSearchQuery])
+  useEffect(() => { isTrackingRef.current = isTrackingVehicle }, [isTrackingVehicle])
+
 
   // ─── Cursor change when zone tool is active ──────────────────────────
 
@@ -227,47 +281,85 @@ export function CrossFlowMap() {
       if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
     })
 
-    // Click on transit vehicles
+    // Click on transit vehicles → update store selection (drives VehicleInfoCard)
     map.on('click', VEHICLES_SOURCE + '-layer', (e) => {
       if (zoneActiveRef.current) return
       const feat = e.features?.[0]
       if (!feat) return
-      const p = feat.properties as any
-      popupRef.current?.remove()
-      const typeLabel: Record<string, string> = {
-        subway: 'Métro', tram: 'Tramway', bus: 'Bus',
-        train: 'Train', ferry: 'Ferry', monorail: 'Monorail',
+      const vehicleId = String(feat.properties?.id ?? '')
+      setSelectedVehicleRef.current(vehicleId)
+      // Update the highlight source immediately
+      const selSrc = map.getSource(VEHICLES_SOURCE + '-selected') as maplibregl.GeoJSONSource | undefined
+      if (selSrc) {
+        selSrc.setData({
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: (feat.geometry as GeoJSON.Point).coordinates },
+            properties: feat.properties,
+          }],
+        })
       }
-      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '220px' })
+    })
+
+    map.on('mouseenter', VEHICLES_SOURCE + '-layer', (e) => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = 'pointer'
+      const feat = e.features?.[0]
+      if (feat) {
+        const hSrc = map.getSource(VEHICLES_SOURCE + '-hover') as maplibregl.GeoJSONSource | undefined
+        if (hSrc) {
+          hSrc.setData(feat)
+          map.setLayoutProperty(VEHICLES_SOURCE + '-hover-ring', 'visibility', 'visible')
+        }
+      }
+    })
+    map.on('mouseleave', VEHICLES_SOURCE + '-layer', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
+      const m = mapRef.current
+      if (m && m.getLayer(VEHICLES_SOURCE + '-hover-ring')) {
+        m.setLayoutProperty(VEHICLES_SOURCE + '-hover-ring', 'visibility', 'none')
+      }
+    })
+
+    // Click on metro stations
+    map.on('click', METRO_STATIONS_SOURCE + '-dot', (e) => {
+      if (zoneActiveRef.current) return
+      const feat = e.features?.[0]
+      if (!feat) return
+      const p       = feat.properties as Record<string, unknown>
+      const name    = String(p.name ?? 'Station')
+      const lines   = String(p.lines ?? '').split('·').filter(Boolean)
+      const disrupted  = ratpDisruptedRef.current
+      const ratpStatus = ratpStatusRef.current
+
+      const linesBadges = lines.map(line => {
+        const color       = String(ratpStatus.get(line) ?? LINE_COLORS[line] ?? '#8B5CF6')
+        const isDisrupted = disrupted.has(line.toUpperCase())
+        const tc          = textOnBg(color)
+        return `
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+            <div style="width:20px;height:20px;border-radius:5px;background:${color};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:${tc};flex-shrink:0">${line}</div>
+            <span style="font-size:10px;color:${isDisrupted ? '#EF4444' : '#22C55E'};font-weight:600">${isDisrupted ? '⚠ Perturbé' : '● Normal'}</span>
+          </div>`
+      }).join('')
+
+      popupRef.current?.remove()
+      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '260px', className: 'cf-station-popup' })
         .setLngLat(e.lngLat)
         .setHTML(`
-          <div style="font-family:Inter,sans-serif;color:#F5F5F7;padding:12px">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-              <div style="width:28px;height:28px;border-radius:8px;background:${p.color};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000">${(p.routeRef || '?').slice(0,3)}</div>
-              <div>
-                <p style="margin:0;font-size:12px;font-weight:700;color:#F5F5F7">${typeLabel[p.routeType] ?? p.routeType} ${p.routeRef}</p>
-                <p style="margin:0;font-size:10px;color:#86868B">${p.routeName || ''}</p>
-              </div>
-            </div>
-            <div style="display:flex;gap:8px">
-              <div style="flex:1;background:rgba(255,255,255,0.04);border-radius:8px;padding:6px;text-align:center">
-                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase">Vitesse</p>
-                <p style="margin:0;font-size:14px;font-weight:700">${p.speedKmh} <span style="font-size:9px">km/h</span></p>
-              </div>
-              <div style="flex:1;background:rgba(255,255,255,0.04);border-radius:8px;padding:6px;text-align:center">
-                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase">Type</p>
-                <p style="margin:0;font-size:11px;font-weight:700">${typeLabel[p.routeType] ?? p.routeType}</p>
-              </div>
-            </div>
+          <div style="font-family:Inter,sans-serif;padding:14px;min-width:180px">
+            <p style="margin:0 0 3px 0;font-size:9px;font-weight:700;color:#86868B;text-transform:uppercase;letter-spacing:0.12em">Station</p>
+            <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:700;color:#F5F5F7">${name}</h3>
+            ${lines.length ? `<div style="display:flex;flex-direction:column;gap:4px">${linesBadges}</div>` : `<p style="margin:0;font-size:11px;color:#86868B">Aucune ligne associée</p>`}
           </div>
         `)
         .addTo(map)
     })
 
-    map.on('mouseenter', VEHICLES_SOURCE + '-layer', () => {
+    map.on('mouseenter', METRO_STATIONS_SOURCE + '-dot', () => {
       if (!zoneActiveRef.current) map.getCanvas().style.cursor = 'pointer'
     })
-    map.on('mouseleave', VEHICLES_SOURCE + '-layer', () => {
+    map.on('mouseleave', METRO_STATIONS_SOURCE + '-dot', () => {
       if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
     })
 
@@ -527,7 +619,7 @@ export function CrossFlowMap() {
       const routes   = [...priority, ...bus]
       if (!routes.length) return
       osmRoutesRef.current.set(city.id, routes)
-      updateVehicleSource()
+      updateVehicles(Date.now())
       updateTransitRoutesSource(ratpStatusRef.current)
     }
     loadRoutes()
@@ -579,38 +671,103 @@ export function CrossFlowMap() {
 
   // ─── Vehicle position update (every 10 seconds) ───────────────────────
 
-  function updateVehicleSource() {
+  // ─── Vehicle position update & smooth animation (RAF loop) ───────────
+
+  const updateVehicles = useCallback((nowMs: number) => {
     const map    = mapRef.current
     const routes = osmRoutesRef.current.get(city.id)
     if (!map || !routes?.length) return
-    const src = map.getSource(VEHICLES_SOURCE) as maplibregl.GeoJSONSource | undefined
-    if (!src) return
 
-    const vehicles = simulateTransitVehicles(routes, Date.now())
-    src.setData({
-      type: 'FeatureCollection',
-      features: vehicles.map(v => ({
-        type:       'Feature' as const,
-        geometry:   { type: 'Point' as const, coordinates: [v.lng, v.lat] },
-        properties: {
-          id:        v.id,
-          routeType: v.routeType,
-          routeRef:  v.routeRef,
-          routeName: v.routeName,
-          color:     v.color,
-          bearing:   v.bearing,
-          speedKmh:  v.speedKmh,
-        },
-      })),
+    // 1. Simulate all vehicles at current time
+    const allVehicles = simulateTransitVehicles(routes, nowMs)
+    liveVehiclesRef.current = allVehicles
+
+    // 2. Apply Filters (Type + Search)
+    const filtered = allVehicles.filter(v => {
+      // Type filter
+      if (vehicleTypeFilterRef.current.size > 0 && !vehicleTypeFilterRef.current.has(v.routeType)) {
+        return false
+      }
+      // Search filter
+      if (vehicleSearchRef.current) {
+        const q = vehicleSearchRef.current.toLowerCase()
+        const match = v.routeRef.toLowerCase().includes(q) || v.routeName.toLowerCase().includes(q)
+        if (!match) return false
+      }
+      return true
     })
-  }
+
+    // 3. Update Map Source
+    const src = map.getSource(VEHICLES_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (src) {
+      src.setData({
+        type: 'FeatureCollection',
+        features: filtered.map(v => ({
+          type:       'Feature' as const,
+          geometry:   { type: 'Point' as const, coordinates: [v.lng, v.lat] },
+          properties: {
+            id:        v.id,
+            routeType: v.routeType,
+            routeRef:  v.routeRef,
+            routeName: v.routeName,
+            color:     v.color,
+            bearing:   v.bearing,
+            speedKmh:  v.speedKmh,
+          },
+        })),
+      })
+    }
+
+    // 4. Handle Selected Vehicle & Tracking
+    const selId = useMapStore.getState().selectedVehicleId
+    if (selId) {
+      const active = allVehicles.find(v => v.id === selId)
+      if (active) {
+        // Update selection highlight source
+        const hSrc = map.getSource(VEHICLES_SOURCE + '-selected') as maplibregl.GeoJSONSource | undefined
+        if (hSrc) {
+          hSrc.setData({
+            type: 'Feature' as const,
+            geometry: { type: 'Point' as const, coordinates: [active.lng, active.lat] },
+            properties: active,
+          })
+        }
+        // Sync React state for InfoCard (throttled)
+        if (nowMs - lastVehicleUpdateRef.current > 100) {
+          setSelectedVehicleState(active)
+          lastVehicleUpdateRef.current = nowMs
+        }
+        // Camera follow
+        if (isTrackingRef.current) {
+          map.easeTo({ center: [active.lng, active.lat], duration: 100, easing: (t) => t })
+        }
+      } else {
+        // Vehicle likely disappeared (off routes)
+        setSelectedVehicleState(null)
+      }
+    } else {
+      // Clear highlight if nothing selected
+      const hSrc = map.getSource(VEHICLES_SOURCE + '-selected') as maplibregl.GeoJSONSource | undefined
+      if (hSrc) hSrc.setData({ type: 'FeatureCollection', features: [] })
+      setSelectedVehicleState(null)
+    }
+
+    setVehicleCount(allVehicles.length)
+  }, [city.id])
 
   useEffect(() => {
     if (!mapLoaded) return
-    updateVehicleSource()
-    const interval = setInterval(updateVehicleSource, 10_000)
-    return () => clearInterval(interval)
-  }, [city.id, mapLoaded]) // eslint-disable-line
+    
+    const animate = () => {
+      updateVehicles(Date.now())
+      rafRef.current = requestAnimationFrame(animate)
+    }
+    
+    rafRef.current = requestAnimationFrame(animate)
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
+  }, [mapLoaded, updateVehicles])
 
   // ─── Transit route polylines (bus + metro as colored lines) ──────────
 
@@ -1191,7 +1348,14 @@ export function CrossFlowMap() {
     trySet(VEHICLES_SOURCE + '-glow',  transportVis)
     trySet(VEHICLES_SOURCE + '-layer', transportVis)
     trySet(VEHICLES_SOURCE + '-label', transportVis)
+    
+    // Vehicle selection highlight visibility
+    const selectedVehVis = (transportVis === 'visible' && selectedVehicleId !== null) ? 'visible' : 'none'
+    trySet(VEHICLES_SOURCE + '-selected-ring', selectedVehVis)
+    trySet(VEHICLES_SOURCE + '-selected-dot',  selectedVehVis)
+    
     // Transit route polylines
+
     trySet(TRANSIT_ROUTES_SOURCE + '-bus',    transportVis)
     trySet(TRANSIT_ROUTES_SOURCE + '-metro',  transportVis)
     // Metro station markers
@@ -1261,7 +1425,17 @@ export function CrossFlowMap() {
   return (
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full" />
+      
+      {/* Interactive transit components */}
+      <VehicleFilterPanel vehicleCount={vehicleCount} />
+      <VehicleInfoCard 
+        vehicle={selectedVehicle} 
+        isDisrupted={selectedVehicle ? ratpDisruptedRef.current.has(selectedVehicle.routeRef.toUpperCase()) : false} 
+      />
+
       {/* Loading overlay — fades out once map tiles are ready */}
+
+
       {!mapLoaded && (
         <div className="absolute inset-0 bg-bg-surface flex flex-col items-center justify-center gap-4 pointer-events-none z-10">
           <div className="w-10 h-10 border-[3px] border-brand-green border-t-transparent rounded-full animate-spin" />
@@ -1642,6 +1816,52 @@ function initStaticSources(map: maplibregl.Map) {
       'text-halo-color': 'rgba(0,0,0,0)',
       'text-halo-width': 0,
     },
+  })
+
+  // ── Vehicle selection highlight ───────────────────────────────────
+  map.addSource(VEHICLES_SOURCE + '-selected', { type: 'geojson', data: emptyFC })
+  
+  // Large pulsing selection ring
+  map.addLayer({
+    id:     VEHICLES_SOURCE + '-selected-ring',
+    type:   'circle',
+    source: VEHICLES_SOURCE + '-selected',
+    paint:  {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 12, 15, 24],
+      'circle-color':  ['get', 'color'],
+      'circle-opacity': 0.15,
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#FFFFFF',
+    },
+  })
+
+  // Selected dot (on top)
+  map.addLayer({
+    id:     VEHICLES_SOURCE + '-selected-dot',
+    type:   'circle',
+    source: VEHICLES_SOURCE + '-selected',
+    paint:  {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 6, 15, 12],
+      'circle-color':  ['get', 'color'],
+      'circle-stroke-width': 3,
+      'circle-stroke-color': '#FFFFFF',
+    },
+  })
+
+  // Hover layer (simple ring, visible on mouseenter)
+  map.addSource(VEHICLES_SOURCE + '-hover', { type: 'geojson', data: emptyFC })
+  map.addLayer({
+    id:     VEHICLES_SOURCE + '-hover-ring',
+    type:   'circle',
+    source: VEHICLES_SOURCE + '-hover',
+    paint:  {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 9, 15, 18],
+      'circle-color':  '#FFFFFF',
+      'circle-opacity': 0.25,
+      'circle-stroke-width': 1,
+      'circle-stroke-color': '#FFFFFF',
+    },
+    layout: { visibility: 'none' }
   })
 }
 

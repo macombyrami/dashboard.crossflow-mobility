@@ -57,6 +57,16 @@ interface MapStore {
   selectedSegmentId: string | null
   selectSegment:     (id: string | null) => void
 
+  // Vehicle selection & tracking
+  selectedVehicleId:   string | null
+  setSelectedVehicle:  (id: string | null) => void
+  isTrackingVehicle:   boolean
+  setTrackingVehicle:  (tracking: boolean) => void
+  vehicleTypeFilter:   Set<string>  // empty = show all
+  toggleVehicleType:   (type: string) => void
+  vehicleSearchQuery:  string
+  setVehicleSearch:    (query: string) => void
+
   // Timeline
   timeOffsetMinutes: number
   setTimeOffset:     (min: number) => void
@@ -157,6 +167,19 @@ export const useMapStore = create<MapStore>()(
 
       selectedSegmentId: null,
       selectSegment:     (id) => set({ selectedSegmentId: id, isPanelOpen: id !== null }),
+
+      selectedVehicleId:   null,
+      setSelectedVehicle:  (id) => set({ selectedVehicleId: id }),
+      isTrackingVehicle:   false,
+      setTrackingVehicle:  (tracking) => set({ isTrackingVehicle: tracking }),
+      vehicleTypeFilter:   new Set<string>(),
+      toggleVehicleType:   (type) => set(s => {
+        const next = new Set(s.vehicleTypeFilter)
+        next.has(type) ? next.delete(type) : next.add(type)
+        return { vehicleTypeFilter: next }
+      }),
+      vehicleSearchQuery:  '',
+      setVehicleSearch:    (query) => set({ vehicleSearchQuery: query }),
 
       timeOffsetMinutes: 0,
       setTimeOffset:     (min) => set({ timeOffsetMinutes: min }),
