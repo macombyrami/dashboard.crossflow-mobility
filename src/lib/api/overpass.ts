@@ -223,6 +223,88 @@ export async function fetchCityStats(cityName: string, countryCode: string): Pro
   }
 }
 
+// ─── Metro stations with line associations ────────────────────────────────
+
+export interface MetroStation {
+  id:    number
+  name:  string
+  lat:   number
+  lng:   number
+  lines: string[]   // sorted line refs e.g. ["1", "4", "7"]
+}
+
+/**
+ * Fetch subway stations (railway=station + stop_position) AND subway route
+ * relations in one Overpass call. Associates each station with its metro line
+ * numbers by cross-referencing route-relation member node IDs.
+ */
+export async function fetchMetroStations(
+  bbox: [number, number, number, number],
+): Promise<MetroStation[]> {
+  const [west, south, east, north] = bbox
+  const query = `
+    [out:json][timeout:30];
+    (
+      node["railway"="station"]["station"="subway"](${south},${west},${north},${east});
+      node["public_transport"="stop_position"]["subway"="yes"](${south},${west},${north},${east});
+      relation["type"="route"]["route"="subway"](${south},${west},${north},${east});
+    );
+    out body qt 800;
+  `
+  try {
+    await overpassLimiter.acquire()
+    const res = await fetch(OVERPASS_BASE, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    `data=${encodeURIComponent(query)}`,
+      signal:  AbortSignal.timeout(25000),
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+
+    // 1. Build nodeId → Set<lineRef> from route relations
+    const nodeLines = new Map<number, Set<string>>()
+    for (const el of data.elements ?? []) {
+      if (el.type !== 'relation') continue
+      const ref = (el.tags?.ref ?? '').trim()
+      if (!ref) continue
+      for (const member of el.members ?? []) {
+        if (member.type === 'node') {
+          if (!nodeLines.has(member.ref)) nodeLines.set(member.ref, new Set())
+          nodeLines.get(member.ref)!.add(ref)
+        }
+      }
+    }
+
+    // 2. Collect station nodes, merge by name to deduplicate multi-stop stations
+    const byName = new Map<string, MetroStation>()
+    for (const el of data.elements ?? []) {
+      if (el.type !== 'node' || el.lat === undefined) continue
+      const tags = el.tags ?? {}
+      const isStation =
+        (tags.railway === 'station' && (tags.station === 'subway' || tags.subway === 'yes')) ||
+        (tags.public_transport === 'stop_position' && tags.subway === 'yes' && tags.name)
+      if (!isStation) continue
+      const name = (tags.name ?? tags['name:fr'] ?? '').trim()
+      if (!name) continue
+      const lines = [...(nodeLines.get(el.id) ?? new Set())].sort()
+      const key   = name.toLowerCase()
+      const exist = byName.get(key)
+      if (!exist) {
+        byName.set(key, { id: el.id, name, lat: el.lat, lng: el.lon, lines })
+      } else {
+        // Merge lines from multiple stop_position nodes for same station
+        const merged = [...new Set([...exist.lines, ...lines])].sort()
+        byName.set(key, { ...exist, lines: merged })
+      }
+    }
+
+    return [...byName.values()].slice(0, 400)
+  } catch {
+    return []
+  }
+}
+
 // ─── Transit route relations ──────────────────────────────────────────────
 
 export interface OSMTransitLine {

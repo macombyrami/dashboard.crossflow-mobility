@@ -17,7 +17,8 @@ import {
 import {
   fetchRoads,
   fetchTrafficPOIs,
-  fetchRouteGeometries
+  fetchRouteGeometries,
+  fetchMetroStations,
 } from '@/lib/api/overpass'
 import {
   fetchSytadinKPIs,
@@ -26,7 +27,8 @@ import {
   fetchAndInjectSytadinIncidents,
   isIdfCity,
 } from '@/lib/engine/sytadin.engine'
-import type { OSMRoad, OSMPOIPoint, OSMRouteGeometry } from '@/lib/api/overpass'
+import type { OSMRoad, OSMPOIPoint, OSMRouteGeometry, MetroStation } from '@/lib/api/overpass'
+import { fetchAllTrafficStatus, LINE_COLORS } from '@/lib/api/ratp'
 import { simulateTransitVehicles } from '@/lib/engine/transit.engine'
 import {
   hasKey,
@@ -59,6 +61,8 @@ const ZONE_SOURCE             = 'cf-zone'
 const ZONE_DRAFT_SOURCE       = 'cf-zone-draft'
 const POI_SOURCE              = 'cf-pois'
 const VEHICLES_SOURCE         = 'cf-vehicles'
+const METRO_STATIONS_SOURCE   = 'cf-metro-stations'
+const TRANSIT_ROUTES_SOURCE   = 'cf-transit-routes'
 
 // CartoDB Voyager Dark — completely free, no key, beautiful dark style
 const CARTO_DARK_STYLE: maplibregl.StyleSpecification = {
@@ -102,6 +106,8 @@ export function CrossFlowMap() {
   const osmRoadsRef     = useRef<Map<string, OSMRoad[]>>(new Map())
   const osmPoisRef      = useRef<Map<string, OSMPOIPoint[]>>(new Map())
   const osmRoutesRef    = useRef<Map<string, OSMRouteGeometry[]>>(new Map())
+  const osmMetroRef     = useRef<Map<string, MetroStation[]>>(new Map())
+  const ratpStatusRef   = useRef<Map<string, string>>(new Map())
   const refreshDataRef  = useRef<() => void>(() => {})
   const [mapLoaded, setMapLoaded] = useState(false)
 
@@ -500,20 +506,67 @@ export function CrossFlowMap() {
     }
   }, [city.id, mapLoaded]) // eslint-disable-line
 
-  // ─── Load transit route geometries for vehicle simulation ────────────
+  // ─── Detect Paris (enables RATP real-time status) ────────────────────
+
+  const isParis = city.countryCode === 'FR' &&
+    Math.abs(city.center.lat - 48.8566) < 0.6 &&
+    Math.abs(city.center.lng - 2.3522) < 0.8
+
+  // ─── Load transit route geometries + render as polylines ─────────────
 
   useEffect(() => {
     if (!mapLoaded) return
     if (osmRoutesRef.current.has(city.id)) return
 
-    // Fetch subway + tram + bus routes with real geometry (max 30)
-    fetchRouteGeometries(city.bbox, ['subway', 'tram', 'bus'], 30).then(routes => {
+    // Fetch subway + tram + bus routes with real geometry (max 60)
+    fetchRouteGeometries(city.bbox, ['subway', 'tram', 'bus'], 60).then(routes => {
       if (!routes.length) return
       osmRoutesRef.current.set(city.id, routes)
-      // Trigger initial vehicle paint immediately
       updateVehicleSource()
+      updateTransitRoutesSource(ratpStatusRef.current)
     })
   }, [city.id, mapLoaded]) // eslint-disable-line
+
+  // ─── Metro stations with line labels ─────────────────────────────────
+
+  useEffect(() => {
+    if (!mapLoaded) return
+    if (osmMetroRef.current.has(city.id)) return
+
+    fetchMetroStations(city.bbox).then(stations => {
+      if (!stations.length) return
+      osmMetroRef.current.set(city.id, stations)
+      updateMetroStationsSource()
+    })
+  }, [city.id, mapLoaded]) // eslint-disable-line
+
+  // ─── RATP real-time status → bus + metro route colors (Paris only) ───
+
+  useEffect(() => {
+    if (!mapLoaded || !isParis) return
+
+    const applyRatp = async () => {
+      const lines = await fetchAllTrafficStatus()
+      const statusColors = new Map<string, string>()
+      for (const line of lines) {
+        let color: string
+        switch (line.status) {
+          case 'interrompu': color = '#EF4444'; break
+          case 'perturbé':   color = '#F59E0B'; break
+          case 'travaux':    color = '#F97316'; break
+          default:           color = line.color ?? LINE_COLORS[line.slug] ?? '#3B82F6'
+        }
+        // Keyed by slug (e.g. "1", "4", "21", "T3A")
+        statusColors.set(line.slug, color)
+      }
+      ratpStatusRef.current = statusColors
+      updateTransitRoutesSource(statusColors)
+    }
+
+    applyRatp()
+    const iv = setInterval(applyRatp, 60_000)
+    return () => clearInterval(iv)
+  }, [mapLoaded, isParis, city.id]) // eslint-disable-line
 
   // ─── Vehicle position update (every 10 seconds) ───────────────────────
 
@@ -549,6 +602,68 @@ export function CrossFlowMap() {
     const interval = setInterval(updateVehicleSource, 10_000)
     return () => clearInterval(interval)
   }, [city.id, mapLoaded]) // eslint-disable-line
+
+  // ─── Transit route polylines (bus + metro as colored lines) ──────────
+
+  function updateTransitRoutesSource(ratpStatus: Map<string, string>) {
+    const map    = mapRef.current
+    const routes = osmRoutesRef.current.get(city.id)
+    if (!map || !routes?.length) return
+    const src = map.getSource(TRANSIT_ROUTES_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (!src) return
+
+    src.setData({
+      type: 'FeatureCollection',
+      features: routes.map(r => {
+        // For Paris: override color from RATP status if available
+        let color = r.colour
+        const slug = r.ref.toUpperCase()
+        const statusColor = ratpStatus.get(slug)
+        if (statusColor) color = statusColor
+        return {
+          type:       'Feature' as const,
+          geometry:   { type: 'LineString' as const, coordinates: r.coords },
+          properties: { id: r.id, routeType: r.route, ref: r.ref, color, name: r.name },
+        }
+      }),
+    })
+  }
+
+  // ─── Metro station markers with line numbers ──────────────────────────
+
+  function updateMetroStationsSource() {
+    const map      = mapRef.current
+    const stations = osmMetroRef.current.get(city.id)
+    if (!map || !stations?.length) return
+    const src = map.getSource(METRO_STATIONS_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (!src) return
+
+    src.setData({
+      type: 'FeatureCollection',
+      features: stations.map(s => {
+        const firstLine = s.lines[0] ?? ''
+        const color     = LINE_COLORS[firstLine] ?? '#8B5CF6'
+        // Label: "M1", "M4+3" for transfer stations
+        const label     = firstLine
+          ? s.lines.length > 1
+            ? `${firstLine}·${s.lines.slice(1).join('·')}`
+            : firstLine
+          : 'M'
+        return {
+          type:       'Feature' as const,
+          geometry:   { type: 'Point' as const, coordinates: [s.lng, s.lat] },
+          properties: {
+            id:        s.id,
+            name:      s.name,
+            lines:     s.lines.join('·'),
+            lineCount: s.lines.length,
+            color,
+            label,
+          },
+        }
+      }),
+    })
+  }
 
   // ─── Fly to city ─────────────────────────────────────────────────────
 
@@ -1048,9 +1163,19 @@ export function CrossFlowMap() {
       trySet(TOMTOM_INC  + '-layer', activeLayers.has('incidents') ? 'visible' : 'none')
     }
 
-    trySet(VEHICLES_SOURCE + '-glow',  activeLayers.has('transport') ? 'visible' : 'none')
-    trySet(VEHICLES_SOURCE + '-layer', activeLayers.has('transport') ? 'visible' : 'none')
-    trySet(VEHICLES_SOURCE + '-label', activeLayers.has('transport') ? 'visible' : 'none')
+    const transportVis = activeLayers.has('transport') ? 'visible' : 'none'
+    trySet(VEHICLES_SOURCE + '-glow',  transportVis)
+    trySet(VEHICLES_SOURCE + '-layer', transportVis)
+    trySet(VEHICLES_SOURCE + '-label', transportVis)
+    // Transit route polylines
+    trySet(TRANSIT_ROUTES_SOURCE + '-bus',    transportVis)
+    trySet(TRANSIT_ROUTES_SOURCE + '-metro',  transportVis)
+    // Metro station markers
+    trySet(METRO_STATIONS_SOURCE + '-glow',   transportVis)
+    trySet(METRO_STATIONS_SOURCE + '-ring',   transportVis)
+    trySet(METRO_STATIONS_SOURCE + '-dot',    transportVis)
+    trySet(METRO_STATIONS_SOURCE + '-lineref',transportVis)
+    trySet(METRO_STATIONS_SOURCE + '-name',   transportVis)
   }, [activeLayers, mapLoaded, useLiveData])
 
   // ─── Heatmap mode (shows/hides correct heatmap layer) ────────────────
@@ -1295,6 +1420,128 @@ function initStaticSources(map: maplibregl.Map) {
       'circle-opacity':       1,
       'circle-stroke-width':  2,
       'circle-stroke-color':  '#08090B',
+    },
+  })
+
+  // ── Transit Route Polylines (bus + metro lines on the map) ───────────
+  map.addSource(TRANSIT_ROUTES_SOURCE, { type: 'geojson', data: emptyFC })
+
+  // Metro / tram / train — thick colored lines
+  map.addLayer({
+    id:      TRANSIT_ROUTES_SOURCE + '-metro',
+    type:    'line',
+    source:  TRANSIT_ROUTES_SOURCE,
+    minzoom: 10,
+    filter:  ['in', ['get', 'routeType'], ['literal', ['subway', 'tram', 'train']]],
+    layout:  { 'line-join': 'round', 'line-cap': 'round' },
+    paint:   {
+      'line-color':   ['get', 'color'],
+      'line-width':   ['interpolate', ['linear'], ['zoom'], 10, 2.5, 13, 4, 15, 5.5, 17, 7],
+      'line-opacity': 0.85,
+    },
+  })
+
+  // Bus routes — thinner lines, visible from zoom 12
+  map.addLayer({
+    id:      TRANSIT_ROUTES_SOURCE + '-bus',
+    type:    'line',
+    source:  TRANSIT_ROUTES_SOURCE,
+    minzoom: 12,
+    filter:  ['==', ['get', 'routeType'], 'bus'],
+    layout:  { 'line-join': 'round', 'line-cap': 'round' },
+    paint:   {
+      'line-color':   ['get', 'color'],
+      'line-width':   ['interpolate', ['linear'], ['zoom'], 12, 1.5, 14, 2.5, 16, 3.5],
+      'line-opacity': 0.7,
+    },
+  })
+
+  // ── Metro Stations (proper markers with line numbers) ─────────────────
+  map.addSource(METRO_STATIONS_SOURCE, { type: 'geojson', data: emptyFC })
+
+  // Outer glow (atmospheric)
+  map.addLayer({
+    id:      METRO_STATIONS_SOURCE + '-glow',
+    type:    'circle',
+    source:  METRO_STATIONS_SOURCE,
+    minzoom: 11,
+    paint:   {
+      'circle-radius':   ['interpolate', ['linear'], ['zoom'], 11, 9, 14, 18, 16, 24],
+      'circle-color':    ['get', 'color'],
+      'circle-opacity':  ['interpolate', ['linear'], ['zoom'], 11, 0.1, 14, 0.18],
+      'circle-blur':     0.8,
+    },
+  })
+
+  // White backing ring
+  map.addLayer({
+    id:      METRO_STATIONS_SOURCE + '-ring',
+    type:    'circle',
+    source:  METRO_STATIONS_SOURCE,
+    minzoom: 11,
+    paint:   {
+      'circle-radius':       ['interpolate', ['linear'], ['zoom'], 11, 5.5, 14, 10, 16, 13],
+      'circle-color':        '#FFFFFF',
+      'circle-opacity':      1,
+      'circle-stroke-width': 0,
+    },
+  })
+
+  // Colored fill (line color)
+  map.addLayer({
+    id:      METRO_STATIONS_SOURCE + '-dot',
+    type:    'circle',
+    source:  METRO_STATIONS_SOURCE,
+    minzoom: 11,
+    paint:   {
+      'circle-radius':        ['interpolate', ['linear'], ['zoom'], 11, 4, 14, 8, 16, 11],
+      'circle-color':         ['get', 'color'],
+      'circle-opacity':       1,
+      'circle-stroke-width':  1.5,
+      'circle-stroke-color':  '#1A1A2E',
+    },
+  })
+
+  // Line ref label (e.g. "1", "4·9·14") — centered on the dot
+  map.addLayer({
+    id:      METRO_STATIONS_SOURCE + '-lineref',
+    type:    'symbol',
+    source:  METRO_STATIONS_SOURCE,
+    minzoom: 13,
+    layout:  {
+      'text-field':            ['get', 'label'],
+      'text-font':             ['Open Sans Bold'],
+      'text-size':             ['interpolate', ['linear'], ['zoom'], 13, 7, 15, 10, 17, 12],
+      'text-anchor':           'center',
+      'text-allow-overlap':    true,
+      'text-ignore-placement': true,
+    },
+    paint:   {
+      'text-color':      '#FFFFFF',
+      'text-halo-color': 'rgba(0,0,0,0)',
+      'text-halo-width': 0,
+    },
+  })
+
+  // Station name label below the dot (visible from zoom 14)
+  map.addLayer({
+    id:      METRO_STATIONS_SOURCE + '-name',
+    type:    'symbol',
+    source:  METRO_STATIONS_SOURCE,
+    minzoom: 14,
+    layout:  {
+      'text-field':        ['get', 'name'],
+      'text-font':         ['Open Sans Bold'],
+      'text-size':         ['interpolate', ['linear'], ['zoom'], 14, 10, 16, 13],
+      'text-anchor':       'top',
+      'text-offset':       [0, 1.0],
+      'text-max-width':    8,
+      'text-allow-overlap': false,
+    },
+    paint:   {
+      'text-color':      '#F5F5F7',
+      'text-halo-color': 'rgba(8,9,11,0.95)',
+      'text-halo-width': 2.5,
     },
   })
 

@@ -23,7 +23,7 @@ export interface TrafficMessage {
   severity: 'info' | 'warning' | 'critical'
 }
 
-const LINE_COLORS: Record<string, string> = {
+export const LINE_COLORS: Record<string, string> = {
   // Métro
   '1': '#FFCD00', '2': '#003CA6', '3': '#837902', '3B': '#6EC4E8',
   '4': '#CF009E', '5': '#FF7E2E', '6': '#6ECA97', '7': '#FA9ABA',
