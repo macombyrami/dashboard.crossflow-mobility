@@ -77,9 +77,16 @@ function PostCard({ post }: { post: SocialPost }) {
       </div>
 
       {/* Content */}
-      <p className="text-xs text-text-secondary leading-relaxed line-clamp-3">
-        {post.text}
+      <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">
+        {post.text.split(/(https?:\/\/[^\s]+)/g).map((part, i) => (
+          part.match(/^https?:\/\//) ? (
+            <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-[#1DA1F2] hover:underline break-all block mt-1 font-medium">
+              {part.length > 40 ? part.substring(0, 40) + '...' : part}
+            </a>
+          ) : part
+        ))}
       </p>
+
 
       {/* Location + km */}
       <div className="flex items-center gap-3 flex-wrap">

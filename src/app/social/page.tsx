@@ -266,10 +266,21 @@ function XPulseFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
                       <span className="text-xs font-bold text-text-primary truncate">{post.author?.name}</span>
                       <span className="text-[10px] text-text-muted truncate">@{post.author?.handle}</span>
                     </div>
-                    <span className="text-[10px] text-text-muted shrink-0">{new Date(post.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="text-[10px] text-text-muted shrink-0">
+                      {new Date(post.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </div>
-                  <p className="text-xs text-text-secondary leading-relaxed mt-1">{post.text}</p>
+                  <p className="text-xs text-text-secondary leading-relaxed mt-1 whitespace-pre-wrap">
+                    {post.text.split(/(https?:\/\/[^\s]+)/g).map((part, i) => (
+                      part.match(/^https?:\/\//) ? (
+                        <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-brand-blue hover:underline break-all">
+                          {part.length > 30 ? part.substring(0, 30) + '...' : part}
+                        </a>
+                      ) : part
+                    ))}
+                  </p>
                 </div>
+
               </div>
               
               <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-bg-border/50">

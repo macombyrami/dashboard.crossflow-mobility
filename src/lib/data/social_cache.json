@@ -1,0 +1,109 @@
+{
+  "posts": [
+    {
+      "id": "sytadin-590276",
+      "text": "[Terminé] FLASH/Accident sur l'A1 vers Paris (La Bourget) (#590276)",
+      "type": "alert",
+      "severity": "medium",
+      "location": "La Bourget",
+      "axis": "A1",
+      "author_name": "Sytadin",
+      "author_handle": "sytadin",
+      "author_avatar": "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png",
+      "timestamp": "2026-03-27T18:19:00Z",
+      "tags": ["A1", "Accident"]
+    },
+    {
+      "id": "sytadin-590277",
+      "text": "FLASH/Accident sur l'A86 extérieur (Maisons-Alfort) http://sytadin.fr/sys/alert_reseau.jsp.html#590277",
+      "type": "alert",
+      "severity": "high",
+      "location": "Maisons-Alfort",
+      "axis": "A86",
+      "author_name": "Sytadin",
+      "author_handle": "sytadin",
+      "author_avatar": "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png",
+      "timestamp": "2026-03-27T17:45:00Z",
+      "tags": ["A86", "Accident"]
+    },
+    {
+      "id": "sytadin-590274",
+      "text": "FLASH/Accident sur l'A1 vers Paris (La Bourget) http://sytadin.fr/sys/alert_reseau.jsp.html#590274",
+      "type": "alert",
+      "severity": "high",
+      "location": "La Bourget",
+      "axis": "A1",
+      "author_name": "Sytadin",
+      "author_handle": "sytadin",
+      "author_avatar": "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png",
+      "timestamp": "2026-03-27T17:34:00Z",
+      "tags": ["A1", "Accident"]
+    },
+    {
+      "id": "sytadin-590270",
+      "text": "[Terminé] FLASH/Accident sur l'A3 vers Paris (Aulnay sous Bois) (#590270)",
+      "type": "alert",
+      "severity": "medium",
+      "location": "Aulnay sous Bois",
+      "axis": "A3",
+      "author_name": "Sytadin",
+      "author_handle": "sytadin",
+      "author_avatar": "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png",
+      "timestamp": "2026-03-27T17:34:00Z",
+      "tags": ["A3", "Accident"]
+    },
+    {
+      "id": "sytadin-590270b",
+      "text": "FLASH/Accident sur l'A3 vers Paris (Aulnay sous Bois) http://sytadin.fr/sys/alert_reseau.jsp.html#590270",
+      "type": "alert",
+      "severity": "high",
+      "location": "Aulnay sous Bois",
+      "axis": "A3",
+      "author_name": "Sytadin",
+      "author_handle": "sytadin",
+      "author_avatar": "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png",
+      "timestamp": "2026-03-27T17:34:00Z",
+      "tags": ["A3", "Accident"]
+    },
+    {
+      "id": "sytadin-590269",
+      "text": "FLASH/Accident sur l'A4 vers Paris (Aulnay sous Bois) http://sytadin.fr/sys/alert_reseau.jsp.html#590269",
+      "type": "alert",
+      "severity": "high",
+      "location": "Aulnay sous Bois",
+      "axis": "A4",
+      "author_name": "Sytadin",
+      "author_handle": "sytadin",
+      "author_avatar": "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png",
+      "timestamp": "2026-03-27T17:34:00Z",
+      "tags": ["A4", "Accident"]
+    },
+    {
+      "id": "sytadin-590268",
+      "text": "[Terminé] FLASH/BUS en panne sur l'A1 vers Paris (Saint Denis) (#590268)",
+      "type": "alert",
+      "severity": "medium",
+      "location": "Saint Denis",
+      "axis": "A1",
+      "author_name": "Sytadin",
+      "author_handle": "sytadin",
+      "author_avatar": "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png",
+      "timestamp": "2026-03-27T16:34:00Z",
+      "tags": ["A1", "Panne"]
+    },
+    {
+      "id": "sytadin-590268b",
+      "text": "FLASH/BUS en panne sur l'A1 vers Paris (Saint Denis) http://sytadin.fr/sys/alert_reseau.jsp.html#590268",
+      "type": "alert",
+      "severity": "medium",
+      "location": "Saint Denis",
+      "axis": "A1",
+      "author_name": "Sytadin",
+      "author_handle": "sytadin",
+      "author_avatar": "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png",
+      "timestamp": "2026-03-27T15:34:00Z",
+      "tags": ["A1", "Panne"]
+    }
+  ],
+  "fetchedAt": "2026-03-27T18:48:59Z"
+}
