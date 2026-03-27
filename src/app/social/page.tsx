@@ -143,42 +143,76 @@ function RatpFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
 interface RealIncident {
   id:          string
   title:       string
-  type:        'accident' | 'travaux' | 'fermeture' | 'événement' | 'congestion' | 'incident'
-  severity:    'low' | 'medium' | 'high' | 'critical'
-  address:     string
-  district?:   string
-  lat:         number
-  lng:         number
-  startDate?:  string
-  endDate?:    string
-  source:      'paris-opendata' | 'here' | 'dirif'
-  sourceLabel: string
+  description: string
+  severity:    'minor' | 'moderate' | 'major' | 'critical'
+  type:        'accident' | 'work' | 'congestion' | 'closure' | 'event' | 'other'
+  timestamp:   string
+  coordinates: [number, number]
+  source:      string
+  location?:   string
 }
 
-const SEVERITY_COLORS: Record<RealIncident['severity'], string> = {
-  critical: '#FF1744',
-  high:     '#FF6D00',
-  medium:   '#FFB300',
-  low:      '#00E676',
+const SEVERITY_CONFIG: Record<RealIncident['severity'], { text: string; bg: string; iconBg: string; border: string }> = {
+  critical: { text: 'text-red-500', bg: 'bg-red-500', iconBg: 'bg-red-500/10', border: 'border-red-500/20' },
+  major:    { text: 'text-orange-500', bg: 'bg-orange-500', iconBg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+  moderate: { text: 'text-yellow-500', bg: 'bg-yellow-500', iconBg: 'bg-yellow-500/10', border: 'border-yellow-500/20' },
+  minor:    { text: 'text-green-500', bg: 'bg-green-500', iconBg: 'bg-green-500/10', border: 'border-green-500/20' },
 }
 
-const TYPE_ICONS: Record<string, React.ElementType> = {
-  travaux:    Wrench,
-  fermeture:  Ban,
+const INCIDENT_ICONS: Record<RealIncident['type'], React.ElementType> = {
+  work:       Wrench,
+  closure:    Ban,
   accident:   AlertTriangle,
-  incident:   AlertTriangle,
-  événement:  MapPin,
   congestion: AlertTriangle,
+  event:      MapPin,
+  other:      AlertTriangle,
 }
 
-function formatDateRange(start?: string, end?: string): string {
-  if (!start) return ''
-  const s   = new Date(start)
-  const fmt = (d: Date) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-  if (!end) return `depuis le ${fmt(s)}`
-  const e = new Date(end)
-  if (s.toDateString() === e.toDateString()) return `le ${fmt(s)}`
-  return `du ${fmt(s)} au ${fmt(e)}`
+function IncidentCard({ incident }: { incident: RealIncident }) {
+  const Icon = INCIDENT_ICONS[incident.type] || AlertTriangle
+  const sev  = SEVERITY_CONFIG[incident.severity]
+
+  return (
+    <div className="group relative bg-bg-surface border border-bg-border rounded-2xl p-4 transition-all hover:border-text-muted/30 hover:translate-x-1 shadow-sm overflow-hidden">
+      {/* Visual Indicator Layer */}
+      <div className={cn("absolute left-0 top-0 bottom-0 w-1", sev.bg)} />
+      
+      <div className="flex gap-4">
+        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm", sev.iconBg)}>
+          <Icon className={cn("w-5 h-5", sev.text)} />
+        </div>
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <h4 className="text-[13px] font-bold text-text-primary leading-tight truncate">{incident.title}</h4>
+            <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full border shrink-0", sev.border, sev.text)}>
+              {incident.severity.toUpperCase()}
+            </span>
+          </div>
+          
+          <p className="text-[12px] text-text-secondary line-clamp-2 leading-snug mb-2">
+            {incident.description}
+          </p>
+          
+          <div className="flex items-center flex-wrap gap-3">
+            {incident.location && (
+              <div className="flex items-center gap-1 text-text-muted">
+                <MapPin className="w-3 h-3" />
+                <span className="text-[10px] font-medium">{incident.location}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1 text-text-muted">
+              <RefreshCw className="w-3 h-3" />
+              <span className="text-[10px] uppercase font-bold tracking-wider">{incident.source}</span>
+            </div>
+            <span className="text-[10px] text-text-muted/60 ml-auto">
+              {new Date(incident.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 interface SocialPost {
@@ -342,31 +376,11 @@ function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
 
   const stats = useMemo(() => ({
     critical: incidents.filter(i => i.severity === 'critical').length,
-    high:     incidents.filter(i => i.severity === 'high').length,
-    medium:   incidents.filter(i => i.severity === 'medium').length,
+    major:    incidents.filter(i => i.severity === 'major').length,
+    moderate: incidents.filter(i => i.severity === 'moderate').length,
+    minor:    incidents.filter(i => i.severity === 'minor').length,
   }), [incidents])
 
-  const refresh = async () => {
-
-    setLoading(true)
-    try {
-      const res = await fetch(
-        `/api/social/incidents?lat=${city.center.lat}&lng=${city.center.lng}`,
-      )
-      if (res.ok) {
-        const data = await res.json()
-        const items = data ?? []
-        setIncidents(items)
-        onUpdate?.(items.length)
-
-        // Update global intelligence
-        if (typeof window !== 'undefined' && 'updateAlerts' in window) {
-          (window as any).updateAlerts(items.map((p: any) => ({
-            text: p.title,
-            source: 'COMMUNITY',
-            severity: p.severity
-          })))
-        }
 
       }
     } catch {
