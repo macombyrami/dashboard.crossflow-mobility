@@ -761,6 +761,23 @@ export function CrossFlowMap() {
     }
 
     setVehicleCount(allVehicles.length)
+
+    // 5. Global Animations (Pulse for disrupted stations + selected vehicles)
+    pulseRef.current = (nowMs % 1500) / 1500 // 1.5s cycle
+    const p = pulseRef.current
+    const pulseOpacity = 0.7 * (1 - p)
+
+    if (map.getLayer(METRO_STATIONS_SOURCE + '-alert')) {
+      map.setPaintProperty(METRO_STATIONS_SOURCE + '-alert', 'circle-opacity', pulseOpacity)
+    }
+    if (map.getLayer(VEHICLES_SOURCE + '-selected-ring')) {
+      map.setPaintProperty(VEHICLES_SOURCE + '-selected-ring', 'circle-opacity', pulseOpacity * 0.6)
+      map.setPaintProperty(VEHICLES_SOURCE + '-selected-ring', 'circle-radius', [
+        'interpolate', ['linear'], ['zoom'],
+        10, 12 + (p * 8),
+        15, 24 + (p * 12)
+      ])
+    }
   }, [city.id])
 
   useEffect(() => {
@@ -831,9 +848,10 @@ export function CrossFlowMap() {
 
         // Importance: based on line count + major hubs
         let importance = 1.0 + (s.lines.length * 0.35)
-        const isHub = METRO_HUBS.some(hub => s.name.includes(hub))
+        const isHub = METRO_HUBS.some((hub: string) => s.name.includes(hub))
         if (isHub) importance += 1.8
         if (s.lines.length >= 3) importance += 0.5
+
 
         // Label: show all lines separated by · (e.g. "1·4·7·14")
 
@@ -1682,11 +1700,16 @@ function initStaticSources(map: maplibregl.Map) {
     source:  METRO_STATIONS_SOURCE,
     minzoom: 11,
     paint:   {
-      'circle-radius':   ['interpolate', ['linear'], ['zoom'], 11, 9, 14, 18, 16, 24],
+      'circle-radius':   ['interpolate', ['linear'], ['zoom'], 
+        11, ['*', 8, ['get', 'importance']], 
+        14, ['*', 16, ['get', 'importance']], 
+        16, ['*', 22, ['get', 'importance']]
+      ],
       'circle-color':    ['get', 'color'],
-      'circle-opacity':  ['interpolate', ['linear'], ['zoom'], 11, 0.1, 14, 0.18],
+      'circle-opacity':  ['interpolate', ['linear'], ['zoom'], 11, 0.08, 14, 0.15],
       'circle-blur':     0.8,
     },
+
   })
 
   // White backing ring
@@ -1696,11 +1719,16 @@ function initStaticSources(map: maplibregl.Map) {
     source:  METRO_STATIONS_SOURCE,
     minzoom: 11,
     paint:   {
-      'circle-radius':       ['interpolate', ['linear'], ['zoom'], 11, 5.5, 14, 10, 16, 13],
+      'circle-radius':       ['interpolate', ['linear'], ['zoom'], 
+        11, ['*', 5, ['get', 'importance']], 
+        14, ['*', 9, ['get', 'importance']], 
+        16, ['*', 12, ['get', 'importance']]
+      ],
       'circle-color':        '#FFFFFF',
       'circle-opacity':      1,
       'circle-stroke-width': 0,
     },
+
   })
 
   // Colored fill (line color)
@@ -1710,12 +1738,17 @@ function initStaticSources(map: maplibregl.Map) {
     source:  METRO_STATIONS_SOURCE,
     minzoom: 11,
     paint:   {
-      'circle-radius':        ['interpolate', ['linear'], ['zoom'], 11, 4, 14, 8, 16, 11],
+      'circle-radius':        ['interpolate', ['linear'], ['zoom'], 
+        11, ['*', 3.5, ['get', 'importance']], 
+        14, ['*', 7.5, ['get', 'importance']], 
+        16, ['*', 10.5, ['get', 'importance']]
+      ],
       'circle-color':         ['get', 'color'],
       'circle-opacity':       1,
       'circle-stroke-width':  1.5,
       'circle-stroke-color':  '#1A1A2E',
     },
+
   })
 
   // Line ref label (e.g. "1", "4·9·14") — centered on the dot
@@ -1769,13 +1802,14 @@ function initStaticSources(map: maplibregl.Map) {
     minzoom: 11,
     filter:  ['==', ['get', 'disrupted'], 1],
     paint:   {
-      'circle-radius':         ['interpolate', ['linear'], ['zoom'], 11, 9, 14, 16, 16, 21],
+      'circle-radius':         ['interpolate', ['linear'], ['zoom'], 11, 10, 14, 18, 16, 24],
       'circle-color':          '#EF4444',
-      'circle-opacity':        0.30,
-      'circle-stroke-width':   2.5,
+      'circle-opacity':        0, // Driven by animation
+      'circle-stroke-width':   1.5,
       'circle-stroke-color':   '#EF4444',
-      'circle-stroke-opacity': 0.65,
+      'circle-stroke-opacity': 0.8,
     },
+
   })
 
   // ── Transit Vehicles ──────────────────────────────────────────────────
