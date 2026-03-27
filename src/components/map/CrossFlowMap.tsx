@@ -95,6 +95,12 @@ const TYPE_LABEL: Record<string, string> = {
   monorail: 'Monorail',
 }
 
+const METRO_HUBS = [
+  'Châtelet', 'Gare du Nord', 'Gare de Lyon', 'Montparnasse', 'Saint-Lazare',
+  'La Défense', 'Auber', 'Les Halles', 'Charles de Gaulle', 'Nation', 'République',
+]
+
+
 // CartoDB Voyager Dark — completely free, no key, beautiful dark style
 const CARTO_DARK_STYLE: maplibregl.StyleSpecification = {
   version: 8,
@@ -143,7 +149,9 @@ export function CrossFlowMap() {
   const refreshDataRef  = useRef<() => void>(() => {})
   const liveVehiclesRef = useRef<import('@/lib/engine/transit.engine').TransitVehicle[]>([])
   const rafRef          = useRef<number | null>(null)
+  const pulseRef        = useRef<number>(0)
   const lastVehicleUpdateRef = useRef<number>(0)
+
   const [mapLoaded, setMapLoaded] = useState(false)
   const [selectedVehicle, setSelectedVehicleState] = useState<import('@/lib/engine/transit.engine').TransitVehicle | null>(null)
   const [vehicleCount, setVehicleCount] = useState(0)
@@ -821,7 +829,14 @@ export function CrossFlowMap() {
         // Disruption: any of the station's lines is disrupted
         const isDisrupted = s.lines.some(l => disrupted.has(l.toUpperCase()))
 
+        // Importance: based on line count + major hubs
+        let importance = 1.0 + (s.lines.length * 0.35)
+        const isHub = METRO_HUBS.some(hub => s.name.includes(hub))
+        if (isHub) importance += 1.8
+        if (s.lines.length >= 3) importance += 0.5
+
         // Label: show all lines separated by · (e.g. "1·4·7·14")
+
         const label = firstLine
           ? s.lines.length > 1
             ? s.lines.join('·')
@@ -839,12 +854,14 @@ export function CrossFlowMap() {
             color,
             label,
             disrupted:  isDisrupted ? 1 : 0,
+            importance,
             isRer:      isRer ? 1 : 0,
           },
         }
       }),
     })
   }
+
 
   // ─── Fly to city ─────────────────────────────────────────────────────
 
