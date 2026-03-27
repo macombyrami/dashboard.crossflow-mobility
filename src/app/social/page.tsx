@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils/cn'
 
 
 
-type SocialTab = 'sytadin' | 'ratp' | 'community'
+type SocialTab = 'sytadin' | 'ratp' | 'community' | 'xpulse'
+
 
 // ─── RATP Feed ───────────────────────────────────────────────────────────────
 import { fetchAllTrafficStatus, type TrafficLine } from '@/lib/api/ratp'
@@ -166,6 +167,114 @@ function formatDateRange(start?: string, end?: string): string {
   return `du ${fmt(s)} au ${fmt(e)}`
 }
 
+interface SocialPost {
+  id: string
+  author: {
+    avatar: string
+    name: string
+    handle: string
+  }
+  timestamp: string
+  text: string
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  location: string
+  tags: string[]
+}
+
+function XPulseFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
+  const [loading, setLoading]     = useState(true)
+  const [posts, setPosts]         = useState<SocialPost[]>([])
+
+  const refresh = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/social/x-pulse')
+      if (res.ok) {
+        const data = await res.json()
+        const items = data.posts ?? []
+        setPosts(items)
+        onUpdate?.(items.length)
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refresh()
+    const iv = setInterval(refresh, 180_000)
+    return () => clearInterval(iv)
+  }, [])
+
+  return (
+    <div className="flex flex-col h-full bg-black/5">
+      <div className="px-5 py-4 border-b border-bg-border flex items-center justify-between bg-bg-surface">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-black flex items-center justify-center">
+            <Twitter className="w-3.5 h-3.5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-text-primary">X Traffic Pulse</h2>
+            <p className="text-[10px] text-text-muted">Analyse IA des flux sociaux (RAG)</p>
+          </div>
+        </div>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="p-1.5 rounded-lg hover:bg-bg-elevated transition-colors text-text-muted disabled:opacity-50"
+        >
+          <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {loading && posts.length === 0 ? (
+          <div className="text-center p-8">
+            <div className="w-8 h-8 border-2 border-text-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-xs text-text-muted">Analyse des flux X en cours…</p>
+          </div>
+        ) : (
+          posts.map(post => (
+            <div key={post.id} className="rounded-2xl border border-bg-border bg-bg-surface/50 backdrop-blur-sm p-4 space-y-3 hover:border-text-muted/30 transition-all hover:translate-x-1">
+              <div className="flex items-start gap-3">
+                <img src={post.author?.avatar} className="w-9 h-9 rounded-full bg-bg-elevated border border-bg-border shrink-0" alt="" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-xs font-bold text-text-primary truncate">{post.author?.name}</span>
+                      <span className="text-[10px] text-text-muted truncate">@{post.author?.handle}</span>
+                    </div>
+                    <span className="text-[10px] text-text-muted shrink-0">{new Date(post.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <p className="text-xs text-text-secondary leading-relaxed mt-1">{post.text}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-bg-border/50">
+                <span className={cn(
+                  "text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase",
+                  post.severity === 'critical' ? 'text-red-500 bg-red-500/10 border-red-500/20' :
+                  post.severity === 'high' ? 'text-orange-500 bg-orange-500/10 border-orange-500/20' :
+                  'text-blue-500 bg-blue-500/10 border-blue-500/20'
+                )}>
+                  {post.location}
+                </span>
+                {post.tags.map(tag => (
+                  <span key={tag} className="text-[9px] font-semibold text-brand-blue bg-brand-blue/10 px-2 py-0.5 rounded-full">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
 function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
   const city = useMapStore(s => s.city)
   const [loading, setLoading]     = useState(true)
@@ -297,6 +406,8 @@ export default function SocialPage() {
   const [ratpCount, setRatpCount] = useState(0)
   const [sytadinCount, setSytadinCount] = useState(0)
   const [communityCount, setCommunityCount] = useState(0)
+  const [xCount, setXCount] = useState(0)
+
 
   useEffect(() => { document.title = 'Flux Social — Alertes IDF | CrossFlow' }, [])
 
@@ -378,6 +489,21 @@ export default function SocialPage() {
               {activeTab === 'community' && <p className="text-[9px] font-normal mt-0.5 opacity-80">OpenData + HERE Traffic</p>}
             </div>
           </button>
+
+          <button
+            onClick={() => setActiveTab('xpulse')}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-xs font-semibold w-full text-left",
+              activeTab === 'xpulse' ? "bg-black/10 text-black border border-black/20 dark:bg-white/10 dark:text-white dark:border-white/20" : "text-text-secondary hover:bg-bg-elevated border border-transparent"
+            )}
+          >
+            <Twitter className="w-4 h-4" />
+            <div className="flex-1">
+              <span>X Traffic Pulse</span>
+              {activeTab === 'xpulse' && <p className="text-[9px] font-normal mt-0.5 opacity-80">RAG Twitter Monitoring</p>}
+            </div>
+          </button>
+
         </div>
 
         {/* Network Stats (Bottom of sidebar) */}
@@ -396,6 +522,7 @@ export default function SocialPage() {
             ratpCount={ratpCount} 
             sytadinCount={sytadinCount} 
             communityCount={communityCount} 
+            xCount={xCount}
           />
           
           <div className="flex-1 overflow-hidden relative">
@@ -408,7 +535,11 @@ export default function SocialPage() {
             <div className={cn("absolute inset-0 transition-opacity duration-300", activeTab === 'community' ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none")}>
               <CommunityFeed onUpdate={setCommunityCount} />
             </div>
+            <div className={cn("absolute inset-0 transition-opacity duration-300", activeTab === 'xpulse' ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none")}>
+              <XPulseFeed onUpdate={setXCount} />
+            </div>
           </div>
+
 
         </div>
 

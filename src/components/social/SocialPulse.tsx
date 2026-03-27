@@ -7,10 +7,11 @@ interface SocialPulseProps {
   ratpCount: number
   sytadinCount: number
   communityCount: number
+  xCount?: number
 }
 
-export function SocialPulse({ ratpCount, sytadinCount, communityCount }: SocialPulseProps) {
-  const totalAlerts = ratpCount + sytadinCount + communityCount
+export function SocialPulse({ ratpCount, sytadinCount, communityCount, xCount = 0 }: SocialPulseProps) {
+  const totalAlerts = ratpCount + sytadinCount + communityCount + xCount
   
   // Calculate a "Mobility Health Score" (higher is better)
   const healthScore = useMemo(() => {
@@ -18,8 +19,10 @@ export function SocialPulse({ ratpCount, sytadinCount, communityCount }: SocialP
     score -= (ratpCount * 12)
     score -= (sytadinCount * 8)
     score -= (communityCount * 5)
+    score -= (xCount * 4)
     return Math.max(0, score)
-  }, [ratpCount, sytadinCount, communityCount])
+  }, [ratpCount, sytadinCount, communityCount, xCount])
+
 
   const getStatusColor = (score: number) => {
     if (score > 80) return 'text-brand-green'
@@ -83,8 +86,10 @@ export function SocialPulse({ ratpCount, sytadinCount, communityCount }: SocialP
         <div className="flex items-center gap-3">
           <Badge count={ratpCount} label="RATP" color="bg-[#00A88F]" />
           <Badge count={sytadinCount} label="ROUTIER" color="bg-[#1DA1F2]" />
+          <Badge count={xCount} label="X (PULSE)" color="bg-[#000000]" />
           <Badge count={communityCount} label="CITOYEN" color="bg-brand" />
         </div>
+
       </div>
 
       {/* 3. Social Pulse / Trend */}
