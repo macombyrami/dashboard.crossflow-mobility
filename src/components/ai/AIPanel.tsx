@@ -1,11 +1,12 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
-import { BrainCircuit, Send, Loader2, X, Sparkles, ChevronDown, Zap, Map as MapIcon } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Lightbulb, Info, AlertTriangle, ArrowRight, Zap, Target, Leaf, Sparkles } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { cn } from '@/lib/utils/cn'
 import { isPointInPolygon, isSegmentInPolygon } from '@/lib/utils/spatial'
 import { useTranslation } from '@/lib/hooks/useTranslation'
+import { DecisionHub } from './DecisionHub'
 import appData from '@/lib/data/app.json'
 
 interface Message {
@@ -18,6 +19,7 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
   const [messages,  setMessages]  = useState<Message[]>([])
   const [input,     setInput]     = useState('')
   const [loading,   setLoading]   = useState(false)
+  const [activeTab, setActiveTab] = useState<'assistant' | 'intelligence'>('intelligence')
   
   const MODELS = [
     { id: 'google/gemini-2.0-flash-001',            label: 'Gemini 2.0 Flash',  note: t('ai.model_note_fast') },
@@ -75,8 +77,6 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
         active:      true,
         segmentCount: zoneSegments.length,
         incidentCount: zoneIncidents.length,
-        avgCongestion,
-        topIncidents: zoneIncidents.slice(0, 3).map(i => `${i.severity}: ${i.title}`),
         // Just names of streets in the zone
         streets: Array.from(new Set(zoneSegments.map(s => s.name).filter(Boolean))).slice(0, 10)
       }
@@ -208,23 +208,34 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
         </div>
       </div>
 
-      {/* City context badge */}
-      <div className="px-4 py-2 border-b border-bg-border flex items-center gap-2 flex-shrink-0">
-        <span className="text-lg">{city.flag ?? '🌍'}</span>
-        <span className="text-xs text-text-secondary">{city.name}</span>
-        {kpis && (
-          <span className="ml-auto text-xs text-text-muted">
-            {t('dashboard.congestion')}: <span className={cn(
-              'font-semibold',
-              kpis.congestionRate > 0.7 ? 'text-[#FF1744]' :
-              kpis.congestionRate > 0.5 ? 'text-[#FF6D00]' : 'text-[#00E676]',
-            )}>{Math.round(kpis.congestionRate * 100)}%</span>
-          </span>
-        )}
+      {/* Tab Switcher */}
+      <div className="flex px-4 py-2 border-b border-bg-border bg-bg-elevated/20">
+        <button
+          onClick={() => setActiveTab('assistant')}
+          className={cn(
+            "flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all",
+            activeTab === 'assistant' ? "bg-bg-surface text-brand shadow-sm border border-bg-border" : "text-text-muted hover:text-text-primary"
+          )}
+        >
+          ASSISTANT
+        </button>
+        <button
+          onClick={() => setActiveTab('intelligence')}
+          className={cn(
+            "flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all",
+            activeTab === 'intelligence' ? "bg-bg-surface text-brand-green shadow-sm border border-bg-border" : "text-text-muted hover:text-text-primary"
+          )}
+        >
+          INTELLIGENCE
+        </button>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+      {activeTab === 'intelligence' ? (
+        <DecisionHub />
+      ) : (
+        <>
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
         {messages.length === 0 && (
           <div className="space-y-4">
             <div className="text-center py-4">
@@ -326,6 +337,9 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
           </button>
         </div>
       </div>
+    </>
+  )
+}
     </div>
   )
 }
