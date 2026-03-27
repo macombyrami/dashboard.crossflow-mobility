@@ -19,29 +19,30 @@ export async function POST(req: NextRequest) {
   // Use first 200 chars as cache key fingerprint (queries can be large)
   const cacheKey = `overpass:${rawQuery.trim()}`
 
-  const cached = await cache.get<unknown>(cacheKey)
-  if (cached) {
-    return NextResponse.json(cached, {
-      headers: { 'X-Cache': 'HIT', 'Cache-Control': `public, max-age=${CACHE_TTL_SEC}` },
-    })
-  }
-
   try {
-    const res = await fetch(OVERPASS_BASE, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    `data=${encodeURIComponent(rawQuery)}`,
-      signal:  AbortSignal.timeout(40_000),
-    })
-    if (!res.ok) {
-      return NextResponse.json({ error: 'Overpass error', status: res.status }, { status: res.status })
-    }
-    const data = await res.json()
-    await cache.set(cacheKey, data, CACHE_TTL_SEC)
+    // getOrSetDeduped: concurrent requests with the same bbox hit Overpass only once
+    const data = await cache.getOrSetDeduped(
+      cacheKey,
+      async () => {
+        const res = await fetch(OVERPASS_BASE, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body:    `data=${encodeURIComponent(rawQuery)}`,
+          signal:  AbortSignal.timeout(40_000),
+        })
+        if (!res.ok) throw Object.assign(new Error('Overpass error'), { httpStatus: res.status })
+        return res.json()
+      },
+      CACHE_TTL_SEC,
+    )
     return NextResponse.json(data, {
       headers: { 'X-Cache': 'MISS', 'Cache-Control': `public, max-age=${CACHE_TTL_SEC}` },
     })
   } catch (err: unknown) {
+    const httpStatus = (err as { httpStatus?: number }).httpStatus
+    if (httpStatus) {
+      return NextResponse.json({ error: 'Overpass error', status: httpStatus }, { status: httpStatus })
+    }
     const msg = err instanceof Error ? err.message : 'timeout'
     return NextResponse.json({ error: msg }, { status: 503 })
   }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import fs from 'fs'
+import fs from 'fs/promises'
 import path from 'path'
 
 const supabase = createClient(
@@ -10,6 +10,11 @@ const supabase = createClient(
 
 // Path to localized cache
 const CACHE_PATH = path.join(process.cwd(), 'src/lib/data/social_cache.json')
+
+// In-memory parsed cache to avoid repeated disk reads
+let _fileCache: { posts: any[] } | null = null
+let _fileCacheAt = 0
+const FILE_CACHE_TTL_MS = 5 * 60_000 // re-read at most every 5 minutes
 
 interface SocialPost {
   id:       string
@@ -31,10 +36,20 @@ export async function GET(req: NextRequest) {
   const refresh = searchParams.get('refresh') === 'true'
 
   try {
-    // 1. Load localized cache as baseline fallback
+    // 1. Load localized cache as baseline fallback (async, with in-memory TTL)
     let fallbackData: { posts: any[] } = { posts: [] }
-    if (fs.existsSync(CACHE_PATH)) {
-      fallbackData = JSON.parse(fs.readFileSync(CACHE_PATH, 'utf-8'))
+    const now = Date.now()
+    if (_fileCache && now - _fileCacheAt < FILE_CACHE_TTL_MS) {
+      fallbackData = _fileCache
+    } else {
+      try {
+        const raw = await fs.readFile(CACHE_PATH, 'utf-8')
+        _fileCache = JSON.parse(raw)
+        _fileCacheAt = now
+        fallbackData = _fileCache!
+      } catch {
+        // file missing or unreadable — proceed with empty fallback
+      }
     }
 
     // 2. Try to sync with Supabase if refresh is requested

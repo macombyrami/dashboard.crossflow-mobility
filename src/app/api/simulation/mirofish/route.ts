@@ -285,9 +285,9 @@ async function runSimulation(
 
   onEvent({ type: 'agents_start', total: personnages.length })
 
-  // Run agents in batches of 2 to avoid rate-limits, emit progress per agent
+  // Run agents in batches — 10 concurrent is safe for serverless + Groq rate limits
   const insights: AgentInsight[] = []
-  const BATCH = 2
+  const BATCH = 10
   for (let i = 0; i < personnages.length; i += BATCH) {
     const batch   = personnages.slice(i, i + BATCH)
     const results = await Promise.all(batch.map(p => simulerAgent(p, seed, simId)))

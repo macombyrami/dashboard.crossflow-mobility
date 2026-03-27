@@ -7,6 +7,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import { fetchWithRetry } from '@/lib/retry'
 
 const PG_BASE   = 'https://api-ratp.pierre-grimaud.fr/v3'
 const PRIM_BASE = 'https://prim.iledefrance-mobilites.fr/marketplace'
@@ -56,14 +57,18 @@ async function fetchPierreGrimaud(): Promise<RatpTrafficLine[]> {
   await Promise.allSettled(
     types.map(async (type) => {
       try {
-        const res = await fetch(`${PG_BASE}/traffic/${type}`, {
-          headers: {
-            'User-Agent': UA,
-            'Accept':     'application/json',
-            'Origin':     'https://crossflow-mobility.com',
+        const res = await fetchWithRetry(
+          `${PG_BASE}/traffic/${type}`,
+          {
+            headers: {
+              'User-Agent': UA,
+              'Accept':     'application/json',
+              'Origin':     'https://crossflow-mobility.com',
+            },
+            signal: AbortSignal.timeout(6000),
           },
-          signal: AbortSignal.timeout(6000),
-        })
+          { attempts: 2, baseMs: 400 },
+        )
         if (!res.ok) return
 
         const data = await res.json()

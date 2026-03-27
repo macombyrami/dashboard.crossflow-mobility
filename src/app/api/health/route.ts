@@ -65,8 +65,10 @@ export async function GET() {
   const BASE = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const PREDICTIVE_URL = process.env.PREDICTIVE_BACKEND_URL ?? 'http://localhost:8000'
 
-  // Run all probes in parallel
-  const [tomtom, ratp, overpass, sytadin, predictive, supabase] = await Promise.all([
+  const UNKNOWN: ServiceHealth = { status: 'unknown' }
+
+  // allSettled: a thrown/hung probe never blocks the others
+  const results = await Promise.allSettled([
     probeJson(`${BASE}/api/tomtom/flow?lat=48.85&lng=2.35`,                    4_000),
     probeJson(`${BASE}/api/ratp-traffic`,                                       6_000),
     probe('https://overpass-api.de/api/status',                                4_000),
@@ -74,6 +76,9 @@ export async function GET() {
     probeJson(`${PREDICTIVE_URL}/health`,                                       4_000),
     probe(process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://supabase.com',      4_000),
   ])
+  const [tomtom, ratp, overpass, sytadin, predictive, supabase] = results.map(r =>
+    r.status === 'fulfilled' ? r.value : UNKNOWN,
+  )
 
   const services: Record<string, ServiceHealth> = {
     tomtom,
