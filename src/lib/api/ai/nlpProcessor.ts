@@ -23,8 +23,12 @@ export async function processTrafficAlert(rawText: string): Promise<StructuredEv
   console.log('🧠 Processing Urban Signal:', rawText.substring(0, 50) + '...')
 
   try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30000) // 30s timeout
+
     const response = await fetch(SEARCH_API_URL, {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
         'Content-Type':  'application/json',
@@ -65,6 +69,8 @@ export async function processTrafficAlert(rawText: string): Promise<StructuredEv
         response_format: { type: 'json_object' }
       })
     })
+
+    clearTimeout(timeout)
 
     const data = await response.json()
     const content = data.choices[0].message.content
