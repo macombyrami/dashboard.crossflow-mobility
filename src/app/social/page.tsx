@@ -12,6 +12,9 @@ import { fetchAllTrafficStatus, type TrafficLine, LINE_COLORS as RATP_COLORS } f
 import { RatpNetworkStatus } from '@/components/social/RatpNetworkStatus'
 
 
+type SocialTab = 'sytadin' | 'ratp' | 'community' | 'xpulse'
+
+
 // Colors are imported from @/lib/api/ratp
 
 
@@ -381,15 +384,40 @@ function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
     minor:    incidents.filter(i => i.severity === 'minor').length,
   }), [incidents])
 
+  const refresh = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/social/incidents?lat=${city.center.lat}&lng=${city.center.lng}`)
+      if (!res.ok) throw new Error('API failed')
+      const data = await res.json()
+      const mapped = (data ?? []).map((item: any) => ({
+        id:          item.id,
+        title:       item.title,
+        description: item.address || item.title,
+        severity:    item.severity === 'critical' ? 'critical' : item.severity === 'high' ? 'major' : (item.severity === 'medium' || item.severity === 'moderate') ? 'moderate' : 'minor',
+        type:        item.type || 'other',
+        timestamp:   item.startDate || new Date().toISOString(),
+        coordinates: [item.lng, item.lat],
+        source:      item.sourceLabel || item.source || 'COMMUNITY',
+        location:    item.district || item.address || '',
+      }))
+      setIncidents(mapped)
+      onUpdate?.(mapped.length)
 
+      // Update global intelligence
+      if (typeof window !== 'undefined' && 'updateAlerts' in window) {
+        (window as any).updateAlerts(mapped.map((p: any) => ({
+          text: p.title,
+          source: 'COMMUNITY',
+          severity: p.severity
+        })))
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error('Failed to fetch community incidents:', err)
     } finally {
       setLoading(false)
     }
   }
-
 
   useEffect(() => {
     refresh()
@@ -421,16 +449,30 @@ function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
         {!loading && incidents.length > 0 && (
           <div className="flex items-center gap-3 px-1 py-1 border-b border-bg-border/50">
-            {(['critical', 'high', 'medium'] as const).map(sev => (
-              stats[sev] > 0 && (
-                <div key={sev} className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: SEVERITY_COLORS[sev] }} />
-                  <span className="text-[10px] font-bold" style={{ color: SEVERITY_COLORS[sev] }}>
-                    {stats[sev]} {sev === 'critical' ? 'Critique' : sev === 'high' ? 'Élevé' : 'Modéré'}
-                  </span>
-                </div>
-              )
-            ))}
+            {stats.critical > 0 && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                <span className="text-[10px] font-bold text-red-500">
+                  {stats.critical} Critique
+                </span>
+              </div>
+            )}
+            {stats.major > 0 && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                <span className="text-[10px] font-bold text-orange-500">
+                  {stats.major} Majeur
+                </span>
+              </div>
+            )}
+            {stats.moderate > 0 && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+                <span className="text-[10px] font-bold text-yellow-500">
+                  {stats.moderate} Modéré
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -445,59 +487,9 @@ function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
             <p className="text-xs text-text-muted">Le secteur est actuellement fluide.</p>
           </div>
         ) : (
-
-          incidents.map(inc => {
-            const Icon    = TYPE_ICONS[inc.type] ?? AlertTriangle
-            const color   = SEVERITY_COLORS[inc.severity]
-            const dateStr = formatDateRange(inc.startDate, inc.endDate)
-            return (
-              <div
-                key={inc.id}
-                className="rounded-2xl border border-bg-border bg-bg-surface p-4 space-y-2.5 hover:border-text-muted/30 transition-colors"
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ backgroundColor: `${color}18` }}
-                  >
-                    <Icon className="w-4 h-4" style={{ color }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-text-primary leading-tight line-clamp-2">
-                      {inc.title}
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      <span className="flex items-center gap-1 text-[10px] text-text-muted">
-                        <MapPin className="w-2.5 h-2.5" />
-                        {inc.address}{inc.district ? ` — ${inc.district}` : ''}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span
-                    className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                    style={{ color, backgroundColor: `${color}18` }}
-                  >
-                    {inc.type.charAt(0).toUpperCase() + inc.type.slice(1)}
-                  </span>
-                  <span
-                    className={cn(
-                      'text-[10px] font-semibold px-2 py-0.5 rounded-full border',
-                      inc.source === 'paris-opendata'
-                        ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
-                        : 'text-orange-400 bg-orange-500/10 border-orange-500/20',
-                    )}
-                  >
-                    {inc.sourceLabel}
-                  </span>
-                  {dateStr && (
-                    <span className="text-[10px] text-text-muted">{dateStr}</span>
-                  )}
-                </div>
-              </div>
-            )
-          })
+          incidents.map(inc => (
+            <IncidentCard key={inc.id} incident={inc} />
+          ))
         )}
       </div>
     </div>
