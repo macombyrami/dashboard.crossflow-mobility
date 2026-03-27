@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import personasData from '@/lib/data/personas.json'
 import aiData from '@/lib/data/ai.json'
 import appData from '@/lib/data/app.json'
+import { rateLimit, getClientIp } from '@/lib/rateLimit'
 
 const OPENROUTER_BASE = aiData.openrouter.baseUrl
 const MODEL           = aiData.openrouter.miroFishModel
@@ -265,7 +266,56 @@ Génère un rapport JSON avec exactement cette structure :
   }
 }
 
+// ─── Simulation core (shared between JSON + SSE modes) ────────────────────────
+
+async function runSimulation(
+  seed: SimSeed,
+  onEvent: (event: Record<string, unknown>) => void,
+): Promise<MiroFishResult> {
+  const simId = `mf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  onEvent({ type: 'session', simId })
+
+  await creerSessionZep(simId)
+
+  const nb            = seed.nbAgents ?? 50
+  const tiers         = aiData.miroFish.agentSelectionTiers
+  const personasCount = nb <= tiers.small.maxAgents  ? tiers.small.personasCount :
+                        nb <= tiers.medium.maxAgents ? tiers.medium.personasCount : tiers.large.personasCount
+  const personnages   = PERSONAS.slice(0, personasCount)
+
+  onEvent({ type: 'agents_start', total: personnages.length })
+
+  // Run agents in batches of 2 to avoid rate-limits, emit progress per agent
+  const insights: AgentInsight[] = []
+  const BATCH = 2
+  for (let i = 0; i < personnages.length; i += BATCH) {
+    const batch   = personnages.slice(i, i + BATCH)
+    const results = await Promise.all(batch.map(p => simulerAgent(p, seed, simId)))
+    for (const insight of results) {
+      insights.push(insight)
+      onEvent({ type: 'agent_done', done: insights.length, total: personnages.length, insight })
+    }
+  }
+
+  onEvent({ type: 'report_start' })
+  const rapport = await genererRapport(seed, insights)
+
+  const result: MiroFishResult = {
+    simulationId:   simId,
+    status:         'terminee',
+    insightsAgents: insights,
+    termineeA:      new Date().toISOString(),
+    ...rapport,
+  }
+
+  onEvent({ type: 'complete', result })
+  return result
+}
+
 // ─── Route POST — Lancer la simulation ────────────────────────────────────────
+// Supports two response modes based on Accept header:
+//   application/json       → wait for full result (backward-compatible)
+//   text/event-stream      → stream SSE progress events in real time
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENROUTER_API_KEY
@@ -273,45 +323,55 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'OPENROUTER_API_KEY manquant' }, { status: 503 })
   }
 
+  // Rate limit: 3 simulations per minute per IP (expensive LLM calls)
+  const ip = getClientIp(req.headers)
+  const rl = await rateLimit(ip, 'mirofish', 3, 60)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: `Trop de simulations — réessayez dans ${rl.resetIn}s` },
+      { status: 429, headers: { 'Retry-After': String(rl.resetIn) } },
+    )
+  }
+
+  const wantsSSE = req.headers.get('accept')?.includes('text/event-stream')
+
+  let seed: SimSeed
   try {
-    const seed: SimSeed = await req.json()
+    seed = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Corps de requête invalide' }, { status: 400 })
+  }
 
-    // Identifiant unique de simulation
-    const simId = `mf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  // ── SSE streaming mode ─────────────────────────────────────────────────────
+  if (wantsSSE) {
+    const encoder  = new TextEncoder()
+    const { readable, writable } = new TransformStream<Uint8Array>()
+    const writer   = writable.getWriter()
 
-    // Créer la session Zep (mémoire des agents)
-    await creerSessionZep(simId)
-
-    // Sélectionner les personas à simuler selon nbAgents
-    const nb          = seed.nbAgents ?? 50
-    const tiers       = aiData.miroFish.agentSelectionTiers
-    const personasCount = nb <= tiers.small.maxAgents  ? tiers.small.personasCount :
-                          nb <= tiers.medium.maxAgents ? tiers.medium.personasCount : tiers.large.personasCount
-    const personnages = PERSONAS.slice(0, personasCount)
-
-    // Simuler les agents en parallèle par lots (éviter rate-limit)
-    const insights: AgentInsight[] = []
-    const lots = [personnages.slice(0, 2), personnages.slice(2)]
-
-    for (const lot of lots) {
-      const resultats = await Promise.all(lot.map(p => simulerAgent(p, seed, simId)))
-      insights.push(...resultats)
+    const send = (event: Record<string, unknown>) => {
+      writer.write(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
     }
 
-    // Générer le rapport final
-    const rapport = await genererRapport(seed, insights)
+    // Run in background — stream closes when simulation ends
+    runSimulation(seed, send).catch(e => {
+      send({ type: 'error', message: e instanceof Error ? e.message : 'inconnue' })
+    }).finally(() => writer.close())
 
-    const result: MiroFishResult = {
-      simulationId:    simId,
-      status:          'terminee',
-      insightsAgents:  insights,
-      termineeA:       new Date().toISOString(),
-      ...rapport,
-    }
-
-    return NextResponse.json(result, {
-      headers: { 'Cache-Control': 'no-store' },
+    return new Response(readable, {
+      headers: {
+        'Content-Type':  'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection':    'keep-alive',
+        'X-Accel-Buffering': 'no', // disable Nginx buffering on Vercel
+      },
     })
+  }
+
+  // ── JSON mode (backward-compatible) ───────────────────────────────────────
+  try {
+    const noop = () => { /* no streaming in JSON mode */ }
+    const result = await runSimulation(seed, noop)
+    return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } })
   } catch (e) {
     console.error('[MiroFish] Erreur simulation:', e)
     return NextResponse.json(

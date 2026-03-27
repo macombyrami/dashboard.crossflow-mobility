@@ -89,69 +89,36 @@ async function fetchPierreGrimaud(): Promise<RatpTrafficLine[]> {
   return lines
 }
 
-// ─── PRIM IDFM fetch (officiel) ───────────────────────────────────────────────
+// ─── PRIM IDFM — single fetch, dual parse ─────────────────────────────────────
+// Previously called general-message TWICE (once per function). Now one call,
+// two result maps derived from the same response.
 
-async function fetchPrimDisruptions(apiKey: string): Promise<Map<string, string>> {
+async function fetchPrimData(apiKey: string): Promise<{
+  disruptions: Map<string, string>
+  status:      Map<string, 'normal' | 'perturbé' | 'interrompu'>
+}> {
   const disruptions = new Map<string, string>()
-  try {
-    const res = await fetch(`${PRIM_BASE}/general-message`, {
-      headers: {
-        'apikey': apiKey,
-        'Accept': 'application/json',
-      },
-      signal: AbortSignal.timeout(8000),
-    })
-    if (!res.ok) return disruptions
-
-    const data = await res.json()
-    const messages: PrimInfoMessage[] =
-      data?.Siri?.ServiceDelivery?.GeneralMessageDelivery?.[0]?.InfoMessage ?? []
-
-    for (const msg of messages) {
-      const validUntil = msg.ValidUntilTime ? new Date(msg.ValidUntilTime) : null
-      if (validUntil && validUntil < new Date()) continue // expired
-
-      const text = msg.Content?.Message?.find(m =>
-        m.MessageType === 'shortMessage' || m.MessageType === 'longMessage',
-      )?.MessageText?.value ?? ''
-
-      if (!text) continue
-
-      const lineRefs = msg.Content?.LineRef ?? []
-      for (const ref of lineRefs) {
-        // "STIF:Line::C01742:" → C01742
-        const stifId = ref.value?.match(/::([^:]+):/)?.[1] ?? ''
-        const slug   = STIF_TO_SLUG[stifId]
-        if (slug) disruptions.set(slug, text)
-      }
-    }
-  } catch {
-    // PRIM indisponible — pas bloquant
-  }
-  return disruptions
-}
-
-// ─── PRIM IDFM — état des lignes (estimated-timetable) ───────────────────────
-// Requête légère : on vérifie juste si une ligne a des perturbations actives
-
-async function fetchPrimLineStatus(apiKey: string): Promise<Map<string, 'normal' | 'perturbé' | 'interrompu'>> {
-  const status = new Map<string, 'normal' | 'perturbé' | 'interrompu'>()
+  const status      = new Map<string, 'normal' | 'perturbé' | 'interrompu'>()
   try {
     const res = await fetch(`${PRIM_BASE}/general-message`, {
       headers: { 'apikey': apiKey, 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(8000),
+      signal:  AbortSignal.timeout(8_000),
     })
-    if (!res.ok) return status
+    if (!res.ok) return { disruptions, status }
 
-    const data = await res.json()
+    const data     = await res.json()
     const messages: PrimInfoMessage[] =
       data?.Siri?.ServiceDelivery?.GeneralMessageDelivery?.[0]?.InfoMessage ?? []
+    const now = new Date()
 
     for (const msg of messages) {
       const validUntil = msg.ValidUntilTime ? new Date(msg.ValidUntilTime) : null
-      if (validUntil && validUntil < new Date()) continue
+      if (validUntil && validUntil < now) continue // expired
 
-      const channel = msg.InfoChannelRef?.value?.toLowerCase() ?? ''
+      const text     = msg.Content?.Message?.find(m =>
+        m.MessageType === 'shortMessage' || m.MessageType === 'longMessage',
+      )?.MessageText?.value ?? ''
+      const channel  = msg.InfoChannelRef?.value?.toLowerCase() ?? ''
       const lineRefs = msg.Content?.LineRef ?? []
 
       for (const ref of lineRefs) {
@@ -159,20 +126,25 @@ async function fetchPrimLineStatus(apiKey: string): Promise<Map<string, 'normal'
         const slug   = STIF_TO_SLUG[stifId]
         if (!slug) continue
 
-        const current = status.get(slug)
-        if (current === 'interrompu') continue // ne pas downgrader
+        // Disruption text map
+        if (text) disruptions.set(slug, text)
 
-        if (channel.includes('perturbation') || channel.includes('incident')) {
-          status.set(slug, 'perturbé')
-        } else if (channel.includes('interru') || channel.includes('susp')) {
+        // Status map (don't downgrade interrompu)
+        const current = status.get(slug)
+        if (current === 'interrompu') continue
+        if (channel.includes('interru') || channel.includes('susp')) {
           status.set(slug, 'interrompu')
+        } else if (channel.includes('perturbation') || channel.includes('incident') || text) {
+          status.set(slug, 'perturbé')
         } else if (!current) {
           status.set(slug, 'perturbé')
         }
       }
     }
-  } catch {}
-  return status
+  } catch {
+    // PRIM indisponible — pas bloquant
+  }
+  return { disruptions, status }
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -180,12 +152,15 @@ async function fetchPrimLineStatus(apiKey: string): Promise<Map<string, 'normal'
 export async function GET() {
   const primKey = process.env.IDFM_API_KEY ?? ''
 
-  // Fetch sources in parallel
-  const [pgLines, primDisruptions, primStatus] = await Promise.all([
+  // Single PRIM call + Pierre-Grimaud in parallel (was 3 calls: PG + 2×PRIM)
+  const [pgLines, prim] = await Promise.all([
     fetchPierreGrimaud(),
-    primKey ? fetchPrimDisruptions(primKey) : Promise.resolve(new Map<string, string>()),
-    primKey ? fetchPrimLineStatus(primKey)  : Promise.resolve(new Map<string, 'normal' | 'perturbé' | 'interrompu'>()),
+    primKey ? fetchPrimData(primKey) : Promise.resolve({
+      disruptions: new Map<string, string>(),
+      status:      new Map<string, 'normal' | 'perturbé' | 'interrompu'>(),
+    }),
   ])
+  const { disruptions: primDisruptions, status: primStatus } = prim
 
   // Merge PRIM data into PG lines
   const merged = pgLines.map(line => {

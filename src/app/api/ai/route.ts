@@ -5,11 +5,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import aiData from '@/lib/data/ai.json'
 import appData from '@/lib/data/app.json'
+import { rateLimit, getClientIp } from '@/lib/rateLimit'
 
 const OPENROUTER_BASE = aiData.openrouter.baseUrl
 const DEFAULT_MODEL   = aiData.openrouter.defaultModel
 
 export async function POST(req: NextRequest) {
+  // Rate limit: 20 requests per minute per IP
+  const ip = getClientIp(req.headers)
+  const rl = await rateLimit(ip, 'ai', 20, 60)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: `Trop de requêtes — réessayez dans ${rl.resetIn}s` },
+      { status: 429, headers: { 'Retry-After': String(rl.resetIn) } },
+    )
+  }
+
   const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) {
     return NextResponse.json(

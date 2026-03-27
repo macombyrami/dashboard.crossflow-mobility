@@ -48,7 +48,7 @@ export function MiroFishPanel() {
   const scenarioType = useSimulationStore(s => s.scenarioType)
   const incidents    = useTrafficStore(s => s.incidents)
 
-  const { statut, resultat, erreur, elapsed, lancer, reinitialiser } = useMiroFish()
+  const { statut, resultat, erreur, elapsed, agentsDone, agentsTotal, isRapport, lancer, reinitialiser } = useMiroFish()
 
   const [mode, setMode] = useState<ModeSimulation>('standard')
   const [horizon, setHorizon] = useState(2)
@@ -91,7 +91,7 @@ export function MiroFishPanel() {
 
   // ── En cours ───────────────────────────────────────────────────────────────
   if (statut === 'en_cours') {
-    return <PanneauChargement elapsed={elapsed} mode={mode} />
+    return <PanneauChargement elapsed={elapsed} mode={mode} agentsDone={agentsDone} agentsTotal={agentsTotal} isRapport={isRapport} />
   }
 
   // ── Erreur ─────────────────────────────────────────────────────────────────
@@ -234,22 +234,35 @@ function PanneauConfig({
   )
 }
 
-function PanneauChargement({ elapsed, mode }: { elapsed: number; mode: ModeSimulation }) {
-  const etapes = [
-    { label: 'Initialisation des agents...',     pct: 10 },
-    { label: 'Injection de la graine trafic...', pct: 25 },
-    { label: 'Simulation comportements...',      pct: 50 },
-    { label: 'Analyse des interactions...',      pct: 75 },
-    { label: 'Génération du rapport IA...',      pct: 90 },
-  ]
-
+function PanneauChargement({
+  elapsed, mode, agentsDone, agentsTotal, isRapport,
+}: {
+  elapsed:     number
+  mode:        ModeSimulation
+  agentsDone:  number
+  agentsTotal: number
+  isRapport:   boolean
+}) {
+  // Real progress from SSE; fallback to time-based estimate
+  const hasRealProgress = agentsTotal > 0
+  const agentPct  = hasRealProgress ? Math.round((agentsDone / agentsTotal) * 80) : 0
+  const reportPct = isRapport ? 15 : 0
   const dureeEstimee = mode === 'rapide' ? 20 : mode === 'standard' ? 45 : 90
-  const progression  = Math.min(95, Math.round((elapsed / dureeEstimee) * 100))
-  const etapeActuelle = etapes.find(e => progression < e.pct) ?? etapes[etapes.length - 1]
+  const timePct   = hasRealProgress ? 0 : Math.min(75, Math.round((elapsed / dureeEstimee) * 100))
+  const progression = Math.min(95, agentPct + reportPct + timePct)
+
+  const label = isRapport
+    ? 'Génération du rapport IA...'
+    : hasRealProgress && agentsDone > 0
+      ? `Agent ${agentsDone}/${agentsTotal} simulé`
+      : agentsTotal > 0
+        ? `Initialisation de ${agentsTotal} agents...`
+        : 'Initialisation des agents...'
+
+  const AGENT_EMOJIS = ['🚗', '📦', '🚇', '🚲', '🚶']
 
   return (
     <div className="space-y-5 py-2">
-      {/* Animation */}
       <div className="flex flex-col items-center gap-3">
         <div className="relative">
           <div className="w-14 h-14 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
@@ -259,45 +272,54 @@ function PanneauChargement({ elapsed, mode }: { elapsed: number; mode: ModeSimul
         </div>
         <div className="text-center">
           <p className="text-sm font-bold text-white">Simulation en cours...</p>
-          <p className="text-[11px] text-purple-300/70 mt-0.5">{etapeActuelle.label}</p>
+          <p className="text-[11px] text-purple-300/70 mt-0.5">{label}</p>
         </div>
       </div>
 
-      {/* Barre de progression */}
+      {/* Real-time progress bar */}
       <div>
         <div className="flex justify-between text-[10px] text-text-muted mb-1.5">
-          <span>Progression</span>
+          <span>{isRapport ? 'Rapport IA' : hasRealProgress ? `Agents ${agentsDone}/${agentsTotal}` : 'Progression'}</span>
           <span>{progression}%</span>
         </div>
         <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
           <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width:      `${progression}%`,
-              background: 'linear-gradient(90deg, #9333ea, #3b82f6)',
-            }}
+            className="h-full rounded-full transition-all duration-700"
+            style={{ width: `${progression}%`, background: 'linear-gradient(90deg,#9333ea,#3b82f6)' }}
           />
         </div>
       </div>
 
-      {/* Agents actifs */}
+      {/* Agent status grid */}
       <div className="grid grid-cols-5 gap-1">
-        {['🚗', '📦', '🚇', '🚲', '🚶'].map((e, i) => (
-          <div
-            key={i}
-            className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white/[0.03] border border-white/5"
-            style={{ animationDelay: `${i * 200}ms` }}
-          >
-            <span className="text-lg">{e}</span>
-            <div className="w-full h-0.5 rounded bg-purple-500/30">
-              <div className="h-full bg-purple-400 rounded animate-pulse" style={{ width: `${40 + i * 12}%` }} />
+        {AGENT_EMOJIS.map((e, i) => {
+          const done = hasRealProgress ? i < agentsDone : false
+          return (
+            <div
+              key={i}
+              className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-colors duration-300 ${
+                done
+                  ? 'bg-purple-500/15 border-purple-500/30'
+                  : 'bg-white/[0.03] border-white/5'
+              }`}
+            >
+              <span className="text-lg">{e}</span>
+              <div className="w-full h-0.5 rounded bg-purple-500/30">
+                <div
+                  className="h-full bg-purple-400 rounded transition-all duration-500"
+                  style={{ width: done ? '100%' : isRapport || !hasRealProgress ? `${40 + i * 12}%` : '0%' }}
+                />
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       <p className="text-center text-[10px] text-text-muted">
-        Durée estimée : {CONFIG_MODES[mode].duree} · Écoulé : {elapsed}s
+        {hasRealProgress
+          ? `${agentsDone}/${agentsTotal} agents · ${elapsed}s écoulé`
+          : `Estimé : ${CONFIG_MODES[mode].duree} · ${elapsed}s écoulé`
+        }
       </p>
     </div>
   )

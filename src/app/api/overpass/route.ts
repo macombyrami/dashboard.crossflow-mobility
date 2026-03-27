@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cache } from '@/lib/cache'
 
 const OVERPASS_BASE = 'https://overpass-api.de/api/interpreter'
-
-// Simple in-memory cache: cacheKey → { data, expiresAt }
-const cache = new Map<string, { data: unknown; expiresAt: number }>()
-const CACHE_TTL_MS = 60 * 60 * 1_000 // 1 hour
+const CACHE_TTL_SEC = 3_600 // 1 hour — shared across all instances via Redis
 
 export async function POST(req: NextRequest) {
   let body: string
@@ -14,16 +12,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   }
 
-  // Strip the "data=" prefix if present (form-encoded)
   const rawQuery = body.startsWith('data=')
     ? decodeURIComponent(body.slice(5))
     : body
 
-  const cacheKey = rawQuery.trim()
-  const cached = cache.get(cacheKey)
-  if (cached && cached.expiresAt > Date.now()) {
-    return NextResponse.json(cached.data, {
-      headers: { 'X-Cache': 'HIT', 'Cache-Control': 'max-age=3600' },
+  // Use first 200 chars as cache key fingerprint (queries can be large)
+  const cacheKey = `overpass:${rawQuery.trim()}`
+
+  const cached = await cache.get<unknown>(cacheKey)
+  if (cached) {
+    return NextResponse.json(cached, {
+      headers: { 'X-Cache': 'HIT', 'Cache-Control': `public, max-age=${CACHE_TTL_SEC}` },
     })
   }
 
@@ -38,9 +37,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Overpass error', status: res.status }, { status: res.status })
     }
     const data = await res.json()
-    cache.set(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL_MS })
+    await cache.set(cacheKey, data, CACHE_TTL_SEC)
     return NextResponse.json(data, {
-      headers: { 'X-Cache': 'MISS', 'Cache-Control': 'max-age=3600' },
+      headers: { 'X-Cache': 'MISS', 'Cache-Control': `public, max-age=${CACHE_TTL_SEC}` },
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'timeout'
