@@ -14,7 +14,7 @@ import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { generateCityKPIs } from '@/lib/engine/traffic.engine'
 import { hasKey } from '@/lib/api/tomtom'
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React from 'react'
 import { useTranslation } from '@/lib/hooks/useTranslation'
 import type { Metadata } from 'next'
 
@@ -27,7 +27,7 @@ export default function MapPage() {
   const { t } = useTranslation()
   const city           = useMapStore(s => s.city)
 
-  useEffect(() => { document.title = `Carte — ${city.name} | CrossFlow` }, [city.name])
+  React.useEffect(() => { document.title = `Carte — ${city.name} | CrossFlow` }, [city.name])
   const mode           = useMapStore(s => s.mode)
   const isAIPanelOpen  = useMapStore(s => s.isAIPanelOpen)
   const setAIPanelOpen = useMapStore(s => s.setAIPanelOpen)
@@ -40,7 +40,7 @@ export default function MapPage() {
     Math.abs(city.center.lng - 2.3522) < 0.8
   const isLive   = isTomTom || isParis
 
-  useEffect(() => {
+  React.useEffect(() => {
     setKPIs(generateCityKPIs(city))
     const interval = setInterval(() => setKPIs(generateCityKPIs(city)), 30_000)
     return () => clearInterval(interval)

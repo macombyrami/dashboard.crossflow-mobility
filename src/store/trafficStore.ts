@@ -20,6 +20,7 @@ interface TrafficStore {
   setOpenMeteoWeather:  (w: OpenMeteoWeather | null) => void
   setAirQuality:        (a: AirQuality | null) => void
   setDataSource:        (src: 'live' | 'synthetic') => void
+  clearIncidents:       () => void
   clearAll:             () => void
 }
 
@@ -40,6 +41,7 @@ export const useTrafficStore = create<TrafficStore>()((set) => ({
   setOpenMeteoWeather: (w)   => set({ openMeteoWeather: w }),
   setAirQuality:       (a)   => set({ airQuality: a }),
   setDataSource:       (src) => set({ dataSource: src }),
+  clearIncidents:      ()    => set({ incidents: [] }),
   clearAll:            ()    => set({
     snapshot: null, incidents: [], kpis: null,
     weather: null, openMeteoWeather: null, airQuality: null,

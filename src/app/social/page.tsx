@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React from 'react'
 
 import { Rss, Twitter, Train, Users, AlertTriangle, RefreshCw, MapPin, Search, Wrench, Ban } from 'lucide-react'
 import { SytadinFeed } from '@/components/simulation/SytadinFeed'
@@ -19,10 +19,10 @@ type SocialTab = 'sytadin' | 'ratp' | 'community' | 'xpulse'
 
 
 function RatpFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState(false)
-  const [allLines, setAllLines] = useState<TrafficLine[]>([])
-  const [disrupted, setDisrupted] = useState<TrafficLine[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [error,   setError]   = React.useState(false)
+  const [allLines, setAllLines] = React.useState<TrafficLine[]>([])
+  const [disrupted, setDisrupted] = React.useState<TrafficLine[]>([])
 
   const refresh = async () => {
     setLoading(true)
@@ -52,7 +52,7 @@ function RatpFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
 
 
 
-  useEffect(() => {
+  React.useEffect(() => {
     refresh()
     const iv = setInterval(refresh, 60000)
     return () => clearInterval(iv)
@@ -250,8 +250,8 @@ interface SocialPost {
 }
 
 function XPulseFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
-  const [loading, setLoading]     = useState(true)
-  const [posts, setPosts]         = useState<SocialPost[]>([])
+  const [loading, setLoading]     = React.useState(true)
+  const [posts, setPosts]         = React.useState<SocialPost[]>([])
 
   const refresh = async (force: boolean = false) => {
     setLoading(true)
@@ -279,7 +279,7 @@ function XPulseFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
     }
   }
 
-  useEffect(() => {
+  React.useEffect(() => {
     refresh(true) // Initial load triggers a refresh to populate DB
     const iv = setInterval(() => refresh(), 180_000)
     return () => clearInterval(iv)
@@ -391,10 +391,10 @@ function LiveIntelligenceTicker({ alerts }: { alerts: { text: string; source: st
 
 function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
   const city = useMapStore(s => s.city)
-  const [loading, setLoading]     = useState(true)
-  const [incidents, setIncidents] = useState<RealIncident[]>([])
+  const [loading, setLoading]     = React.useState(true)
+  const [incidents, setIncidents] = React.useState<RealIncident[]>([])
 
-  const stats = useMemo(() => ({
+  const stats = React.useMemo(() => ({
     critical: incidents.filter(i => i.severity === 'critical').length,
     major:    incidents.filter(i => i.severity === 'major').length,
     moderate: incidents.filter(i => i.severity === 'moderate').length,
@@ -451,7 +451,7 @@ function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
     }
   }
 
-  useEffect(() => {
+  React.useEffect(() => {
     refresh()
     const iv = setInterval(refresh, 120_000)
     return () => clearInterval(iv)
@@ -531,18 +531,18 @@ function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
 // ─── Main Page Option ────────────────────────────────────────────────────────
 
 export default function SocialPage() {
-  const [activeTab, setActiveTab] = useState<SocialTab>('sytadin')
+  const [activeTab, setActiveTab] = React.useState<SocialTab>('sytadin')
   const city = useMapStore(s => s.city)
 
   
   // Stats tracking for SocialPulse
-  const [ratpCount, setRatpCount] = useState(0)
-  const [sytadinCount, setSytadinCount] = useState(0)
-  const [communityCount, setCommunityCount] = useState(0)
-  const [xCount, setXCount] = useState(0)
+  const [ratpCount, setRatpCount] = React.useState(0)
+  const [sytadinCount, setSytadinCount] = React.useState(0)
+  const [communityCount, setCommunityCount] = React.useState(0)
+  const [xCount, setXCount] = React.useState(0)
 
   // Combined store for intelligence ticker
-  const [allAlerts, setAllAlerts] = useState<{ text: string; source: string; severity: string }[]>([])
+  const [allAlerts, setAllAlerts] = React.useState<{ text: string; source: string; severity: string }[]>([])
 
   const updateAlerts = (newAlerts: { text: string; source: string; severity: string }[]) => {
     setAllAlerts(prev => {
@@ -553,11 +553,11 @@ export default function SocialPage() {
 
 
 
-  useEffect(() => {
+  React.useEffect(() => {
     (window as any).updateAlerts = updateAlerts
   }, [updateAlerts])
 
-  useEffect(() => { document.title = 'Flux Social — Alertes IDF | CrossFlow' }, [])
+  React.useEffect(() => { document.title = 'Flux Social — Alertes IDF | CrossFlow' }, [])
 
 
 

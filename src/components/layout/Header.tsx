@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef, memo } from 'react'
+import React, { memo } from 'react'
 import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap, Lock, AlertTriangle, Clock } from 'lucide-react'
 import { useMapStore, geocodingToCity } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
@@ -19,8 +19,8 @@ const SEVERITY_COLOR: Record<string, string> = {
 
 // Isolated clock — re-renders only itself every 10s, not the whole Header
 const LiveClock = memo(function LiveClock() {
-  const [time, setTime] = useState('')
-  useEffect(() => {
+  const [time, setTime] = React.useState('')
+  React.useEffect(() => {
     const tick = () => {
       setTime(new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
     }
@@ -41,13 +41,14 @@ export function Header() {
   const isAIPanelOpen   = useMapStore(s => s.isAIPanelOpen)
   const weather         = useTrafficStore(s => s.weather)
   const incidents       = useTrafficStore(s => s.incidents)
-  const [alertOpen, setAlertOpen] = useState(false)
-  const alertRef                  = useRef<HTMLDivElement>(null)
+  const clearIncidents  = useTrafficStore(s => s.clearIncidents)
+  const [alertOpen, setAlertOpen] = React.useState(false)
+  const alertRef                  = React.useRef<HTMLDivElement>(null)
 
   const incidentCount = incidents?.length ?? 0
 
   // Close dropdown on outside click
-  useEffect(() => {
+  React.useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (alertRef.current && !alertRef.current.contains(e.target as Node)) {
         setAlertOpen(false)
@@ -177,10 +178,19 @@ export function Header() {
               </div>
 
               {/* Footer CTA */}
-              <div className="px-4 py-2.5 border-t border-bg-border">
+              <div className="px-4 py-2.5 border-t border-bg-border flex flex-col gap-2">
+                {incidentCount > 0 && (
+                  <button
+                    onClick={() => { clearIncidents(); setAlertOpen(false) }}
+                    className="w-full py-1.5 rounded-lg bg-white/5 border border-white/5 text-[11px] font-bold text-text-secondary hover:text-white hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                  >
+                    <X className="w-3 h-3" />
+                    Tout effacer
+                  </button>
+                )}
                 <button
                   onClick={() => { router.push('/incidents'); setAlertOpen(false) }}
-                  className="w-full text-[11px] font-bold text-brand hover:text-brand/80 transition-colors text-center"
+                  className="w-full text-[11px] font-bold text-brand hover:text-brand/80 transition-colors text-center py-1"
                 >
                   Voir tous les incidents →
                 </button>
@@ -269,20 +279,20 @@ function CitySearchBar() {
   const setCityBoundary = useMapStore(s => s.setCityBoundary)
 
   // Move hooks before conditional returns
-  const [open, setOpen]       = useState(false)
-  const [query, setQuery]     = useState('')
-  const [results, setResults] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
+  const [open, setOpen]       = React.useState(false)
+  const [query, setQuery]     = React.useState('')
+  const [results, setResults] = React.useState<any[]>([])
+  const [loading, setLoading] = React.useState(false)
   
-  const inputRef              = useRef<HTMLInputElement>(null)
-  const containerRef          = useRef<HTMLDivElement>(null)
+  const inputRef              = React.useRef<HTMLInputElement>(null)
+  const containerRef          = React.useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!open) { setQuery(''); setResults([]); return }
     inputRef.current?.focus()
   }, [open])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!query || query.length < 2) { setResults([]); return }
     const tid = setTimeout(async () => {
       setLoading(true)
@@ -314,7 +324,7 @@ function CitySearchBar() {
   }, [query])
 
   // Click outside
-  useEffect(() => {
+  React.useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false)

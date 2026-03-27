@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React from 'react'
 import { BrainCircuit, Send, Loader2, X, Sparkles, ChevronDown, Zap } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
@@ -16,10 +16,10 @@ interface Message {
 
 export function AIPanel({ onClose }: { onClose?: () => void }) {
   const { t, locale } = useTranslation()
-  const [messages,  setMessages]  = useState<Message[]>([])
-  const [input,     setInput]     = useState('')
-  const [loading,   setLoading]   = useState(false)
-  const [activeTab, setActiveTab] = useState<'assistant' | 'intelligence'>('intelligence')
+  const [messages,  setMessages]  = React.useState<Message[]>([])
+  const [input,     setInput]     = React.useState('')
+  const [loading,   setLoading]   = React.useState(false)
+  const [activeTab, setActiveTab] = React.useState<'assistant' | 'intelligence'>('intelligence')
   
   const MODELS = [
     { id: 'google/gemini-2.0-flash-001',            label: 'Gemini 2.0 Flash',  note: t('ai.model_note_fast') },
@@ -43,11 +43,11 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
     'Forecast for this area',
   ]
 
-  const [model,     setModel]     = useState(MODELS[0].id)
-  const [showModel, setShowModel] = useState(false)
-  const [apiError,  setApiError]  = useState<string | null>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef  = useRef<HTMLTextAreaElement>(null)
+  const [model,     setModel]     = React.useState(MODELS[0].id)
+  const [showModel, setShowModel] = React.useState(false)
+  const [apiError,  setApiError]  = React.useState<string | null>(null)
+  const bottomRef = React.useRef<HTMLDivElement>(null)
+  const inputRef  = React.useRef<HTMLTextAreaElement>(null)
 
   const city               = useMapStore(s => s.city)
   const zonePolygon        = useMapStore(s => s.zonePolygon)
@@ -58,7 +58,7 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
   const airQuality         = useTrafficStore(s => s.airQuality)
   const dataSource         = useTrafficStore(s => s.dataSource)
 
-  useEffect(() => {
+  React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 

@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React from 'react'
 import { BrainCircuit, Send, Loader2, X, Sparkles, ChevronDown, Zap, Lightbulb, Info, AlertTriangle, ArrowRight, Target, Leaf } from 'lucide-react'
 import { useTrafficStore } from '@/store/trafficStore'
 import { cn } from '@/lib/utils/cn'
@@ -17,7 +17,7 @@ export function DecisionHub() {
   const kpis      = useTrafficStore(s => s.kpis)
   const incidents = useTrafficStore(s => s.incidents)
   
-  const [activeTab, setActiveTab] = useState<'explain' | 'recommend'>('explain')
+  const [activeTab, setActiveTab] = React.useState<'explain' | 'recommend'>('explain')
 
   const recommendations: Recommendation[] = [
     {
