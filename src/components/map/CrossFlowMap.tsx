@@ -106,8 +106,9 @@ export function CrossFlowMap() {
   const osmRoadsRef     = useRef<Map<string, OSMRoad[]>>(new Map())
   const osmPoisRef      = useRef<Map<string, OSMPOIPoint[]>>(new Map())
   const osmRoutesRef    = useRef<Map<string, OSMRouteGeometry[]>>(new Map())
-  const osmMetroRef     = useRef<Map<string, MetroStation[]>>(new Map())
-  const ratpStatusRef   = useRef<Map<string, string>>(new Map())
+  const osmMetroRef       = useRef<Map<string, MetroStation[]>>(new Map())
+  const ratpStatusRef     = useRef<Map<string, string>>(new Map())
+  const ratpDisruptedRef  = useRef<Set<string>>(new Set())
   const refreshDataRef  = useRef<() => void>(() => {})
   const [mapLoaded, setMapLoaded] = useState(false)
 
@@ -547,20 +548,23 @@ export function CrossFlowMap() {
 
     const applyRatp = async () => {
       const lines = await fetchAllTrafficStatus()
-      const statusColors = new Map<string, string>()
+      const statusColors  = new Map<string, string>()
+      const disrupted     = new Set<string>()
+
       for (const line of lines) {
         let color: string
         switch (line.status) {
-          case 'interrompu': color = '#EF4444'; break
-          case 'perturbé':   color = '#F59E0B'; break
-          case 'travaux':    color = '#F97316'; break
+          case 'interrompu': color = '#EF4444'; disrupted.add(line.slug); break
+          case 'perturbé':   color = '#F59E0B'; disrupted.add(line.slug); break
+          case 'travaux':    color = '#F97316'; disrupted.add(line.slug); break
           default:           color = line.color ?? LINE_COLORS[line.slug] ?? '#3B82F6'
         }
-        // Keyed by slug (e.g. "1", "4", "21", "T3A")
         statusColors.set(line.slug, color)
       }
-      ratpStatusRef.current = statusColors
+      ratpStatusRef.current    = statusColors
+      ratpDisruptedRef.current = disrupted
       updateTransitRoutesSource(statusColors)
+      updateMetroStationsSource()   // re-render station markers with disruption flags
     }
 
     applyRatp()
@@ -638,27 +642,42 @@ export function CrossFlowMap() {
     const src = map.getSource(METRO_STATIONS_SOURCE) as maplibregl.GeoJSONSource | undefined
     if (!src) return
 
+    const disrupted   = ratpDisruptedRef.current
+    const ratpStatus  = ratpStatusRef.current
+
     src.setData({
       type: 'FeatureCollection',
       features: stations.map(s => {
-        const firstLine = s.lines[0] ?? ''
-        const color     = LINE_COLORS[firstLine] ?? '#8B5CF6'
-        // Label: "M1", "M4+3" for transfer stations
-        const label     = firstLine
+        const firstLine  = s.lines[0] ?? ''
+        // RER lines are uppercase letters A-E; metro lines are numbers
+        const isRer      = /^[A-E]$/.test(firstLine)
+        // Use exact RATP status color (red=interrompu, amber=perturbé) or official line color
+        const statusColor = ratpStatus.get(firstLine) ?? null
+        const lineColor  = LINE_COLORS[firstLine] ?? (isRer ? '#E2231A' : '#8B5CF6')
+        const color      = statusColor ?? lineColor
+
+        // Disruption: any of the station's lines is disrupted
+        const isDisrupted = s.lines.some(l => disrupted.has(l.toUpperCase()))
+
+        // Label: show all lines separated by · (e.g. "1·4·7·14")
+        const label = firstLine
           ? s.lines.length > 1
-            ? `${firstLine}·${s.lines.slice(1).join('·')}`
+            ? s.lines.join('·')
             : firstLine
-          : 'M'
+          : isRer ? 'RER' : 'M'
+
         return {
           type:       'Feature' as const,
           geometry:   { type: 'Point' as const, coordinates: [s.lng, s.lat] },
           properties: {
-            id:        s.id,
-            name:      s.name,
-            lines:     s.lines.join('·'),
-            lineCount: s.lines.length,
+            id:         s.id,
+            name:       s.name,
+            lines:      s.lines.join('·'),
+            lineCount:  s.lines.length,
             color,
             label,
+            disrupted:  isDisrupted ? 1 : 0,
+            isRer:      isRer ? 1 : 0,
           },
         }
       }),
@@ -1176,6 +1195,7 @@ export function CrossFlowMap() {
     trySet(METRO_STATIONS_SOURCE + '-dot',    transportVis)
     trySet(METRO_STATIONS_SOURCE + '-lineref',transportVis)
     trySet(METRO_STATIONS_SOURCE + '-name',   transportVis)
+    trySet(METRO_STATIONS_SOURCE + '-alert',  transportVis)
   }, [activeLayers, mapLoaded, useLiveData])
 
   // ─── Heatmap mode (shows/hides correct heatmap layer) ────────────────
@@ -1542,6 +1562,23 @@ function initStaticSources(map: maplibregl.Map) {
       'text-color':      '#F5F5F7',
       'text-halo-color': 'rgba(8,9,11,0.95)',
       'text-halo-width': 2.5,
+    },
+  })
+
+  // Disruption alert ring (red/orange halo around disrupted station dots)
+  map.addLayer({
+    id:      METRO_STATIONS_SOURCE + '-alert',
+    type:    'circle',
+    source:  METRO_STATIONS_SOURCE,
+    minzoom: 11,
+    filter:  ['==', ['get', 'disrupted'], 1],
+    paint:   {
+      'circle-radius':         ['interpolate', ['linear'], ['zoom'], 11, 9, 14, 16, 16, 21],
+      'circle-color':          '#EF4444',
+      'circle-opacity':        0.30,
+      'circle-stroke-width':   2.5,
+      'circle-stroke-color':   '#EF4444',
+      'circle-stroke-opacity': 0.65,
     },
   })
 

@@ -32,7 +32,12 @@ export default function MapPage() {
   const setAIPanelOpen = useMapStore(s => s.setAIPanelOpen)
   const setKPIs        = useTrafficStore(s => s.setKPIs)
 
-  const isLive = hasKey()
+  const isTomTom = hasKey()
+  // Paris → IDFM/RATP data is real-time even without TomTom
+  const isParis  = city.countryCode === 'FR' &&
+    Math.abs(city.center.lat - 48.8566) < 0.6 &&
+    Math.abs(city.center.lng - 2.3522) < 0.8
+  const isLive   = isTomTom || isParis
 
   useEffect(() => {
     setKPIs(generateCityKPIs(city))
@@ -62,9 +67,14 @@ export default function MapPage() {
         {mode === 'live' && (
           <div className="absolute bottom-16 left-4 z-10 pointer-events-none">
             <div className="bg-bg-surface/85 border border-bg-border rounded-lg px-3 py-2 backdrop-blur-sm">
-              <LiveIndicator 
-                label={isLive ? `MODE LIVE · TOMTOM` : `MODE DÉMO · SIMULÉ`} 
-                color={isLive ? '#00E676' : '#FFD600'} 
+              <LiveIndicator
+                label={
+                  isTomTom && isParis ? 'TEMPS RÉEL · IDFM + TOMTOM' :
+                  isTomTom           ? 'TEMPS RÉEL · TOMTOM' :
+                  isParis            ? 'TEMPS RÉEL · IDFM' :
+                                       'MODE DÉMO · SIMULÉ'
+                }
+                color={isLive ? '#00E676' : '#FFD600'}
               />
             </div>
           </div>

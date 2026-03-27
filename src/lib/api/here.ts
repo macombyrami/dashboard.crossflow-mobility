@@ -10,7 +10,8 @@
 import { hereFlowLimiter, hereIncidentsLimiter } from '@/lib/utils/rateLimiter'
 
 export function hasKey(): boolean {
-  return process.env.NEXT_PUBLIC_HERE_ENABLED === 'true'
+  return process.env.NEXT_PUBLIC_HERE_ENABLED === 'true' ||
+    (!!process.env.NEXT_PUBLIC_HERE_API_KEY && process.env.NEXT_PUBLIC_HERE_API_KEY.length > 10)
 }
 
 export interface HereFlowSegment {

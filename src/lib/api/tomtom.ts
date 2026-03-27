@@ -4,7 +4,8 @@
  */
 
 export function hasKey(): boolean {
-  return process.env.NEXT_PUBLIC_TOMTOM_ENABLED === 'true'
+  return process.env.NEXT_PUBLIC_TOMTOM_ENABLED === 'true' ||
+    (!!process.env.NEXT_PUBLIC_TOMTOM_API_KEY && process.env.NEXT_PUBLIC_TOMTOM_API_KEY.length > 10)
 }
 
 export function getTrafficFlowTileUrl(): string {
