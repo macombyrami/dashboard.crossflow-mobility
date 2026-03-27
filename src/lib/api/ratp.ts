@@ -14,7 +14,7 @@ export interface TrafficLine {
   status:  'normal' | 'perturbé' | 'travaux' | 'interrompu' | 'inconnu'
   message: string
   slug:    string
-  color?:  string
+  color:   string
   source?: string
 }
 

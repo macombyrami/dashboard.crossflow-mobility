@@ -14,10 +14,13 @@ interface VehicleFilterPanelProps {
 }
 
 export function VehicleFilterPanel({ vehicleCount }: VehicleFilterPanelProps) {
+  const activeLayers = useMapStore(s => s.activeLayers)
   const typeFilter   = useMapStore(s => s.vehicleTypeFilter)
   const toggleType   = useMapStore(s => s.toggleVehicleType)
   const searchQuery  = useMapStore(s => s.vehicleSearchQuery)
   const setSearch    = useMapStore(s => s.setVehicleSearch)
+
+  if (!activeLayers.has('transport')) return null
 
   return (
     <div

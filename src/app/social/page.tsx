@@ -1,52 +1,39 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
+
 import { Rss, Twitter, Train, Users, AlertTriangle, RefreshCw, MapPin, Search, Wrench, Ban } from 'lucide-react'
 import { SytadinFeed } from '@/components/simulation/SytadinFeed'
 import { IdfNetworkStats } from '@/components/simulation/IdfNetworkStats'
 import { SocialPulse } from '@/components/social/SocialPulse'
 import { LiveIndicator } from '@/components/ui/LiveIndicator'
 import { cn } from '@/lib/utils/cn'
+import { useMapStore } from '@/store/mapStore'
+import { fetchAllTrafficStatus, type TrafficLine, LINE_COLORS as RATP_COLORS } from '@/lib/api/ratp'
+import { RatpNetworkStatus } from '@/components/social/RatpNetworkStatus'
 
 
+// Colors are imported from @/lib/api/ratp
 
-type SocialTab = 'sytadin' | 'ratp' | 'community' | 'xpulse'
-
-
-// ─── RATP Feed ───────────────────────────────────────────────────────────────
-import { fetchAllTrafficStatus, type TrafficLine } from '@/lib/api/ratp'
-
-const RATP_COLORS: Record<string, string> = {
-  // Métro
-  '1': '#FFCD00', '2': '#003CA6', '3': '#837902', '3b': '#6EC4E8',
-  '4': '#CF009E', '5': '#FF7E2E', '6': '#6ECA97', '7': '#FA9ABA',
-  '7b': '#6ECA97', '8': '#E19BDF', '9': '#B6BD00', '10': '#C9910A',
-  '11': '#704B1C', '12': '#007852', '13': '#6EC4E8', '14': '#62259D',
-  // RER
-  'A': '#E2231A', 'B': '#47A0D5', 'C': '#FFCD00', 'D': '#00814F', 'E': '#C04191',
-  // Tram
-  'T1': '#E85D0E', 'T2': '#2E67B1', 'T3a': '#65AE30', 'T3b': '#65AE30',
-  'T4': '#E2231A', 'T5': '#694394', 'T6': '#FF7F00', 'T7': '#AA57A7',
-  'T8': '#E2231A', 'T9': '#00A1E0', 'T10': '#004B9B', 'T11': '#00A99D',
-  'T12': '#E85D0E', 'T13': '#00A1E0',
-}
 
 function RatpFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(false)
-  const [alerts, setAlerts] = useState<TrafficLine[]>([])
+  const [allLines, setAllLines] = useState<TrafficLine[]>([])
+  const [disrupted, setDisrupted] = useState<TrafficLine[]>([])
 
   const refresh = async () => {
     setLoading(true)
     setError(false)
     try {
       const lines = await fetchAllTrafficStatus()
-      const disrupted = lines.filter(l => l.status !== 'normal' && l.status !== 'inconnu')
-      setAlerts(disrupted)
-      onUpdate?.(disrupted.length)
+      const issues = lines.filter(l => l.status !== 'normal' && l.status !== 'inconnu')
+      setAllLines(lines)
+      setDisrupted(issues)
+      onUpdate?.(issues.length)
       
       // Update global intelligence
       if (typeof window !== 'undefined' && 'updateAlerts' in window) {
-        (window as any).updateAlerts(disrupted.map(l => ({
+        (window as any).updateAlerts(issues.map(l => ({
           text: `${l.name}: ${l.message}`,
           source: 'RATP',
           severity: l.status === 'interrompu' ? 'critical' : 'high'
@@ -59,6 +46,7 @@ function RatpFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
       setLoading(false)
     }
   }
+
 
 
   useEffect(() => {
@@ -84,8 +72,8 @@ function RatpFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {loading && alerts.length === 0 ? (
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {loading && allLines.length === 0 ? (
           <div className="text-center p-8">
             <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-3" />
             <p className="text-xs text-text-muted">Chargement du trafic RATP...</p>
@@ -96,36 +84,55 @@ function RatpFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
             <p className="text-xs text-text-muted mb-3">L'API RATP ne répond pas. Réessayez dans quelques instants.</p>
             <button onClick={refresh} className="text-xs text-brand font-semibold hover:underline">Réessayer</button>
           </div>
-        ) : alerts.length === 0 ? (
-          <div className="text-center p-8 bg-brand-green/5 rounded-2xl border border-brand-green/20">
-            <p className="text-sm font-bold text-brand-green mb-1">Trafic Normal</p>
-            <p className="text-xs text-text-muted">Aucune perturbation majeure signalée sur le réseau.</p>
-          </div>
         ) : (
-          alerts.map(alert => (
-            <div key={alert.id} className="rounded-2xl border border-bg-border bg-bg-surface p-4 flex gap-3 hover:border-text-muted/30 transition-colors">
-              <div 
-                className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-bold text-white text-xs"
-                style={{ backgroundColor: RATP_COLORS[alert.slug.toUpperCase()] ?? '#555' }}
-              >
-                {alert.slug.toUpperCase()}
-              </div>
-              <div className="flex-1 space-y-1 mt-0.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-text-primary">{alert.name}</span>
-                  <span className={cn(
-                    "text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase",
-                    alert.status === 'interrompu' ? 'bg-red-500/10 text-red-500' :
-                    alert.status === 'travaux' ? 'bg-orange-500/10 text-orange-500' :
-                    'bg-yellow-500/10 text-yellow-500'
-                  )}>
-                    {alert.status}
-                  </span>
-                </div>
-                <p className="text-xs text-text-secondary leading-relaxed">{alert.message}</p>
-              </div>
+          <>
+            {/* 1. Network Grid (All lines) */}
+            <div className="bg-bg-surface/50 border border-bg-border rounded-2xl p-4 shadow-sm">
+              <RatpNetworkStatus lines={allLines} />
             </div>
-          ))
+
+            {/* 2. Disrupted Lines (Detail) */}
+            {disrupted.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 px-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider">Alertes Actives</h3>
+                </div>
+                
+                <div className="space-y-3">
+                  {disrupted.map(alert => (
+                    <div key={alert.id} className="rounded-2xl border border-bg-border bg-bg-surface p-4 flex gap-3 hover:border-text-muted/30 transition-all hover:translate-x-1">
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-white text-[13px] shadow-sm"
+                        style={{ backgroundColor: RATP_COLORS[alert.slug.toUpperCase()] ?? '#555' }}
+                      >
+                        {alert.slug}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-xs font-bold text-text-primary truncate">{alert.name}</span>
+                          <span className={cn(
+                            "text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase",
+                            alert.status === 'interrompu' ? "text-red-500 border-red-500/20 bg-red-500/5" : "text-orange-500 border-orange-500/20 bg-orange-500/5"
+                          )}>
+                            {alert.status}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-text-secondary leading-normal">{alert.message}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {disrupted.length === 0 && !loading && (
+              <div className="text-center p-8 bg-brand-green/5 rounded-2xl border border-brand-green/20">
+                <p className="text-sm font-bold text-brand-green mb-1">Trafic Global Fluide</p>
+                <p className="text-xs text-text-muted">Aucun incident significatif sur le réseau ferré.</p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -133,9 +140,6 @@ function RatpFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
 }
 
 // ─── Community Feed ────────────────────────────────────────────────────────────
-import { useMapStore } from '@/store/mapStore'
-import type { Metadata } from 'next'
-
 interface RealIncident {
   id:          string
   title:       string
@@ -336,7 +340,14 @@ function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
   const [loading, setLoading]     = useState(true)
   const [incidents, setIncidents] = useState<RealIncident[]>([])
 
+  const stats = useMemo(() => ({
+    critical: incidents.filter(i => i.severity === 'critical').length,
+    high:     incidents.filter(i => i.severity === 'high').length,
+    medium:   incidents.filter(i => i.severity === 'medium').length,
+  }), [incidents])
+
   const refresh = async () => {
+
     setLoading(true)
     try {
       const res = await fetch(
@@ -393,18 +404,34 @@ function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+        {!loading && incidents.length > 0 && (
+          <div className="flex items-center gap-3 px-1 py-1 border-b border-bg-border/50">
+            {(['critical', 'high', 'medium'] as const).map(sev => (
+              stats[sev] > 0 && (
+                <div key={sev} className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: SEVERITY_COLORS[sev] }} />
+                  <span className="text-[10px] font-bold" style={{ color: SEVERITY_COLORS[sev] }}>
+                    {stats[sev]} {sev === 'critical' ? 'Critique' : sev === 'high' ? 'Élevé' : 'Modéré'}
+                  </span>
+                </div>
+              )
+            ))}
+          </div>
+        )}
+
         {loading && incidents.length === 0 ? (
           <div className="text-center p-8">
             <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-xs text-text-muted">Chargement des incidents…</p>
+            <p className="text-xs text-text-muted">Chargement des incidents ({city.name})…</p>
           </div>
         ) : incidents.length === 0 ? (
           <div className="text-center p-8 bg-brand-green/5 rounded-2xl border border-brand-green/20">
-            <p className="text-sm font-bold text-brand-green mb-1">Aucun incident actif</p>
-            <p className="text-xs text-text-muted">Aucun incident signalé sur le secteur.</p>
+            <p className="text-sm font-bold text-brand-green mb-1">Aucun incident à {city.name}</p>
+            <p className="text-xs text-text-muted">Le secteur est actuellement fluide.</p>
           </div>
         ) : (
+
           incidents.map(inc => {
             const Icon    = TYPE_ICONS[inc.type] ?? AlertTriangle
             const color   = SEVERITY_COLORS[inc.severity]
@@ -467,6 +494,8 @@ function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
 
 export default function SocialPage() {
   const [activeTab, setActiveTab] = useState<SocialTab>('sytadin')
+  const city = useMapStore(s => s.city)
+
   
   // Stats tracking for SocialPulse
   const [ratpCount, setRatpCount] = useState(0)
@@ -508,11 +537,12 @@ export default function SocialPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-text-primary tracking-tight">Social Hub</h2>
+                <h2 className="text-base font-bold text-text-primary tracking-tight">{city.name} Social Hub</h2>
                 <LiveIndicator label="TEMPS RÉEL" className="px-2 py-0.5 scale-75 origin-left" />
               </div>
-              <p className="text-[11px] text-text-muted">Command Center · Île-de-France</p>
+              <p className="text-[11px] text-text-muted">Command Center · {city.country || 'Île-de-France'}</p>
             </div>
+
 
           </div>
 
