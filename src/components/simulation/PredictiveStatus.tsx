@@ -2,6 +2,11 @@
 import { useEffect, useState } from 'react'
 import { Server, CheckCircle, XCircle, RefreshCw, Map, Activity } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
+import { useMapStore } from '@/store/mapStore'
+import { useSimulationStore } from '@/store/simulationStore'
+
+
+
 
 interface BackendHealth {
   online: boolean
@@ -12,9 +17,13 @@ interface BackendHealth {
 }
 
 export function PredictiveStatus() {
+  const city = useMapStore((s: any) => s.city)
+  const { setGraphLoaded, setBackendOnline } = useSimulationStore()
+
   const [health,       setHealth]       = useState<BackendHealth | null>(null)
   const [loading,      setLoading]      = useState(true)
   const [graphLoading, setGraphLoading] = useState(false)
+
 
   const check = async () => {
     setLoading(true)
@@ -22,23 +31,29 @@ export function PredictiveStatus() {
       const res = await fetch('/api/predictive/health')
       const data: BackendHealth = await res.json()
       setHealth(data)
+      setBackendOnline(data.online)
+      if (data.graph_loaded) setGraphLoaded(true)
       return data
     } catch {
       setHealth({ online: false })
+      setBackendOnline(false)
     } finally {
       setLoading(false)
     }
+
   }
 
   const loadGraph = async () => {
     setGraphLoading(true)
+    const citySlug = city.id.toLowerCase().replace('city-', '')
     try {
-      await fetch('/api/predictive/graph/load-gennevilliers', { method: 'POST' })
+      await fetch(`/api/predictive/graph/load-${citySlug}`, { method: 'POST' })
       setTimeout(check, 3000)
     } catch { /* ignore */ } finally {
       setGraphLoading(false)
     }
   }
+
 
   useEffect(() => {
     check().then(data => {

@@ -67,6 +67,9 @@ const POI_SOURCE              = 'cf-pois'
 const VEHICLES_SOURCE         = 'cf-vehicles'
 const METRO_STATIONS_SOURCE   = 'cf-metro-stations'
 const TRANSIT_ROUTES_SOURCE   = 'cf-transit-routes'
+const PREDICTIVE_AFFECTED_SOURCE = 'cf-pred-affected'
+const PREDICTIVE_EVENTS_SOURCE   = 'cf-pred-events'
+
 
 // ─── Popup helpers ────────────────────────────────────────────────────────
 
@@ -622,8 +625,8 @@ export function CrossFlowMap() {
     // Fetch metro/tram first (always), then supplement with bus routes.
     // Two separate calls ensures metro lines are never cut off by bus-route count.
     const loadRoutes = async () => {
-      const priority = await fetchRouteGeometries(city.bbox, ['subway', 'tram', 'train'], 30)
-      const bus      = await fetchRouteGeometries(city.bbox, ['bus'], 40)
+      const priority = await fetchRouteGeometries(city.bbox, ['subway', 'tram', 'train'], 80)
+      const bus      = await fetchRouteGeometries(city.bbox, ['bus'], 120)
       const routes   = [...priority, ...bus]
       if (!routes.length) return
       osmRoutesRef.current.set(city.id, routes)
@@ -699,11 +702,18 @@ export function CrossFlowMap() {
       // Search filter
       if (vehicleSearchRef.current) {
         const q = vehicleSearchRef.current.toLowerCase()
+          .replace(/ligne\s+/g, '')
+          .replace(/bus\s+/g, '')
+          .replace(/metro\s+/g, '')
+          .replace(/m\d/g, m => m.slice(1)) // "M14" -> "14"
+          .trim()
         const match = v.routeRef.toLowerCase().includes(q) || v.routeName.toLowerCase().includes(q)
         if (!match) return false
       }
       return true
     })
+
+
 
     // 3. Update Map Source
     const src = map.getSource(VEHICLES_SOURCE) as maplibregl.GeoJSONSource | undefined
@@ -893,8 +903,49 @@ export function CrossFlowMap() {
       essential: true,
     })
   }, [city.id, mapLoaded]) // eslint-disable-line
+ 
+  // ─── Predictive Simulation Results — Visual Sync ─────────────────────
+  const simulationResult = useSimulationStore(s => s.currentResult)
+
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+
+    const updatePredictiveLayers = async () => {
+      const map = mapRef.current!
+      const affectedSrc = map.getSource(PREDICTIVE_AFFECTED_SOURCE) as maplibregl.GeoJSONSource | undefined
+      const eventsSrc   = map.getSource(PREDICTIVE_EVENTS_SOURCE) as maplibregl.GeoJSONSource | undefined
+
+      if (!simulationResult || !simulationResult.predictive) {
+        // Clear if no active simulation result
+        affectedSrc?.setData({ type: 'FeatureCollection', features: [] })
+        eventsSrc?.setData({ type: 'FeatureCollection', features: [] })
+        return
+      }
+
+      try {
+        const { predictiveApi } = await import('@/lib/api/predictive')
+
+        // 1. Fetch geojson for all affected edges (slow OR blocked)
+        const affectedGeoJSON = await predictiveApi.getAffectedEdges()
+        if (affectedSrc) affectedSrc.setData(affectedGeoJSON)
+
+
+        // 2. Clear events if not specifically handled
+        eventsSrc?.setData({ type: 'FeatureCollection', features: [] })
+
+      } catch (err) {
+        console.error('Failed to refresh predictive layers:', err)
+      }
+    }
+
+    updatePredictiveLayers()
+
+  }, [simulationResult, mapLoaded])
+
 
   // ─── City boundary ────────────────────────────────────────────────────
+
+
 
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return
@@ -1488,6 +1539,9 @@ function initStaticSources(map: maplibregl.Map) {
 
   // Synthetic traffic lines
   map.addSource(TRAFFIC_SOURCE, { type: 'geojson', data: emptyFC })
+  map.addSource(PREDICTIVE_AFFECTED_SOURCE, { type: 'geojson', data: emptyFC })
+  map.addSource(PREDICTIVE_EVENTS_SOURCE,   { type: 'geojson', data: emptyFC })
+
 
   // 1. Glow Layer (Outer)
   map.addLayer({
@@ -1516,11 +1570,65 @@ function initStaticSources(map: maplibregl.Map) {
     paint:  {
       'line-color':   ['get', 'color'],
       'line-width': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.4, ['get', 'width']], 13, ['get', 'width'], 17, ['*', 1.4, ['get', 'width']]],
-      // realData=true → HERE/OSM segments (on real roads) → fully visible
       // realData=false → synthetic grid → barely visible
       'line-opacity': ['case', ['boolean', ['get', 'realData'], false], 0.88, 0.08],
     },
   })
+
+  // ── PREDICTIVE AFFECTED ROADS ──────────────────
+  map.addLayer({
+    id:     PREDICTIVE_AFFECTED_SOURCE + '-glow',
+    type:   'line',
+    source: PREDICTIVE_AFFECTED_SOURCE,
+    paint: {
+      'line-color':   '#FF3B30',
+      'line-width':   12,
+      'line-opacity': 0.15,
+      'line-blur':    8,
+    }
+  })
+  map.addLayer({
+    id:     PREDICTIVE_AFFECTED_SOURCE + '-lines',
+    type:   'line',
+    source: PREDICTIVE_AFFECTED_SOURCE,
+    paint: {
+      'line-color':   '#FF3B30',
+      'line-width':   3.5,
+      'line-opacity': 0.85,
+    }
+  })
+
+  // ── PREDICTIVE EVENTS ─────────────────────────
+  map.addLayer({
+    id:     PREDICTIVE_EVENTS_SOURCE + '-circles',
+    type:   'circle',
+    source: PREDICTIVE_EVENTS_SOURCE,
+    paint: {
+      'circle-radius':       8,
+      'circle-color':        '#FF3B30',
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#FFFFFF',
+      'circle-opacity':      0.9,
+    }
+  })
+  map.addLayer({
+    id:     PREDICTIVE_EVENTS_SOURCE + '-labels',
+    type:   'symbol',
+    source: PREDICTIVE_EVENTS_SOURCE,
+    layout: {
+      'text-field':    ['get', 'label'],
+      'text-font':     ['Open Sans Bold'],
+      'text-size':     11,
+      'text-anchor':   'top',
+      'text-offset':   [0, 1.2],
+    },
+    paint: {
+      'text-color':      '#FFFFFF',
+      'text-halo-color': 'rgba(0,0,0,0.8)',
+      'text-halo-width': 2,
+    }
+  })
+
 
   // Heatmap
   map.addSource(HEATMAP_SOURCE, { type: 'geojson', data: emptyFC })

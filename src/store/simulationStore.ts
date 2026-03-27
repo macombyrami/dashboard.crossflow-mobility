@@ -33,7 +33,14 @@ interface SimulationStore {
   addResult:   (r: SimulationResult) => void
   setCurrentResult: (r: SimulationResult | null) => void
   clearResults:() => void
+
+  // Backend state
+  graphLoaded:   boolean
+  backendOnline: boolean
+  setGraphLoaded: (l: boolean) => void
+  setBackendOnline:(o: boolean) => void
 }
+
 
 export const useSimulationStore = create<SimulationStore>()(
   persist(
@@ -78,7 +85,13 @@ export const useSimulationStore = create<SimulationStore>()(
       addResult:     (r: SimulationResult) => set(s => ({ results: [r, ...(s as SimulationStore).results].slice(0, 20) })),
       setCurrentResult: (r: SimulationResult | null) => set({ currentResult: r }),
       clearResults:  () => set({ results: [], currentResult: null }),
+
+      graphLoaded:   false,
+      backendOnline: false,
+      setGraphLoaded: (l: boolean) => set({ graphLoaded: l }),
+      setBackendOnline:(o: boolean) => set({ backendOnline: o }),
     }),
+
     {
       name: 'cf-simulation-storage',
       partialize: (state) => ({

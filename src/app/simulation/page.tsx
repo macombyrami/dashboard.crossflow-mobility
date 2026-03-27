@@ -7,7 +7,10 @@ import { IdfNetworkStats } from '@/components/simulation/IdfNetworkStats'
 import { MiroFishPanel } from '@/components/simulation/MiroFishPanel'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
+import { useSimulationStore } from '@/store/simulationStore'
 import { generateCityKPIs, generateIncidents } from '@/lib/engine/traffic.engine'
+
+
 import { useEffect, useState } from 'react'
 import { Brain, GitBranch, Info, Rss } from 'lucide-react'
 import dynamic from 'next/dynamic'
@@ -23,17 +26,45 @@ type RightTab = 'results' | 'social' | 'mirofish'
 
 export default function SimulationPage() {
   const { t } = useTranslation()
-  const city         = useMapStore(s => s.city)
+  const city         = useMapStore((s: any) => s.city)
 
   useEffect(() => { document.title = `Simulation — ${city.name} | CrossFlow` }, [city.name])
-  const setKPIs      = useTrafficStore(s => s.setKPIs)
-  const setIncidents = useTrafficStore(s => s.setIncidents)
+  const setKPIs      = useTrafficStore((s: any) => s.setKPIs)
+  const setIncidents = useTrafficStore((s: any) => s.setIncidents)
+  const setGraphLoaded = useSimulationStore((s: any) => s.setGraphLoaded)
+  const setBackendOnline = useSimulationStore((s: any) => s.setBackendOnline)
+
+
   const [rightTab, setRightTab] = useState<RightTab>('results')
+
 
   useEffect(() => {
     setKPIs(generateCityKPIs(city))
     setIncidents(generateIncidents(city))
-  }, [city, setKPIs, setIncidents])
+
+    // Predictive backend auto-load
+    const initBackend = async () => {
+      try {
+        const h = await import('@/lib/api/predictive').then(m => m.predictiveApi.health())
+        setBackendOnline(h.online)
+        if (h.online) {
+          if (!h.graph_loaded) {
+            // Load graph for current city slug (e.g. 'gennevilliers')
+            const citySlug = city.id.toLowerCase().replace('city-', '')
+            await import('@/lib/api/predictive').then(m => m.predictiveApi.loadGraph(citySlug))
+            setGraphLoaded(true)
+          } else {
+            setGraphLoaded(true)
+          }
+        }
+      } catch (err) {
+        console.error('Predictive backend failed to init:', err)
+        setBackendOnline(false)
+      }
+    }
+    initBackend()
+  }, [city, setKPIs, setIncidents, setBackendOnline, setGraphLoaded])
+
 
   return (
     <div className="flex flex-1 flex-col lg:flex-row h-full overflow-hidden">

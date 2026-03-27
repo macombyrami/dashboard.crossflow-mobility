@@ -138,7 +138,25 @@ export const predictiveApi = {
   /** Network analytics */
   getAnalytics: () =>
     get<PredAnalytics>('simulation/analytics'),
+
+  /** Get GeoJSON of edges (filter: 'all' | 'blocked' | 'slow') */
+  getEdges: (filter: 'all' | 'blocked' | 'slow' = 'all') =>
+    get<GeoJSON.FeatureCollection>(`graph/edges?status_filter=${filter}`),
+
+  /** Get GeoJSON of ALL affected edges (slow OR blocked) */
+  getAffectedEdges: () =>
+    get<GeoJSON.FeatureCollection>('graph/export/edges-geojson'),
+
+
+  /** Get GeoJSON of all nodes */
+  getNodes: () =>
+    get<GeoJSON.FeatureCollection>('graph/nodes'),
+
+  /** Get GeoJSON of active simulation events */
+  getEvents: () =>
+    get<GeoJSON.FeatureCollection>('simulation/state'), // Assuming the backend returns GeoJSON for events here or similar
 }
+
 
 // ─── Scenario → event type mapping ───────────────────────────────────────────
 
