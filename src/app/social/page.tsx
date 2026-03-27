@@ -3,7 +3,11 @@ import React, { useState, useEffect } from 'react'
 import { Rss, Twitter, Train, Users, AlertTriangle, RefreshCw, MapPin, Search, Wrench, Ban } from 'lucide-react'
 import { SytadinFeed } from '@/components/simulation/SytadinFeed'
 import { IdfNetworkStats } from '@/components/simulation/IdfNetworkStats'
+import { SocialPulse } from '@/components/social/SocialPulse'
+import { LiveIndicator } from '@/components/ui/LiveIndicator'
 import { cn } from '@/lib/utils/cn'
+
+
 
 type SocialTab = 'sytadin' | 'ratp' | 'community'
 
@@ -25,7 +29,7 @@ const RATP_COLORS: Record<string, string> = {
   'T12': '#E85D0E', 'T13': '#00A1E0',
 }
 
-function RatpFeed() {
+function RatpFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(false)
   const [alerts, setAlerts] = useState<TrafficLine[]>([])
@@ -37,12 +41,14 @@ function RatpFeed() {
       const lines = await fetchAllTrafficStatus()
       const disrupted = lines.filter(l => l.status !== 'normal' && l.status !== 'inconnu')
       setAlerts(disrupted)
+      onUpdate?.(disrupted.length)
     } catch {
       setError(true)
     } finally {
       setLoading(false)
     }
   }
+
 
   useEffect(() => {
     refresh()
@@ -160,7 +166,7 @@ function formatDateRange(start?: string, end?: string): string {
   return `du ${fmt(s)} au ${fmt(e)}`
 }
 
-function CommunityFeed() {
+function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
   const city = useMapStore(s => s.city)
   const [loading, setLoading]     = useState(true)
   const [incidents, setIncidents] = useState<RealIncident[]>([])
@@ -173,7 +179,9 @@ function CommunityFeed() {
       )
       if (res.ok) {
         const data = await res.json()
-        setIncidents(data ?? [])
+        const items = data ?? []
+        setIncidents(items)
+        onUpdate?.(items.length)
       }
     } catch {
       // ignore
@@ -181,6 +189,7 @@ function CommunityFeed() {
       setLoading(false)
     }
   }
+
 
   useEffect(() => {
     refresh()
@@ -283,8 +292,14 @@ function CommunityFeed() {
 
 export default function SocialPage() {
   const [activeTab, setActiveTab] = useState<SocialTab>('sytadin')
+  
+  // Stats tracking for SocialPulse
+  const [ratpCount, setRatpCount] = useState(0)
+  const [sytadinCount, setSytadinCount] = useState(0)
+  const [communityCount, setCommunityCount] = useState(0)
 
   useEffect(() => { document.title = 'Flux Social — Alertes IDF | CrossFlow' }, [])
+
 
   return (
     <div className="flex flex-col lg:flex-row min-h-full overflow-hidden bg-bg-base">
@@ -299,9 +314,13 @@ export default function SocialPage() {
               <Rss className="w-4 h-4 text-brand" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-text-primary tracking-tight">Flux Social</h2>
-              <p className="text-[11px] text-text-muted">Événements & Alertes IDF</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-text-primary tracking-tight">Social Hub</h2>
+                <LiveIndicator label="TEMPS RÉEL" className="px-2 py-0.5 scale-75 origin-left" />
+              </div>
+              <p className="text-[11px] text-text-muted">Command Center · Île-de-France</p>
             </div>
+
           </div>
 
           <div className="relative">
@@ -372,10 +391,27 @@ export default function SocialPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-bg-surface/50 to-bg-base pointer-events-none z-0" />
         
         <div className="relative z-10 flex-1 flex flex-col overflow-hidden h-full">
-          {activeTab === 'sytadin' && <SytadinFeed />}
-          {activeTab === 'ratp' && <RatpFeed />}
-          {activeTab === 'community' && <CommunityFeed />}
+          {/* Top Global Stats */}
+          <SocialPulse 
+            ratpCount={ratpCount} 
+            sytadinCount={sytadinCount} 
+            communityCount={communityCount} 
+          />
+          
+          <div className="flex-1 overflow-hidden relative">
+            <div className={cn("absolute inset-0 transition-opacity duration-300", activeTab === 'sytadin' ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none")}>
+              <SytadinFeed onUpdate={setSytadinCount} />
+            </div>
+            <div className={cn("absolute inset-0 transition-opacity duration-300", activeTab === 'ratp' ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none")}>
+              <RatpFeed onUpdate={setRatpCount} />
+            </div>
+            <div className={cn("absolute inset-0 transition-opacity duration-300", activeTab === 'community' ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none")}>
+              <CommunityFeed onUpdate={setCommunityCount} />
+            </div>
+          </div>
+
         </div>
+
       </div>
 
     </div>

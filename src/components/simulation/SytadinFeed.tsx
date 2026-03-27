@@ -116,7 +116,7 @@ function PostCard({ post }: { post: SocialPost }) {
   )
 }
 
-export function SytadinFeed() {
+export function SytadinFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
   const [data, setData]             = useState<FeedData | null>(null)
   const [loading, setLoading]       = useState(true)
   const [staleError, setStaleError] = useState(false)   // error on refresh, but stale data still shown
@@ -129,16 +129,18 @@ export function SytadinFeed() {
       const json: FeedData = await res.json()
       setData(json)
       setStaleError(false)
+      onUpdate?.(json.posts.length)
     } catch {
       // Keep existing data visible — only show error if we have nothing at all
       setStaleError(true)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [onUpdate])
 
   useEffect(() => {
     fetchFeed()
+
     const id = setInterval(fetchFeed, 3 * 60 * 1000) // refresh every 3 min
     return () => clearInterval(id)
   }, [fetchFeed])
