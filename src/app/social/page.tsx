@@ -153,6 +153,18 @@ interface RealIncident {
   coordinates: [number, number]
   source:      string
   location?:   string
+  distance?:   number
+}
+
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371 // km
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
 }
 
 const SEVERITY_CONFIG: Record<RealIncident['severity'], { text: string; bg: string; iconBg: string; border: string }> = {
@@ -199,13 +211,18 @@ function IncidentCard({ incident }: { incident: RealIncident }) {
           
           <div className="flex items-center flex-wrap gap-3">
             {incident.location && (
-              <div className="flex items-center gap-1 text-text-muted">
-                <MapPin className="w-3 h-3" />
-                <span className="text-[10px] font-medium">{incident.location}</span>
+              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/5 border border-white/5">
+                <MapPin className="w-2.5 h-2.5 text-text-muted" />
+                <span className="text-[10px] font-bold text-text-primary whitespace-nowrap">{incident.location}</span>
+                {incident.distance !== undefined && (
+                  <span className="text-[10px] text-text-muted ml-1 pl-1 border-l border-white/10 italic">
+                    {incident.distance.toFixed(1)} km
+                  </span>
+                )}
               </div>
             )}
             <div className="flex items-center gap-1 text-text-muted">
-              <RefreshCw className="w-3 h-3" />
+              <RefreshCw className="w-2.5 h-2.5" />
               <span className="text-[10px] uppercase font-bold tracking-wider">{incident.source}</span>
             </div>
             <span className="text-[10px] text-text-muted/60 ml-auto">
@@ -390,17 +407,29 @@ function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
       const res = await fetch(`/api/social/incidents?lat=${city.center.lat}&lng=${city.center.lng}`)
       if (!res.ok) throw new Error('API failed')
       const data = await res.json()
-      const mapped = (data ?? []).map((item: any) => ({
-        id:          item.id,
-        title:       item.title,
-        description: item.address || item.title,
-        severity:    item.severity === 'critical' ? 'critical' : item.severity === 'high' ? 'major' : (item.severity === 'medium' || item.severity === 'moderate') ? 'moderate' : 'minor',
-        type:        item.type || 'other',
-        timestamp:   item.startDate || new Date().toISOString(),
-        coordinates: [item.lng, item.lat],
-        source:      item.sourceLabel || item.source || 'COMMUNITY',
-        location:    item.district || item.address || '',
-      }))
+      const mapped = (data ?? []).map((item: any) => {
+        const dist = calculateDistance(city.center.lat, city.center.lng, item.lat, item.lng)
+        
+        // Refine location context (esp. for Paris arrondissements)
+        let loc = item.district || item.address || ''
+        if (loc.match(/^750\d{2}$/)) {
+          const arr = parseInt(loc.slice(3))
+          loc = arr === 1 ? 'Paris 1er' : `Paris ${arr}e`
+        }
+
+        return {
+          id:          item.id,
+          title:       item.title,
+          description: item.address || item.title,
+          severity:    item.severity === 'critical' ? 'critical' : item.severity === 'high' ? 'major' : (item.severity === 'medium' || item.severity === 'moderate') ? 'moderate' : 'minor',
+          type:        item.type || 'other',
+          timestamp:   item.startDate || new Date().toISOString(),
+          coordinates: [item.lng, item.lat],
+          source:      item.sourceLabel || item.source || 'COMMUNITY',
+          location:    loc,
+          distance:    dist,
+        }
+      })
       setIncidents(mapped)
       onUpdate?.(mapped.length)
 
