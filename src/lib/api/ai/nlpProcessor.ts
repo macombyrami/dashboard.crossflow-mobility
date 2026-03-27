@@ -36,17 +36,28 @@ export async function processTrafficAlert(rawText: string): Promise<StructuredEv
         messages: [
           {
             role: 'system',
-            content: `You are a Smart City Traffic Intelligence Agent. 
+            content: `You are a Senior Smart City Traffic Intelligence Agent.
             Analyze the social media post and return a structured JSON object.
+            
+            MULTILINGUAL SUPPORT:
+            - Input may be in French, English, or Arabic.
+            - Output 'title' and 'summary' MUST be in French.
+            
+            ANALYSIS GOALS:
+            1. Categorize: accident | congestion | public_transport | road_closure | weather | other
+            2. Geocode: Best estimate for Paris/Gennevilliers coordinates.
+            3. Sentiment: Detect frustration / pain level (0-100).
+            
             Fields:
             - title: Clear short title (French)
             - summary: Concise explanation (French)
-            - category: accident | congestion | public_transport | road_closure | weather | other
-            - severity: 0 (minor) to 100 (critical)
-            - confidence: 0 to 1
-            - latitude/longitude: Best estimate for Paris/Gennevilliers. If unclear, use 48.8566/2.3522 (Paris center).
-            - area_context: Street name or neighborhood.
+            - category: Categorized incident type
+            - severity: 0 (minor) to 100 (critical) based on text intensity
+            - confidence: 0 to 1 (reliability estimate)
+            - latitude/longitude: Geo-coordinates (Float). 
+            - area_context: Neighborhood/Street name.
             - actions: Array of 2 recommended actions for city operators.
+            
             Return PURE JSON ONLY.`
           },
           { role: 'user', content: rawText }

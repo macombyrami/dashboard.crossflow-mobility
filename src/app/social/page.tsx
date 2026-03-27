@@ -81,89 +81,208 @@ function RatpFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
 }
 
 function XPulseFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
-  return <div className="p-8 text-center text-text-muted text-xs">X-Pulse Active Monitoring...</div>
+  const [loading, setLoading]     = React.useState(true)
+  const [posts, setPosts]         = React.useState<any[]>([])
+
+  const refresh = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/social/x-pulse')
+      if (res.ok) {
+        const data = await res.json()
+        setPosts(data.posts || [])
+        onUpdate?.(data.posts?.length || 0)
+      }
+    } catch { } finally { setLoading(false) }
+  }
+
+  React.useEffect(() => { refresh() }, [])
+
+  return (
+    <div className="flex flex-col h-full bg-black/5">
+      <div className="px-5 py-4 border-b border-bg-border flex items-center justify-between bg-bg-surface">
+        <div className="flex items-center gap-2">
+          <Twitter className="w-4 h-4 text-white p-1 rounded bg-black" />
+          <h2 className="text-sm font-semibold text-text-primary">X Traffic Pulse</h2>
+        </div>
+        <button onClick={refresh} className="p-1.5 rounded-lg hover:bg-bg-elevated transition-colors">
+          <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {loading ? <div className="text-center p-8 text-xs text-text-muted">Analyse des flux X...</div> :
+          posts.map(post => (
+            <div key={post.id} className="p-4 rounded-xl border border-bg-border bg-bg-surface/50">
+              <div className="flex items-center gap-2 mb-2">
+                <img src={post.author?.avatar} className="w-6 h-6 rounded-full" alt="" />
+                <span className="text-[11px] font-bold text-text-primary">{post.author?.name}</span>
+              </div>
+              <p className="text-xs text-text-secondary">{post.text}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  )
 }
 
 function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
-  return <div className="p-8 text-center text-text-muted text-xs">Community Reports (HERE/OpenData)...</div>
+  const [loading, setLoading]     = React.useState(true)
+  const [incidents, setIncidents] = React.useState<any[]>([])
+
+  const refresh = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/social/incidents')
+      if (res.ok) {
+        const data = await res.json()
+        setIncidents(data || [])
+        onUpdate?.(data?.length || 0)
+      }
+    } catch { } finally { setLoading(false) }
+  }
+
+  React.useEffect(() => { refresh() }, [])
+
+  return (
+    <div className="flex flex-col h-full bg-bg-base/50">
+      <div className="px-5 py-4 border-b border-bg-border flex items-center justify-between bg-bg-surface">
+        <h2 className="text-sm font-semibold text-text-primary">Signalements Locale</h2>
+        <button onClick={refresh} className="p-1.5 rounded-lg hover:bg-bg-elevated transition-colors">
+          <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {incidents.map(inc => (
+          <div key={inc.id} className="p-4 rounded-xl border border-bg-border bg-bg-surface">
+            <h4 className="text-xs font-bold text-text-primary mb-1">{inc.title}</h4>
+            <p className="text-[11px] text-text-muted">{inc.address}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // ─── AI Intelligence Pipeline (Synthesized Pain Points) ──────────────────
 
 function IntelligenceDashboard() {
   const [events, setEvents] = React.useState<any[]>([])
+  const [anomaly, setAnomaly] = React.useState<{ active: boolean; stats: any }>({ active: false, stats: null })
   const [loading, setLoading] = React.useState(true)
+  const [analyzing, setAnalyzing] = React.useState(false)
 
   const refresh = async () => {
     setLoading(true)
-    setTimeout(() => {
-      setEvents([
-        {
-          id: 1,
-          title: "Congestion Majeure : Secteur La Défense",
-          summary: "Accumulation de 15+ signalements sociaux. Accident signalé sous le tunnel de l'A14.",
-          category: 'accident',
-          severity: 85,
-          confidence: 0.92,
-          area_context: "Nanterre / La Défense",
-          actions: ["Dégagement prioritaire requis", "Déviation vers N186"],
-          startedAt: new Date(Date.now() - 45 * 60000).toISOString()
-        },
-        {
-          id: 2,
-          title: "Saturation Critique : RER B (Nord)",
-          summary: "Panne de signalisation locale. Flux important de passagers bloqués à Gare du Nord.",
-          category: 'public_transport',
-          severity: 72,
-          confidence: 0.88,
-          area_context: "Paris Nord / Plaine St-Denis",
-          actions: ["Renfort bus de substitution", "Alerte voyageurs via App"],
-          startedAt: new Date(Date.now() - 15 * 60000).toISOString()
-        }
-      ])
+    try {
+      // 1. Fetch synthesized events
+      const res = await fetch('/api/social/intelligence')
+      if (res.ok) {
+        const data = await res.json()
+        setEvents(data.events || [])
+      }
+
+      // 2. Fetch anomaly status
+      const anonRes = await fetch('/api/social/anomalies')
+      if (anonRes.ok) {
+        const data = await anonRes.json()
+        setAnomaly({ active: data.anomaly, stats: data.stats })
+      }
+    } catch (err) {
+      console.error('Failed to fetch intelligence:', err)
+    } finally {
       setLoading(false)
-    }, 800)
+    }
+  }
+
+  const runAnalysis = async () => {
+    setAnalyzing(true)
+    try {
+      const res = await fetch('/api/social/analyze', { method: 'POST' })
+      if (res.ok) {
+        await refresh()
+      }
+    } catch (err) {
+      console.error('Analysis trigger failed:', err)
+    } finally {
+      setAnalyzing(false)
+    }
   }
 
   React.useEffect(() => { refresh() }, [])
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex flex-col gap-1">
-          <div className="flex items-center justify-between">
-            <ShieldAlert className="w-5 h-5 text-red-500" />
-            <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Pain Index</span>
+      {/* Risk Overview & Controls */}
+      <div className="flex flex-col md:flex-row gap-4 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 w-full">
+          <div className={cn(
+            "p-4 rounded-xl border flex flex-col gap-1 transition-all duration-500",
+            anomaly.active ? "bg-traffic-critical/20 border-traffic-critical/40" : "bg-white/5 border-white/10"
+          )}>
+            <div className="flex items-center justify-between">
+              <ShieldAlert className={cn("w-5 h-5", anomaly.active ? "text-traffic-critical animate-pulse" : "text-text-muted")} />
+              <span className={cn("text-[10px] font-bold uppercase tracking-widest", anomaly.active ? "text-traffic-critical" : "text-text-muted")}>
+                {anomaly.active ? 'Anomaly Detected' : 'Pain Index'}
+              </span>
+            </div>
+            <p className="text-2xl font-bold text-white mt-2">{anomaly.active ? '84' : '32'} / 100</p>
+            <p className="text-[11px] text-text-muted">
+              {anomaly.active ? 'Sudden spike in report volume' : 'Signal volume stable'}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-white mt-2">84 / 100</p>
-          <p className="text-[11px] text-text-muted">Risque d'anomalie détecté à Gennevilliers</p>
-        </div>
-        <div className="p-4 rounded-xl bg-brand/10 border border-brand/20 flex flex-col gap-1">
-          <div className="flex items-center justify-between">
-            <Brain className="w-5 h-5 text-brand" />
-            <span className="text-[10px] font-bold text-brand uppercase tracking-widest">AI Confidence</span>
+
+          <div className="p-4 rounded-xl bg-brand/10 border border-brand/20 flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <Brain className="w-5 h-5 text-brand" />
+              <span className="text-[10px] font-bold text-brand uppercase tracking-widest">AI Confidence</span>
+            </div>
+            <p className="text-2xl font-bold text-white mt-2">94.2%</p>
+            <p className="text-[11px] text-text-muted">Multi-source signal validation</p>
           </div>
-          <p className="text-2xl font-bold text-white mt-2">94.2%</p>
-          <p className="text-[11px] text-text-muted">Basé sur 240+ signaux multisources</p>
-        </div>
-        <div className="p-4 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1">
-          <div className="flex items-center justify-between">
-            <TrendingUp className="w-5 h-5 text-text-secondary" />
-            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Sentiment Hub</span>
+
+          <div className="p-4 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <TrendingUp className="w-5 h-5 text-text-secondary" />
+              <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Sentiment Hub</span>
+            </div>
+            <p className="text-2xl font-bold text-white mt-2">-15% Frustration</p>
+            <p className="text-[11px] text-text-muted">Tendance à la baisse (H-1)</p>
           </div>
-          <p className="text-2xl font-bold text-white mt-2">-15% Frustration</p>
-          <p className="text-[11px] text-text-muted">Tendance à la baisse par rapport à H-1</p>
         </div>
+
+        <button 
+          onClick={runAnalysis}
+          disabled={analyzing}
+          className="w-full md:w-auto px-6 py-4 rounded-2xl bg-brand text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-brand/90 transition-all disabled:opacity-50 shadow-lg shadow-brand/20"
+        >
+          {analyzing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {analyzing ? 'Analysis In Progress...' : 'Run Intelligence Cycle'}
+        </button>
       </div>
 
+      {/* Synthesized Events */}
       <div className="space-y-4">
-        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-          <Activity className="w-4 h-4 text-brand" />
-          Événements Urbains Synthétisés
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <Activity className="w-4 h-4 text-brand" />
+            Événements Urbains Synthétisés
+          </h3>
+          <button onClick={refresh} className="text-[10px] font-bold text-brand hover:underline">
+            Actualiser
+          </button>
+        </div>
         
-        {loading ? (
-          <div className="py-20 text-center text-text-muted text-sm">Analyse des signaux sociaux en cours...</div>
+        {loading && events.length === 0 ? (
+          <div className="py-20 text-center text-text-muted text-sm flex flex-col items-center gap-3">
+            <RefreshCw className="w-6 h-6 animate-spin text-brand" />
+            Analyse des signaux sociaux en cours...
+          </div>
+        ) : events.length === 0 ? (
+          <div className="py-20 text-center rounded-2xl border border-white/5 bg-white/[0.02]">
+            <p className="text-sm font-bold text-white mb-1">Aucun événement détecté</p>
+            <p className="text-xs text-text-muted">Lancez un cycle d'analyse pour processed les signaux récents.</p>
+          </div>
         ) : (
           events.map(event => (
             <div key={event.id} className="group relative p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 transition-all duration-300">
@@ -184,7 +303,7 @@ function IntelligenceDashboard() {
                   <p className="text-[13px] text-text-secondary leading-relaxed mb-4">{event.summary}</p>
                   
                   <div className="flex flex-wrap gap-2">
-                    {event.actions.map((action: string, idx: number) => (
+                    {(event.recommended_actions || []).map((action: string, idx: number) => (
                       <div key={idx} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand/10 border border-brand/20 text-[11px] font-bold text-brand">
                         <Zap className="w-3 h-3" />
                         {action}
@@ -195,15 +314,16 @@ function IntelligenceDashboard() {
                 
                 <div className="text-right shrink-0">
                   <div className="text-[11px] text-text-muted mb-4">
-                    {formatDistanceToNow(new Date(event.startedAt), { locale: fr, addSuffix: true })}
+                    {formatDistanceToNow(new Date(event.created_at || Date.now()), { locale: fr, addSuffix: true })}
                   </div>
                   <div className="w-16 h-16 rounded-full border-4 border-white/5 flex items-center justify-center relative overflow-hidden">
                     <div 
                       className="absolute inset-0 bg-brand/20" 
-                      style={{ height: `${event.confidence * 100}%`, top: `${100 - event.confidence * 100}%` }} 
+                      style={{ height: `${(event.confidence || 0.5) * 100}%`, top: `${100 - (event.confidence || 0.5) * 100}%` }} 
                     />
-                    <span className="relative z-10 text-[11px] font-bold text-white">{Math.round(event.confidence * 100)}%</span>
+                    <span className="relative z-10 text-[11px] font-bold text-white">{Math.round((event.confidence || 0.5) * 100)}%</span>
                   </div>
+                  <p className="text-[9px] font-bold text-text-muted uppercase mt-2 tracking-widest">Confiance IA</p>
                 </div>
               </div>
             </div>
