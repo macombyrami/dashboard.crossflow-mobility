@@ -195,10 +195,10 @@ function XPulseFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
   const [loading, setLoading]     = useState(true)
   const [posts, setPosts]         = useState<SocialPost[]>([])
 
-  const refresh = async () => {
+  const refresh = async (force: boolean = false) => {
     setLoading(true)
     try {
-      const res = await fetch('/api/social/x-pulse')
+      const res = await fetch(`/api/social/x-pulse${force ? '?refresh=true' : ''}`)
       if (res.ok) {
         const data = await res.json()
         const items = data.posts ?? []
@@ -213,7 +213,6 @@ function XPulseFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
             severity: p.severity
           })))
         }
-
       }
     } catch {
       // ignore
@@ -223,8 +222,8 @@ function XPulseFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
   }
 
   useEffect(() => {
-    refresh()
-    const iv = setInterval(refresh, 180_000)
+    refresh(true) // Initial load triggers a refresh to populate DB
+    const iv = setInterval(() => refresh(), 180_000)
     return () => clearInterval(iv)
   }, [])
 
@@ -241,12 +240,13 @@ function XPulseFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
           </div>
         </div>
         <button
-          onClick={refresh}
+          onClick={() => refresh(true)}
           disabled={loading}
           className="p-1.5 rounded-lg hover:bg-bg-elevated transition-colors text-text-muted disabled:opacity-50"
         >
           <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
         </button>
+
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
