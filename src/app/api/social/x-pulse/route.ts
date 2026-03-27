@@ -15,64 +15,87 @@ interface SocialPost {
   }
 }
 
-// ─── Simulated Raw Tweets (representing a scrape result) ──────────────────────
+// ─── Simulated Raw Tweets (representing a high-density scrape of @sytadin) ─────
 const MOCK_RAW_TWEETS = [
   {
     id: 'x1',
-    text: "Gros carton sur l'A13 direction Paris au niveau de Rocquencourt. 3 voitures impliquées, ça ne bouge plus du tout ! #A13 #TraficIDF",
-    user: { name: "Jean-Pierre T.", handle: "jpt_paris", avatar: "https://i.pravatar.cc/150?u=x1" },
-    time: -2,
+    text: "[EN COURS] FLASH/Accident sur l'A1 vers Paris au niveau de la Courneuve. Voie de droite bloquée, gros bouchon en amont. #A1 #Accident",
+    user: { name: "Sytadin", handle: "sytadin", avatar: "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png" },
+    time: -5,
   },
   {
     id: 'x2',
-    text: "Incroyable bouchon sur le périph intérieur entre Porte d'Italie et Porte de Versailles. On est à l'arrêt complet depuis 20 min. #Périph #Bouchon",
-    user: { name: "Léa Mobility", handle: "lea_mob", avatar: "https://i.pravatar.cc/150?u=x2" },
-    time: -15,
+    text: "FLASH/Accident sur l'A86 extérieur (Maisons-Alfort). Une voiture seule immobilisée. Prudence dans le secteur. #A86 #IDF",
+    user: { name: "Sytadin", handle: "sytadin", avatar: "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png" },
+    time: -22,
   },
   {
     id: 'x3',
-    text: "Travaux non signalés sur la N118 vers Vélizy. Passage sur une voie seulement. Évitez le secteur si possible. #N118 #Travaux",
-    user: { name: "Alertes Route", handle: "route_alert", avatar: "https://i.pravatar.cc/150?u=x3" },
+    text: "FLASH/A15 vers la province : Fermeture de la sortie n°2 vers Saint-Gratien et Enghien les Bains. #A15 #Travaux",
+    user: { name: "Sytadin", handle: "sytadin", avatar: "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png" },
     time: -45,
   },
   {
     id: 'x4',
-    text: "Manifestation en cours à République, les bus sont déviés. Circulation très compliquée dans le 11ème. #Paris #Manifestation",
-    user: { name: "Actu Paris", handle: "actu_paris", avatar: "https://i.pravatar.cc/150?u=x4" },
-    time: -60,
+    text: "FLASH/Circulation difficile sur l'A86 sens Extérieur, entre La Courneuve et Gennevilliers : Accident. #A86 #Trafic",
+    user: { name: "Sytadin", handle: "sytadin", avatar: "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png" },
+    time: -12,
   },
   {
     id: 'x5',
-    text: "Panne de signalisation sur l'A1 à hauteur du Stade de France. Ça commence à bien coincer en direction de Roissy. #A1 #InfoTrafic",
-    user: { name: "Thomas Driver", handle: "tom_drive", avatar: "https://i.pravatar.cc/150?u=x5" },
-    time: -10,
+    text: "Flash/ N12 coupée en direction de Paris (Maulette). Itinéraire de délestage conseillé par la RN10. #N12 #Blocage",
+    user: { name: "Sytadin", handle: "sytadin", avatar: "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png" },
+    time: -30,
+  },
+  {
+    id: 'x6',
+    text: "FLASH/Accident sur l'A3 vers Paris (Aulnay sous Bois). Deux voies neutralisées. Bouchon de 5 km. #A3 #Bouchon",
+    user: { name: "Sytadin", handle: "sytadin", avatar: "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png" },
+    time: -8,
+  },
+  {
+    id: 'x7',
+    text: "FLASH/A86 extérieur : Fermeture de la sortie 22 (D19-Créteil / l'échat). Travaux en cours. #A86 #SortieClose",
+    user: { name: "Sytadin", handle: "sytadin", avatar: "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png" },
+    time: -18,
+  },
+  {
+    id: 'x8',
+    text: "FLASH/Accident sur l'A1 vers Paris (Le Bourget). Véhicule léger contre PL. Secteur très chargé. #A1 #InfoTrafic",
+    user: { name: "Sytadin", handle: "sytadin", avatar: "https://abs.twimg.com/sticky/default_profile_images/default_profile_2_normal.png" },
+    time: -35,
   }
 ]
 
 // ─── AI-like Parser (RAG-lite) ────────────────────────────────────────────────
-// In a real scenario, this would call the /api/ai route or a dedicated model
+// Improved to handle Sytadin-style syntax and IDF geography
 function parseTweet(raw: typeof MOCK_RAW_TWEETS[0]): SocialPost {
   const text = raw.text.toUpperCase()
   
   // Severity detection
   let severity: SocialPost['severity'] = 'low'
-  if (text.includes('ARRÊT COMPLET') || text.includes('CARTON') || text.includes('GRAVE')) severity = 'critical'
-  else if (text.includes('BOUCHON') || text.includes('COMPLIQUÉE')) severity = 'high'
-  else if (text.includes('TRAVAUX') || text.includes('DÉVIÉS')) severity = 'medium'
+  if (text.includes('COUPÉE') || text.includes('BLOQUÉE') || text.includes('NEUTRALISÉES')) severity = 'critical'
+  else if (text.includes('ACCIDENT') || text.includes('FERMETURE')) severity = 'high'
+  else if (text.includes('DIFFICILE') || text.includes('BOUCHON')) severity = 'medium'
 
   // Type detection
   let type: SocialPost['type'] = 'info'
-  if (text.includes('ACCIDENT') || text.includes('CARTON') || text.includes('PANNE')) type = 'alert'
-  else if (text.includes('BOUCHON') || text.includes('FLUX') || text.includes('COINCER')) type = 'congestion'
+  if (text.includes('ACCIDENT') || text.includes('VÉHICULE')) type = 'alert'
+  else if (text.includes('BOUCHON') || text.includes('DIFFICLE') || text.includes('CHARGÉ')) type = 'congestion'
+  else if (text.includes('FERMETURE') || text.includes('TRAVAUX')) type = 'alert'
 
-  // Location extraction
-  const locationMatch = raw.text.match(/(à|au niveau de|entre|vers)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/)
-  const location = locationMatch ? locationMatch[2] : 'Île-de-France'
+  // Location extraction (Improved regex)
+  const locMatch = raw.text.match(/\(([^)]+)\)/) || raw.text.match(/(à|au niveau de|entre|vers)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i)
+  let location = 'Île-de-France'
+  if (locMatch) {
+    location = locMatch[1] || locMatch[2]
+  }
 
-  // Axis extraction (A1, A13, N118, etc.)
-  const axes = raw.text.match(/(A\d+|N\d+|D\d+|RN\d+|BP|Périph)/i)
+  // Axis extraction (A1, A13, N118, BP, etc.)
+  const axisMatch = raw.text.match(/\/(A\d+|N\d+|D\d+|RN\d+|BP|RN\d+)\b/i) || raw.text.match(/([A-Z]\d+)/)
   const tags = raw.text.match(/#[a-zA-Z0-9]+/g)?.map(t => t.replace('#', '')) || []
-  if (axes) tags.push(axes[0].toUpperCase())
+  if (axisMatch) tags.push(axisMatch[1].toUpperCase())
+
 
   const timestamp = new Date(Date.now() + raw.time * 60000).toISOString()
 

@@ -126,17 +126,47 @@ export function SytadinFeed({ onUpdate }: { onUpdate?: (count: number) => void }
     try {
       const res = await fetch('/api/social/sytadin')
       if (!res.ok) throw new Error('fetch error')
-      const json: FeedData = await res.json()
+      let json: FeedData = await res.json()
+      
+      // FALLBACK: If Sytadin website is empty but the user sees tweets,
+      // we try to pull from our X-Pulse high-density feed.
+      if (json.posts.length === 0) {
+        const xRes = await fetch('/api/social/x-pulse')
+        if (xRes.ok) {
+          const xData = await xRes.json()
+          if (xData.posts?.length > 0) {
+            json = {
+              posts: xData.posts.map((p: any) => ({
+                ...p,
+                id: `hybrid-${p.id}`,
+                text: `[X-Pulse] ${p.text}`
+              })),
+              fetchedAt: new Date().toISOString(),
+              degraded: true
+            }
+          }
+        }
+      }
+
       setData(json)
       setStaleError(false)
       onUpdate?.(json.posts.length)
+
+      // Update global intelligence
+      if (typeof window !== 'undefined' && 'updateAlerts' in window) {
+        (window as any).updateAlerts(json.posts.map(p => ({
+          text: p.text,
+          source: 'SYTADIN',
+          severity: p.severity
+        })))
+      }
     } catch {
-      // Keep existing data visible — only show error if we have nothing at all
       setStaleError(true)
     } finally {
       setLoading(false)
     }
   }, [onUpdate])
+
 
   useEffect(() => {
     fetchFeed()

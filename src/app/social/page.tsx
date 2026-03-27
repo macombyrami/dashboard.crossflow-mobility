@@ -43,6 +43,16 @@ function RatpFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
       const disrupted = lines.filter(l => l.status !== 'normal' && l.status !== 'inconnu')
       setAlerts(disrupted)
       onUpdate?.(disrupted.length)
+      
+      // Update global intelligence
+      if (typeof window !== 'undefined' && 'updateAlerts' in window) {
+        (window as any).updateAlerts(disrupted.map(l => ({
+          text: `${l.name}: ${l.message}`,
+          source: 'RATP',
+          severity: l.status === 'interrompu' ? 'critical' : 'high'
+        })))
+      }
+
     } catch {
       setError(true)
     } finally {
@@ -194,6 +204,16 @@ function XPulseFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
         const items = data.posts ?? []
         setPosts(items)
         onUpdate?.(items.length)
+
+        // Update global intelligence
+        if (typeof window !== 'undefined' && 'updateAlerts' in window) {
+          (window as any).updateAlerts(items.map((p: any) => ({
+            text: p.text,
+            source: 'X-PULSE',
+            severity: p.severity
+          })))
+        }
+
       }
     } catch {
       // ignore
@@ -275,6 +295,31 @@ function XPulseFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
   )
 }
 
+function LiveIntelligenceTicker({ alerts }: { alerts: { text: string; source: string; severity: string }[] }) {
+  const critical = alerts.filter(a => a.severity === 'critical')
+  if (critical.length === 0) return null
+
+  return (
+    <div className="bg-red-500/10 border-y border-red-500/20 px-4 py-2 flex items-center gap-3 overflow-hidden">
+      <div className="flex items-center gap-1.5 shrink-0">
+        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+        <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider">Flash Info</span>
+      </div>
+      <div className="flex-1 overflow-hidden whitespace-nowrap">
+        <div className="inline-block animate-marquee hover:pause whitespace-nowrap">
+          {critical.map((a, i) => (
+            <span key={i} className="text-xs text-text-primary font-medium mr-12 inline-flex items-center gap-2">
+              <span className="text-[10px] text-text-muted uppercase">[{a.source}]</span>
+              {a.text}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
   const city = useMapStore(s => s.city)
   const [loading, setLoading]     = useState(true)
@@ -291,6 +336,16 @@ function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
         const items = data ?? []
         setIncidents(items)
         onUpdate?.(items.length)
+
+        // Update global intelligence
+        if (typeof window !== 'undefined' && 'updateAlerts' in window) {
+          (window as any).updateAlerts(items.map((p: any) => ({
+            text: p.title,
+            source: 'COMMUNITY',
+            severity: p.severity
+          })))
+        }
+
       }
     } catch {
       // ignore
@@ -408,8 +463,24 @@ export default function SocialPage() {
   const [communityCount, setCommunityCount] = useState(0)
   const [xCount, setXCount] = useState(0)
 
+  // Combined store for intelligence ticker
+  const [allAlerts, setAllAlerts] = useState<{ text: string; source: string; severity: string }[]>([])
+
+  const updateAlerts = (newAlerts: { text: string; source: string; severity: string }[]) => {
+    setAllAlerts(prev => {
+      const filtered = prev.filter(a => a.source !== newAlerts[0]?.source)
+      return [...filtered, ...newAlerts].slice(0, 15)
+    })
+  }
+
+
+
+  useEffect(() => {
+    (window as any).updateAlerts = updateAlerts
+  }, [updateAlerts])
 
   useEffect(() => { document.title = 'Flux Social — Alertes IDF | CrossFlow' }, [])
+
 
 
   return (
@@ -524,6 +595,9 @@ export default function SocialPage() {
             communityCount={communityCount} 
             xCount={xCount}
           />
+          
+          <LiveIntelligenceTicker alerts={allAlerts} />
+
           
           <div className="flex-1 overflow-hidden relative">
             <div className={cn("absolute inset-0 transition-opacity duration-300", activeTab === 'sytadin' ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none")}>
