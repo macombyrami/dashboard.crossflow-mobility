@@ -21,7 +21,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Navigation principale mobile"
-      className="print-hidden lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-bg-border"
+      className="print-hidden lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-bg-border"
       style={{
         background:              'rgba(12,13,16,0.94)',
         backdropFilter:          'blur(24px) saturate(180%)',

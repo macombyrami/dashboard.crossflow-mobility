@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { TrendingUp, Calendar, Cloud, Zap, Users, AlertCircle, RefreshCw, Sun, Train, ThumbsUp, ThumbsDown, CheckCircle2 } from 'lucide-react'
+import { TrendingUp, Calendar, Cloud, Zap, Users, AlertCircle, RefreshCw, Sun, Train, ThumbsUp, ThumbsDown, CheckCircle2, Lightbulb, ShieldAlert, CheckCheck } from 'lucide-react'
 import { EventsWidget } from '@/components/dashboard/EventsWidget'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
@@ -201,6 +201,42 @@ export default function PredictionPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Stratégie recommandée */}
+              {ctx.strategy?.length > 0 && (
+                <div className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
+                  <div className="px-5 py-4 border-b border-bg-border flex items-center gap-2">
+                    {ctx.pressureLevel === 'HIGH'
+                      ? <ShieldAlert className="w-4 h-4 text-[#FF1744]" />
+                      : ctx.pressureLevel === 'MEDIUM'
+                      ? <Lightbulb className="w-4 h-4 text-[#FFB300]" />
+                      : <CheckCheck className="w-4 h-4 text-brand-green" />
+                    }
+                    <p className="text-sm font-semibold text-text-primary">Stratégie recommandée</p>
+                    <span className={cn(
+                      'ml-auto text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider',
+                      ctx.pressureLevel === 'HIGH'   ? 'bg-[rgba(255,23,68,0.1)] border-[rgba(255,23,68,0.3)] text-[#FF1744]' :
+                      ctx.pressureLevel === 'MEDIUM' ? 'bg-[rgba(255,179,0,0.1)] border-[rgba(255,179,0,0.3)] text-[#FFB300]' :
+                                                       'bg-[rgba(0,230,118,0.1)] border-[rgba(0,230,118,0.3)] text-brand-green',
+                    )}>
+                      {ctx.pressureLevel === 'HIGH' ? 'Alerte' : ctx.pressureLevel === 'MEDIUM' ? 'Attention' : 'Normal'}
+                    </span>
+                  </div>
+                  <ul className="divide-y divide-bg-border">
+                    {ctx.strategy.map((tip, i) => (
+                      <li key={i} className="flex items-start gap-3 px-5 py-3.5">
+                        <span className={cn(
+                          'flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5',
+                          ctx.pressureLevel === 'HIGH'   ? 'bg-[rgba(255,23,68,0.15)] text-[#FF1744]' :
+                          ctx.pressureLevel === 'MEDIUM' ? 'bg-[rgba(255,179,0,0.15)] text-[#FFB300]' :
+                                                           'bg-[rgba(0,230,118,0.15)] text-brand-green',
+                        )}>{i + 1}</span>
+                        <p className="text-[12px] text-text-secondary leading-relaxed">{tip}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {/* Horizon predictions */}
               <div className="bg-bg-surface border border-bg-border rounded-2xl p-5">
