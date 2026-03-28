@@ -69,6 +69,7 @@ const METRO_STATIONS_SOURCE   = 'cf-metro-stations'
 const TRANSIT_ROUTES_SOURCE   = 'cf-transit-routes'
 const PREDICTIVE_AFFECTED_SOURCE = 'cf-pred-affected'
 const PREDICTIVE_EVENTS_SOURCE   = 'cf-pred-events'
+const SIM_LOCATION_SOURCE        = 'cf-sim-location'
 
 
 // ─── Popup helpers ────────────────────────────────────────────────────────
@@ -189,20 +190,30 @@ export function CrossFlowMap() {
   const setDataSource         = useTrafficStore(s => s.setDataSource)
   const dataSource            = useTrafficStore(s => s.dataSource)
 
-  const currentResult = useSimulationStore(s => s.currentResult)
+  const currentResult           = useSimulationStore(s => s.currentResult)
+  const locationPickerActive    = useSimulationStore(s => s.locationPickerActive)
+  const eventLocation           = useSimulationStore(s => s.eventLocation)
+  const setEventLocation        = useSimulationStore(s => s.setEventLocation)
+  const setLocationPickerActive = useSimulationStore(s => s.setLocationPickerActive)
 
   const useLiveData = hasKey()
 
   // Refs to avoid stale closures in map click handler
-  const zoneActiveRef         = useRef(zoneActive)
-  const addZonePointRef       = useRef(addZonePoint)
-  const setSelectedVehicleRef = useRef(setSelectedVehicle)
+  const zoneActiveRef              = useRef(zoneActive)
+  const addZonePointRef            = useRef(addZonePoint)
+  const setSelectedVehicleRef      = useRef(setSelectedVehicle)
+  const locationPickerRef          = useRef(locationPickerActive)
+  const setEventLocationRef        = useRef(setEventLocation)
+  const setLocationPickerActiveRef = useRef(setLocationPickerActive)
   const vehicleTypeFilterRef  = useRef(vehicleTypeFilter)
   const vehicleSearchRef      = useRef(vehicleSearchQuery)
   const isTrackingRef         = useRef(isTrackingVehicle)
   useEffect(() => { zoneActiveRef.current = zoneActive }, [zoneActive])
   useEffect(() => { addZonePointRef.current = addZonePoint }, [addZonePoint])
   useEffect(() => { setSelectedVehicleRef.current = setSelectedVehicle }, [setSelectedVehicle])
+  useEffect(() => { locationPickerRef.current = locationPickerActive }, [locationPickerActive])
+  useEffect(() => { setEventLocationRef.current = setEventLocation }, [setEventLocation])
+  useEffect(() => { setLocationPickerActiveRef.current = setLocationPickerActive }, [setLocationPickerActive])
   useEffect(() => { vehicleTypeFilterRef.current = vehicleTypeFilter }, [vehicleTypeFilter])
   useEffect(() => { vehicleSearchRef.current = vehicleSearchQuery }, [vehicleSearchQuery])
   useEffect(() => { isTrackingRef.current = isTrackingVehicle }, [isTrackingVehicle])
@@ -212,8 +223,8 @@ export function CrossFlowMap() {
 
   useEffect(() => {
     if (!mapRef.current) return
-    mapRef.current.getCanvas().style.cursor = zoneActive ? 'crosshair' : ''
-  }, [zoneActive])
+    mapRef.current.getCanvas().style.cursor = (zoneActive || locationPickerActive) ? 'crosshair' : ''
+  }, [zoneActive, locationPickerActive])
 
   // ─── Init map ────────────────────────────────────────────────────────
 
@@ -266,8 +277,15 @@ export function CrossFlowMap() {
       }
     })
 
-    // General map click — zone drawing + TomTom point query
+    // General map click — sim location picker + zone drawing + TomTom point query
     map.on('click', async (e) => {
+      // Simulation location picker — place event marker on click
+      if (locationPickerRef.current) {
+        setEventLocationRef.current({ lat: e.lngLat.lat, lng: e.lngLat.lng })
+        setLocationPickerActiveRef.current(false)
+        return
+      }
+
       // Zone drawing mode
       if (zoneActiveRef.current) {
         addZonePointRef.current([e.lngLat.lng, e.lngLat.lat])
@@ -942,6 +960,25 @@ export function CrossFlowMap() {
 
   }, [simulationResult, mapLoaded])
 
+
+  // ─── Sim Event Location Marker ───────────────────────────────────────
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+    const src = mapRef.current.getSource(SIM_LOCATION_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (!src) return
+    if (!eventLocation) {
+      src.setData({ type: 'FeatureCollection', features: [] })
+      return
+    }
+    src.setData({
+      type: 'FeatureCollection',
+      features: [{
+        type:       'Feature',
+        geometry:   { type: 'Point', coordinates: [eventLocation.lng, eventLocation.lat] },
+        properties: {},
+      }],
+    })
+  }, [eventLocation, mapLoaded])
 
   // ─── City boundary ────────────────────────────────────────────────────
 
@@ -1629,6 +1666,31 @@ function initStaticSources(map: maplibregl.Map) {
     }
   })
 
+
+  // ── SIM LOCATION MARKER ────────────────────────
+  map.addSource(SIM_LOCATION_SOURCE, { type: 'geojson', data: emptyFC })
+  map.addLayer({
+    id:     SIM_LOCATION_SOURCE + '-ring',
+    type:   'circle',
+    source: SIM_LOCATION_SOURCE,
+    paint: {
+      'circle-radius':       20,
+      'circle-color':        'rgba(255,71,87,0.12)',
+      'circle-stroke-color': '#FF4757',
+      'circle-stroke-width': 2.5,
+    },
+  })
+  map.addLayer({
+    id:     SIM_LOCATION_SOURCE + '-dot',
+    type:   'circle',
+    source: SIM_LOCATION_SOURCE,
+    paint: {
+      'circle-radius':       5,
+      'circle-color':        '#FF4757',
+      'circle-stroke-color': '#FFFFFF',
+      'circle-stroke-width': 1.5,
+    },
+  })
 
   // Heatmap
   map.addSource(HEATMAP_SOURCE, { type: 'geojson', data: emptyFC })

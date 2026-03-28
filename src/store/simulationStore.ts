@@ -39,6 +39,12 @@ interface SimulationStore {
   backendOnline: boolean
   setGraphLoaded: (l: boolean) => void
   setBackendOnline:(o: boolean) => void
+
+  // Event location picker (map click to place simulation zone)
+  eventLocation:         { lat: number; lng: number } | null
+  locationPickerActive:  boolean
+  setEventLocation:      (loc: { lat: number; lng: number } | null) => void
+  setLocationPickerActive: (active: boolean) => void
 }
 
 
@@ -90,6 +96,11 @@ export const useSimulationStore = create<SimulationStore>()(
       backendOnline: false,
       setGraphLoaded: (l: boolean) => set({ graphLoaded: l }),
       setBackendOnline:(o: boolean) => set({ backendOnline: o }),
+
+      eventLocation:        null,
+      locationPickerActive: false,
+      setEventLocation:     (loc) => set({ eventLocation: loc, locationPickerActive: false }),
+      setLocationPickerActive: (active) => set({ locationPickerActive: active }),
     }),
 
     {

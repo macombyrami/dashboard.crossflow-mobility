@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Play, Ban, TrafficCone, Bike, Gauge, Train, Calendar, Cpu } from 'lucide-react'
+import { Play, Ban, TrafficCone, Bike, Gauge, Train, Calendar, Cpu, MapPin, X } from 'lucide-react'
 import { useSimulationStore } from '@/store/simulationStore'
 import { useMapStore } from '@/store/mapStore'
 import { runSimulation } from '@/lib/engine/simulation.engine'
@@ -22,7 +22,7 @@ const ICONS: Record<ScenarioType, typeof Play> = {
 
 /** Try to apply the scenario on the predictive backend and return route delta. */
 async function runPredictiveStrategy(
-  cityCenter: { lat: number; lng: number },
+  eventCenter: { lat: number; lng: number },
   scenarioType: ScenarioType,
   scenarioName: string,
   magnitude: number,
@@ -30,15 +30,15 @@ async function runPredictiveStrategy(
   const health = await predictiveApi.health()
   if (!health?.online || !health?.graph_loaded) return undefined
 
-  // Reset previous state, then apply scenario
+  // Reset previous state, then apply scenario at the selected (or city center) location
   await predictiveApi.resetSimulation()
   const eventType = scenarioToEventType(scenarioType)
   const radius    = scenarioRadius(scenarioType, magnitude)
-  await predictiveApi.addEvent(cityCenter, eventType, radius, scenarioName)
+  await predictiveApi.addEvent(eventCenter, eventType, radius, scenarioName)
 
-  // Compare a representative route (city center → ~500 m NE)
-  const start = cityCenter
-  const end   = { lat: cityCenter.lat + 0.005, lng: cityCenter.lng + 0.005 }
+  // Compare a representative route through the event zone
+  const start = { lat: eventCenter.lat - 0.008, lng: eventCenter.lng - 0.008 }
+  const end   = { lat: eventCenter.lat + 0.008, lng: eventCenter.lng + 0.008 }
   const cmp   = await predictiveApi.compareRoutes(start, end)
 
   if (!cmp.delta) return undefined
@@ -68,11 +68,12 @@ export function SimulationPanel() {
     try {
       const scenario = store.buildScenario()
 
-      // 1. Try predictive backend (non-blocking fallback)
+      // 1. Try predictive backend — use pinned location or city center as fallback
       let predictive: SimulationResult['predictive'] | undefined
+      const eventCenter = store.eventLocation ?? city.center
       try {
         predictive = await runPredictiveStrategy(
-          city.center,
+          eventCenter,
           store.scenarioType,
           scenario.name,
           store.magnitude,
@@ -207,6 +208,47 @@ export function SimulationPanel() {
               ))}
             </select>
           </div>
+        </div>
+      </div>
+
+      {/* Localisation de l'événement */}
+      <div className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-bg-border flex items-center justify-between">
+          <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">Localisation</p>
+          {store.eventLocation && (
+            <button
+              onClick={() => store.setEventLocation(null)}
+              className="text-[10px] text-[#FF4757] hover:opacity-80 flex items-center gap-1"
+            >
+              <X className="w-3 h-3" /> Réinitialiser
+            </button>
+          )}
+        </div>
+        <div className="p-3 space-y-2.5">
+          {store.eventLocation ? (
+            <div className="flex items-center gap-2 bg-[rgba(255,71,87,0.08)] border border-[rgba(255,71,87,0.2)] rounded-lg px-3 py-2">
+              <MapPin className="w-3.5 h-3.5 text-[#FF4757] shrink-0" />
+              <span className="text-xs text-[#FF4757] font-mono">
+                {store.eventLocation.lat.toFixed(4)}, {store.eventLocation.lng.toFixed(4)}
+              </span>
+            </div>
+          ) : (
+            <p className="text-[11px] text-text-muted leading-relaxed">
+              Zone entière de <strong>{city.name}</strong> — ou placez un point précis sur la carte.
+            </p>
+          )}
+          <button
+            onClick={() => store.setLocationPickerActive(!store.locationPickerActive)}
+            className={cn(
+              'w-full text-xs rounded-lg py-2 font-semibold flex items-center justify-center gap-1.5 transition-all border',
+              store.locationPickerActive
+                ? 'bg-[rgba(255,71,87,0.15)] text-[#FF4757] border-[rgba(255,71,87,0.4)] animate-pulse'
+                : 'bg-bg-elevated text-text-secondary border-bg-border hover:text-text-primary',
+            )}
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            {store.locationPickerActive ? 'Cliquez sur la carte…' : 'Placer sur la carte'}
+          </button>
         </div>
       </div>
 

@@ -23,6 +23,7 @@ export function PredictiveStatus() {
   const [health,       setHealth]       = useState<BackendHealth | null>(null)
   const [loading,      setLoading]      = useState(true)
   const [graphLoading, setGraphLoading] = useState(false)
+  const [loadError,    setLoadError]    = useState<string | null>(null)
 
 
   const check = async () => {
@@ -45,20 +46,26 @@ export function PredictiveStatus() {
 
   const loadGraph = async () => {
     setGraphLoading(true)
+    setLoadError(null)
     // OSMnx needs the full city name, e.g. "Paris, France"
     const cityName = `${city.name}, ${city.country}`
     try {
       const res = await fetch(
         `/api/predictive/graph/load?city=${encodeURIComponent(cityName)}`,
-        { method: 'POST', signal: AbortSignal.timeout(120_000) },
+        { method: 'POST', signal: AbortSignal.timeout(180_000) }, // 3 min — large cities can be slow
       )
       if (!res.ok) {
-        const err = await res.text().catch(() => res.statusText)
-        console.error('[PredictiveStatus] loadGraph failed:', err)
+        const errText = await res.text().catch(() => res.statusText)
+        const msg = `Erreur ${res.status} : ${errText.slice(0, 120)}`
+        setLoadError(msg)
+        console.error('[PredictiveStatus] loadGraph failed:', msg)
+      } else {
+        // Re-check health after a short delay to update node/edge counts
+        setTimeout(check, 1500)
       }
-      // Re-check health after a short delay to let the backend finish initialising
-      setTimeout(check, 2000)
-    } catch (err) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Timeout ou réseau indisponible'
+      setLoadError(msg.slice(0, 120))
       console.error('[PredictiveStatus] loadGraph error:', err)
     } finally {
       setGraphLoading(false)
@@ -154,6 +161,13 @@ export function PredictiveStatus() {
         )}
       </div>
 
+      {/* Error message */}
+      {loadError && (
+        <div className="rounded-lg bg-[rgba(255,23,68,0.08)] border border-[rgba(255,23,68,0.2)] px-3 py-2 text-[10px] text-[#FF1744] leading-relaxed">
+          {loadError}
+        </div>
+      )}
+
       {/* Load graph button */}
       {!health.graph_loaded && (
         <button
@@ -161,10 +175,16 @@ export function PredictiveStatus() {
           disabled={graphLoading}
           className="w-full text-xs bg-brand-green/10 text-brand-green border border-brand-green/30 rounded-lg py-2 hover:bg-brand-green/20 transition-colors font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60"
         >
-          {graphLoading
-            ? <><RefreshCw className="w-3 h-3 animate-spin" />Chargement du graphe…</>
-            : 'Charger le graphe OSM'
-          }
+          {graphLoading ? (
+            <>
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              Chargement OSM — {city.name}…
+            </>
+          ) : loadError ? (
+            'Réessayer le chargement'
+          ) : (
+            `Charger le graphe OSM — ${city.name}`
+          )}
         </button>
       )}
     </div>

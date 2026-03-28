@@ -42,27 +42,14 @@ export default function SimulationPage() {
     setKPIs(generateCityKPIs(city))
     setIncidents(generateIncidents(city))
 
-    // Predictive backend auto-load
-    const initBackend = async () => {
-      try {
-        const h = await import('@/lib/api/predictive').then(m => m.predictiveApi.health())
+    // Predictive backend status — handled by PredictiveStatus component
+    import('@/lib/api/predictive')
+      .then(m => m.predictiveApi.health())
+      .then(h => {
         setBackendOnline(h.online)
-        if (h.online) {
-          if (!h.graph_loaded) {
-            // Use full OSMnx city name, e.g. "Paris, France"
-            const cityName = `${city.name}, ${city.country}`
-            await import('@/lib/api/predictive').then(m => m.predictiveApi.loadGraph(cityName))
-            setGraphLoaded(true)
-          } else {
-            setGraphLoaded(true)
-          }
-        }
-      } catch (err) {
-        console.error('Predictive backend failed to init:', err)
-        setBackendOnline(false)
-      }
-    }
-    initBackend()
+        if (h.graph_loaded) setGraphLoaded(true)
+      })
+      .catch(() => setBackendOnline(false))
   }, [city, setKPIs, setIncidents, setBackendOnline, setGraphLoaded])
 
 
