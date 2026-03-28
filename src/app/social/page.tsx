@@ -7,6 +7,7 @@ import { SocialPulse } from '@/components/social/SocialPulse'
 import { LiveIndicator } from '@/components/ui/LiveIndicator'
 import { cn } from '@/lib/utils/cn'
 import { useMapStore } from '@/store/mapStore'
+import { useTrafficStore } from '@/store/trafficStore'
 import { fetchAllTrafficStatus, type TrafficLine, LINE_COLORS as RATP_COLORS } from '@/lib/api/ratp'
 import { RatpNetworkStatus } from '@/components/social/RatpNetworkStatus'
 import { formatDistanceToNow } from 'date-fns'
@@ -179,7 +180,23 @@ function IntelligenceDashboard() {
       const res = await fetch('/api/social/intelligence')
       if (res.ok) {
         const data = await res.json()
-        setEvents(data.events || [])
+        const rawEvents = data.events || []
+        setEvents(rawEvents)
+
+        // Sync with global TrafficStore for notifications
+        const mappedIncidents = rawEvents.map((ev: any) => ({
+          id:          ev.id,
+          type:        'congestion' as const, // Default type for intelligence insights
+          severity:    (ev.severity > 80 ? 'critical' : ev.severity > 50 ? 'high' : 'medium') as any,
+          title:       ev.title,
+          description: ev.summary,
+          location:    { lat: 48.8566, lng: 2.3522 }, // Default to Paris center if no coordinates
+          address:     ev.area_context || 'Zone Urbaine',
+          startedAt:   ev.created_at || new Date().toISOString(),
+          source:      'AI Pulse',
+          iconColor:   ev.severity > 80 ? '#FF1744' : '#FF6D00',
+        }))
+        useTrafficStore.getState().setSocialIncidents(mappedIncidents)
       }
 
       // 2. Fetch anomaly status

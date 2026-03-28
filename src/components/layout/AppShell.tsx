@@ -22,9 +22,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <UserCityProvider>
       <div className="app-shell">
         <Sidebar />
-        <div className="main-content">
+        <div className="main-content relative">
           <Header />
-          <div className="flex-1 overflow-hidden relative flex flex-col min-h-0">
+          <div className="flex-1 overflow-hidden relative flex flex-col min-h-0 z-0">
             <SwipeNavigation>
               {children}
             </SwipeNavigation>

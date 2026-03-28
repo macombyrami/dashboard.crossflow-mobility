@@ -41,11 +41,13 @@ export function Header() {
   const isAIPanelOpen   = useMapStore(s => s.isAIPanelOpen)
   const weather         = useTrafficStore(s => s.weather)
   const incidents       = useTrafficStore(s => s.incidents)
+  const socialIncidents = useTrafficStore(s => s.socialIncidents)
   const clearIncidents  = useTrafficStore(s => s.clearIncidents)
   const [alertOpen, setAlertOpen] = React.useState(false)
   const alertRef                  = React.useRef<HTMLDivElement>(null)
 
-  const incidentCount = incidents?.length ?? 0
+  const allIncidents  = [...socialIncidents, ...incidents]
+  const incidentCount = allIncidents.length
 
   // Close dropdown on outside click
   React.useEffect(() => {
@@ -60,7 +62,7 @@ export function Header() {
 
   return (
     <header
-      className="print-hidden flex items-center h-[52px] px-3 sm:px-4 gap-2 shrink-0 border-b border-bg-border"
+      className="print-hidden flex items-center h-[52px] px-3 sm:px-4 gap-2 shrink-0 border-b border-bg-border relative z-[100]"
       style={{
         background: 'rgba(10,11,14,0.92)',
         backdropFilter: 'blur(24px) saturate(180%)',
@@ -93,17 +95,24 @@ export function Header() {
         <LiveClock />
 
         {/* Alerts dropdown */}
-        <div ref={alertRef} className="relative">
+        <div ref={alertRef} className="relative z-[110]">
           <button
-            onClick={() => setAlertOpen(o => !o)}
-            className={cn('btn-icon relative', alertOpen && 'bg-bg-elevated')}
+            onClick={() => {
+              console.log('Notification button clicked');
+              setAlertOpen(o => !o);
+            }}
+            className={cn(
+              'btn-icon relative pointer-events-auto', 
+              alertOpen && 'bg-bg-elevated'
+            )}
             title="Incidents actifs"
             aria-label="Incidents actifs"
             aria-expanded={alertOpen}
+            style={{ isolation: 'isolate' }}
           >
             <Bell className="w-[18px] h-[18px]" strokeWidth={1.75} />
             {incidentCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-traffic-critical text-white text-[9px] font-bold leading-4 text-center tabular-nums">
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-traffic-critical text-white text-[9px] font-bold leading-4 text-center tabular-nums z-[120]">
                 {incidentCount > 9 ? '9+' : incidentCount}
               </span>
             )}
@@ -138,42 +147,47 @@ export function Header() {
               </div>
 
               {/* Incident list */}
-              <div className="max-h-72 overflow-y-auto">
-                {incidentCount === 0 ? (
-                  <div className="px-4 py-6 text-center">
-                    <p className="text-[13px] font-semibold text-text-primary mb-1">Tout est fluide</p>
-                    <p className="text-[11px] text-text-muted">Aucun incident actif détecté.</p>
-                  </div>
-                ) : (
-                  incidents
-                    .slice()
-                    .sort((a, b) => {
-                      const order = { critical: 0, high: 1, medium: 2, low: 3 }
-                      return (order[a.severity] ?? 3) - (order[b.severity] ?? 3)
-                    })
-                    .slice(0, 6)
-                    .map(inc => (
-                      <div
-                        key={inc.id}
-                        className="flex items-start gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors border-b border-bg-border/50 last:border-0"
-                      >
-                        <div
-                          className="mt-0.5 w-2 h-2 rounded-full shrink-0"
-                          style={{ background: SEVERITY_COLOR[inc.severity] ?? '#FFD600', boxShadow: `0 0 6px ${SEVERITY_COLOR[inc.severity] ?? '#FFD600'}` }}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[12px] font-semibold text-text-primary truncate leading-snug">{inc.title}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[10px] text-text-muted truncate max-w-[140px]">{inc.address}</span>
-                            <span className="text-text-muted/40">·</span>
-                            <div className="flex items-center gap-1 text-[10px] text-text-muted shrink-0">
-                              <Clock className="w-2.5 h-2.5" />
-                              {formatDistanceToNow(new Date(inc.startedAt), { locale: fr, addSuffix: true })}
+              <div className="max-h-[360px] overflow-y-auto overflow-x-hidden">
+                {incidentCount > 0 ? (
+                  <div className="divide-y divide-bg-border/50">
+                    {allIncidents.map((inc) => (
+                      <div key={inc.id} className="p-4 hover:bg-white/[0.03] transition-colors group relative">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="mt-1.5 w-2 h-2 rounded-full shrink-0 shadow-sm"
+                            style={{ 
+                              background: SEVERITY_COLOR[inc.severity] ?? '#FFD600', 
+                              boxShadow: `0 0 6px ${SEVERITY_COLOR[inc.severity] ?? '#FFD600'}` 
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">{inc.type}</span>
+                              <span className="text-[10px] text-text-muted font-medium bg-bg-elevated px-1.5 py-0.5 rounded uppercase">{inc.source}</span>
+                            </div>
+                            <h4 className="text-[13px] font-bold text-text-primary leading-tight mb-1 group-hover:text-brand transition-colors">{inc.title}</h4>
+                            <p className="text-[11px] text-text-secondary leading-normal line-clamp-2">{inc.description}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-[10px] text-text-muted font-medium bg-bg-elevated px-1.5 py-0.5 rounded truncate max-w-[120px]">{inc.address}</span>
+                              <span className="text-text-muted/40">·</span>
+                              <div className="flex items-center gap-1 text-[10px] text-text-muted">
+                                <Clock className="w-2.5 h-2.5" />
+                                {formatDistanceToNow(new Date(inc.startedAt), { locale: fr, addSuffix: true })}
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    ))
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-12 text-center">
+                    <div className="w-12 h-12 rounded-full bg-bg-elevated flex items-center justify-center mx-auto mb-3">
+                      <Bell className="w-5 h-5 text-text-muted" />
+                    </div>
+                    <p className="text-[13px] font-medium text-text-secondary">Tout est fluide</p>
+                    <p className="text-[10px] text-text-muted mt-1 px-10">Aucun signalement actif pour le moment.</p>
+                  </div>
                 )}
               </div>
 
