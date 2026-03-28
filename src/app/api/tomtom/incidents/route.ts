@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
   const apiKey = process.env.TOMTOM_API_KEY
-  if (!apiKey) return NextResponse.json([], { status: 503 })
+  if (!apiKey) return NextResponse.json([])
   const bbox = req.nextUrl.searchParams.get('bbox') ?? ''
   if (!bbox) return NextResponse.json([], { status: 400 })
   try {

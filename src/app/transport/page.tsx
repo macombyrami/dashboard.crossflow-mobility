@@ -264,12 +264,9 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
   const refresh = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      // Récupère aussi le flag hasPrim du proxy
-      const res  = await fetch('/api/ratp-traffic', { signal: AbortSignal.timeout(10000) })
-      if (!res.ok) throw new Error(`${res.status}`)
-      const data = await res.json()
-      setHasPrim(data.hasPrim ?? false)
-      setLines(await fetchAllTrafficStatus())
+      const { lines, hasPrim } = await fetchAllTrafficStatus()
+      setHasPrim(hasPrim)
+      setLines(lines)
       setLastUpdate(new Date())
     } catch {
       setError("Impossible de contacter l'API RATP")

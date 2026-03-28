@@ -104,7 +104,10 @@ export function useMiroFish() {
 
         if (!reader) throw new Error('Streaming non supporté par le navigateur')
 
-        while (true) {
+        let completed = false
+        let sseError: string | null = null
+
+        outer: while (true) {
           const { done, value } = await reader.read()
           if (done) break
 
@@ -130,21 +133,25 @@ export function useMiroFish() {
                   break
                 case 'complete':
                   if (event.result) {
+                    completed = true
                     setResultat(event.result)
                     setStatut('terminee')
                   }
                   break
                 case 'error':
-                  throw new Error(event.message ?? 'Erreur simulation')
+                  sseError = event.message ?? 'Erreur simulation'
+                  break outer
               }
-            } catch (parseErr) {
-              // ignore malformed SSE lines
+            } catch {
+              // ignore malformed SSE JSON lines
             }
           }
         }
 
+        if (sseError) throw new Error(sseError)
+
         // If we exited the loop without a 'complete' event
-        if (statut !== 'terminee') {
+        if (!completed) {
           setErreur('La simulation s\'est terminée sans résultat.')
           setStatut('echouee')
         }
@@ -166,7 +173,7 @@ export function useMiroFish() {
     } finally {
       clearInterval(timer)
     }
-  }, [statut])
+  }, [])
 
   const reinitialiser = useCallback(() => {
     setStatut('repos')

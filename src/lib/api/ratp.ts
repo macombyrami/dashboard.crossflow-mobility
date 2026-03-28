@@ -39,11 +39,16 @@ export const LINE_COLORS: Record<string, string> = {
   'T12': '#E85D0E', 'T13': '#00A1E0',
 }
 
-export async function fetchAllTrafficStatus(): Promise<TrafficLine[]> {
+export interface TrafficStatus {
+  lines:   TrafficLine[]
+  hasPrim: boolean
+}
+
+export async function fetchAllTrafficStatus(): Promise<TrafficStatus> {
   try {
     // Appel vers notre proxy Next.js (server-side) — pas de CORS
     const res = await fetch('/api/ratp-traffic', {
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(12000),
     })
     if (!res.ok) throw new Error(`Proxy error: ${res.status}`)
 
@@ -51,7 +56,7 @@ export async function fetchAllTrafficStatus(): Promise<TrafficLine[]> {
     const raw: { slug: string; type: LineType; title: string; message: string; source?: string }[] =
       data?.lines ?? []
 
-    return raw
+    const lines = raw
       .map(l => {
         const slug   = (l.slug ?? '').toUpperCase()
         const status = parseStatus(l.title ?? '')
@@ -70,8 +75,10 @@ export async function fetchAllTrafficStatus(): Promise<TrafficLine[]> {
         const order: Record<string, number> = { interrompu: 0, perturbé: 1, travaux: 2, normal: 3, inconnu: 4 }
         return (order[a.status] ?? 4) - (order[b.status] ?? 4)
       })
+
+    return { lines, hasPrim: data?.hasPrim ?? false }
   } catch {
-    return []
+    return { lines: [], hasPrim: false }
   }
 }
 

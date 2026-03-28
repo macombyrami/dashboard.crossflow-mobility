@@ -30,6 +30,23 @@ const STIF_TO_SLUG: Record<string, string> = {
   C01726: 'T12',C01712: 'T13',
 }
 
+// ─── Default network list (if Pierre Grimaud API fails) ──────────────────────
+const BASE_NETWORK: { slug: string; type: 'metros' | 'rers' | 'tramways' }[] = [
+  { slug: '1',  type: 'metros' }, { slug: '2',  type: 'metros' }, { slug: '3',  type: 'metros' }, 
+  { slug: '3b', type: 'metros' }, { slug: '4',  type: 'metros' }, { slug: '5',  type: 'metros' },
+  { slug: '6',  type: 'metros' }, { slug: '7',  type: 'metros' }, { slug: '7b', type: 'metros' },
+  { slug: '8',  type: 'metros' }, { slug: '9',  type: 'metros' }, { slug: '10', type: 'metros' },
+  { slug: '11', type: 'metros' }, { slug: '12', type: 'metros' }, { slug: '13', type: 'metros' }, 
+  { slug: '14', type: 'metros' },
+  { slug: 'A',  type: 'rers' },   { slug: 'B',  type: 'rers' },   { slug: 'C',  type: 'rers' }, 
+  { slug: 'D',  type: 'rers' },   { slug: 'E',  type: 'rers' },
+  { slug: 'T1', type: 'tramways' },{ slug: 'T2', type: 'tramways' },{ slug: 'T3a',type: 'tramways' },
+  { slug: 'T3b',type: 'tramways' },{ slug: 'T4', type: 'tramways' },{ slug: 'T5', type: 'tramways' },
+  { slug: 'T6', type: 'tramways' },{ slug: 'T7', type: 'tramways' },{ slug: 'T8', type: 'tramways' },
+  { slug: 'T9', type: 'tramways' },{ slug: 'T10',type: 'tramways' },{ slug: 'T11',type: 'tramways' },
+  { slug: 'T12',type: 'tramways' },{ slug: 'T13',type: 'tramways' },
+]
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface RatpTrafficLine {
@@ -166,31 +183,37 @@ export async function GET() {
     }),
   ])
   const { disruptions: primDisruptions, status: primStatus } = prim
+ 
+  // 1. Determine base source (PG or Baseline fallback)
+  const sourceLines = pgLines.length > 0 
+    ? pgLines 
+    : BASE_NETWORK.map(b => ({ ...b, title: 'Trafic normal', message: '' }))
 
-  // Merge PRIM data into PG lines
-  const merged = pgLines.map(line => {
-    const primMsg    = primDisruptions.get(line.slug) ?? primDisruptions.get(line.slug.toLowerCase())
-    const primSt     = primStatus.get(line.slug) ?? primStatus.get(line.slug.toLowerCase())
-
+  // 2. Merge PRIM data into source lines
+  const merged = sourceLines.map(line => {
+    const slugKey    = line.slug.toLowerCase()
+    const primMsg    = primDisruptions.get(line.slug) ?? primDisruptions.get(slugKey)
+    const primSt     = primStatus.get(line.slug)      ?? primStatus.get(slugKey)
+ 
     return {
       ...line,
       // Prefer PRIM message if available (more detailed/official)
       message: primMsg ?? line.message,
-      // Prefer PRIM status if Pierre Grimaud says "normal" but PRIM has a disruption
+      // Prefer PRIM status if Pierre Grimaud / Fallback says "normal" but PRIM has a disruption
       title: primSt && line.title.toLowerCase().includes('normal')
         ? primSt === 'interrompu' ? 'Trafic interrompu' : 'Trafic perturbé'
         : line.title,
-      source: primMsg ? 'prim+pg' : 'pg',
+      source: primMsg ? (pgLines.length > 0 ? 'prim+pg' : 'prim+base') : (pgLines.length > 0 ? 'pg' : 'baseline'),
     }
   })
-
-  // If Pierre Grimaud returned nothing but PRIM has data, build from PRIM
-  if (merged.length === 0 && primDisruptions.size > 0) {
-    for (const [slug, message] of primDisruptions) {
+ 
+  // 3. Add any PRIM-only disruptions that aren't in our source list (e.g. specific RER branches or Noctiliens)
+  for (const [slug, message] of primDisruptions) {
+    if (!merged.find(m => m.slug.toLowerCase() === slug.toLowerCase())) {
       const st = primStatus.get(slug) ?? 'perturbé'
       merged.push({
-        slug,
-        type: slug.length <= 2 && !slug.startsWith('T')
+        slug:    slug.toUpperCase(),
+        type:    slug.length <= 2 && !slug.startsWith('T')
           ? slug.match(/^[A-E]$/) ? 'rers' : 'metros'
           : 'tramways',
         title:   st === 'interrompu' ? 'Trafic interrompu' : 'Trafic perturbé',

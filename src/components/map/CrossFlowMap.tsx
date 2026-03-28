@@ -673,7 +673,7 @@ export function CrossFlowMap() {
     if (!mapLoaded || !isParis) return
 
     const applyRatp = async () => {
-      const lines = await fetchAllTrafficStatus()
+      const { lines } = await fetchAllTrafficStatus()
       const statusColors  = new Map<string, string>()
       const disrupted     = new Set<string>()
 

@@ -25,7 +25,7 @@ function RatpFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
     setLoading(true)
     setError(false)
     try {
-      const lines = await fetchAllTrafficStatus()
+      const { lines } = await fetchAllTrafficStatus()
       const issues = lines.filter(l => l.status !== 'normal' && l.status !== 'inconnu')
       setAllLines(lines)
       setDisrupted(issues)

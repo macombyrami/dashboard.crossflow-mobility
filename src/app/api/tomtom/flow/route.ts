@@ -3,7 +3,7 @@ import { fetchWithRetry } from '@/lib/retry'
 
 export async function GET(req: NextRequest) {
   const apiKey = process.env.TOMTOM_API_KEY
-  if (!apiKey) return NextResponse.json(null, { status: 503 })
+  if (!apiKey) return NextResponse.json(null)
   const sp = req.nextUrl.searchParams
   const lat = sp.get('lat')
   const lng = sp.get('lng')
