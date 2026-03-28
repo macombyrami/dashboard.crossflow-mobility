@@ -45,6 +45,20 @@ export function Header() {
   const clearIncidents  = useTrafficStore(s => s.clearIncidents)
   const [alertOpen, setAlertOpen] = React.useState(false)
   const alertRef                  = React.useRef<HTMLDivElement>(null)
+  const buttonRef                 = React.useRef<HTMLButtonElement>(null)
+
+  // Direct DOM listener fallback for "button doesn't work" issues
+  React.useEffect(() => {
+    const btn = buttonRef.current
+    if (!btn) return
+    const handleDirectClick = (e: MouseEvent) => {
+      // Toggle state directly to bypass potential React event delegation delays
+      setAlertOpen(o => !o)
+      console.log('Notification button: Direct DOM click captured')
+    }
+    btn.addEventListener('click', handleDirectClick)
+    return () => btn.removeEventListener('click', handleDirectClick)
+  }, [])
 
   const allIncidents  = [...socialIncidents, ...incidents]
   const incidentCount = allIncidents.length
@@ -97,10 +111,7 @@ export function Header() {
         {/* Alerts dropdown */}
         <div ref={alertRef} className="relative z-[110]">
           <button
-            onClick={() => {
-              console.log('Notification button clicked');
-              setAlertOpen(o => !o);
-            }}
+            ref={buttonRef}
             className={cn(
               'btn-icon relative pointer-events-auto', 
               alertOpen && 'bg-bg-elevated'
@@ -120,7 +131,7 @@ export function Header() {
 
           {alertOpen && (
             <div
-              className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-bg-border overflow-hidden z-50 animate-scale-in"
+              className="absolute right-0 top-full mt-2 w-[min(20rem,calc(100vw-1rem))] rounded-xl border border-bg-border overflow-hidden z-50 animate-scale-in"
               style={{
                 background:          'rgba(18,20,26,0.97)',
                 backdropFilter:      'blur(24px)',
