@@ -107,9 +107,21 @@ export const predictiveApi = {
   health: () =>
     get<{ online: boolean; graph_loaded?: boolean; node_count?: number; edge_count?: number }>('health'),
 
-  /** Load OSM graph (e.g. 'gennevilliers') */
-  loadGraph: (citySlug: string) =>
-    post<{ success: boolean; message: string }>(`graph/load-${citySlug}`, {}),
+  /** Load OSM graph — cityName = OSMnx place name e.g. "Paris, France" */
+  loadGraph: (cityName: string) => {
+    const url = `${BASE}/graph/load?city=${encodeURIComponent(cityName)}`
+    return fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal:  AbortSignal.timeout(120_000), // 2 min — first load can take 30-90s
+    }).then(async r => {
+      if (!r.ok) {
+        const err = await r.text().catch(() => r.statusText)
+        throw new Error(`[predictive/graph/load] ${r.status}: ${err}`)
+      }
+      return r.json() as Promise<{ success: boolean; message: string }>
+    })
+  },
 
   /** Calculate optimal route (with current simulation state) */
   calculateRoute: (start: PredLatLng, end: PredLatLng, weight_mode = 'travel_time') =>

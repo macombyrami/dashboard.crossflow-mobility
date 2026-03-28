@@ -45,11 +45,22 @@ export function PredictiveStatus() {
 
   const loadGraph = async () => {
     setGraphLoading(true)
-    const citySlug = city.id.toLowerCase().replace('city-', '')
+    // OSMnx needs the full city name, e.g. "Paris, France"
+    const cityName = `${city.name}, ${city.country}`
     try {
-      await fetch(`/api/predictive/graph/load-${citySlug}`, { method: 'POST' })
-      setTimeout(check, 3000)
-    } catch { /* ignore */ } finally {
+      const res = await fetch(
+        `/api/predictive/graph/load?city=${encodeURIComponent(cityName)}`,
+        { method: 'POST', signal: AbortSignal.timeout(120_000) },
+      )
+      if (!res.ok) {
+        const err = await res.text().catch(() => res.statusText)
+        console.error('[PredictiveStatus] loadGraph failed:', err)
+      }
+      // Re-check health after a short delay to let the backend finish initialising
+      setTimeout(check, 2000)
+    } catch (err) {
+      console.error('[PredictiveStatus] loadGraph error:', err)
+    } finally {
       setGraphLoading(false)
     }
   }

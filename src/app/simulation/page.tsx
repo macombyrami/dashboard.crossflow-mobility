@@ -49,9 +49,9 @@ export default function SimulationPage() {
         setBackendOnline(h.online)
         if (h.online) {
           if (!h.graph_loaded) {
-            // Load graph for current city slug (e.g. 'gennevilliers')
-            const citySlug = city.id.toLowerCase().replace('city-', '')
-            await import('@/lib/api/predictive').then(m => m.predictiveApi.loadGraph(citySlug))
+            // Use full OSMnx city name, e.g. "Paris, France"
+            const cityName = `${city.name}, ${city.country}`
+            await import('@/lib/api/predictive').then(m => m.predictiveApi.loadGraph(cityName))
             setGraphLoaded(true)
           } else {
             setGraphLoaded(true)
