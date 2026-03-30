@@ -7,7 +7,7 @@ import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useSimulationStore } from '@/store/simulationStore'
 import { platformConfig } from '@/config/platform.config'
-import { congestionColor } from '@/lib/utils/congestion'
+import { congestionColor, scoreToCongestionLevel } from '@/lib/utils/congestion'
 import { VehicleInfoCard } from '@/components/map/VehicleInfoCard'
 import { VehicleFilterPanel } from '@/components/map/VehicleFilterPanel'
 
@@ -105,44 +105,46 @@ const METRO_HUBS = [
 ]
 
 
-// CartoDB Voyager Dark — completely free, no key, beautiful dark style
-const CARTO_DARK_STYLE: maplibregl.StyleSpecification = {
+// Modern Vector Dark Style - High performance OSM vector tiles
+const OSM_DARK_STYLE: maplibregl.StyleSpecification = {
   version: 8,
-  glyphs:  'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+  glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
   sources: {
-    'carto-dark': {
-      type:        'raster',
-      tiles:       ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'],
-      tileSize:    256,
-      attribution: '© OpenStreetMap contributors © CARTO',
-      maxzoom:     19,
-    },
+    'osm-vector': {
+      type: 'vector',
+      tiles: ['https://tiles.openfreemap.org/tiles/{z}/{x}/{y}.pbf'],
+      maxzoom: 14,
+      attribution: '© OpenStreetMap contributors © OpenFreeMap'
+    }
   },
   layers: [
     {
-      id:     'carto-base',
-      type:   'raster',
-      source: 'carto-dark',
-      paint:  { 'raster-opacity': 0.95 },
-    },
-  ],
+      id: 'background',
+      type: 'background',
+      paint: { 'background-color': '#08090B' }
+    }
+  ]
 }
 
-function computeRoadWidth(roadType: string | undefined, level: import('@/types').CongestionLevel): number {
+function computeRoadWidth(roadType: string | undefined, level: import('@/types').CongestionLevel, zoom: number): number {
   const base: Record<string, number> = {
-    motorway: 8, motorway_link: 6, 
-    trunk: 7, trunk_link: 5,
-    primary: 5.5, primary_link: 4, 
-    secondary: 4, secondary_link: 3.5,
-    tertiary: 3, tertiary_link: 2.5,
-    residential: 2.5, service: 2,
+    motorway: 4.5, motorway_link: 3.5, 
+    trunk: 4, trunk_link: 3,
+    primary: 3.5, primary_link: 2.8, 
+    secondary: 2.8, secondary_link: 2.2,
+    tertiary: 2.2, tertiary_link: 1.8,
+    residential: 1.5, service: 1.2,
+    unclassified: 1.2
   }
   const mult: Record<import('@/types').CongestionLevel, number> = {
-    free: 0.9, slow: 1.1, congested: 1.3, critical: 1.5,
+    free: 1.0, slow: 1.15, congested: 1.3, critical: 1.5,
   }
-  const baseWidth = base[roadType ?? ''] ?? 3.0
+  const baseWidth = base[roadType ?? ''] ?? 1.8
   const multiplier = mult[level] ?? 1.1
-  return Math.round(baseWidth * multiplier * 10) / 10
+  
+  // Exponential scaling with zoom
+  const zoomFactor = Math.pow(1.5, Math.max(0, zoom - 11))
+  return Math.round(baseWidth * multiplier * zoomFactor * 10) / 10
 }
 
 export function CrossFlowMap() {
@@ -238,10 +240,10 @@ export function CrossFlowMap() {
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style:     CARTO_DARK_STYLE,
+      style:     OSM_DARK_STYLE,
       center:    [city.center.lng, city.center.lat],
       zoom:      city.zoom,
-      pitch:     30,
+      pitch:     20,
       bearing:   0,
     })
 
@@ -1194,7 +1196,7 @@ export function CrossFlowMap() {
           speed:     seg.speedKmh,
           level:     seg.level,
           color:     congestionColor(seg.congestionScore),
-          width:     computeRoadWidth(seg.roadType, seg.level),
+          width:     computeRoadWidth(seg.roadType, seg.level, map.getZoom()),
           realData:  seg.id.startsWith('here-') || seg.id.includes('-osm-'),
         },
       })),
@@ -1290,7 +1292,7 @@ export function CrossFlowMap() {
       type: 'FeatureCollection',
       features: snapshot.segments.map(seg => {
         const simCongestion = Math.max(0, Math.min(1, seg.congestionScore + congestionPct))
-        const level = import_scoreToCongestionLevel(simCongestion)
+        const level = scoreToCongestionLevel(simCongestion)
         return {
           type:       'Feature' as const,
           geometry:   { type: 'LineString' as const, coordinates: seg.coordinates },
@@ -1300,7 +1302,7 @@ export function CrossFlowMap() {
               speed:      seg.speedKmh,
               level,
               color:      congestionColor(simCongestion),
-              width:      computeRoadWidth(seg.roadType, level),
+              width:      computeRoadWidth(seg.roadType, level, map.getZoom()),
               roadType:   seg.roadType,
               streetName: seg.streetName,
               axisName:   seg.axisName,
@@ -1328,7 +1330,7 @@ export function CrossFlowMap() {
               speed:      seg.speedKmh,
               level:      seg.level,
               color:      congestionColor(seg.congestionScore),
-              width:      computeRoadWidth(seg.roadType, seg.level),
+              width:      computeRoadWidth(seg.roadType, seg.level, mapRef.current!.getZoom()),
               roadType:   seg.roadType,
               streetName: seg.streetName,
               axisName:   seg.axisName,
@@ -1342,7 +1344,30 @@ export function CrossFlowMap() {
     }
   }, [currentResult, snapshot, mapLoaded]) // eslint-disable-line
 
-  // ─── IDF real road network overlay (simulation mode) ──────────────────
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return
+    const map = mapRef.current
+
+    if (!map.getLayer(TRAFFIC_SOURCE + '-lines')) {
+      map.addLayer({
+        id:     TRAFFIC_SOURCE + '-lines',
+        type:   'line',
+        source: TRAFFIC_SOURCE,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint:  {
+          'line-color': ['get', 'color'],
+          'line-width': ['get', 'width'],
+          'line-opacity': [
+            'interpolate', ['linear'], ['zoom'],
+            10, 0.6,
+            14, 0.85,
+            17, 1.0
+          ],
+          'line-blur': 0.8
+        }
+      })
+    }
+  }, [mapLoaded, mapRef])
 
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return
@@ -1570,10 +1595,71 @@ export function CrossFlowMap() {
 // ─── Sources init ─────────────────────────────────────────────────────────────
 
 function initStaticSources(map: maplibregl.Map) {
+  // ─── Road Network Source (OSM Vector) ──────────────────────────────────
+  // This provides the "skeleton" of the map
+  if (!map.getSource('base-network')) {
+    map.addSource('base-network', {
+      type: 'vector',
+      tiles: ['https://tiles.openfreemap.org/tiles/{z}/{x}/{y}.pbf'],
+      maxzoom: 14
+    })
+  }
+
+  // ─── Base Roads Layer (The complete road network) ──────────────────────
+  if (!map.getLayer('base-roads')) {
+    map.addLayer({
+      id: 'base-roads',
+      type: 'line',
+      source: 'base-network',
+      'source-layer': 'road',
+      paint: {
+        'line-color': '#1A1C22',
+        'line-width': [
+          'interpolate', ['linear'], ['zoom'],
+          10, 0.5,
+          13, 1.2,
+          16, 2.5
+        ],
+        'line-opacity': 0.8
+      },
+      layout: { 'line-cap': 'round', 'line-join': 'round' }
+    })
+  }
+
+  // ─── Labels ───────────────────────────────────────────────────────────
+  if (!map.getLayer('road-labels')) {
+    map.addLayer({
+      id: 'road-labels',
+      type: 'symbol',
+      source: 'base-network',
+      'source-layer': 'road',
+      minzoom: 14,
+      layout: {
+        'text-field': ['get', 'name'],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': 11,
+        'symbol-placement': 'line',
+        'text-rotation-alignment': 'map'
+      },
+      paint: {
+        'text-color': '#424245',
+        'text-halo-color': '#08090B',
+        'text-halo-width': 1
+      }
+    })
+  }
+
+  // ─── Traffic Source ───────────────────────────────────────────────────
+  if (!map.getSource(TRAFFIC_SOURCE)) {
+    map.addSource(TRAFFIC_SOURCE, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+      lineMetrics: true, // required for gradients/stretching
+    })
+  }
   const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
   // Synthetic traffic lines
-  map.addSource(TRAFFIC_SOURCE, { type: 'geojson', data: emptyFC })
   map.addSource(PREDICTIVE_AFFECTED_SOURCE, { type: 'geojson', data: emptyFC })
   map.addSource(PREDICTIVE_EVENTS_SOURCE,   { type: 'geojson', data: emptyFC })
 
