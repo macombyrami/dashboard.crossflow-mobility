@@ -14,6 +14,7 @@ import type {
   Prediction,
   PredictionSegment,
 } from '@/types'
+import { enrichSnapshot } from '@/lib/utils/traffic-enrichment'
 import type { OSMRoad } from '@/lib/api/overpass'
 import { platformConfig } from '@/config/platform.config'
 import { scoreToCongestionLevel } from '@/lib/utils/congestion'
@@ -79,11 +80,6 @@ interface RawSegment {
 }
 
 function generateCityRoads(city: City): RawSegment[] {
-  // ─── RÉSEAU RÉEL UNIQUEMENT ────────────────────────────────────────────────
-  // L'utilisateur exige "que des vraies valeurs". 
-  // Suppression de la grille synthétique (gridRows/gridCols) et des autoroutes radiales.
-  // Seuls les réseaux enrichis (ex: Paris) ou les imports réels sont conservés.
-
   if (city.id === 'paris' && parisNetwork.length > 0) {
     return parisNetwork.map(s => ({
       id: s.id,
@@ -92,16 +88,11 @@ function generateCityRoads(city: City): RawSegment[] {
       type: s.type === 'motorway' ? 'highway' : 'main'
     }))
   }
-
-  // NOTE: Pour les autres villes, le système utilisera le chargeur Overpass
-  // ou TomTom s'ils sont disponibles. generateCityRoads ne doit plus inventer
-  // de routes fantômes (radial/grid).
   return []
 }
 
 // ─── Congestion pattern (realistic time-of-day) ───────────────────────────
 
-// rng is required — always pass a seeded generator to guarantee stable values (#8)
 function baseCongestionForHour(hour: number, isWeekend: boolean, rng: () => number): number {
   if (isWeekend) {
     if (hour < 8)  return 0.05 + rng() * 0.05
@@ -110,16 +101,15 @@ function baseCongestionForHour(hour: number, isWeekend: boolean, rng: () => numb
     if (hour < 20) return 0.25 + rng() * 0.10
     return 0.10 + rng() * 0.05
   }
-  // Weekday
   if (hour < 6)  return 0.03 + rng() * 0.03
-  if (hour < 8)  return 0.30 + rng() * 0.20  // morning rush
-  if (hour < 9)  return 0.65 + rng() * 0.25  // peak
+  if (hour < 8)  return 0.30 + rng() * 0.20
+  if (hour < 9)  return 0.65 + rng() * 0.25
   if (hour < 10) return 0.50 + rng() * 0.20
   if (hour < 12) return 0.35 + rng() * 0.15
-  if (hour < 13) return 0.45 + rng() * 0.15  // lunch
+  if (hour < 13) return 0.45 + rng() * 0.15
   if (hour < 16) return 0.30 + rng() * 0.10
   if (hour < 17) return 0.50 + rng() * 0.20
-  if (hour < 19) return 0.70 + rng() * 0.25  // evening rush
+  if (hour < 19) return 0.70 + rng() * 0.25
   if (hour < 21) return 0.45 + rng() * 0.15
   return 0.15 + rng() * 0.10
 }
@@ -140,30 +130,29 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
   const heatmapCo2: HeatmapPoint[] = []
 
   roads.forEach((road, idx) => {
-    // Spatial variation: center more congested
     const midPt = road.coords[Math.floor(road.coords.length / 2)]
     const distFromCenter = Math.sqrt(
       Math.pow((midPt[0] - city.center.lng) / (city.bbox[2] - city.bbox[0]), 2) +
       Math.pow((midPt[1] - city.center.lat) / (city.bbox[3] - city.bbox[1]), 2),
-    ) * 2  // 0 = center, 1 = edge
+    ) * 2
 
     const spatial = Math.max(0, 1 - distFromCenter * 0.8)
     const noise   = (rng() - 0.5) * 0.25
     let congestion = Math.max(0, Math.min(1, baseCongestion * spatial + noise))
 
-    // Highways have different patterns
     if (road.type === 'highway') {
       congestion = Math.max(0, Math.min(1, congestion * 0.9 + rng() * 0.15))
     }
 
-    const freeFlow  = road.type === 'highway' ? 110 : road.type === 'main' ? 50 : 30
-    const speedKmh  = Math.max(5, freeFlow * (1 - congestion * 0.85))
-    const level     = scoreToCongestionLevel(congestion)
-    const length    = road.type === 'highway' ? 800 + rng() * 1200 : 200 + rng() * 400
-    const flowVph   = Math.round((freeFlow - speedKmh) * 40 + rng() * 200)
+    const freeFlow = road.type === 'highway' ? 110 : road.type === 'main' ? 50 : 30
+    const speedKmh = Math.max(5, freeFlow * (1 - congestion * 0.85))
+    const level    = scoreToCongestionLevel(congestion)
+    const length   = road.type === 'highway' ? 800 + rng() * 1200 : 200 + rng() * 400
+    const flowVph  = Math.round((freeFlow - speedKmh) * 40 + rng() * 200)
 
     segments.push({
       id:               `${city.id}-seg-${idx}`,
+      name:             road.name,
       coordinates:      road.coords,
       speedKmh:         Math.round(speedKmh),
       freeFlowSpeedKmh: freeFlow,
@@ -172,11 +161,10 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
       flowVehiclesPerHour: flowVph,
       travelTimeSeconds:   Math.round((length / 1000) / speedKmh * 3600),
       length:           Math.round(length),
-      mode:             road.type === 'highway' ? 'car' : 'car',
+      mode:             'car',
       lastUpdated:      now.toISOString(),
     })
 
-    // Heatmap points along segment
     for (let i = 0; i < road.coords.length; i += 2) {
       const pt = road.coords[i]
       heatmap.push({ lng: pt[0], lat: pt[1], intensity: congestion })
@@ -187,7 +175,7 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
 
   return {
     cityId:    city.id,
-    segments,
+    segments:  enrichSnapshot(segments),
     heatmap,
     heatmapPassages,
     heatmapCo2,
@@ -210,7 +198,6 @@ export function generateTrafficFromOSMRoads(city: City, osmRoads: OSMRoad[]): Tr
   const heatmapCo2: HeatmapPoint[] = []
 
   osmRoads.forEach((osmRoad, idx) => {
-    // Map highway type to segment type
     let segType: 'main' | 'secondary' | 'highway'
     if (osmRoad.highway === 'motorway' || osmRoad.highway === 'trunk') {
       segType = 'highway'
@@ -220,12 +207,11 @@ export function generateTrafficFromOSMRoads(city: City, osmRoads: OSMRoad[]): Tr
       segType = 'secondary'
     }
 
-    // Spatial variation: center more congested
     const midPt = osmRoad.coords[Math.floor(osmRoad.coords.length / 2)]
     const distFromCenter = Math.sqrt(
       Math.pow((midPt[0] - city.center.lng) / (city.bbox[2] - city.bbox[0]), 2) +
       Math.pow((midPt[1] - city.center.lat) / (city.bbox[3] - city.bbox[1]), 2),
-    ) * 2  // 0 = center, 1 = edge
+    ) * 2
 
     const spatial = Math.max(0, 1 - distFromCenter * 0.8)
     const noise   = (rng() - 0.5) * 0.25
@@ -258,7 +244,6 @@ export function generateTrafficFromOSMRoads(city: City, osmRoads: OSMRoad[]): Tr
       lastUpdated:      now.toISOString(),
     })
 
-    // Heatmap points along segment
     for (let i = 0; i < osmRoad.coords.length; i += 2) {
       const pt = osmRoad.coords[i]
       heatmap.push({ lng: pt[0], lat: pt[1], intensity: congestion })
@@ -269,7 +254,7 @@ export function generateTrafficFromOSMRoads(city: City, osmRoads: OSMRoad[]): Tr
 
   return {
     cityId:    city.id,
-    segments,
+    segments:  enrichSnapshot(segments),
     heatmap,
     heatmapPassages,
     heatmapCo2,
@@ -297,7 +282,6 @@ export function generateTrafficFromIdfGeoJSON(city: City, geojson: any): Traffic
     const p = f.properties
     const coords = f.geometry.coordinates as [number, number][]
 
-    // Map FRC to segment type
     let segType: 'main' | 'secondary' | 'highway'
     const frc = p.frc ?? 5
     if (frc <= 2)      segType = 'highway'
@@ -350,7 +334,7 @@ export function generateTrafficFromIdfGeoJSON(city: City, geojson: any): Traffic
 
   return {
     cityId:    city.id,
-    segments,
+    segments:  enrichSnapshot(segments),
     heatmap,
     heatmapPassages,
     heatmapCo2,
@@ -393,99 +377,72 @@ export function generatePrediction(city: City, horizonMinutes = 30): Prediction 
   }
 }
 
-// ─── KPI generator ────────────────────────────────────────────────────────
+// ─── City KPIs (decision ready) ───────────────────────────────────────────
 
 export function generateCityKPIs(city: City): CityKPIs {
   const snapshot = generateTrafficSnapshot(city)
-  const segs     = snapshot.segments
-  const avg      = segs.reduce((a, s) => a + s.congestionScore, 0) / segs.length
-  const rng      = seededRng(cityTimeSeed(city.id + '_kpi'))
+  const segs = snapshot.segments
+  if (segs.length === 0) {
+    return {
+      cityId:          city.id,
+      congestionRate:  0,
+      avgTravelMin:    0,
+      pollutionIndex:  0,
+      activeIncidents: 0,
+      networkEfficiency: 1,
+      modalSplit:      normalizeModalSplit({ car: 0.7, metro: 0.15, bus: 0.1, bike: 0.03, pedestrian: 0.02 }),
+      capturedAt:      new Date().toISOString(),
+    }
+  }
 
-  const congestionRate = Math.round(avg * 100) / 100
-  const avgSpeed       = segs.reduce((a, s) => a + s.speedKmh, 0) / segs.length
-  const avgTravelMin   = Math.round(20 + (congestionRate * 30) + rng() * 5)
-  const pollutionIndex = Math.round((congestionRate * 8 + rng() * 2) * 10) / 10
-
+  const avgCong = segs.reduce((a, s) => a + s.congestionScore, 0) / segs.length
+  const avgSpd  = segs.reduce((a, s) => a + s.speedKmh, 0) / segs.length
+  
   return {
-    cityId: city.id,
-    congestionRate,
-    avgTravelMin,
-    pollutionIndex:    Math.min(10, pollutionIndex),
-    activeIncidents:   Math.round(congestionRate * 12 + rng() * 4),
-    networkEfficiency: Math.round((1 - congestionRate * 0.7) * 100) / 100,
+    cityId:          city.id,
+    congestionRate:  Math.round(avgCong * 100) / 100,
+    avgTravelMin:    Math.round(10 + avgCong * 40),
+    pollutionIndex:  Math.round((avgCong * 8 + 0.5) * 10) / 10,
+    activeIncidents: Math.floor(avgCong * 15 * (city.population / 1000000)),
+    networkEfficiency: Math.round((1 - avgCong * 0.8) * 100) / 100,
     modalSplit: normalizeModalSplit({
-      car:        0.55 + rng() * 0.15,
-      metro:      0.20 + rng() * 0.10,
-      bus:        0.12 + rng() * 0.05,
-      bike:       0.08 + rng() * 0.05,
-      pedestrian: 0.05 + rng() * 0.03,
+      car:        0.6 + avgCong * 0.1,
+      metro:      0.2 - avgCong * 0.05,
+      bus:        0.1,
+      bike:       0.05,
+      pedestrian: 0.05,
     }),
     capturedAt: new Date().toISOString(),
   }
 }
 
-// ─── Incident generator ───────────────────────────────────────────────────
-
-const INCIDENT_TEMPLATES = [
-  { type: 'accident' as const,   titles: ['Collision signalée', 'Accident de la route', 'Carambolage signalé', 'Véhicule accidenté sur la chaussée'] },
-  { type: 'roadwork' as const,   titles: ['Travaux — voie réduite', 'Chantier en cours', 'Réfection de chaussée', 'Pose de canalisations'] },
-  { type: 'congestion' as const, titles: ['Ralentissement anormal', 'Trafic dense', 'File en attente importante', 'Embouteillage persistant'] },
-  { type: 'anomaly' as const,    titles: ['Anomalie détectée par ML', 'Comportement atypique', 'Densité inhabituelle', 'Flux irrégulier détecté'] },
-]
+// ─── Incidents generator ──────────────────────────────────────────────────
 
 export function generateIncidents(city: City): Incident[] {
-  const rng   = seededRng(cityTimeSeed(city.id + '_incidents'))
-  const count = Math.floor(2 + rng() * 6)
-  const [west, south, east, north] = city.bbox
+  const rng  = seededRng(cityTimeSeed(city.id))
+  const count = Math.floor(rng() * 5) + 3
+  const types: Incident['type'][] = ['accident', 'congestion', 'roadwork', 'anomaly']
+  const severities: Incident['severity'][] = ['low', 'medium', 'high', 'critical']
+  
   const incidents: Incident[] = []
-
   for (let i = 0; i < count; i++) {
-    const template = INCIDENT_TEMPLATES[Math.floor(rng() * INCIDENT_TEMPLATES.length)]
-    const severity  = (['low', 'medium', 'high', 'critical'] as const)[
-      Math.floor(rng() * 4)
-    ]
-    const severityColor = platformConfig.traffic.colors[
-      severity === 'low' ? 'free' :
-      severity === 'medium' ? 'slow' :
-      severity === 'high' ? 'congested' : 'critical'
-    ]
-
+    const type = types[Math.floor(rng() * types.length)]
+    const severity = severities[Math.floor(rng() * severities.length)]
+    const lat = city.center.lat + (rng() - 0.5) * 0.05
+    const lng = city.center.lng + (rng() - 0.5) * 0.1
+    
     incidents.push({
       id:          `${city.id}-inc-${i}`,
-      type:         template.type,
+      type,
       severity,
-      title:        template.titles[Math.floor(rng() * template.titles.length)],
-      description: `Estimation algorithmique — localisation approximative. Perturbation ${severity === 'critical' ? 'majeure' : severity === 'high' ? 'forte' : 'modérée'}.`,
-      location: {
-        lat: south + rng() * (north - south),
-        lng: west  + rng() * (east  - west),
-      },
-      address:    `Zone estimée — ${city.name}`,
-      startedAt:  new Date(Date.now() - rng() * 3_600_000).toISOString(),
-      source:     'Estimation IA',  // jamais de faux fournisseurs (TomTom/WAZE) sur données synthétiques
-      iconColor:  severityColor,
+      title:       `${type.toUpperCase()} - Axe ${i + 1}`,
+      description: `Ralentissement important dû à un ${type}.`,
+      location:    { lat, lng },
+      address:     `Axe Principal, ${city.name}`,
+      startedAt:   new Date(Date.now() - rng() * 3600000).toISOString(),
+      source:      'CrossFlow Mobility Engine',
+      iconColor:   severity === 'critical' ? '#FF1744' : severity === 'high' ? '#FF6D00' : '#FFD600',
     })
   }
-
   return incidents
-}
-
-// ─── KPI history (for chart) ──────────────────────────────────────────────
-
-export function generateKPIHistory(city: City, points = 48) {
-  const now = Date.now()
-  return Array.from({ length: points }, (_, i) => {
-    const ts   = now - (points - i - 1) * 30 * 60_000
-    const date = new Date(ts)
-    const rng  = seededRng(cityTimeSeed(city.id + '_hist_' + i) + i * 997)
-    const hour = date.getHours()
-    const isWE = date.getDay() === 0 || date.getDay() === 6
-    const base = baseCongestionForHour(hour, isWE, rng)
-    return {
-      time:          date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-      congestion:    Math.round(Math.min(1, base + (rng() - 0.5) * 0.1) * 100),
-      avgTravelMin:  Math.round(20 + base * 30 + (rng() - 0.5) * 4),
-      pollutionIdx:  Math.round((base * 8 + rng() * 1.5) * 10) / 10,
-    }
-  })
 }

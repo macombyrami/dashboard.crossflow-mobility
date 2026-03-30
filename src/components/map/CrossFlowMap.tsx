@@ -130,14 +130,19 @@ const CARTO_DARK_STYLE: maplibregl.StyleSpecification = {
 
 function computeRoadWidth(roadType: string | undefined, level: import('@/types').CongestionLevel): number {
   const base: Record<string, number> = {
-    motorway: 7, motorway_link: 5, trunk: 6, trunk_link: 4,
-    primary: 4.5, primary_link: 3, secondary: 3, secondary_link: 2.5,
-    tertiary: 2, tertiary_link: 1.5,
+    motorway: 8, motorway_link: 6, 
+    trunk: 7, trunk_link: 5,
+    primary: 5.5, primary_link: 4, 
+    secondary: 4, secondary_link: 3.5,
+    tertiary: 3, tertiary_link: 2.5,
+    residential: 2.5, service: 2,
   }
   const mult: Record<import('@/types').CongestionLevel, number> = {
     free: 0.9, slow: 1.1, congested: 1.3, critical: 1.5,
   }
-  return Math.round((base[roadType ?? ''] ?? 2.5) * (mult[level] ?? 1) * 10) / 10
+  const baseWidth = base[roadType ?? ''] ?? 3.0
+  const multiplier = mult[level] ?? 1.1
+  return Math.round(baseWidth * multiplier * 10) / 10
 }
 
 export function CrossFlowMap() {
@@ -1289,16 +1294,20 @@ export function CrossFlowMap() {
         return {
           type:       'Feature' as const,
           geometry:   { type: 'LineString' as const, coordinates: seg.coordinates },
-          properties: {
-            id:        seg.id,
-            congestion: simCongestion,
-            speed:     seg.speedKmh,
-            level,
-            color:     congestionColor(simCongestion),
-            width:     computeRoadWidth(seg.roadType, level),
-            realData:  seg.id.startsWith('here-') || seg.id.includes('-osm-'),
-          },
-        }
+            properties: {
+              id:         seg.id,
+              congestion: simCongestion,
+              speed:      seg.speedKmh,
+              level,
+              color:      congestionColor(simCongestion),
+              width:      computeRoadWidth(seg.roadType, level),
+              roadType:   seg.roadType,
+              streetName: seg.streetName,
+              axisName:   seg.axisName,
+              dist:       seg.arrondissement,
+              realData:   seg.id.startsWith('here-') || seg.id.includes('-osm-') || seg.id.includes('-seg-'),
+            },
+          }
       }),
     }
     tSrc.setData(simFeatures)
@@ -1314,13 +1323,17 @@ export function CrossFlowMap() {
             type:       'Feature' as const,
             geometry:   { type: 'LineString' as const, coordinates: seg.coordinates },
             properties: {
-              id:        seg.id,
+              id:         seg.id,
               congestion: seg.congestionScore,
-              speed:     seg.speedKmh,
-              level:     seg.level,
-              color:     congestionColor(seg.congestionScore),
-              width:     computeRoadWidth(seg.roadType, seg.level),
-              realData:  seg.id.startsWith('here-') || seg.id.includes('-osm-'),
+              speed:      seg.speedKmh,
+              level:      seg.level,
+              color:      congestionColor(seg.congestionScore),
+              width:      computeRoadWidth(seg.roadType, seg.level),
+              roadType:   seg.roadType,
+              streetName: seg.streetName,
+              axisName:   seg.axisName,
+              dist:       seg.arrondissement,
+              realData:   seg.id.startsWith('here-') || seg.id.includes('-osm-') || seg.id.includes('-seg-'),
             },
           })),
         }

@@ -48,7 +48,8 @@ export interface City {
 export interface TrafficSegment {
   id:               string
   name?:            string
-  roadType?:        string   // motorway | trunk | primary | secondary | tertiary
+  streetName?:      string
+  roadType?:        string   // motorway | trunk | primary | secondary | tertiary | residential
   coordinates:      [number, number][] // [lng, lat][]
   speedKmh:         number
   freeFlowSpeedKmh: number
@@ -59,6 +60,15 @@ export interface TrafficSegment {
   length:           number // meters
   mode:             TransportMode
   lastUpdated:      string // ISO
+
+  // Detailed GIS Enrichment
+  arrondissement?:  string   // e.g. "1er arrondissement"
+  direction?:       string   // Cardinal: N, S, E, W, NE, etc.
+  isIntersection?:  boolean
+  hasTrafficLight?: boolean
+  priorityAxis?:    number   // 0-1 (importance score)
+  axisName?:        string   // e.g. "Boulevard Saint-Michel"
+  flowTrend?:       'improving' | 'stable' | 'worsening'
 }
 
 export interface HeatmapPoint {
