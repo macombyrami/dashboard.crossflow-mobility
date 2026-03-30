@@ -5,6 +5,7 @@ import { Header }          from './Header'
 import { BottomNav }       from './BottomNav'
 import { UserCityProvider } from '@/components/auth/UserCityProvider'
 import { SwipeNavigation }   from './SwipeNavigation'
+import { WeatherProvider }   from '@/components/providers/WeatherProvider'
 
 // Pages that must NOT have the app shell (sidebar / header / bottom nav)
 const PUBLIC_PREFIXES = ['/login', '/onboarding', '/auth']
@@ -20,6 +21,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <UserCityProvider>
+      {/* Météo globale : se synchronise avec la ville sur toutes les pages */}
+      <WeatherProvider />
       <div className="app-shell">
         <Sidebar />
         <div className="main-content relative">

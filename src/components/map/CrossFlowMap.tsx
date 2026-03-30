@@ -1255,25 +1255,9 @@ export function CrossFlowMap() {
       }
     }
 
-    // Real weather + air quality (OpenMeteo, 100% free, no key)
-    const [omWeather, aq] = await Promise.all([
-      fetchOpenMeteoWeather(city.center.lat, city.center.lng),
-      fetchAirQuality(city.center.lat, city.center.lng),
-    ])
-    setOpenMeteoWeather(omWeather)
-    setAirQuality(aq)
-    // Populate legacy WeatherData shape from OpenMeteo data
-    setWeather(omWeather ? {
-      description:   omWeather.weatherLabel,
-      temp:          omWeather.temp,
-      icon:          omWeather.weatherEmoji,
-      wind:          omWeather.windSpeedKmh,
-      rain:          omWeather.precipitationMm > 0,
-      snow:          omWeather.snowDepthCm > 0,
-      visibility:    omWeather.visibilityM,
-      trafficImpact: omWeather.trafficImpact,
-    } : null)
-  }, [city, mapLoaded, useLiveData, setSnapshot, setIncidents, setWeather, setOpenMeteoWeather, setAirQuality, setDataSource, dataSource])
+    // NOTE: Météo gérée globalement par WeatherProvider (AppShell)
+    // Plus besoin de l'appeler ici — évite les appels dupliqués à OpenMeteo
+  }, [city, mapLoaded, useLiveData, setSnapshot, setIncidents, setDataSource, dataSource])
 
   // Keep refreshDataRef in sync so OSM loader can call it after roads are cached
   useEffect(() => { refreshDataRef.current = refreshData }, [refreshData])
@@ -2348,32 +2332,61 @@ function addTomTomLayers(map: maplibregl.Map) {
   const flowUrl = getTrafficFlowTileUrl()
   const incUrl  = getTrafficIncidentTileUrl()
 
+  // Helper : désactive un layer TomTom apr\u00e8s N erreurs consécutives (évite le spam 503)
+  function watchTileErrors(sourceId: string, layerId: string, maxErrors = 3) {
+    let errorCount = 0
+    const onError = (e: any) => {
+      // Seuls les erreurs de tiles 503/404 nous intéressent
+      if (!e?.error?.status && !String(e?.error).includes('503') && !String(e?.error).includes('AJAXError')) return
+      errorCount++
+      if (errorCount >= maxErrors) {
+        // Désactiver silencieusement le layer — stop la boucle de retry
+        try {
+          if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', 'none')
+          console.warn(`[CrossFlow] TomTom layer "${layerId}" désactivé apr\u00e8s ${errorCount} erreurs 503 — cl\u00e9 API indisponible ou quota dépassé`)
+        } catch { /* carte déjà détruite */ }
+        map.off('error', onError)
+      }
+    }
+    map.on('error', onError)
+  }
+
   if (flowUrl) {
-    map.addSource(TOMTOM_FLOW, {
-      type:    'raster',
-      tiles:   [flowUrl],
-      tileSize: 256,
-    })
-    map.addLayer({
-      id:     TOMTOM_FLOW + '-layer',
-      type:   'raster',
-      source: TOMTOM_FLOW,
-      paint:  { 'raster-opacity': 0.85 },
-    })
+    try {
+      map.addSource(TOMTOM_FLOW, {
+        type:    'raster',
+        tiles:   [flowUrl],
+        tileSize: 256,
+      })
+      map.addLayer({
+        id:     TOMTOM_FLOW + '-layer',
+        type:   'raster',
+        source: TOMTOM_FLOW,
+        paint:  { 'raster-opacity': 0.85 },
+      })
+      watchTileErrors(TOMTOM_FLOW, TOMTOM_FLOW + '-layer')
+    } catch (err) {
+      console.warn('[CrossFlow] TomTom flow layer init failed:', err)
+    }
   }
 
   if (incUrl) {
-    map.addSource(TOMTOM_INC, {
-      type:    'raster',
-      tiles:   [incUrl],
-      tileSize: 256,
-    })
-    map.addLayer({
-      id:     TOMTOM_INC + '-layer',
-      type:   'raster',
-      source: TOMTOM_INC,
-      paint:  { 'raster-opacity': 0.90 },
-    })
+    try {
+      map.addSource(TOMTOM_INC, {
+        type:    'raster',
+        tiles:   [incUrl],
+        tileSize: 256,
+      })
+      map.addLayer({
+        id:     TOMTOM_INC + '-layer',
+        type:   'raster',
+        source: TOMTOM_INC,
+        paint:  { 'raster-opacity': 0.90 },
+      })
+      watchTileErrors(TOMTOM_INC, TOMTOM_INC + '-layer')
+    } catch (err) {
+      console.warn('[CrossFlow] TomTom incidents layer init failed:', err)
+    }
   }
 }
 

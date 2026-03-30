@@ -79,7 +79,11 @@ interface RawSegment {
 }
 
 function generateCityRoads(city: City): RawSegment[] {
-  // Use enriched Paris network if available
+  // ─── RÉSEAU RÉEL UNIQUEMENT ────────────────────────────────────────────────
+  // L'utilisateur exige "que des vraies valeurs". 
+  // Suppression de la grille synthétique (gridRows/gridCols) et des autoroutes radiales.
+  // Seuls les réseaux enrichis (ex: Paris) ou les imports réels sont conservés.
+
   if (city.id === 'paris' && parisNetwork.length > 0) {
     return parisNetwork.map(s => ({
       id: s.id,
@@ -89,49 +93,10 @@ function generateCityRoads(city: City): RawSegment[] {
     }))
   }
 
-  const rng = seededRng(cityTimeSeed(city.id + '_roads', 0) + 42)
-  const [west, south, east, north] = city.bbox
-  const latSpan = north - south
-  const lngSpan = east - west
-  const roads: RawSegment[] = []
-
-  // Grid roads
-  const gridRows = 12
-  const gridCols = 12
-  for (let r = 0; r <= gridRows; r++) {
-    const lat = south + (r / gridRows) * latSpan
-    const coords: [number, number][] = []
-    for (let c = 0; c <= gridCols; c++) {
-      const lng = west + (c / gridCols) * lngSpan
-      coords.push([lng + (rng() - 0.5) * 0.001, lat + (rng() - 0.5) * 0.001])
-    }
-    roads.push({ coords, type: r % 3 === 0 ? 'main' : 'secondary' })
-  }
-  for (let c = 0; c <= gridCols; c++) {
-    const lng = west + (c / gridCols) * lngSpan
-    const coords: [number, number][] = []
-    for (let r = 0; r <= gridRows; r++) {
-      const lat = south + (r / gridRows) * latSpan
-      coords.push([lng + (rng() - 0.5) * 0.001, lat + (rng() - 0.5) * 0.001])
-    }
-    roads.push({ coords, type: c % 3 === 0 ? 'main' : 'secondary' })
-  }
-
-  // Radial highways from center
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2
-    const coords: [number, number][] = []
-    for (let d = 0; d <= 10; d++) {
-      const r = (d / 10) * Math.min(latSpan, lngSpan) * 0.5
-      coords.push([
-        city.center.lng + Math.cos(angle) * r * 1.5,
-        city.center.lat + Math.sin(angle) * r,
-      ])
-    }
-    roads.push({ coords, type: 'highway' })
-  }
-
-  return roads
+  // NOTE: Pour les autres villes, le système utilisera le chargeur Overpass
+  // ou TomTom s'ils sont disponibles. generateCityRoads ne doit plus inventer
+  // de routes fantômes (radial/grid).
+  return []
 }
 
 // ─── Congestion pattern (realistic time-of-day) ───────────────────────────

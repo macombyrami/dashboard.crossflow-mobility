@@ -15,7 +15,6 @@ import { useTrafficStore } from '@/store/trafficStore'
 import { useKPIHistoryStore } from '@/store/kpiHistoryStore'
 import { useTranslation } from '@/lib/hooks/useTranslation'
 import { generateCityKPIs, generateIncidents } from '@/lib/engine/traffic.engine'
-import { fetchWeather, fetchAirQuality } from '@/lib/api/openmeteo'
 import { exportToPdf } from '@/lib/utils/export'
 import { platformConfig } from '@/config/platform.config'
 import { pollutionLabel } from '@/lib/utils/congestion'
@@ -53,6 +52,7 @@ export default function DashboardPage() {
   const dataSource          = useTrafficStore(s => s.dataSource)
   const openMeteoWeather    = useTrafficStore(s => s.openMeteoWeather)
   const setOpenMeteoWeather = useTrafficStore(s => s.setOpenMeteoWeather)
+  const setWeather          = useTrafficStore(s => s.setWeather)  // legacy shape lu par le Header
   const airQuality          = useTrafficStore(s => s.airQuality)
   const setAirQuality       = useTrafficStore(s => s.setAirQuality)
   const addSnapshot  = useKPIHistoryStore(s => s.addSnapshot)
@@ -75,7 +75,7 @@ export default function DashboardPage() {
 
   // Real KPIs derived from HERE live snapshot
   useEffect(() => {
-    if (!snapshot || dataSource !== 'live') return
+    if (!snapshot) return
     const base = generateCityKPIs(city)
     setKPIs(kpisFromSnapshot(city.id, snapshot, incidents.length, base))
   }, [snapshot, dataSource, city, incidents.length, setKPIs])
@@ -84,24 +84,6 @@ export default function DashboardPage() {
   useEffect(() => {
     if (kpis) addSnapshot(kpis)
   }, [kpis, addSnapshot])
-
-  // Real weather from OpenMeteo (free, no key)
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      const [w, a] = await Promise.all([
-        fetchWeather(city.center.lat, city.center.lng),
-        fetchAirQuality(city.center.lat, city.center.lng),
-      ])
-      if (!cancelled) {
-        setOpenMeteoWeather(w)
-        setAirQuality(a)
-      }
-    }
-    load()
-    const interval = setInterval(load, 5 * 60 * 1000)
-    return () => { cancelled = true; clearInterval(interval) }
-  }, [city.center.lat, city.center.lng, setOpenMeteoWeather, setAirQuality])
 
   if (!kpis) return null
 
