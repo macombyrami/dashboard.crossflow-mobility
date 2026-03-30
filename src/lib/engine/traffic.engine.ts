@@ -490,14 +490,14 @@ export function generateIncidents(city: City): Incident[] {
       type:         template.type,
       severity,
       title:        template.titles[Math.floor(rng() * template.titles.length)],
-      description: `Signalé il y a ${Math.floor(5 + rng() * 55)} min. Perturbation ${severity === 'critical' ? 'majeure' : severity === 'high' ? 'forte' : 'modérée'}.`,
+      description: `Estimation algorithmique — localisation approximative. Perturbation ${severity === 'critical' ? 'majeure' : severity === 'high' ? 'forte' : 'modérée'}.`,
       location: {
         lat: south + rng() * (north - south),
         lng: west  + rng() * (east  - west),
       },
-      address:    `Secteur ${String.fromCharCode(65 + Math.floor(rng() * 26))}${Math.floor(rng() * 9 + 1)} — ${city.name}`,
+      address:    `Zone estimée — ${city.name}`,
       startedAt:  new Date(Date.now() - rng() * 3_600_000).toISOString(),
-      source:     ['TomTom', 'WAZE', 'Capteurs IA', 'Utilisateur'][Math.floor(rng() * 4)],
+      source:     'Estimation IA',  // jamais de faux fournisseurs (TomTom/WAZE) sur données synthétiques
       iconColor:  severityColor,
     })
   }

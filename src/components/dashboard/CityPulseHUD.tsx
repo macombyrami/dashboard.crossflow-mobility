@@ -1,6 +1,6 @@
 'use client'
 import { useMemo } from 'react'
-import { Activity, ShieldAlert, Sparkles, TrendingUp, TrendingDown, Clock } from 'lucide-react'
+import { Activity, ShieldAlert, TrendingUp, TrendingDown } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { cn } from '@/lib/utils/cn'
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils/cn'
 export function CityPulseHUD() {
   const city = useMapStore(s => s.city)
   const kpis = useTrafficStore(s => s.kpis)
+  const dataSource = useTrafficStore(s => s.dataSource)
   const mode = useMapStore(s => s.mode)
 
   // Derived Intelligence
@@ -19,12 +20,39 @@ export function CityPulseHUD() {
     return Math.max(Math.round(base - incidentPenalty), 0)
   }, [kpis])
 
-  const riskTrend = useMemo(() => {
-    // Mock risk prediction logic
-    if (cityHealth < 60) return { label: 'CRITIQUE', color: 'text-red-500', icon: TrendingUp, val: '+12%' }
-    if (cityHealth < 85) return { label: 'STABLE', color: 'text-orange-500', icon: Clock, val: '0%' }
-    return { label: 'OPTIMAL', color: 'text-green-500', icon: TrendingDown, val: '-5%' }
-  }, [cityHealth])
+  // Tendance basée sur l'heure + les données réelles (plus de mock)
+  const congestionTrend = useMemo(() => {
+    const congPct = kpis ? Math.round(kpis.congestionRate * 100) : 0
+    const h = new Date().getHours()
+    // Rush hours réels (7h-9h matin, 17h-19h soir)
+    const isRushHour = (h >= 7 && h < 9) || (h >= 17 && h < 19)
+    const isShoulder  = (h >= 9 && h < 11) || (h >= 19 && h < 21)
+
+    if (cityHealth < 55) return {
+      label: 'SATURÉ',
+      color: 'text-red-500',
+      icon: TrendingUp,
+      val: `${congPct}%`,
+    }
+    if (cityHealth < 80 || isRushHour) return {
+      label: isRushHour ? 'HEURE DE POINTE' : 'DENSE',
+      color: 'text-orange-500',
+      icon: TrendingUp,
+      val: `${congPct}%`,
+    }
+    if (isShoulder) return {
+      label: 'EN BAISSE',
+      color: 'text-yellow-400',
+      icon: TrendingDown,
+      val: `${congPct}%`,
+    }
+    return {
+      label: 'FLUIDE',
+      color: 'text-green-500',
+      icon: TrendingDown,
+      val: `${congPct}%`,
+    }
+  }, [cityHealth, kpis])
 
   if (mode === 'simulate') return null
 
@@ -74,19 +102,22 @@ export function CityPulseHUD() {
           </div>
         </div>
 
-        {/* Section 2: AI Risk Prediction */}
+        {/* Section 2: Congestion actuelle (remplacement de la fausse prédiction AI) */}
         <div className="px-5 py-2.5 flex flex-col justify-center gap-1 border-x border-white/5 bg-white/5 hover:bg-white/10 transition-all cursor-default hidden sm:flex">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-3 h-3 text-brand-blue" />
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] leading-none">AI RISK +60M</p>
+            <Activity className="w-3 h-3 text-brand" />
+            <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] leading-none">
+              CONGESTION
+              {dataSource === 'live' && <span className="ml-1 text-brand">· LIVE</span>}
+            </p>
           </div>
           <div className="flex items-center gap-3">
-             <span className={cn("text-xs font-black tracking-wider", riskTrend.color)}>
-               {riskTrend.label}
+             <span className={cn("text-xs font-black tracking-wider", congestionTrend.color)}>
+               {congestionTrend.label}
              </span>
              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/5 border border-white/5">
-                <riskTrend.icon className={cn("w-3 h-3", riskTrend.color)} />
-                <span className="text-[10px] font-bold text-white/80">{riskTrend.val}</span>
+                <congestionTrend.icon className={cn("w-3 h-3", congestionTrend.color)} />
+                <span className="text-[10px] font-bold text-white/80">{congestionTrend.val}</span>
              </div>
           </div>
         </div>

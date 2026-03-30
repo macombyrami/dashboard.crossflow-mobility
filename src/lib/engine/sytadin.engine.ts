@@ -46,13 +46,25 @@ function congestionFactor(): number {
   return 1.1 + Math.random() * 0.3
 }
 
-function baseCongestionKm(): number {
+/**
+ * IDF reference: Paris metro-area ~12M inhabitants → jusqu'à 420 km de bouchons
+ * Autres villes: scalé proportionnellement à la population
+ */
+function baseCongestionKm(city?: import('@/types').City): number {
   const h = new Date().getHours()
-  if (h >= 7  && h < 10)  return 130 + Math.random() * 220
-  if (h >= 17 && h < 20)  return 160 + Math.random() * 260
-  if (h >= 11 && h < 14)  return 50  + Math.random() * 80
-  if (h >= 22 || h < 6)   return 3   + Math.random() * 15
-  return 30 + Math.random() * 60
+  // Facteur population : rapport à l'Île-de-France (12M référence)
+  const idfPopulation = 12_000_000
+  const cityPop = city?.population ?? idfPopulation
+  const popFactor = Math.min(1, Math.max(0.002, cityPop / idfPopulation))
+
+  const base =
+    (h >= 7  && h < 10) ? 130 + Math.random() * 220 :
+    (h >= 17 && h < 20) ? 160 + Math.random() * 260 :
+    (h >= 11 && h < 14) ? 50  + Math.random() * 80  :
+    (h >= 22 || h < 6)  ? 3   + Math.random() * 15  :
+                          30  + Math.random() * 60
+
+  return Math.max(0.5, base * popFactor)
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────
@@ -61,10 +73,10 @@ function baseCongestionKm(): number {
  * Fetch live Sytadin KPIs from sytadin.fr.
  * Falls back to synthetic data on error.
  */
-export async function fetchSytadinKPIs(): Promise<SytadinKPIs> {
+export async function fetchSytadinKPIs(city?: import('@/types').City): Promise<SytadinKPIs> {
   try {
     const data = await fetchSytadinData()
-    const km   = data.congestionKm || Math.round(baseCongestionKm())
+    const km   = data.congestionKm || Math.round(baseCongestionKm(city))
 
     // Determine trend based on time of day
     const h = new Date().getHours()
@@ -82,7 +94,7 @@ export async function fetchSytadinKPIs(): Promise<SytadinKPIs> {
       degraded:          data.degraded,
     }
   } catch {
-    return generateSytadinKPIs()
+    return generateSytadinKPIs(city)
   }
 }
 
@@ -98,7 +110,7 @@ export function generateSytadinKPIs(_city?: City): SytadinKPIs {
     (h >= 19 && h < 21) ? 'decreasing' : 'stable'
 
   return {
-    totalCongestionKm: Math.round(baseCongestionKm()),
+    totalCongestionKm: Math.round(baseCongestionKm(_city)),  // scalé par population
     trend,
     lastUpdated:       new Date().toISOString(),
     source:            'synthetic',

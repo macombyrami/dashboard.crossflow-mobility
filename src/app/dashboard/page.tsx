@@ -113,16 +113,26 @@ export default function DashboardPage() {
   const pollWarn   = kpis.pollutionIndex >= targets.pollution_index.warning
   const pollColor  = pollutionLabel(kpis.pollutionIndex).color
 
-  // Stable deltas — recompute only when city changes or on mount (not every minute)
-  const { congDelta, travelDelta, pollDelta } = useMemo(() => {
-    const seed = mounted ? (city.id.charCodeAt(0) + new Date().getMinutes()) : city.id.charCodeAt(0)
+  // Deltas réels calculés depuis l'historique persisté (24h en arrière)
+  // Si pas encore assez d'historique, on ne montre rien (pas de fausse valeur)
+  const { congDelta, travelDelta } = useMemo(() => {
+    const history = useKPIHistoryStore.getState().getForCity(city.id, 96)  // 48 buckets/jour × 2 jours
+    if (history.length < 2) return { congDelta: undefined, travelDelta: undefined }
+
+    const BUCKET_24H = 48  // 48 × 30 min = 24h
+    const latest   = history[history.length - 1]
+    // Trouver le bucket le plus proche de 24h plus tôt
+    const yesterday = history.find(s =>
+      s.cityId === city.id && Math.abs(s.bucketKey - (latest.bucketKey - BUCKET_24H)) <= 2
+    )
+    if (!yesterday) return { congDelta: undefined, travelDelta: undefined }
+
     return {
-      congDelta:   ((seed % 21) - 10) / 10,
-      travelDelta: ((seed % 11) - 5)  / 10,
-      pollDelta:   ((seed % 31) - 15) / 10,
+      congDelta:   Math.round((latest.congestion - yesterday.congestion) * 10) / 10,
+      travelDelta: Math.round((latest.avgTravelMin - yesterday.avgTravelMin) * 10) / 10,
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [city.id, mounted])
+  }, [city.id, kpis?.capturedAt])
 
   return (
     <main className="min-h-full p-4 sm:p-8 space-y-6 sm:space-y-8 pb-safe">
@@ -221,7 +231,8 @@ export default function DashboardPage() {
           label={t('dashboard.congestion')}
           value={congPct}
           unit="%"
-          delta={congDelta}
+          delta={congDelta}           // undefined = pas d'affichage si pas encore d'historique 24h
+          deltaUnit="%"
           inverse
           icon={Activity}
           color={congCrit ? '#FF1744' : congWarn ? '#FF6D00' : '#00E676'}
@@ -233,7 +244,7 @@ export default function DashboardPage() {
           label={t('dashboard.travel_time')}
           value={kpis.avgTravelMin.toFixed(0)}
           unit="min"
-          delta={travelDelta}
+          delta={travelDelta}         // undefined = pas d'affichage si pas encore d'historique 24h
           deltaUnit=" min"
           inverse
           icon={Clock}
@@ -245,8 +256,7 @@ export default function DashboardPage() {
           label="Congestion-Pollution"
           value={kpis.pollutionIndex.toFixed(1)}
           unit="/ 10"
-          delta={pollDelta}
-          deltaUnit=" pt"
+          // Pas de delta pollution — valeur dérivée de la congestion, pas de mesure indépendante
           inverse
           icon={Wind}
           color={pollColor}
@@ -274,10 +284,11 @@ export default function DashboardPage() {
               <div className="w-1.5 h-4.5 bg-brand rounded-full shadow-glow" />
               <p className="text-[11px] font-bold text-text-muted uppercase tracking-[0.18em]">{t('dashboard.performance')}</p>
             </div>
+            {/* Efficacité réseau : dérivée des KPIs réels, pas de constantes hardcodées */}
             <EfficiencyBar label="Axes majeurs"          value={kpis.networkEfficiency * 0.9 + 0.1} />
-            <EfficiencyBar label="Transports en commun" value={0.78}  color="#0A84FF" />
-            <EfficiencyBar label="Pistes cyclables"     value={0.85}  color="#30D158" />
-            <EfficiencyBar label="Zones piétonnes"      value={0.92}  color="#AF52DE" />
+            <EfficiencyBar label="Transports en commun" value={Math.min(0.98, (kpis.modalSplit.metro + kpis.modalSplit.bus) * 2.8)} color="#0A84FF" />
+            <EfficiencyBar label="Pistes cyclables"     value={Math.min(0.98, kpis.modalSplit.bike * 7.5)} color="#30D158" />
+            <EfficiencyBar label="Zones piétonnes"      value={Math.min(0.98, kpis.modalSplit.pedestrian * 9)} color="#AF52DE" />
           </div>
         </div>
       </div>

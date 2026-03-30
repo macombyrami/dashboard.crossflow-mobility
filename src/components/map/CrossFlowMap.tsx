@@ -445,7 +445,7 @@ export function CrossFlowMap() {
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
               <div style="background:rgba(255,255,255,0.04);padding:8px;border-radius:10px;">
-                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase;">Densité trafic</p>
+                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase;">Densité estimée ⚠</p>
                 <p style="margin:3px 0 0 0;font-size:13px;font-weight:600;color:${color};">${label}</p>
               </div>
               <div style="background:rgba(255,255,255,0.04);padding:8px;border-radius:10px;">
@@ -453,6 +453,7 @@ export function CrossFlowMap() {
                 <p style="margin:3px 0 0 0;font-size:13px;font-weight:600;">Niv. ${feat.properties?.admin_level ?? 9}</p>
               </div>
             </div>
+            <p style="margin:10px 0 0 0;font-size:9px;color:#424245;font-style:italic;">Densité calculée — données temps réel non disponibles</p>
           </div>
         `)
         .addTo(map)
@@ -1580,7 +1581,7 @@ function initStaticSources(map: maplibregl.Map) {
   map.addSource(PREDICTIVE_EVENTS_SOURCE,   { type: 'geojson', data: emptyFC })
 
 
-  // 1. Glow Layer (Outer)
+  // 1. Glow Layer (Outer) — only for real road data
   map.addLayer({
     id:     TRAFFIC_SOURCE + '-glow',
     type:   'line',
@@ -1589,16 +1590,18 @@ function initStaticSources(map: maplibregl.Map) {
     paint:  {
       'line-color':   ['get', 'color'],
       'line-width': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.5, ['get', 'width']], 13, ['*', 2, ['get', 'width']], 17, ['*', 3, ['get', 'width']]],
+      // Ne rendre visible que les données RÉELLES (HERE/OSM) — masquer la grille synthétique
       'line-opacity': [
-        'interpolate', ['linear'], ['zoom'],
-        10, 0.05,
-        14, 0.15
+        'case',
+        ['boolean', ['get', 'realData'], false],
+        ['interpolate', ['linear'], ['zoom'], 10, 0.12, 14, 0.25],
+        0  // segments synthétiques = invisible
       ],
       'line-blur':    10,
     },
   })
 
-  // 2. Main Flow Line (Inner)
+  // 2. Main Flow Line (Inner) — only for real road data
   map.addLayer({
     id:     TRAFFIC_SOURCE + '-lines',
     type:   'line',
@@ -1607,8 +1610,8 @@ function initStaticSources(map: maplibregl.Map) {
     paint:  {
       'line-color':   ['get', 'color'],
       'line-width': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.4, ['get', 'width']], 13, ['get', 'width'], 17, ['*', 1.4, ['get', 'width']]],
-      // realData=false → synthetic grid → barely visible
-      'line-opacity': ['case', ['boolean', ['get', 'realData'], false], 0.88, 0.08],
+      // realData=false → grille synthétique → complètement masquée (ne pas afficher sur routes fantômes)
+      'line-opacity': ['case', ['boolean', ['get', 'realData'], false], 0.88, 0],
     },
   })
 
