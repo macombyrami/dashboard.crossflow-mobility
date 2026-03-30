@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { fetchSytadinRaw } from '@/lib/api/sytadin'
 
 interface SocialPost {
   id:       string
@@ -40,7 +41,6 @@ function parseTitle(raw: string, index: number): SocialPost {
   const km      = kmMatch ? parseInt(kmMatch[1], 10) : undefined
 
   // Build human-readable location from the title
-  // Remove prefix like "FLASH/A1 " or "INFO/A86 Extérieur "
   const cleaned = raw
     .replace(/^[!]?(FLASH|INFO|ALERTE)\/[A-Z0-9]+\s*/i, '')
     .replace(/^(Direction|Extérieur|Intérieur)\s+/i, '')
@@ -54,7 +54,6 @@ function parseTitle(raw: string, index: number): SocialPost {
   if (type === 'info')       tags.push('Info')
   if (km !== undefined)      tags.push(`${km}km`)
 
-  // Location = first meaningful fragment
   const location = cleaned.split(/[,–\-]/)[0].trim() || `Île-de-France${axis ? ' · ' + axis : ''}`
 
   return {
@@ -69,41 +68,28 @@ function parseTitle(raw: string, index: number): SocialPost {
   }
 }
 
-// ─── Fetch & parse HTML from the existing /api/sytadin proxy ─────────────
-async function fetchSytadinPosts(baseUrl: string): Promise<{ posts: SocialPost[]; degraded: boolean }> {
-  const url = `${baseUrl}/api/sytadin?endpoint=alerts`
-  const res  = await fetch(url, {
-    signal: AbortSignal.timeout(8_000),
-    next:   { revalidate: 180 },
-  })
-
-  const html     = await res.text()
-  const degraded = res.headers.get('X-Sytadin-Fallback') === 'true'
-
-  // Extract <a title="..."> values from the alert list
-  const titleRegex = /title="([^"]+)"/g
-  const posts: SocialPost[] = []
-  let m: RegExpExecArray | null
-  let i = 0
-
-  while ((m = titleRegex.exec(html)) !== null) {
-    const raw = m[1].trim()
-    if (!raw || raw.length < 5) continue
-    posts.push(parseTitle(raw, i++))
-    if (posts.length >= 20) break
-  }
-
-  return { posts, degraded }
-}
-
 // ─── GET /api/social/sytadin ──────────────────────────────────────────────
-export async function GET(req: Request): Promise<NextResponse> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://${new URL(req.url).host}`
-
+export async function GET(): Promise<NextResponse> {
   try {
-    const { posts, degraded } = await fetchSytadinPosts(baseUrl)
+    // ─── DIRECT FETCH (No circular HTTP call to proxy) ──────────────────────
+    const { html, degraded } = await fetchSytadinRaw('alerts')
 
-    const feed: FeedData & { degraded?: boolean } = {
+    if (!html) throw new Error('Empty Sytadin response')
+
+    // Extract <a title="..."> values
+    const titleRegex = /title="([^"]+)"/g
+    const posts: SocialPost[] = []
+    let m: RegExpExecArray | null
+    let i = 0
+
+    while ((m = titleRegex.exec(html)) !== null) {
+      const raw = (m[1] ?? '').trim()
+      if (!raw || raw.length < 5) continue
+      posts.push(parseTitle(raw, i++))
+      if (posts.length >= 20) break
+    }
+
+    const feed: FeedData & { degraded: boolean } = {
       posts,
       fetchedAt: new Date().toISOString(),
       degraded,
@@ -117,7 +103,6 @@ export async function GET(req: Request): Promise<NextResponse> {
     })
   } catch (err) {
     console.error('[social/sytadin] fetch error:', err)
-    // Return a minimal synthetic feed so the UI is never empty
     const fallback: FeedData & { degraded: boolean } = {
       posts: [
         parseTitle('INFO/A86 Extérieur Travaux à Nanterre (Flux de secours)', 0),

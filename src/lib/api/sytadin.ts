@@ -187,30 +187,51 @@ function parseAlertText(text: string, id: string): SytadinAlert | null {
   }
 }
 
-// ─── API client (calls our Next.js proxy) ─────────────────────────────────
+// ─── API client (Core Fetcher — No circular calls) ───────────────────────
 
-async function fetchEndpoint(endpoint: 'alerts' | 'congestion'): Promise<string> {
-  const res = await fetch(`/api/sytadin?endpoint=${endpoint}`, {
-    next: { revalidate: 180 },
-  })
-  if (!res.ok) throw new Error(`Sytadin proxy error: ${res.status}`)
-  return res.text()
+export async function fetchSytadinRaw(endpoint: 'alerts' | 'congestion'): Promise<{ html: string; degraded: boolean }> {
+  const url = endpoint === 'alerts' 
+    ? 'https://www.sytadin.fr/refreshed/alert_block.jsp.html' 
+    : 'https://www.sytadin.fr/refreshed/cumul_bouchon.jsp.html'
+
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent':      'Mozilla/5.0 (compatible; CrossFlow/1.0; contact@crossflow-mobility.com)',
+        'Accept-Language': 'fr-FR,fr;q=0.9',
+        'Accept':          'text/html,application/xhtml+xml',
+      },
+      next: { revalidate: 180 },
+      signal: AbortSignal.timeout(8000), 
+    })
+
+    if (!res.ok) throw new Error(`Sytadin upstream error: ${res.status}`)
+    
+    const html = await res.text()
+    const degraded = res.headers.get('X-Sytadin-Fallback') === 'true' || /degrade\s*:\s*true/i.test(html)
+    
+    return { html, degraded }
+  } catch (err) {
+    console.error(`[Sytadin Raw Fetch] Fail for ${endpoint}:`, err)
+    return { html: '', degraded: true }
+  }
 }
 
 export async function fetchSytadinData(): Promise<SytadinData> {
-  const [alertHtml, congestHtml] = await Promise.all([
-    fetchEndpoint('alerts').catch(() => ''),
-    fetchEndpoint('congestion').catch(() => ''),
+  // Use direct raw fetching instead of HTTP calls to own proxy
+  const [alertRes, congestRes] = await Promise.all([
+    fetchSytadinRaw('alerts'),
+    fetchSytadinRaw('congestion'),
   ])
 
-  const { alerts, degraded, dataTimestamp } = parseAlertHtml(alertHtml)
-  const congestionKm = parseCongestionHtml(congestHtml)
+  const { alerts, degraded, dataTimestamp } = parseAlertHtml(alertRes.html)
+  const congestionKm = parseCongestionHtml(congestRes.html)
 
   return {
     alerts,
     congestionKm,
     lastUpdated:   new Date().toISOString(),
-    degraded,
+    degraded:      degraded || alertRes.degraded || congestRes.degraded,
     dataTimestamp,
   }
 }

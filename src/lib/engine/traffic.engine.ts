@@ -18,6 +18,7 @@ import { enrichSnapshot } from '@/lib/utils/traffic-enrichment'
 import type { OSMRoad } from '@/lib/api/overpass'
 import { platformConfig } from '@/config/platform.config'
 import { scoreToCongestionLevel } from '@/lib/utils/congestion'
+import type { KPISnapshot } from '@/store/kpiHistoryStore'
 
 // Import enriched data (optional/conditional)
 let parisNetwork: any[] = []
@@ -445,4 +446,35 @@ export function generateIncidents(city: City): Incident[] {
     })
   }
   return incidents
+}
+
+/**
+ * Generates synthetic KPI history for the chart fallback
+ */
+export function generateKPIHistory(city: City, points = 48): KPISnapshot[] {
+  const history: KPISnapshot[] = []
+  const now = Date.now()
+  const BUCKET_MS = 30 * 60 * 1000
+  const startBucket = Math.floor(now / BUCKET_MS) - points
+
+  for (let i = 0; i < points; i++) {
+    const bucketKey = startBucket + i
+    const timeMs    = bucketKey * BUCKET_MS
+    const date      = new Date(timeMs)
+    const hour      = date.getHours()
+    
+    // Simple harmonic congestion simulation (deterministic)
+    const rng = seededRng(cityTimeSeed(city.id) + bucketKey)
+    const baseHour = baseCongestionForHour(hour, date.getDay() === 0 || date.getDay() === 6, rng)
+    const congestion = Math.round(baseHour * 100)
+    
+    history.push({
+      time: `${hour.toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`,
+      congestion,
+      avgTravelMin: Math.round(10 + baseHour * 40),
+      cityId: city.id,
+      bucketKey
+    })
+  }
+  return history
 }

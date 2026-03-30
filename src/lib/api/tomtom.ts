@@ -31,11 +31,15 @@ export interface FlowSegmentData {
 }
 
 export async function fetchFlowSegment(lat: number, lng: number, zoom = 10): Promise<FlowSegmentData | null> {
-  if (!hasKey()) return null
+  const apiKey = process.env.TOMTOM_API_KEY
+  if (!apiKey) return null
+  
   try {
-    const res = await fetch(`/api/tomtom/flow?lat=${lat}&lng=${lng}&zoom=${zoom}`)
+    const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/relative0/${zoom}/json?point=${lat},${lng}&unit=kmph&key=${apiKey}`
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
     if (!res.ok) return null
-    return res.json()
+    const data = await res.json()
+    return data.flowSegmentData ?? null
   } catch {
     return null
   }
@@ -112,11 +116,35 @@ export interface WeatherData {
 }
 
 export async function fetchWeather(lat: number, lng: number): Promise<WeatherData | null> {
-  if (process.env.NEXT_PUBLIC_OPENWEATHER_ENABLED !== 'true') return null
+  const apiKey = process.env.OPENWEATHER_API_KEY
+  if (!apiKey) return null
+  
   try {
-    const res = await fetch(`/api/weather/openweather?lat=${lat}&lng=${lng}`)
+    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&units=metric&appid=${apiKey}&lang=fr`
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
     if (!res.ok) return null
-    return res.json()
+    const d = await res.json()
+    
+    const rain = d.rain?.['1h'] > 0 || d.weather?.[0]?.main === 'Rain'
+    const snow = d.snow?.['1h'] > 0 || d.weather?.[0]?.main === 'Snow'
+    const vis  = d.visibility ?? 10000
+    const wind = d.wind?.speed ?? 0
+
+    const trafficImpact: WeatherData['trafficImpact'] =
+      snow || vis < 500   ? 'severe'   :
+      rain || vis < 2000  ? 'moderate' :
+      wind > 15           ? 'minor'    : 'none'
+
+    return {
+      temp:        Math.round(d.main?.temp ?? 0),
+      description: d.weather?.[0]?.description ?? '',
+      icon:        d.weather?.[0]?.icon ?? '',
+      wind:        Math.round(wind),
+      rain,
+      snow,
+      visibility:  vis,
+      trafficImpact
+    }
   } catch {
     return null
   }

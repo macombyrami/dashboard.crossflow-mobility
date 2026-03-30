@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AppShell } from '@/components/layout/AppShell'
 import appData from '@/lib/data/app.json'
+import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 
 export const metadata: Metadata = {
   title:       appData.metaTitle,
@@ -60,7 +62,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <AppShell>{children}</AppShell>
+        <AppShell>
+          {children}
+          <Analytics />
+          <SpeedInsights />
+        </AppShell>
       </body>
     </html>
   )
