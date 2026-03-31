@@ -8,6 +8,8 @@ import { useTrafficStore } from '@/store/trafficStore'
 import { useSimulationStore } from '@/store/simulationStore'
 import { platformConfig } from '@/config/platform.config'
 import { congestionColor, scoreToCongestionLevel } from '@/lib/utils/congestion'
+import { cn } from '@/lib/utils/cn'
+import { AlertTriangle } from 'lucide-react'
 import { VehicleInfoCard } from '@/components/map/VehicleInfoCard'
 import { VehicleFilterPanel } from '@/components/map/VehicleFilterPanel'
 
@@ -105,16 +107,20 @@ const METRO_HUBS = [
 ]
 
 
-// Modern Vector Dark Style - High performance OSM vector tiles
+// Reliable Vector Dark Style
 const OSM_DARK_STYLE: maplibregl.StyleSpecification = {
   version: 8,
   glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
   sources: {
     'osm-vector': {
       type: 'vector',
-      tiles: ['https://tiles.openfreemap.org/tiles/{z}/{x}/{y}.pbf'],
+      // Using CartoDB as primary (highly stable) and OpenFreeMap as fallback
+      tiles: [
+        'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+        'https://tiles.openfreemap.org/tiles/{z}/{x}/{y}.pbf'
+      ],
       maxzoom: 14,
-      attribution: '© OpenStreetMap contributors © OpenFreeMap'
+      attribution: '© OpenStreetMap contributors © CARTO'
     }
   },
   layers: [
@@ -164,6 +170,7 @@ export function CrossFlowMap() {
   const lastVehicleUpdateRef = useRef<number>(0)
 
   const [mapLoaded, setMapLoaded] = useState(false)
+  const [mapError, setMapError]   = useState<string | null>(null)
   const [selectedVehicle, setSelectedVehicleState] = useState<import('@/lib/engine/transit.engine').TransitVehicle | null>(null)
   const [vehicleCount, setVehicleCount] = useState(0)
 
@@ -269,7 +276,11 @@ export function CrossFlowMap() {
 
     map.on('error', (e) => {
       console.error('[CrossFlow] MapLibre error:', e.error?.message || e)
-      // If style fails, we might need a fallback or just log it
+      // Check if it's a critical style or tile loading error
+      const msg = e.error?.message || ''
+      if (msg.includes('Failed to fetch') || msg.includes('Style is not done loading')) {
+        setMapError('Impossible de charger les données cartographiques. Vérifiez votre connexion.')
+      }
     })
 
     // Click on synthetic segments
@@ -1070,6 +1081,10 @@ export function CrossFlowMap() {
   const refreshData = useCallback(async () => {
     if (!mapRef.current || !mapLoaded) return
     const map = mapRef.current
+    const bounds = map.getBounds()
+    const viewportBbox: [number, number, number, number] = [
+      bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()
+    ]
 
     const useHere    = hereHasKey()
     const useTomTom  = useLiveData
@@ -1121,7 +1136,7 @@ export function CrossFlowMap() {
               speedKmh:         Math.round(speed),
               freeFlowSpeedKmh: Math.round(freeFlow),
               congestionScore:  Math.round(congestion * 100) / 100,
-              level:            import_scoreToCongestionLevel(congestion),
+              level:            scoreToCongestionLevel(congestion),
               flowVehiclesPerHour: Math.round((1 - congestion) * 1800 + 200),
               travelTimeSeconds:   length > 0 ? Math.round((length / 1000) / speed * 3600) : 60,
               length,
@@ -1145,9 +1160,9 @@ export function CrossFlowMap() {
     let incidents: Incident[] = synthetic
 
     if (useTomTom) {
-      // Fetch real TomTom incidents
+      // Fetch real TomTom incidents for current viewport
       if (!useHere) setDataSource('live')
-      const tomtomIncs = await fetchTomTomIncidents(city.bbox)
+      const tomtomIncs = await fetchTomTomIncidents(viewportBbox)
       if (tomtomIncs.length > 0) {
         incidents = tomtomIncs.map(inc => ({
           id:          inc.id,
@@ -1164,8 +1179,8 @@ export function CrossFlowMap() {
         }))
       }
     } else if (useHere) {
-      // HERE incidents as fallback
-      const hereIncs = await fetchHereIncidents(city.bbox)
+      // HERE incidents as fallback for current viewport
+      const hereIncs = await fetchHereIncidents(viewportBbox)
       if (hereIncs.length > 0) {
         incidents = hereIncs.map(inc => ({
           id:          inc.incidentId,
@@ -1279,7 +1294,15 @@ export function CrossFlowMap() {
     if (!mapLoaded) return
     refreshData()
     const interval = setInterval(refreshData, platformConfig.traffic.refreshIntervalMs)
-    return () => clearInterval(interval)
+    
+    // Viewport-aware refresh: update when user stops moving/zooming
+    const onMoveEnd = () => refreshData()
+    mapRef.current?.on('moveend', onMoveEnd)
+
+    return () => {
+      clearInterval(interval)
+      mapRef.current?.off('moveend', onMoveEnd)
+    }
   }, [mapLoaded, refreshData])
 
   // ─── Simulation overlay — tint segment colors by delta ────────────────
@@ -1576,7 +1599,33 @@ export function CrossFlowMap() {
 
   return (
     <div className="w-full h-full relative">
-      <div ref={containerRef} className="w-full h-full" />
+      {mapError && (
+        <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-md p-6 text-center">
+          <div className="max-w-sm p-6 rounded-2xl bg-bg-elevated border border-traffic-critical/30 shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="w-12 h-12 rounded-full bg-traffic-critical/10 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-6 h-6 text-traffic-critical" />
+            </div>
+            <h3 className="text-lg font-bold text-text-primary mb-2">Erreur de chargement</h3>
+            <p className="text-sm text-text-muted mb-6 leading-relaxed">
+              {mapError}
+            </p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full py-2.5 rounded-xl bg-brand text-black font-bold text-sm hover:scale-[1.02] active:scale-[0.98] transition-all"
+            >
+              Réessayer
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div 
+        ref={containerRef} 
+        className={cn(
+          "w-full h-full bg-[#08090B] transition-opacity duration-700",
+          mapLoaded ? "opacity-100" : "opacity-0"
+        )} 
+      />
       
       {/* Interactive transit components */}
       <VehicleFilterPanel vehicleCount={vehicleCount} />
@@ -1586,12 +1635,10 @@ export function CrossFlowMap() {
       />
 
       {/* Loading overlay — fades out once map tiles are ready */}
-
-
-      {!mapLoaded && (
-        <div className="absolute inset-0 bg-bg-surface flex flex-col items-center justify-center gap-4 pointer-events-none z-10">
-          <div className="w-10 h-10 border-[3px] border-brand-green border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">Chargement de la carte…</p>
+      {!mapLoaded && !mapError && (
+        <div className="absolute inset-0 bg-black flex flex-col items-center justify-center gap-4 pointer-events-none z-10 transition-opacity duration-500">
+          <div className="w-10 h-10 border-[3px] border-brand-green border-t-transparent rounded-full animate-spin shadow-glow-sm" />
+          <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest animate-pulse">Chargement de la carte…</p>
         </div>
       )}
     </div>
@@ -1606,7 +1653,10 @@ function initStaticSources(map: maplibregl.Map) {
   if (!map.getSource('base-network')) {
     map.addSource('base-network', {
       type: 'vector',
-      tiles: ['https://tiles.openfreemap.org/tiles/{z}/{x}/{y}.pbf'],
+      tiles: [
+        'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+        'https://tiles.openfreemap.org/tiles/{z}/{x}/{y}.pbf'
+      ],
       maxzoom: 14
     })
   }

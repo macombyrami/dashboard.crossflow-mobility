@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import { usePathname } from 'next/navigation'
 import { Sidebar }         from './Sidebar'
 import { Header }          from './Header'
@@ -12,18 +13,35 @@ const PUBLIC_PREFIXES = ['/login', '/onboarding', '/auth']
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname   = usePathname()
+  const [mounted, setMounted] = React.useState(false)
   const isPublic   = PUBLIC_PREFIXES.some(p => pathname.startsWith(p))
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
 
   if (isPublic) {
     // Auth / onboarding pages: full-screen, no chrome
     return <>{children}</>
   }
 
+  // Defer rendering of shell components that depend on persisted stores (city, user...)
+  // This is the primary fix for React Hydration Error #418.
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-[#08090B] flex flex-col">
+        <div className="flex-1 relative overflow-hidden">
+          {children}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <UserCityProvider>
       {/* Météo globale : se synchronise avec la ville sur toutes les pages */}
       <WeatherProvider />
-      <div className="app-shell">
+      <div className="app-shell animate-in fade-in duration-500">
         <Sidebar />
         <div className="main-content relative">
           <Header />

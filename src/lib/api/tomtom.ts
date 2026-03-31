@@ -31,15 +31,11 @@ export interface FlowSegmentData {
 }
 
 export async function fetchFlowSegment(lat: number, lng: number, zoom = 10): Promise<FlowSegmentData | null> {
-  const apiKey = process.env.TOMTOM_API_KEY
-  if (!apiKey) return null
-  
   try {
-    const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/relative0/${zoom}/json?point=${lat},${lng}&unit=kmph&key=${apiKey}`
+    const url = `/api/tomtom/flow?lat=${lat}&lng=${lng}&zoom=${zoom}`
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
     if (!res.ok) return null
-    const data = await res.json()
-    return data.flowSegmentData ?? null
+    return await res.json()
   } catch {
     return null
   }
