@@ -38,10 +38,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <UserCityProvider>
-      {/* Météo globale : se synchronise avec la ville sur toutes les pages */}
-      <WeatherProvider />
-      <div className="app-shell animate-in fade-in duration-500">
+    <div className="app-shell animate-in fade-in duration-500">
+      <UserCityProvider>
+        <WeatherProvider />
         <Sidebar />
         <div className="main-content relative">
           <Header />
@@ -51,8 +50,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </SwipeNavigation>
           </div>
         </div>
-      </div>
-      <BottomNav />
-    </UserCityProvider>
+        <BottomNav />
+      </UserCityProvider>
+    </div>
   )
 }

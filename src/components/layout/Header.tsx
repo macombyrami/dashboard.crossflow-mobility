@@ -29,7 +29,11 @@ const LiveClock = memo(function LiveClock() {
     return () => clearInterval(id)
   }, [])
   return (
-    <div className="hidden md:flex items-center px-2.5 py-1.5 rounded-lg bg-bg-elevated/60 border border-bg-border/50">
+    <div className="hidden md:flex items-center gap-3 px-2.5 py-1.5 rounded-lg bg-bg-elevated/60 border border-bg-border/50">
+      <div className="flex items-center gap-1.5 border-r border-white/10 pr-2">
+        <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse shadow-glow"></div>
+        <span className="text-[10px] font-bold text-brand uppercase tracking-widest">Active Intelligence</span>
+      </div>
       <span className="text-[13px] font-medium text-text-secondary mono tabular-nums">{time}</span>
     </div>
   )
@@ -224,21 +228,20 @@ export function Header() {
           )}
         </div>
 
-        {/* AI Assistant */}
         <button
           onClick={() => setAIPanelOpen(!isAIPanelOpen)}
           className={`
-            flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-[13px] font-medium
+            flex items-center gap-1.5 px-3 h-9 rounded-lg text-[12px] font-bold uppercase tracking-wide
             transition-all duration-150 active:scale-95
             ${isAIPanelOpen
-              ? 'bg-brand/15 text-brand border border-brand/30'
+              ? 'bg-brand text-black shadow-glow'
               : 'bg-bg-elevated border border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-hover'
             }
           `}
-          aria-label="Assistant IA"
+          aria-label="Assistant IA Discovery"
         >
-          <Sparkles className={`w-3.5 h-3.5 ${isAIPanelOpen ? 'text-brand' : ''}`} strokeWidth={2} />
-          <span className="hidden sm:inline">IA</span>
+          <Sparkles className={`w-3.5 h-3.5 ${isAIPanelOpen ? 'text-black' : 'text-brand'}`} strokeWidth={2.5} />
+          <span className="hidden sm:inline">Prediction Analysis</span>
         </button>
       </div>
     </header>

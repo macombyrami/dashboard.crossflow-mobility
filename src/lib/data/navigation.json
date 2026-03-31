@@ -1,9 +1,9 @@
 [
-  { "href": "/map",        "iconName": "Map",             "label": "Carte",      "description": "Trafic temps réel", "ariaLabel": "Carte du trafic en temps réel"          },
-  { "href": "/dashboard",  "iconName": "LayoutDashboard", "label": "Tableau",    "description": "Métriques & KPIs",  "ariaLabel": "Tableau de bord et métriques KPI"       },
-  { "href": "/prediction", "iconName": "TrendingUp",      "label": "Prévisions", "description": "Modèle prédictif", "ariaLabel": "Prévisions et modèle prédictif"         },
-  { "href": "/simulation", "iconName": "GitBranch",       "label": "Simulation", "description": "Scénarios",        "ariaLabel": "Simulation de scénarios de trafic"      },
-  { "href": "/transport",  "iconName": "Activity",        "label": "Transport",  "description": "Réseau TC",        "ariaLabel": "Réseau de transport en commun"          },
-  { "href": "/incidents",  "iconName": "AlertTriangle",   "label": "Incidents",  "description": "Alertes actives",  "ariaLabel": "Alertes et incidents actifs"            },
-  { "href": "/social",     "iconName": "Rss",             "label": "Social",     "description": "@Sytadin · IDF",   "ariaLabel": "Feed social trafic Île-de-France"       }
+  { "href": "/map",        "iconName": "Activity",        "label": "LIVE ✦",      "description": "Système de vérité trafic", "ariaLabel": "Carte du trafic en temps réel"          },
+  { "href": "/prediction", "iconName": "TrendingUp",      "label": "PREDICT 🔮",  "description": "+15min · +30min · +1h",    "ariaLabel": "Prévisions et modèle prédictif"         },
+  { "href": "/simulation", "iconName": "GitBranch",       "label": "SIMULATE 🧪", "description": "Bac à sable urbain",       "ariaLabel": "Simulation de scénarios de trafic"      },
+  { "href": "/dashboard",  "iconName": "LayoutDashboard", "label": "INSIGHTS 📊", "description": "Décisionnel mairies",       "ariaLabel": "Tableau de bord et métriques KPI"       },
+  { "href": "/incidents",  "iconName": "AlertTriangle",   "label": "ALERTS",      "description": "Incidents critiques",      "ariaLabel": "Alertes et incidents actifs"            },
+  { "href": "/social",     "iconName": "Rss",             "label": "SOCIAL NLP",  "description": "X · Sytadin · Alerts",     "ariaLabel": "Feed social trafic Île-de-France"       },
+  { "href": "/transport",  "iconName": "Map",             "label": "NETWORK",     "description": "RATP · Bus · Métro",       "ariaLabel": "Réseau de transport en commun"          }
 ]

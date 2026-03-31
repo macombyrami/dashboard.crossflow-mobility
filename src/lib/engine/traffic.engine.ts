@@ -20,6 +20,8 @@ import type { OSMRoad } from '@/lib/api/overpass'
 import { platformConfig } from '@/config/platform.config'
 import { scoreToCongestionLevel } from '@/lib/utils/congestion'
 import type { KPISnapshot } from '@/store/kpiHistoryStore'
+import { calculateEnrichedTrafficScore } from './TrafficScoreService'
+import { enrichSegmentWithStreetMetadata } from './StreetMapper'
 
 // ─── Map Matching & Stitching (Turf.js) ───────────────────────────────────
 
@@ -151,18 +153,27 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
     )
     const spatial = Math.max(0, 1 - distFromCenter * 0.8)
     const noise   = (rng() - 0.5) * 0.25
-    let congestion = Math.max(0, Math.min(1, baseCongestion * spatial + noise))
-    const level = scoreToCongestionLevel(congestion)
+    const baseRaw = Math.max(0, Math.min(1, baseCongestion * spatial + noise))
     
     const freeFlow = road.type === 'highway' ? 110 : 50
-    const speedKmh = freeFlow * (1 - congestion * 0.7)
     const length   = road.type === 'highway' ? 1200 : 350
 
-    segments.push({
+    // ─── Urban Intelligence Enrichment ───
+    const enriched = calculateEnrichedTrafficScore(baseRaw, {
+      weatherImpact: 'none', // To be connected to WeatherProvider
+      eventIntensity: 0,     // To be connected to EventStore
+      hourOfDay: hour,
+      isWeekend: isWE,
+      publicTransportLoad: 0.1
+    })
+
+    const speedKmh = freeFlow * (1 - enriched.score * 0.7)
+
+    const segment: TrafficSegment = {
       id: `${city.id}-synthetic-${idx}`,
       coordinates: road.coords,
-      congestionScore: congestion,
-      level,
+      congestionScore: enriched.score,
+      level: enriched.level,
       speedKmh: Math.round(speedKmh * 10) / 10,
       freeFlowSpeedKmh: freeFlow,
       flowVehiclesPerHour: Math.round((freeFlow - speedKmh) * 40 + (rng() * 100)),
@@ -170,8 +181,10 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
       length: Math.round(length),
       lastUpdated: now.toISOString(),
       mode: 'car'
-    })
-    road.coords.forEach(pt => heatmap.push({ lng: pt[0], lat: pt[1], intensity: congestion }))
+    }
+
+    segments.push(enrichSegmentWithStreetMetadata(segment))
+    road.coords.forEach(pt => heatmap.push({ lng: pt[0], lat: pt[1], intensity: enriched.score }))
   })
 
   return {

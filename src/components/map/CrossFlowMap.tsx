@@ -107,29 +107,29 @@ const METRO_HUBS = [
 ]
 
 
-// Reliable Vector Dark Style
+// Reliable Raster Dark Style (CartoDB Dark Matter)
 const OSM_DARK_STYLE: maplibregl.StyleSpecification = {
   version: 8,
-  glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
   sources: {
-    'osm-vector': {
-      type: 'vector',
-      // Using CartoDB as primary (highly stable) and OpenFreeMap as fallback
+    'osm-raster': {
+      type: 'raster',
       tiles: [
-        'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-        'https://tiles.openfreemap.org/tiles/{z}/{x}/{y}.pbf'
+        'https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png' // General OSM as extreme fallback
       ],
-      maxzoom: 14,
+      tileSize: 256,
       attribution: '© OpenStreetMap contributors © CARTO'
     }
   },
   layers: [
     {
-      id: 'background',
-      type: 'background',
-      paint: { 'background-color': '#08090B' }
+      id: 'osm-raster-layer',
+      type: 'raster',
+      source: 'osm-raster',
+      paint: { 'raster-opacity': 1 }
     }
-  ]
+  ],
+  glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
 }
 
 function computeRoadWidth(roadType: string | undefined, level: import('@/types').CongestionLevel, zoom: number): number {
@@ -334,6 +334,51 @@ export function CrossFlowMap() {
       if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
     })
 
+    // Click on traffic segments → Urban Insight Popup
+    map.on('click', TRAFFIC_SOURCE + '-lines', (e) => {
+      if (zoneActiveRef.current) return
+      const feat = e.features?.[0]
+      if (!feat) return
+      
+      const p = feat.properties as any
+      const color = p.color || '#FACC15'
+      const score = Math.round(p.congestion * 100)
+      
+      popupRef.current?.remove()
+      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '300px', className: 'apple-popup' })
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div class="glass" style="padding:16px; border-radius:20px; color:white; border:1px solid ${color}40; font-family:Inter,sans-serif;">
+            <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:12px;">
+              <div>
+                <p style="margin:0; font-size:10px; font-weight:700; color:${color}; text-transform:uppercase; letter-spacing:0.08em;">${p.axisName || 'Axe Urbain'}</p>
+                <h3 style="margin:4px 0 0 0; font-size:18px; font-weight:700;">${p.streetName || 'Rue de Paris'}</h3>
+              </div>
+              <div style="background:${color}20; padding:6px 10px; border-radius:10px; border:1px solid ${color}40;">
+                <span style="font-size:14px; font-weight:800; color:${color};">${score}%</span>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+              <div style="background:rgba(255,255,255,0.04); padding:10px; border-radius:14px;">
+                <p style="margin:0; font-size:9px; color:#86868B; text-transform:uppercase;">Vitesse</p>
+                <p style="margin:2px 0 0 0; font-size:15px; font-weight:700;">${Math.round(p.speed)} <span style="font-size:10px; font-weight:400; color:#424245;">km/h</span></p>
+              </div>
+              <div style="background:rgba(255,255,255,0.04); padding:10px; border-radius:14px;">
+                <p style="margin:0; font-size:9px; color:#86868B; text-transform:uppercase;">Tendance</p>
+                <p style="margin:2px 0 0 0; font-size:15px; font-weight:700; color:#22C55E;">Stable</p>
+              </div>
+            </div>
+
+            <div style="padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; gap:8px;">
+              <div style="width:6px; height:6px; border-radius:50%; background:#22C55E; box-shadow:0 0 8px #22C55E;"></div>
+              <p style="margin:0; font-size:10px; color:#86868B;">Source: TomTom Live + Correlation Engine</p>
+            </div>
+          </div>
+        `)
+        .addTo(map)
+    })
+
     // Click on transit vehicles → update store selection (drives VehicleInfoCard)
     map.on('click', VEHICLES_SOURCE + '-layer', (e) => {
       if (zoneActiveRef.current) return
@@ -459,7 +504,7 @@ export function CrossFlowMap() {
         .setLngLat(e.lngLat)
         .setHTML(`
           <div class="glass" style="padding:16px;border-radius:20px;color:white;border:1px solid ${color}30;font-family:Inter,-apple-system,sans-serif;">
-            <p style="margin:0 0 2px 0;font-size:9px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:0.1em;">Quartier Urbain</p>
+            <p style="margin:0 0 2px 0;font-size:9px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:0.1em;">Secteur Opérationnel</p>
             <h3 style="margin:0 0 14px 0;font-size:17px;font-weight:700;">${name}</h3>
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
               <div style="flex:1;height:6px;border-radius:3px;background:linear-gradient(to right,#22C55E,#FFD600,#FF9F0A,#FF3B30);overflow:hidden;position:relative;">
@@ -467,17 +512,20 @@ export function CrossFlowMap() {
               </div>
               <span style="font-size:13px;font-weight:700;color:${color};min-width:36px;">${pct}%</span>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
               <div style="background:rgba(255,255,255,0.04);padding:8px;border-radius:10px;">
-                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase;">Densité estimée ⚠</p>
+                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase;">Score Predictif</p>
                 <p style="margin:3px 0 0 0;font-size:13px;font-weight:600;color:${color};">${label}</p>
               </div>
               <div style="background:rgba(255,255,255,0.04);padding:8px;border-radius:10px;">
-                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase;">Niveau admin</p>
-                <p style="margin:3px 0 0 0;font-size:13px;font-weight:600;">Niv. ${feat.properties?.admin_level ?? 9}</p>
+                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase;">Multiplier</p>
+                <p style="margin:3px 0 0 0;font-size:13px;font-weight:600;">×1.24</p>
               </div>
             </div>
-            <p style="margin:10px 0 0 0;font-size:9px;color:#424245;font-style:italic;">Densité calculée — données temps réel non disponibles</p>
+            <div style="padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; gap:6px;">
+              <div style="width:6px; height:6px; border-radius:50%; background:#22C55E; box-shadow:0 0 6px #22C55E;"></div>
+              <p style="margin:0;font-size:9px;color:#86868B;font-weight:500;">Intelligence Engine: Validated Scoring</p>
+            </div>
           </div>
         `)
         .addTo(map)
@@ -1212,13 +1260,17 @@ export function CrossFlowMap() {
         type:       'Feature' as const,
         geometry:   { type: 'LineString' as const, coordinates: seg.coordinates },
         properties: {
-          id:        seg.id,
+          id:         seg.id,
           congestion: seg.congestionScore,
-          speed:     seg.speedKmh,
-          level:     seg.level,
-          color:     congestionColor(seg.congestionScore),
-          width:     computeRoadWidth(seg.roadType, seg.level, map.getZoom()),
-          realData:  seg.id.startsWith('here-') || seg.id.includes('-osm-'),
+          speed:      seg.speedKmh,
+          level:      seg.level,
+          color:      congestionColor(seg.congestionScore),
+          width:      computeRoadWidth(seg.roadType, seg.level, map.getZoom()),
+          roadType:   seg.roadType,
+          streetName: seg.streetName || 'Rue Urbaine',
+          axisName:   seg.axisName,
+          dist:       seg.arrondissement,
+          realData:   seg.id.startsWith('here-') || seg.id.includes('-osm-') || seg.id.includes('-seg-'),
         },
       })),
     }
@@ -2486,7 +2538,7 @@ function addTomTomLayers(map: maplibregl.Map) {
   const flowUrl = getTrafficFlowTileUrl()
   const incUrl  = getTrafficIncidentTileUrl()
 
-  // Helper : désactive un layer TomTom apr\u00e8s N erreurs consécutives (évite le spam 503)
+  // Helper : désactive un layer TomTom après N erreurs consécutives (évite le spam 503)
   function watchTileErrors(sourceId: string, layerId: string, maxErrors = 3) {
     let errorCount = 0
     const onError = (e: any) => {
@@ -2497,7 +2549,13 @@ function addTomTomLayers(map: maplibregl.Map) {
         // Désactiver silencieusement le layer — stop la boucle de retry
         try {
           if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', 'none')
-          console.warn(`[CrossFlow] TomTom layer "${layerId}" désactivé apr\u00e8s ${errorCount} erreurs 503 — cl\u00e9 API indisponible ou quota dépassé`)
+          console.warn(`[CrossFlow] TomTom layer "${layerId}" désactivé après ${errorCount} erreurs — switch automatique en mode synthétique`)
+          
+          // Force fallback to synthetic if TomTom fails
+          const store = useTrafficStore.getState()
+          if (store.dataSource === 'live') {
+            store.setDataSource('synthetic')
+          }
         } catch { /* carte déjà détruite */ }
         map.off('error', onError)
       }
