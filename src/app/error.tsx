@@ -12,6 +12,25 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error('[CrossFlow Error]', error)
+
+    // Check for ChunkLoadError (Standard Next.js / Webpack / Turbopack chunk load failure)
+    const isChunkError = 
+      error.name === 'ChunkLoadError' || 
+      error.message?.includes('Failed to load chunk') || 
+      error.message?.includes('Loading chunk')
+
+    if (isChunkError) {
+      const now = Date.now()
+      const lastReload = Number(sessionStorage.getItem('cf-last-chunk-reload') || '0')
+      
+      // Only auto-reload once every 30s to prevent refresh loops if server is really down
+      if (now - lastReload > 30000) {
+        sessionStorage.setItem('cf-last-chunk-reload', String(now))
+        console.warn('[CrossFlow] ChunkLoadError detected. Re-syncing client with latest build...')
+        // Short delay to let the UI update before refresh
+        setTimeout(() => window.location.reload(), 1500)
+      }
+    }
   }, [error])
 
   return (
@@ -26,10 +45,12 @@ export default function GlobalError({
 
       <div className="space-y-2 max-w-sm">
         <h1 className="text-lg font-semibold text-text-primary">Une erreur s'est produite</h1>
-        <p className="text-sm text-text-secondary leading-relaxed">
-          {error.message?.includes('fetch')
-            ? 'Impossible de charger les données. Vérifiez votre connexion internet.'
-            : 'Un problème inattendu est survenu. Réessayez ou revenez à l\'accueil.'}
+        <p className="text-sm text-text-secondary leading-relaxed font-medium">
+          {error.name === 'ChunkLoadError' || error.message?.includes('Failed to load chunk')
+             ? 'Mise à jour de l\'application en cours...'
+             : error.message?.includes('fetch')
+             ? 'Impossible de charger les données. Vérifiez votre connexion internet.'
+             : 'Un problème inattendu est survenu. Réessayez ou revenez à l\'accueil.'}
         </p>
         {error.digest && (
           <p className="text-[10px] font-mono text-text-muted mt-2">
