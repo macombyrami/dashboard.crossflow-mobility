@@ -7,7 +7,7 @@ const CACHE_TTL_INCIDENTS = 300  // 5 minutes for memory
 const DB_TTL_INCIDENTS    = 600  // 10 minutes for persistence
 
 export async function GET(req: NextRequest) {
-  const apiKey = process.env.TOMTOM_API_KEY
+  const apiKey = process.env.TOMTOM_API_KEY || process.env.NEXT_PUBLIC_TOMTOM_API_KEY
   if (!apiKey) return NextResponse.json([])
 
   const bboxRaw = req.nextUrl.searchParams.get('bbox') ?? ''

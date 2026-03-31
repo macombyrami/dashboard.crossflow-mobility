@@ -6,7 +6,7 @@
 
 import { FlowSegmentData, TomTomIncident } from '../tomtom'
 
-const API_KEY = process.env.TOMTOM_API_KEY
+const API_KEY = process.env.TOMTOM_API_KEY || process.env.NEXT_PUBLIC_TOMTOM_API_KEY
 
 /**
  * Fetch real-time flow data for a specific segment point

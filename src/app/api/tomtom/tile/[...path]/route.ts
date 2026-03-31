@@ -12,7 +12,7 @@ const CACHE_TTL = 1000 * 60 * 30 // 30 minutes cache for traffic tiles
 const throttle = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
-  const apiKey = process.env.TOMTOM_API_KEY
+  const apiKey = process.env.TOMTOM_API_KEY || process.env.NEXT_PUBLIC_TOMTOM_API_KEY
   if (!apiKey) {
     console.error('[TomTom Proxy] API Key missing')
     return new NextResponse(null, { status: 503 })
@@ -46,8 +46,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
     })
 
     if (!res.ok) {
-      if (res.status === 429 || res.status === 503) {
-        console.warn(`[TomTom Proxy] Upstream oversight: ${res.status} for ${tilePath}`)
+      if (res.status === 401 || res.status === 403) {
+        console.error(`[TomTom Proxy] Auth failure (API Key issue) - Status: ${res.status} for ${tilePath}`);
+      } else if (res.status === 429) {
+        console.warn(`[TomTom Proxy] Rate limit exceeded (429) for ${tilePath}`);
+      } else if (res.status >= 500) {
+        console.warn(`[TomTom Proxy] Upstream TomTom error (${res.status}) for ${tilePath}`);
+      } else {
+        console.warn(`[TomTom Proxy] Other error (${res.status}) for ${tilePath}`);
       }
       return new NextResponse(null, { status: res.status })
     }
