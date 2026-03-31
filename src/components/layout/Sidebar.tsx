@@ -73,7 +73,7 @@ export function Sidebar() {
         </div>
         <div>
           <div className="text-[14px] font-bold text-text-primary tracking-tight leading-none">{appData.name}</div>
-          <div className="text-[10px] font-bold text-text-muted mt-1 leading-none uppercase tracking-widest">Smart City</div>
+          <div className="text-[10px] font-bold text-text-muted mt-1 leading-none uppercase tracking-widest">Plateforme de Mobilité</div>
         </div>
       </div>
 

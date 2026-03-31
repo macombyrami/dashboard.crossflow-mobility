@@ -1706,10 +1706,10 @@ function initStaticSources(map: maplibregl.Map) {
     map.addSource('base-network', {
       type: 'vector',
       tiles: [
-        'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
         'https://tiles.openfreemap.org/tiles/{z}/{x}/{y}.pbf'
       ],
-      maxzoom: 14
+      maxzoom: 14,
+      promoteId: 'id'
     })
   }
 

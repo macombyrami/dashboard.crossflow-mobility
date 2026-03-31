@@ -32,7 +32,7 @@ const LiveClock = memo(function LiveClock() {
     <div className="hidden md:flex items-center gap-3 px-2.5 py-1.5 rounded-lg bg-bg-elevated/60 border border-bg-border/50">
       <div className="flex items-center gap-1.5 border-r border-white/10 pr-2">
         <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse shadow-glow"></div>
-        <span className="text-[10px] font-bold text-brand uppercase tracking-widest">Active Intelligence</span>
+        <span className="text-[10px] font-bold text-brand uppercase tracking-widest">Intelligence Active</span>
       </div>
       <span className="text-[13px] font-medium text-text-secondary mono tabular-nums">{time}</span>
     </div>
@@ -241,7 +241,7 @@ export function Header() {
           aria-label="Assistant IA Discovery"
         >
           <Sparkles className={`w-3.5 h-3.5 ${isAIPanelOpen ? 'text-black' : 'text-brand'}`} strokeWidth={2.5} />
-          <span className="hidden sm:inline">Prediction Analysis</span>
+          <span className="hidden sm:inline">Analyse Prédictive</span>
         </button>
       </div>
     </header>

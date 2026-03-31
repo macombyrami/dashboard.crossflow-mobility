@@ -1,22 +1,22 @@
 /**
- * SimpleCache — Next.js In-Memory Level 1 Cache
- * Dédoublonne les requêtes API (TomTom, Weather, etc.) 
- * pour éviter d'appeler le même point dans une fenêtre < TTL.
+ * Simple In-Memory Singleton Cache
+ * Used by Next.js API routes to deduplicate and cache heavy API calls
+ * during the same process lifetime (e.g. concurrent user requests for same city).
  */
 
-type CacheItem<T> = {
-  data:      T
+type CacheEntry<T> = {
+  data: T
   expiresAt: number
 }
 
 class SimpleCache {
   private static instance: SimpleCache
-  private store: Map<string, CacheItem<any>> = new Map()
+  private cache: Map<string, CacheEntry<any>> = new Map()
 
   private constructor() {
-    // Nettoyage périodique toutes les minutes
-    if (typeof window === 'undefined') {
-      setInterval(() => this.cleanup(), 60_000)
+    // Periodic cleanup (every minute)
+    if (typeof setInterval !== 'undefined') {
+      setInterval(() => this.cleanup(), 60000)
     }
   }
 
@@ -28,54 +28,50 @@ class SimpleCache {
   }
 
   /**
-   * Récupère une donnée du cache si elle est encore valide.
+   * Get an item from the cache
+   * @param key Unique key (e.g. "flow:paris:12.3,45.6")
    */
   public get<T>(key: string): T | null {
-    const item = this.store.get(key)
-    if (!item) return null
-
-    if (Date.now() > item.expiresAt) {
-      this.store.delete(key)
+    const entry = this.cache.get(key)
+    if (!entry) return null
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key)
       return null
     }
-
-    return item.data as T
+    return entry.data as T
   }
 
   /**
-   * Stocke une donnée avec une durée de vie (TTL) en secondes.
+   * Set an item in the cache
+   * @param key Unique key
+   * @param data Data to store
+   * @param ttlSeconds Time to live in seconds
    */
   public set<T>(key: string, data: T, ttlSeconds: number): void {
-    this.store.set(key, {
+    this.cache.set(key, {
       data,
-      expiresAt: Date.now() + (ttlSeconds * 1000)
+      expiresAt: Date.now() + ttlSeconds * 1000
     })
   }
 
   /**
-   * Génère une clé unique basée sur les paramètres.
+   * Delete an item from the cache
    */
-  public makeKey(...args: any[]): string {
-    return args
-      .map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg))
-      .join(':')
-  }
-
-  private cleanup(): void {
-    const now = Date.now()
-    for (const [key, item] of this.store.entries()) {
-      if (now > item.expiresAt) {
-        this.store.delete(key)
-      }
-    }
+  public delete(key: string): void {
+    this.cache.delete(key)
   }
 
   /**
-   * Pour le monitoring : retourne la taille actuelle du cache.
+   * Manual cleanup of expired entries
    */
-  public size(): number {
-    return this.store.size
+  private cleanup(): void {
+    const now = Date.now()
+    for (const [key, entry] of this.cache.entries()) {
+      if (now > entry.expiresAt) {
+        this.cache.delete(key)
+      }
+    }
   }
 }
 
-export const simpleCache = SimpleCache.getInstance()
+export const cache = SimpleCache.getInstance()

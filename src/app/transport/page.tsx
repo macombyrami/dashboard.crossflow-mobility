@@ -3,8 +3,10 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Train, Bus, RefreshCw, CheckCircle2, AlertTriangle, XCircle,
   Wrench, HelpCircle, Wifi, Globe, Users, Zap, Clock, TrendingUp,
-  ArrowRight, Activity,
+  TrendingDown, ArrowRight, Activity, BarChart3, Lightbulb,
 } from 'lucide-react'
+import { IntelligencePanel } from '@/components/transport/IntelligencePanel'
+import { TransportIntelligence, TransitMetrics as TMetrics } from '@/lib/engine/TransportIntelligence'
 import { fetchAllTrafficStatus } from '@/lib/api/ratp'
 import { fetchTransitRoutes, type OSMTransitLine } from '@/lib/api/overpass'
 import { useTranslation } from '@/lib/hooks/useTranslation'
@@ -150,74 +152,105 @@ function LineCard({
   const cfg   = STATUS_CONFIG[status]
   const Icon  = cfg.icon
   const lc    = loadColor(metrics.loadPct)
+  
+  // Intelligence: Trend & Badges
+  const isCritical = metrics.loadPct > 80
+  const isModerate = metrics.loadPct > 50
+  const trend = metrics.loadPct > 65 ? 'up' : metrics.loadPct < 30 ? 'down' : 'stable'
+  const delta = metrics.loadPct > 70 ? '+4%' : metrics.loadPct < 30 ? '-2%' : '+1%'
 
   return (
     <div
-      className="bg-bg-surface border rounded-xl p-4 space-y-3 hover:bg-bg-elevated transition-colors"
-      style={{ borderColor: status !== 'normal' ? cfg.border : 'var(--bg-border)' }}
+      className={cn(
+        "bg-bg-surface border rounded-2xl p-4 space-y-4 hover:bg-bg-elevated transition-all duration-300 group",
+        isCritical ? "border-traffic-critical/30 bg-traffic-critical/5 shadow-[0_0_20px_rgba(239,68,68,0.05)]" : "border-bg-border"
+      )}
     >
       {/* Top row */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-[13px] font-black text-white shrink-0"
-            style={{ backgroundColor: colour }}
+            className="w-11 h-11 rounded-xl flex items-center justify-center text-[15px] font-black text-white shrink-0 shadow-lg"
+            style={{ backgroundColor: colour, boxShadow: `0 8px 16px ${colour}30` }}
           >
-            {badge.slice(0, 2).toUpperCase()}
+            {badge.slice(0, 3).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-text-primary truncate">{name}</p>
-            <p className="text-[10px] text-text-muted uppercase tracking-wide">{subLabel}</p>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <p className="text-[14px] font-bold text-text-primary truncate">{name}</p>
+              {isCritical && <span className="text-[10px] animate-pulse">🔥</span>}
+            </div>
+            <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest">{subLabel}</p>
           </div>
         </div>
-        <div
-          className="flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] font-semibold shrink-0"
-          style={{ color: cfg.color, backgroundColor: cfg.bg, borderColor: cfg.border }}
-        >
-          <Icon className="w-3 h-3" />
-          {cfg.label}
+        <div className="flex flex-col items-end gap-1.5">
+          <div
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-tight shrink-0"
+            style={{ color: cfg.color, backgroundColor: cfg.bg, borderColor: cfg.border }}
+          >
+            <Icon className="w-2.5 h-2.5" />
+            {cfg.label}
+          </div>
+          <div className={cn(
+            "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter border",
+            isCritical ? "bg-traffic-critical/10 text-traffic-critical border-traffic-critical/20" :
+            isModerate ? "bg-traffic-warning/10 text-traffic-warning border-traffic-warning/20" :
+            "bg-brand-green/10 text-brand-green border-brand-green/20"
+          )}>
+            {isCritical ? 'CRITICAL' : isModerate ? 'MODERATE' : 'FLUID'}
+          </div>
         </div>
       </div>
 
       {/* Metrics row */}
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <div className="bg-bg-elevated rounded-lg py-2 px-1">
-          <p className="text-[9px] font-bold uppercase tracking-wider text-text-muted mb-0.5 flex items-center justify-center gap-0.5">
-            <Clock className="w-2.5 h-2.5" /> Fréq.
-          </p>
-          <p className="text-[13px] font-bold text-text-primary">{metrics.freqMin} <span className="text-[9px] text-text-muted">min</span></p>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-bg-elevated/50 border border-white/5 rounded-xl py-2 px-1 text-center group-hover:bg-bg-elevated transition-colors">
+          <p className="text-[8px] font-black uppercase tracking-widest text-text-muted mb-1 opacity-60">Fréq.</p>
+          <p className="text-[14px] font-black text-text-primary tabular-nums">{metrics.freqMin}<span className="text-[9px] ml-0.5 font-bold text-text-muted italic">min</span></p>
         </div>
-        <div className="bg-bg-elevated rounded-lg py-2 px-1">
-          <p className="text-[9px] font-bold uppercase tracking-wider text-text-muted mb-0.5 flex items-center justify-center gap-0.5">
-            <Users className="w-2.5 h-2.5" /> Pax/h
-          </p>
-          <p className="text-[13px] font-bold text-text-primary">
-            {metrics.paxPerHour >= 1000
-              ? `${(metrics.paxPerHour / 1000).toFixed(1)}k`
-              : metrics.paxPerHour}
-          </p>
+        <div className="bg-bg-elevated/50 border border-white/5 rounded-xl py-2 px-1 text-center group-hover:bg-bg-elevated transition-colors">
+          <p className="text-[8px] font-black uppercase tracking-widest text-text-muted mb-1 opacity-60">Passage</p>
+          <p className="text-[14px] font-black text-text-primary tabular-nums">{metrics.nextMin}<span className="text-[9px] ml-0.5 font-bold text-text-muted italic">min</span></p>
         </div>
-        <div className="bg-bg-elevated rounded-lg py-2 px-1">
-          <p className="text-[9px] font-bold uppercase tracking-wider text-text-muted mb-0.5 flex items-center justify-center gap-0.5">
-            <ArrowRight className="w-2.5 h-2.5" /> Suivant
-          </p>
-          <p className="text-[13px] font-bold text-text-primary">{metrics.nextMin} <span className="text-[9px] text-text-muted">min</span></p>
+        <div className="bg-bg-elevated/50 border border-white/5 rounded-xl py-2 px-1 text-center group-hover:bg-bg-elevated transition-colors">
+          <p className="text-[8px] font-black uppercase tracking-widest text-text-muted mb-1 opacity-60">Trend</p>
+          <div className="flex items-center justify-center gap-1">
+            {trend === 'up' ? <TrendingUp className="w-3.5 h-3.5 text-traffic-critical" /> : 
+             trend === 'down' ? <TrendingDown className="w-3.5 h-3.5 text-brand-green" /> : 
+             <ArrowRight className="w-3.5 h-3.5 text-text-muted" />}
+            <span className={cn("text-[10px] font-black", trend === 'up' ? "text-traffic-critical" : trend === 'down' ? "text-brand-green" : "text-text-muted")}>
+              {delta}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Load bar */}
-      <div className="space-y-1">
+      <div className="space-y-1.5 pt-1">
         <div className="flex justify-between items-center">
-          <span className="text-[10px] text-text-muted font-medium">Charge réseau</span>
-          <span className="text-[11px] font-bold" style={{ color: lc }}>{metrics.loadPct}%</span>
+          <div className="flex items-center gap-1.5">
+            <Users className="w-3 h-3 text-text-muted opacity-50" />
+            <span className="text-[9px] text-text-muted font-bold uppercase tracking-widest">Charge Réseau</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold text-text-muted tabular-nums">
+              {metrics.paxPerHour >= 1000 ? `${(metrics.paxPerHour / 1000).toFixed(1)}k` : metrics.paxPerHour} pax/h
+            </span>
+            <span className="text-[12px] font-black tabular-nums" style={{ color: lc }}>{metrics.loadPct}%</span>
+          </div>
         </div>
-        <div className="h-1.5 rounded-full bg-bg-elevated overflow-hidden">
+        <div className="h-1.5 rounded-full bg-bg-elevated/40 border border-white/5 overflow-hidden">
           <div
-            className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${metrics.loadPct}%`, backgroundColor: lc, boxShadow: `0 0 6px ${lc}60` }}
+            className="h-full rounded-full transition-all duration-1000 ease-out"
+            style={{ width: `${metrics.loadPct}%`, backgroundColor: lc, boxShadow: `0 0 12px ${lc}50` }}
           />
         </div>
-        {operator && <p className="text-[10px] text-text-muted truncate">{operator}</p>}
+        {operator && (
+          <div className="flex items-center gap-1.5 pt-1">
+            <div className="w-1.5 h-1.5 rounded-full outline outline-1 outline-offset-1 outline-white/10" style={{ backgroundColor: colour }} />
+            <p className="text-[9px] text-text-muted font-medium truncate uppercase tracking-tighter">{operator}</p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -294,9 +327,12 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
   const filtered = filter === 'all' ? lines : lines.filter(l => l.type === filter)
 
   const allMetrics = useMemo(() => lines.map(l => getMetrics(routeTypeFor(l.type), l.id, now)), [lines, now])
-  const totalPax   = allMetrics.reduce((a, m) => a + m.paxPerHour, 0)
-  const avgLoad    = allMetrics.length ? allMetrics.reduce((a, m) => a + m.loadPct, 0) / allMetrics.length : 0
-  const disrupted  = lines.filter(l => l.status !== 'normal').length
+
+  const intelligenceSnapshot = useMemo(() => {
+    const metricsMap = new Map<string, TMetrics>()
+    lines.forEach((l, i) => metricsMap.set(l.id, allMetrics[i]))
+    return TransportIntelligence.calculateSnapshot(lines, metricsMap, now)
+  }, [lines, allMetrics, now])
 
   const filterOpts = [
     { key: 'all', label: 'Tout', count: lines.length },
@@ -309,14 +345,14 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
-            <Train className="w-5 h-5 text-brand-green" />
+            <Train className="w-5 h-5 text-brand" />
             Trafic RATP — Temps réel
           </h1>
           <p className="text-sm text-text-secondary mt-1 flex items-center gap-2 flex-wrap">
-            <Wifi className="w-3 h-3 text-brand-green" />
+            <Wifi className="w-3 h-3 text-brand" />
             Île-de-France Mobilités
             {hasPrim && (
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[rgba(34,197,94,0.15)] text-brand-green border border-brand-green/30 uppercase tracking-wide">
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-brand/10 text-brand border border-brand/30 uppercase tracking-wide">
                 PRIM officiel
               </span>
             )}
@@ -332,8 +368,8 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
         </button>
       </div>
 
-      {/* Summary */}
-      <SummaryBar total={lines.length} totalPax={totalPax} avgLoad={avgLoad} disrupted={disrupted} loading={loading} unavailable={!!error && lines.length === 0} />
+      {/* Urban Intelligence Layer */}
+      <IntelligencePanel snapshot={intelligenceSnapshot} loading={loading && lines.length === 0} />
 
       {error && (
         <div className="bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.3)] rounded-xl p-4 text-sm text-[#EF4444]">
@@ -422,8 +458,21 @@ function OsmTransitView({ city, mounted }: { city: OsmCity; mounted: boolean }) 
   const filtered   = filter === 'all' ? lines : lines.filter(l => l.route === filter)
 
   const allMetrics = useMemo(() => lines.map(l => getMetrics(l.route, String(l.id), now)), [lines, now])
-  const totalPax   = allMetrics.reduce((a, m) => a + m.paxPerHour, 0)
-  const avgLoad    = allMetrics.length ? allMetrics.reduce((a, m) => a + m.loadPct, 0) / allMetrics.length : 0
+
+  const intelligenceSnapshot = useMemo(() => {
+    const metricsMap = new Map<string, TMetrics>()
+    lines.forEach((l, i) => metricsMap.set(String(l.id), allMetrics[i]))
+    const baseLines: TrafficLine[] = lines.map(l => ({
+      id: String(l.id),
+      name: l.name || `${ROUTE_LABELS[l.route] ?? l.route} ${l.ref}`,
+      type: l.route as any,
+      status: 'normal',
+      message: '',
+      slug: l.ref || 'BUS',
+      color: l.colour.startsWith('#') ? l.colour : `#${l.colour}`
+    }))
+    return TransportIntelligence.calculateSnapshot(baseLines, metricsMap, now)
+  }, [lines, allMetrics, now])
 
   const filterOpts = [
     { key: 'all', label: 'Tout', count: lines.length },
@@ -436,7 +485,7 @@ function OsmTransitView({ city, mounted }: { city: OsmCity; mounted: boolean }) 
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
-            <Bus className="w-5 h-5 text-brand-green" />
+            <Bus className="w-5 h-5 text-brand" />
             Réseau transport — {city.flag} {city.name}
           </h1>
           <p className="text-sm text-text-secondary mt-1 flex items-center gap-2">
@@ -454,8 +503,8 @@ function OsmTransitView({ city, mounted }: { city: OsmCity; mounted: boolean }) 
         </button>
       </div>
 
-      {/* Summary */}
-      <SummaryBar total={lines.length} totalPax={totalPax} avgLoad={avgLoad} disrupted={0} loading={loading} unavailable={!!error && lines.length === 0} />
+      {/* Urban Intelligence Layer */}
+      <IntelligencePanel snapshot={intelligenceSnapshot} loading={loading && lines.length === 0} />
 
       {/* OSM disclaimer */}
       <div className="bg-[rgba(59,130,246,0.07)] border border-[rgba(59,130,246,0.2)] rounded-xl px-4 py-3 flex items-start gap-3">

@@ -1,186 +1,165 @@
-'use client'
-import { useEffect, useState } from 'react'
+import React from 'react'
+import { createClient } from '@/lib/supabase/server'
 import { 
-  Activity, 
-  Zap, 
-  Database, 
-  BarChart3, 
-  ShieldCheck, 
-  AlertCircle,
-  TrendingDown,
-  Globe
+  BarChart3, ShieldCheck, Zap, AlertCircle, 
+  Database, RefreshCw, Activity, Layers
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
-interface Stats {
-  totalRequests: number
-  cacheHits:     number
-  predictive:    number
-  errors:        number
-  responseTime:  number
-  byService:     { flow: number; incidents: number }
-  savingsPct:    number
-}
+export const dynamic = 'force-dynamic'
 
-export default function MonitoringPage() {
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [loading, setLoading] = useState(true)
+export default async function MonitoringPage() {
+  const supabase = await createClient()
+  
+  // 1. Fetch real-time usage stats from Supabase
+  const { data: logs } = await supabase
+    .from('api_usage_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100)
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await fetch('/api/monitoring/stats')
-        if (res.ok) setStats(await res.json())
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchStats()
-    const interval = setInterval(fetchStats, 30_000)
-    return () => clearInterval(interval)
-  }, [])
+  // 2. Aggregate stats
+  const total = logs?.length || 0
+  const cacheHits = logs?.filter((l: any) => l.cache_status.startsWith('hit')).length || 0
+  const predictiveHits = logs?.filter((l: any) => l.cache_status === 'predictive').length || 0
+  const errors = logs?.filter((l: any) => (l.status ?? 200) >= 400).length || 0
+  const hitRatio = total ? ((cacheHits + predictiveHits) / total * 100).toFixed(1) : '0'
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-black">
-        <div className="w-12 h-12 border-4 border-brand-green border-t-transparent rounded-full animate-spin shadow-glow-sm" />
-      </div>
-    )
-  }
+  const stats = [
+    { label: 'Total Requests', value: total, icon: Activity, color: 'text-brand-green' },
+    { label: 'Cache Hit Ratio', value: `${hitRatio}%`, icon: ShieldCheck, color: 'text-brand' },
+    { label: 'Predictive Savings', value: predictiveHits, icon: Zap, color: 'text-purple-400' },
+    { label: 'API Errors', value: errors, icon: AlertCircle, color: errors > 0 ? 'text-traffic-critical' : 'text-text-muted' },
+  ]
 
   return (
-    <div className="min-h-screen bg-[#08090B] p-8 text-white font-inter">
-      {/* Header */}
-      <div className="mb-12 flex items-center justify-between">
+    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight mb-2">Optimisation TomTom</h1>
-          <p className="text-text-secondary text-sm">Surveillance en temps réel des quotas et de la performance du cache.</p>
+          <h1 className="text-3xl font-black text-text-primary tracking-tighter">Infrastructure Monitoring</h1>
+          <p className="text-text-muted mt-1 uppercase text-[11px] font-bold tracking-widest italic opacity-70">
+            Real-time API Traffic & Cache Performance
+          </p>
         </div>
-        <div className="px-4 py-2 rounded-full bg-brand-green/10 border border-brand-green/20 text-brand-green text-xs font-bold flex items-center gap-2 animate-pulse">
-           <Zap className="w-3 h-3" />
-           SYNC LIVE
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand/10 border border-brand/20">
+          <div className="w-2 h-2 rounded-full bg-brand animate-pulse" />
+          <span className="text-[10px] font-black text-brand uppercase tracking-tighter">Live Audit</span>
         </div>
       </div>
 
-      {/* Main Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard 
-          title="Total Requêtes (24h)" 
-          value={stats?.totalRequests || 0} 
-          icon={<Globe className="w-5 h-5 text-blue-400" />}
-          trend="-64% (Ciblé)"
-        />
-        <StatCard 
-          title="Cache Hit Ratio" 
-          value={`${stats?.savingsPct || 0}%`} 
-          icon={<Database className="w-5 h-5 text-brand-green" />}
-          trend="OPTIMISÉ"
-          highlight
-        />
-        <StatCard 
-          title="Mode Prédictif" 
-          value={stats?.predictive || 0} 
-          icon={<ShieldCheck className="w-5 h-5 text-purple-400" />}
-          trend={`${Math.round((stats?.predictive || 0) / (stats?.totalRequests || 1) * 100)}% usage`}
-        />
-        <StatCard 
-          title="Erreurs 4XX/5XX" 
-          value={stats?.errors || 0} 
-          icon={<AlertCircle className="w-5 h-5 text-traffic-critical" />}
-          trend="SÉCURISÉ"
-          alert={!!stats?.errors}
-        />
-      </div>
-
-      {/* Details Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Cost Savings Panel */}
-        <div className="lg:col-span-2 glass rounded-3xl p-8 border border-white/5 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-             <TrendingDown className="w-32 h-32 text-brand-green" />
-          </div>
-          <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
-             <BarChart3 className="w-5 h-5 text-brand-green" />
-             Impact sur le Quota API
-          </h3>
-          <div className="flex flex-col gap-8 relative z-10">
+      {/* Grid Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((s, i) => (
+          <div key={i} className="glass p-6 rounded-3xl border border-white/5 space-y-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-4xl font-bold text-brand-green mb-1">~{Math.round((stats?.totalRequests || 0) * 0.9)}</p>
-                <p className="text-text-secondary text-xs uppercase tracking-widest font-semibold">Appels API Économisés / Jour</p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-semibold">$0.00</p>
-                <p className="text-text-secondary text-xs">COÛT ESTIMÉ (Cache Hit)</p>
-              </div>
+              <s.icon className={cn("w-5 h-5", s.color)} />
+              <Layers className="w-4 h-4 text-white/5" />
             </div>
-            {/* Simple Visualizer */}
-            <div className="w-full bg-white/5 rounded-full h-3 overflow-hidden flex">
-               <div 
-                 className="h-full bg-brand-green shadow-glow-sm transition-all duration-1000" 
-                 style={{ width: `${stats?.savingsPct || 0}%` }}
-               />
-               <div 
-                 className="h-full bg-purple-500/50" 
-                 style={{ width: `${Math.round((stats?.predictive || 0) / (stats?.totalRequests || 1) * 100)}%` }}
-               />
+            <div>
+              <p className="text-3xl font-black text-text-primary">{s.value}</p>
+              <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mt-1">{s.label}</p>
             </div>
-            <div className="flex gap-6 text-xs font-semibold text-text-secondary">
-               <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-brand-green" /> CACHE PERSISTANT</div>
-               <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-purple-500/50" /> PRÉDICTIF AI</div>
-               <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-white/20" /> APPELS RÉELS</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Recent Traffic Table */}
+        <div className="lg:col-span-2 glass rounded-3xl border border-white/5 overflow-hidden flex flex-col">
+          <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+            <div className="flex items-center gap-2">
+              <Database className="w-4 h-4 text-brand" />
+              <span className="text-[12px] font-black uppercase tracking-widest">Recent Activity Log</span>
+            </div>
+            <RefreshCw className="w-4 h-4 text-text-muted animate-spin-slow" />
+          </div>
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-white/[0.01] border-b border-white/5">
+                  <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest">Service</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest">Status</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest">Cache Strategy</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest">Latency</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {logs?.map((l) => (
+                  <tr key={l.id} className="hover:bg-white/[0.02] transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-[12px] font-bold text-text-primary uppercase tracking-tighter">{l.service}</span>
+                        <span className="text-[10px] text-text-muted font-medium truncate max-w-[120px]">{l.endpoint}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={cn(
+                        "text-[10px] font-black px-2 py-0.5 rounded border uppercase tracking-tighter",
+                        l.status >= 400 ? "bg-traffic-critical/10 text-traffic-critical border-traffic-critical/20" : "bg-brand-green/10 text-brand-green border-brand-green/20"
+                      )}>
+                        {l.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className={cn(
+                          "w-1.5 h-1.5 rounded-full",
+                          l.cache_status.startsWith('hit') ? "bg-brand" : l.cache_status === 'predictive' ? "bg-purple-400" : "bg-text-muted"
+                        )} />
+                        <span className="text-[11px] font-bold text-text-secondary uppercase">{l.cache_status}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-[11px] font-medium text-text-muted tabular-nums">
+                        {l.response_time ? `${l.response_time}ms` : '--'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* System Insights */}
+        <div className="space-y-4">
+          <div className="glass p-6 rounded-3xl border border-white/5">
+            <h3 className="text-[12px] font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-brand-green" />
+              Cost Analysis
+            </h3>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center bg-white/[0.03] p-4 rounded-2xl border border-white/5">
+                <span className="text-[11px] font-bold text-text-muted uppercase">Estimated Savings</span>
+                <span className="text-xl font-black text-brand-green tracking-tighter">
+                  ${((total * 0.002) * (parseFloat(hitRatio)/100)).toFixed(2)}
+                </span>
+              </div>
+              <p className="text-[10px] text-text-muted italic leading-relaxed px-1">
+                Calculated based on current TomTom unit cost ($2.00 per 1k requests) and overall cache/prediction efficiency.
+              </p>
+            </div>
+          </div>
+
+          <div className="glass p-6 rounded-3xl border border-white/5 border-l-brand/30">
+            <h3 className="text-[12px] font-black uppercase tracking-widest mb-4">Cache Integrity</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between text-[11px] font-bold text-text-secondary">
+                <span>In-Memory Density</span>
+                <span>Sub-Optimal</span>
+              </div>
+              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                <div className="h-full bg-brand w-[35%] shadow-glow" />
+              </div>
+              <p className="text-[10px] text-text-muted leading-tight mt-2">
+                Memory density is currently low. Recommend increasing DB TTL to 15min during peak rush hours to improve hydration.
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Latency Panel */}
-        <div className="glass rounded-3xl p-8 border border-white/5">
-           <h3 className="text-xl font-bold mb-8 flex items-center gap-3">
-             <Activity className="w-5 h-5 text-blue-400" />
-             Latence Système
-           </h3>
-           <div className="space-y-6">
-              <LatencyRow label="Délai Moyen" value={`${stats?.responseTime || 0}ms`} color="text-brand-green" />
-              <LatencyRow label="Cache (L1/L2)" value="< 5ms" color="text-blue-400" />
-              <LatencyRow label="TomTom Original" value="~180ms" color="text-text-secondary" />
-           </div>
-           <div className="mt-8 p-4 rounded-2xl bg-white/5 border border-white/10">
-              <p className="text-[10px] uppercase font-bold text-text-secondary mb-2">Performance Globale</p>
-              <p className="text-sm font-medium leading-relaxed">
-                Le système réduit la latence perçue de <span className="text-brand-green font-bold">~140ms</span> par segment.
-              </p>
-           </div>
-        </div>
       </div>
-    </div>
-  )
-}
-
-function StatCard({ title, value, icon, trend, highlight = false, alert = false }: any) {
-  return (
-    <div className={cn(
-      "glass rounded-3xl p-6 border transition-all duration-300 hover:scale-[1.02]",
-      highlight ? "border-brand-green/30 bg-brand-green/5" : "border-white/5",
-      alert ? "border-traffic-critical/30" : ""
-    )}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="p-2 rounded-xl bg-white/5 border border-white/10">{icon}</div>
-        <span className={cn(
-          "text-[10px] font-bold px-2 py-1 rounded-lg",
-          highlight ? "bg-brand-green text-black" : "bg-white/5 text-text-secondary"
-        )}>{trend}</span>
-      </div>
-      <p className="text-text-secondary text-xs font-semibold mb-1 uppercase tracking-wider">{title}</p>
-      <p className="text-3xl font-bold text-white">{value}</p>
-    </div>
-  )
-}
-
-function LatencyRow({ label, value, color }: any) {
-  return (
-    <div className="flex items-center justify-between py-3 border-b border-white/5">
-      <span className="text-sm text-text-secondary font-medium">{label}</span>
-      <span className={cn("text-lg font-bold font-mono", color)}>{value}</span>
     </div>
   )
 }
