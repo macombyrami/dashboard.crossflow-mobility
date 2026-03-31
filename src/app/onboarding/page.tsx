@@ -224,7 +224,7 @@ export default function OnboardingPage() {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-bg-base flex flex-col items-center justify-start sm:justify-center p-4 py-10 sm:py-4 overflow-y-auto">
+    <div className="min-h-screen bg-bg-base flex flex-col items-center justify-start sm:justify-center p-4 py-8 sm:py-12 overflow-x-hidden">
       {/* Background gradient */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-brand-green/5 rounded-full blur-[120px]" />

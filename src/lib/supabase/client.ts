@@ -14,12 +14,5 @@ export function createClient() {
     )
   }
 
-  return createBrowserClient(url, key, {
-    auth: {
-      // Resolve: Navigator LockManager returned a null lock
-      // Standard fix for local HTTP/InPrivate environments where Web Locks API is restricted.
-      // @ts-ignore - The underlying type may vary depending on the Supabase version
-      lock: (name: string, acquire: () => Promise<any>) => acquire(),
-    },
-  })
+  return createBrowserClient(url, key)
 }

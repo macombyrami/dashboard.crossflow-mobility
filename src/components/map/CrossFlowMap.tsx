@@ -1664,7 +1664,6 @@ function initStaticSources(map: maplibregl.Map) {
   map.addSource(PREDICTIVE_EVENTS_SOURCE,   { type: 'geojson', data: emptyFC })
 
 
-  // 1. Glow Layer (Outer) — only for real road data
   map.addLayer({
     id:     TRAFFIC_SOURCE + '-glow',
     type:   'line',
@@ -1675,16 +1674,16 @@ function initStaticSources(map: maplibregl.Map) {
       'line-width': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.5, ['get', 'width']], 13, ['*', 2, ['get', 'width']], 17, ['*', 3, ['get', 'width']]],
       // Ne rendre visible que les données RÉELLES (HERE/OSM) — masquer la grille synthétique
       'line-opacity': [
-        'case',
-        ['boolean', ['get', 'realData'], false],
-        ['interpolate', ['linear'], ['zoom'], 10, 0.12, 14, 0.25],
-        0  // segments synthétiques = invisible
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        10, ['case', ['boolean', ['get', 'realData'], false], 0.12, 0],
+        14, ['case', ['boolean', ['get', 'realData'], false], 0.25, 0]
       ],
       'line-blur':    10,
     },
   })
 
-  // 2. Main Flow Line (Inner) — only for real road data
   map.addLayer({
     id:     TRAFFIC_SOURCE + '-lines',
     type:   'line',

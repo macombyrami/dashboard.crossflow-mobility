@@ -46,14 +46,13 @@
 
 html {
   height: 100%;
-  /* Let SwipeNavigation motion.div handle overflow per page */
-  overflow: hidden;
+  overflow-y: auto;
   background: var(--bg-base);
 }
 
 body {
   height: 100%;
-  overflow: hidden;
+  overflow-y: auto;
   margin: 0;
   padding: 0;
   color: var(--text-primary);
