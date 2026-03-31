@@ -24,10 +24,14 @@ const CrossFlowMap = dynamic(
 )
 
 export default function MapPage() {
+  const [mounted, setMounted] = React.useState(false)
   const { t } = useTranslation()
-  const city           = useMapStore(s => s.city)
+  const city  = useMapStore(s => s.city)
 
-  React.useEffect(() => { document.title = `Carte — ${city.name} | CrossFlow` }, [city.name])
+  React.useEffect(() => {
+    setMounted(true)
+    document.title = `Carte — ${city.name} | CrossFlow`
+  }, [city.name])
   const mode           = useMapStore(s => s.mode)
   const isAIPanelOpen  = useMapStore(s => s.isAIPanelOpen)
   const setAIPanelOpen = useMapStore(s => s.setAIPanelOpen)
@@ -53,22 +57,24 @@ export default function MapPage() {
         <CrossFlowMap />
 
         {/* City Pulse HUD — top center */}
-        <CityPulseHUD />
+        {mounted && <CityPulseHUD />}
 
         {/* Mode selector — top center (offset below HUD) */}
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
-          <ModeSelector />
-        </div>
+        {mounted && (
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+            <ModeSelector />
+          </div>
+        )}
 
         {/* Layer controls — top left */}
-        {mode !== 'simulate' && (
+        {mounted && mode !== 'simulate' && (
           <div className="absolute top-4 left-4 z-10 pointer-events-auto hidden sm:block">
             <LayerControls />
           </div>
         )}
 
         {/* Status indicators */}
-        {mode === 'live' && isLive && (
+        {mounted && mode === 'live' && isLive && (
           <div className="absolute bottom-16 left-4 z-10 pointer-events-none">
             <div className="bg-bg-surface/85 border border-bg-border rounded-lg px-3 py-2 backdrop-blur-sm">
               <LiveIndicator
@@ -82,7 +88,7 @@ export default function MapPage() {
             </div>
           </div>
         )}
-        {mode === 'predict' && (
+        {mounted && mode === 'predict' && (
           <div className="absolute bottom-16 left-4 z-10">
             <div className="bg-bg-surface/90 border border-[rgba(41,121,255,0.5)] rounded-lg px-3 py-2 backdrop-blur-sm">
               <LiveIndicator label={`${t('nav.predictions').toUpperCase()} · +30 MIN`} color="#2979FF" />
@@ -91,7 +97,7 @@ export default function MapPage() {
         )}
 
         {/* Simulation panel */}
-        {mode === 'simulate' && (
+        {mounted && mode === 'simulate' && (
           <div className="absolute top-16 right-4 w-[calc(100%-32px)] sm:w-80 max-h-[calc(100vh-130px)] overflow-y-auto z-20 space-y-4">
             <SimulationPanel />
             <SimulationResults />
@@ -99,17 +105,17 @@ export default function MapPage() {
         )}
 
         {/* Map legend */}
-        <MapLegend />
+        {mounted && <MapLegend />}
 
         {/* Edge detail panel */}
-        {mode !== 'simulate' && <EdgeDetailPanel />}
+        {mounted && mode !== 'simulate' && <EdgeDetailPanel />}
 
         {/* Zone stats panel */}
-        <ZoneStatsPanel />
+        {mounted && <ZoneStatsPanel />}
       </div>
 
       {/* AI Panel — right sidebar */}
-      {isAIPanelOpen && (
+      {mounted && isAIPanelOpen && (
         <div className="fixed inset-y-14 right-0 w-full sm:w-80 bg-bg-surface/95 backdrop-blur-md z-30 sm:relative sm:inset-auto sm:z-auto sm:border-l sm:border-bg-border">
           <AIPanel onClose={() => setAIPanelOpen(false)} />
         </div>

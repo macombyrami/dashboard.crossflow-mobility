@@ -52,7 +52,7 @@ export function MapLegend() {
   const isBoundary   = activeLayers.has('boundary')
 
   return (
-    <div className="absolute bottom-24 right-3 z-10 flex flex-col items-end gap-2">
+    <div className="absolute bottom-16 lg:bottom-24 right-2 lg:right-3 z-10 flex flex-col items-end gap-2">
       {/* District choropleth legend pill (shown when boundary is active) */}
       {isBoundary && (
         <div className="glass px-3 py-2.5 rounded-2xl border border-white/10 animate-in fade-in slide-in-from-right-4 w-44 shadow-xl">
@@ -72,15 +72,15 @@ export function MapLegend() {
 
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-bg-surface/90 border border-bg-border backdrop-blur-sm text-xs font-semibold text-text-secondary hover:text-text-primary transition-all shadow-apple hover:scale-105 active:scale-95"
+        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-bg-surface/90 border border-bg-border backdrop-blur-sm text-[10px] sm:text-xs font-semibold text-text-secondary hover:text-text-primary transition-all shadow-apple hover:scale-105 active:scale-95"
       >
-        <Info className="w-3.5 h-3.5" />
-        Légende
-        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", open && "rotate-180")} />
+        <Info className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+        <span className="hidden xs:inline">Légende</span>
+        <ChevronDown className={cn("w-3 sm:w-3.5 h-3 sm:h-3.5 transition-transform", open && "rotate-180")} />
       </button>
 
       {open && (
-        <div className="bg-bg-surface/95 backdrop-blur-md border border-bg-border rounded-2xl p-4 w-56 shadow-2xl space-y-4 animate-in zoom-in-95 fade-in duration-200 origin-bottom-right">
+        <div className="bg-bg-surface/95 backdrop-blur-md border border-bg-border rounded-2xl p-3 sm:p-4 w-48 sm:w-56 shadow-2xl space-y-3 sm:space-y-4 animate-in zoom-in-95 fade-in duration-200 origin-bottom-right">
           {/* Heatmap Section */}
           {isHeatmap && (
             <div className="pb-3 border-b border-white/5">

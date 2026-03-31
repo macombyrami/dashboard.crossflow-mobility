@@ -57,8 +57,8 @@ export function CityPulseHUD() {
   if (mode === 'simulate') return null
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 w-fit max-w-[95vw] pointer-events-auto">
-      <div className="flex items-stretch gap-1 p-1 bg-bg-surface/60 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden ring-1 ring-black/20">
+    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 w-fit max-w-[98vw] pointer-events-auto">
+      <div className="flex items-stretch gap-1 p-1 bg-bg-surface/75 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden ring-1 ring-black/20">
         
         {/* Section 1: City Health Circular Gauge Style */}
         <div className="px-5 py-2.5 flex items-center gap-4 bg-white/5 rounded-xl border border-white/5 shadow-inner group transition-all hover:bg-white/10">
@@ -93,11 +93,11 @@ export function CityPulseHUD() {
               {cityHealth}
             </span>
           </div>
-          <div>
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] leading-none mb-1">City Health</p>
+          <div className="flex flex-col justify-center">
+            <p className="text-[9px] sm:text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] leading-none mb-1 hidden xs:block">City Health</p>
             <div className="flex items-center gap-1.5">
-              <Activity className="w-3 h-3 text-white/60" />
-              <h2 className="text-sm font-bold text-white leading-none whitespace-nowrap">{city.name}</h2>
+              <Activity className="w-3 h-3 text-white/60 shrink-0" />
+              <h2 className="text-xs sm:text-sm font-bold text-white leading-none whitespace-nowrap">{city.name}</h2>
             </div>
           </div>
         </div>
@@ -130,10 +130,10 @@ export function CityPulseHUD() {
           )}>
             <ShieldAlert className={cn("w-5 h-5", kpis?.activeIncidents && kpis.activeIncidents > 5 ? "text-white animate-pulse" : "text-white/40")} />
           </div>
-          <div className="hidden lg:block">
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] leading-none mb-1">Alerts</p>
-            <p className="text-sm font-black text-white leading-none">
-              {kpis?.activeIncidents ?? 0} <span className="text-white/40 font-bold ml-1">Incidents</span>
+          <div className="hidden sm:block">
+            <p className="text-[9px] sm:text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] leading-none mb-1">Alerts</p>
+            <p className="text-xs sm:text-sm font-black text-white leading-none">
+              {kpis?.activeIncidents ?? 0} <span className="text-white/40 font-bold ml-0.5 hidden xs:inline">Incidents</span>
             </p>
           </div>
         </div>

@@ -251,6 +251,7 @@ export function CrossFlowMap() {
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left')
 
     map.on('load', () => {
+      console.log('[CrossFlow] Map loaded successfully')
       initStaticSources(map)
       initBoundaryLayers(map)
       initDistrictsLayers(map)
@@ -264,6 +265,11 @@ export function CrossFlowMap() {
 
       setMapLoaded(true)
       setMapReady(true)
+    })
+
+    map.on('error', (e) => {
+      console.error('[CrossFlow] MapLibre error:', e.error?.message || e)
+      // If style fails, we might need a fallback or just log it
     })
 
     // Click on synthetic segments
