@@ -412,7 +412,12 @@ export function CrossFlowMap() {
       if (feat) {
         const hSrc = map.getSource(VEHICLES_SOURCE + '-hover') as maplibregl.GeoJSONSource | undefined
         if (hSrc) {
-          hSrc.setData(feat)
+          // Explicitly construct a plain object to avoid serialization errors with minified MapLibre classes (hL)
+          hSrc.setData({
+            type: 'Feature',
+            geometry: feat.geometry,
+            properties: feat.properties
+          })
           map.setLayoutProperty(VEHICLES_SOURCE + '-hover-ring', 'visibility', 'visible')
         }
       }
@@ -1213,9 +1218,9 @@ export function CrossFlowMap() {
 
     let incidents: Incident[] = synthetic
 
-    if (useTomTom) {
+    // ── 4. Fetch TomTom incidents ONLY if not in resilience/synthetic mode ──
+    if (useTomTom && dataSource === 'live') {
       // Fetch real TomTom incidents for current viewport
-      if (!useHere) setDataSource('live')
       const tomtomIncs = await fetchTomTomIncidents(viewportBbox)
       if (tomtomIncs.length > 0) {
         incidents = tomtomIncs.map(inc => ({
@@ -1713,7 +1718,7 @@ function initStaticSources(map: maplibregl.Map) {
       type: 'vector',
       tiles: [
         // Using provided Stadia Maps API Key for authorized access
-        'https://tiles.stadiamaps.com/data/openmaptiles/{z}/{x}/{y}.pbf?api_key=5e67402e-c34c-484f-b67b-edb1686e0390'
+        `https://tiles.stadiamaps.com/data/openmaptiles/{z}/{x}/{y}.pbf?api_key=${process.env.NEXT_PUBLIC_STADIA_API_KEY}`
       ],
       maxzoom: 14,
       promoteId: 'id'
