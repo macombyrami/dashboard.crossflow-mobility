@@ -275,6 +275,12 @@ export function CrossFlowMap() {
     })
 
     map.on('error', (e) => {
+      const status = (e as any)?.error?.status
+      if (status === 503 || status === 429) {
+        console.warn('[CrossFlow] TomTom/Upstream transient error → dashboard enters resilience mode')
+        return // handled by source-specific watchers
+      }
+
       console.error('[CrossFlow] MapLibre error:', e.error?.message || e)
       // Check if it's a critical style or tile loading error
       const msg = e.error?.message || ''
@@ -2543,8 +2549,11 @@ function addTomTomLayers(map: maplibregl.Map) {
   function watchTileErrors(sourceId: string, layerId: string, maxErrors = 3) {
     let errorCount = 0
     const onError = (e: any) => {
-      // Seuls les erreurs de tiles 503/404 nous intéressent
-      if (!e?.error?.status && !String(e?.error).includes('503') && !String(e?.error).includes('AJAXError')) return
+      const status = e?.error?.status
+      const isTransient = status === 503 || status === 429 || String(e?.error).includes('AJAXError')
+
+      if (!isTransient) return
+      
       errorCount++
       if (errorCount >= maxErrors) {
         // Désactiver silencieusement le layer — stop la boucle de retry
@@ -2570,6 +2579,7 @@ function addTomTomLayers(map: maplibregl.Map) {
         type:    'raster',
         tiles:   [flowUrl],
         tileSize: 256,
+        maxzoom: 14, // Prevent API bombing at high zoom levels
       })
       map.addLayer({
         id:     TOMTOM_FLOW + '-layer',
@@ -2589,6 +2599,7 @@ function addTomTomLayers(map: maplibregl.Map) {
         type:    'raster',
         tiles:   [incUrl],
         tileSize: 256,
+        maxzoom: 14, // Limit traffic incident requests
       })
       map.addLayer({
         id:     TOMTOM_INC + '-layer',
