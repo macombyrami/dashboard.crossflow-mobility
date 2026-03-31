@@ -114,8 +114,10 @@ const OSM_DARK_STYLE: maplibregl.StyleSpecification = {
     'osm-raster': {
       type: 'raster',
       tiles: [
-        'https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
-        'https://tile.openstreetmap.org/{z}/{x}/{y}.png' // General OSM as extreme fallback
+        'https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
+        'https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
+        'https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
+        'https://d.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png'
       ],
       tileSize: 256,
       attribution: '© OpenStreetMap contributors © CARTO'
@@ -123,10 +125,19 @@ const OSM_DARK_STYLE: maplibregl.StyleSpecification = {
   },
   layers: [
     {
-      id: 'osm-raster-layer',
-      type: 'raster',
+      id:     'style-background',
+      type:   'background',
+      paint:  { 'background-color': '#08090B' }
+    },
+    {
+      id:     'osm-raster-layer',
+      type:   'raster',
       source: 'osm-raster',
-      paint: { 'raster-opacity': 1 }
+      paint:  { 
+        'raster-opacity': 0.85,
+        'raster-brightness-max': 0.5,
+        'raster-saturation': -0.4
+      }
     }
   ],
   glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
