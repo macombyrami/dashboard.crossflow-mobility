@@ -1706,8 +1706,8 @@ function initStaticSources(map: maplibregl.Map) {
     map.addSource('base-network', {
       type: 'vector',
       tiles: [
-        // Reliable open source mirror for vector tiles
-        'https://tiles.stadiamaps.com/data/openmaptiles/{z}/{x}/{y}.pbf'
+        // Using provided Stadia Maps API Key for authorized access
+        'https://tiles.stadiamaps.com/data/openmaptiles/{z}/{x}/{y}.pbf?api_key=5e67402e-c34c-484f-b67b-edb1686e0390'
       ],
       maxzoom: 14,
       promoteId: 'id'
