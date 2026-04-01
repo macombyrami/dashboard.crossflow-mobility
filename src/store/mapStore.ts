@@ -132,7 +132,7 @@ export const useMapStore = create<MapStore>()(
       mode:    'live',
       setMode: (mode) => set({ mode, selectedSegmentId: null }),
 
-      activeLayers: new Set<MapLayerId>(['traffic', 'incidents', 'boundary', 'transport']),
+      activeLayers: new Set<MapLayerId>(['traffic', 'incidents', 'boundary']),
       toggleLayer: (layer) =>
         set(s => {
           const next = new Set(s.activeLayers)
@@ -215,8 +215,6 @@ export const useMapStore = create<MapStore>()(
           const data = JSON.parse(str)
           if (data.state && data.state.activeLayers) {
             data.state.activeLayers = new Set(data.state.activeLayers)
-            // Always ensure transport layer is active (migration)
-            data.state.activeLayers.add('transport')
           }
           return data
         },
