@@ -52,7 +52,7 @@ import {
 } from '@/lib/api/here'
 import { fetchWeather as fetchOpenMeteoWeather, fetchAirQuality } from '@/lib/api/openmeteo'
 import { fetchCityBoundary, fetchCityDistricts } from '@/lib/api/geocoding'
-import type { Incident, HeatmapMode } from '@/types'
+import type { Incident, HeatmapMode, CongestionLevel, TrafficSnapshot, TrafficSegment } from '@/types'
 
 const TRAFFIC_SOURCE          = 'cf-traffic'
 const HEATMAP_SOURCE          = 'cf-heatmap'
@@ -125,7 +125,7 @@ const OSM_DARK_STYLE: maplibregl.StyleSpecification = {
   },
   layers: [
     {
-      id:     'style-background',
+      id:     'background-pure',
       type:   'background',
       paint:  { 'background-color': '#08090B' }
     },
@@ -135,15 +135,15 @@ const OSM_DARK_STYLE: maplibregl.StyleSpecification = {
       source: 'osm-raster',
       paint:  { 
         'raster-opacity': 0.85,
-        'raster-brightness-max': 0.5,
-        'raster-saturation': -0.4
+        'raster-brightness-max': 0.45,
+        'raster-saturation': -0.45
       }
     }
   ],
   glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
 }
 
-function computeRoadWidth(roadType: string | undefined, level: import('@/types').CongestionLevel, zoom: number): number {
+function computeRoadWidth(roadType: string | undefined, level: CongestionLevel, zoom: number): number {
   const base: Record<string, number> = {
     motorway: 4.5, motorway_link: 3.5, 
     trunk: 4, trunk_link: 3,
@@ -153,7 +153,7 @@ function computeRoadWidth(roadType: string | undefined, level: import('@/types')
     residential: 1.5, service: 1.2,
     unclassified: 1.2
   }
-  const mult: Record<import('@/types').CongestionLevel, number> = {
+  const mult: Record<CongestionLevel, number> = {
     free: 1.0, slow: 1.15, congested: 1.3, critical: 1.5,
   }
   const baseWidth = base[roadType ?? ''] ?? 1.8
@@ -423,11 +423,14 @@ export function CrossFlowMap() {
       if (feat) {
         const hSrc = map.getSource(VEHICLES_SOURCE + '-hover') as maplibregl.GeoJSONSource | undefined
         if (hSrc) {
-          // Explicitly construct a plain object to avoid serialization errors with minified MapLibre classes (hL)
+          // Explicitly construct a plain object to avoid serialization errors with internal MapLibre classes (hL)
           hSrc.setData({
             type: 'Feature',
-            geometry: feat.geometry,
-            properties: feat.properties
+            geometry: {
+              type: (feat.geometry as any).type,
+              coordinates: (feat.geometry as any).coordinates
+            } as any,
+            properties: { ...feat.properties }
           })
           map.setLayoutProperty(VEHICLES_SOURCE + '-hover-ring', 'visibility', 'visible')
         }
@@ -1191,7 +1194,7 @@ export function CrossFlowMap() {
       const hereFlow = await fetchHereFlow(city.bbox)
       if (hereFlow.length > 0) {
         const now = new Date().toISOString()
-        const hereSegments: import('@/types').TrafficSegment[] = hereFlow
+        const hereSegments: TrafficSegment[] = hereFlow
           .filter(s => s.coords.length >= 2)
           .map((s, i) => {
             const congestion = jamFactorToCongestion(s.jamFactor)
@@ -2659,7 +2662,7 @@ function estimateSegmentLength(coords: [number, number][]): number {
 }
 
 // Wrapper to allow inline call with dynamic import-style syntax
-function import_scoreToCongestionLevel(score: number): import('@/types').CongestionLevel {
+function import_scoreToCongestionLevel(score: number): CongestionLevel {
   if (score < 0.25) return 'free'
   if (score < 0.55) return 'slow'
   if (score < 0.80) return 'congested'
