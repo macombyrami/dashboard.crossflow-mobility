@@ -95,6 +95,10 @@ interface MapStore {
   setAIPanelOpen:(open: boolean) => void
   isMapReady:    boolean
   setMapReady:   (ready: boolean) => void
+
+  // Staff Features
+  splitRatio:    number
+  setSplitRatio: (ratio: number) => void
 }
 
 const defaultCity = CITIES.find(c => c.id === DEFAULT_CITY_ID)!
@@ -204,6 +208,10 @@ export const useMapStore = create<MapStore>()(
       setAIPanelOpen: (open) => set({ isAIPanelOpen: open }),
       isMapReady:     false,
       setMapReady:    (ready) => set({ isMapReady: ready }),
+
+      // Staff Features
+      splitRatio:    50,
+      setSplitRatio: (ratio) => set({ splitRatio: ratio }),
     })),
     {
       name: 'cf-map-storage',

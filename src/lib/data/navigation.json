@@ -5,5 +5,6 @@
   { "href": "/dashboard",  "iconName": "LayoutDashboard", "label": "INDICATEURS",   "description": "Décisionnel mairies",       "ariaLabel": "Tableau de bord et métriques KPI"       },
   { "href": "/incidents",  "iconName": "AlertTriangle",   "label": "ALERTES",       "description": "Incidents critiques",      "ariaLabel": "Alertes et incidents actifs"            },
   { "href": "/social",     "iconName": "Rss",             "label": "SOCIAL NLP",    "description": "X · Sytadin · Alerts",     "ariaLabel": "Feed social trafic Île-de-France"       },
-  { "href": "/transport",  "iconName": "Map",             "label": "RÉSEAU",        "description": "RATP · Bus · Métro",       "ariaLabel": "Réseau de transport en commun"          }
+  { "href": "/transport",  "iconName": "Map",             "label": "RÉSEAU",        "description": "RATP · Bus · Métro",       "ariaLabel": "Réseau de transport en commun"          },
+  { "href": "/dashboard/consultant-ai", "iconName": "Bot", "label": "CONSULTANT IA", "description": "Copilote décisionnel",   "ariaLabel": "Assistant intelligent CrossFlow"        }
 ]

@@ -10,6 +10,9 @@ import { ModalSplitChart } from '@/components/dashboard/ModalSplitChart'
 import { WeatherCard } from '@/components/dashboard/WeatherCard'
 import { AirQualityCard } from '@/components/dashboard/AirQualityCard'
 import { EventsWidget } from '@/components/dashboard/EventsWidget'
+import { TimelineScrubber } from '@/components/dashboard/TimelineScrubber'
+import { ZoneExportTool } from '@/components/dashboard/ZoneExportTool'
+import { TrafficStabilityWidget } from '@/components/dashboard/TrafficStabilityWidget'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useKPIHistoryStore } from '@/store/kpiHistoryStore'
@@ -137,12 +140,21 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3 sm:gap-4">
+          <ZoneExportTool />
           <button
             onClick={() => exportToPdf(`${appData.name} — ${city.name} Dashboard`)}
             className="print-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-xs text-text-secondary hover:text-text-primary"
           >
             <Download className="w-3.5 h-3.5" />
             PDF
+          </button>
+          
+          <button
+            onClick={() => alert("Permalink généré : " + window.location.href)}
+            className="print-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand/5 border border-brand/20 hover:bg-brand/10 transition-all text-xs text-brand font-bold"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            PARTAGER
           </button>
           {openMeteoWeather && (
             <div className="glass-light px-4 py-2 rounded-xl border border-white/5 flex items-center gap-2.5">
@@ -254,24 +266,17 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* Staff Playback Timeline */}
+      <TimelineScrubber />
+
       {/* Charts + real data row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <TrafficChart />
         </div>
         <div className="space-y-4">
+          <TrafficStabilityWidget />
           <ModalSplitChart />
-          <div className="glass-card border border-white/5 rounded-[22px] p-6 shadow-sm group animate-scale-in [animation-delay:600ms]">
-            <div className="flex items-center gap-2.5 mb-5">
-              <div className="w-1.5 h-4.5 bg-brand rounded-full shadow-glow" />
-              <p className="text-[11px] font-bold text-text-muted uppercase tracking-[0.18em]">{t('dashboard.performance')}</p>
-            </div>
-            {/* Efficacité réseau : dérivée des KPIs réels, pas de constantes hardcodées */}
-            <EfficiencyBar label="Axes majeurs"          value={kpis.networkEfficiency * 0.9 + 0.1} />
-            <EfficiencyBar label="Transports en commun" value={Math.min(0.98, (kpis.modalSplit.metro + kpis.modalSplit.bus) * 2.8)} color="#0A84FF" />
-            <EfficiencyBar label="Pistes cyclables"     value={Math.min(0.98, kpis.modalSplit.bike * 7.5)} color="#30D158" />
-            <EfficiencyBar label="Zones piétonnes"      value={Math.min(0.98, kpis.modalSplit.pedestrian * 9)} color="#AF52DE" />
-          </div>
         </div>
       </div>
 

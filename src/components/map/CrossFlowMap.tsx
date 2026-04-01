@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils/cn'
 import { AlertTriangle } from 'lucide-react'
 import { VehicleInfoCard } from '@/components/map/VehicleInfoCard'
 import { VehicleFilterPanel } from '@/components/map/VehicleFilterPanel'
+import { MapSplitSlider } from '@/components/map/MapSplitSlider'
+import { LiveSyncBadge } from '@/components/dashboard/LiveSyncBadge'
 
 import {
   generateTrafficSnapshot,
@@ -209,11 +211,16 @@ export function CrossFlowMap() {
   const setTrackingVehicle = useMapStore(s => s.setTrackingVehicle)
   const vehicleTypeFilter  = useMapStore(s => s.vehicleTypeFilter)
   const vehicleSearchQuery = useMapStore(s => s.vehicleSearchQuery)
+  const splitRatio         = useMapStore(s => s.splitRatio)
+  const [splitLng, setSplitLng] = useState<number>(0)
 
 
   const snapshot              = useTrafficStore(s => s.snapshot)
   const setSnapshot           = useTrafficStore(s => s.setSnapshot)
+  const timeOffsetMinutes     = useMapStore(s => s.timeOffsetMinutes)
   const setIncidents          = useTrafficStore(s => s.setIncidents)
+  const setIsSyncing          = useTrafficStore(s => s.setIsSyncing)
+  const setLastSync           = useTrafficStore(s => s.setLastSync)
   const setWeather            = useTrafficStore(s => s.setWeather)
   const setOpenMeteoWeather   = useTrafficStore(s => s.setOpenMeteoWeather)
   const setAirQuality         = useTrafficStore(s => s.setAirQuality)
@@ -268,6 +275,23 @@ export function CrossFlowMap() {
     return () => cancelAnimationFrame(frame)
   }, [mapLoaded])
 
+  // ─── Split View Lng Calculation ─────────────────────────────────────
+  useEffect(() => {
+    if (!mapRef.current || mode !== 'predict') return
+    const map = mapRef.current
+
+    const updateSplitLine = () => {
+      const container = map.getContainer()
+      const width = container.clientWidth
+      const splitX = (splitRatio / 100) * width
+      const lngLat = map.unproject([splitX, container.clientHeight / 2])
+      setSplitLng(lngLat.lng)
+    }
+
+    updateSplitLine()
+    map.on('move', updateSplitLine)
+    return () => { map.off('move', updateSplitLine) }
+  }, [mapLoaded, splitRatio, mode])
 
   // ─── Cursor change when zone tool is active ──────────────────────────
   useEffect(() => {
@@ -1372,12 +1396,27 @@ export function CrossFlowMap() {
             type: 'Feature',
             id: s.id,
             geometry: { type: 'LineString', coordinates: s.coordinates },
-            properties: { highway: s.roadType }
+            properties: { 
+              highway: s.roadType,
+              midpoint_lng: s.coordinates[Math.floor(s.coordinates.length / 2)][0]
+            }
           }))
         }
         ;(map.getSource(TRAFFIC_SOURCE) as maplibregl.GeoJSONSource).setData(geo)
         ;(map.getSource(TRAFFIC_PREDICTION_SOURCE) as maplibregl.GeoJSONSource).setData(geo)
         cityNetworkRef.current = city.id
+      }
+
+      // ─── A/B Split View Filtering ───
+      if (mode === 'predict') {
+        map.setFilter(TRAFFIC_SOURCE + '-lines', ['<', ['get', 'midpoint_lng'], splitLng])
+        map.setFilter(TRAFFIC_SOURCE + '-glow',  ['<', ['get', 'midpoint_lng'], splitLng])
+        map.setFilter(TRAFFIC_PREDICTION_SOURCE + '-lines', ['>', ['get', 'midpoint_lng'], splitLng])
+      } else {
+        // Reset filters in other modes
+        map.setFilter(TRAFFIC_SOURCE + '-lines', null)
+        map.setFilter(TRAFFIC_SOURCE + '-glow',  null)
+        map.setFilter(TRAFFIC_PREDICTION_SOURCE + '-lines', null)
       }
     }
 
@@ -1430,36 +1469,57 @@ export function CrossFlowMap() {
     }
   }, [mapLoaded, refreshData])
 
-  // ─── 10-Minute Persistence Scheduler ──────────────────────────────────
+  // ─── 10-Minute Persistence Sampler (Staff Engineer Architecture) ───────
   useEffect(() => {
     if (!mapLoaded || !snapshot || mode !== 'live') return
 
-    const captureSnapshot = async () => {
-      if (document.visibilityState !== 'visible') return
+    let lastSnapshotTime = 0
+    let interval: NodeJS.Timeout | null = null
+
+    const capture = async () => {
+      if (document.hidden || !snapshot) return
       
-      console.log('[Snapshot Scheduler] Capturing 10-min sample...')
+      const now = Date.now()
+      if (now - lastSnapshotTime < 550000) return // Throttle to ~10 min
+
+      console.log('[Snapshot Sampler] Capturing state for city:', city.id)
+      setIsSyncing(true)
+      
       try {
-        await fetch('/api/snapshots', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cityId:   city.id,
-            source:   dataSource,
-            segments: snapshot.segments,
-            weather:  {} // Could be enriched with weather state
-          })
+        const { saveSnapshot } = await import('@/lib/api/snapshots')
+        await saveSnapshot({
+          cityId:   city.id,
+          source:   dataSource,
+          segments: snapshot.segments,
+          stats:    { 
+            avg_speed: snapshot.segments.reduce((a, b) => a + b.speedKmh, 0) / snapshot.segments.length,
+            count: snapshot.segments.length 
+          }
         })
+        setLastSync(new Date())
       } catch (err) {
-        console.warn('[Snapshot Scheduler] Failed to persist:', err)
+        console.warn('[Snapshot Sampler] Persistence failed:', err)
+      } finally {
+        setIsSyncing(false)
+        lastSnapshotTime = Date.now()
       }
     }
 
-    // Capture immediately, then every 10m
-    captureSnapshot()
-    const interval = setInterval(captureSnapshot, 10 * 60 * 1000)
-    
-    return () => clearInterval(interval)
-  }, [mapLoaded, city.id, mode, dataSource, snapshot]) // eslint-disable-line
+    // Capture immediately, then every 10 min
+    capture()
+    interval = setInterval(capture, 600000)
+
+    // Visibility Guard: don't capture if tab is hidden
+    const onVisibilityChange = () => {
+      if (!document.hidden) capture()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      if (interval) clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [mapLoaded, city.id, mode, dataSource, snapshot, setIsSyncing, setLastSync])
 
   // ─── Simulation overlay — tint segment colors by delta ────────────────
 
@@ -1783,6 +1843,13 @@ export function CrossFlowMap() {
         )} 
       />
       
+      {/* Staff Features UI */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+        <LiveSyncBadge />
+      </div>
+      
+      <MapSplitSlider />
+
       {/* Interactive transit components */}
       <VehicleFilterPanel vehicleCount={vehicleCount} />
       <VehicleInfoCard 

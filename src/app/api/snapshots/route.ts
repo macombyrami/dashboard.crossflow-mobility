@@ -1,74 +1,71 @@
-// src/app/api/snapshots/route.ts
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
+import { gzipSync } from 'zlib'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role for backend insertions
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE)
+/**
+ * Staff Engineer Persistence API: /api/snapshots
+ * Handles 10-minute traffic samples and historical retrieval.
+ */
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createClient()
     const body = await req.json()
-    const { cityId, source, segments, weather } = body
+    const { cityId, source, segments, stats } = body
 
     if (!cityId || !segments) {
-        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+      return NextResponse.json({ error: 'Missing cityId or segments' }, { status: 400 })
     }
 
-    // Calculate metadata
-    const segmentCount = segments.length
-    const avgCongestion = segments.reduce((acc: number, s: any) => acc + (s.congestionScore || 0), 0) / segmentCount
+    // 1. Gzip the segments JSON for storage efficiency (Staff Optimization)
+    const segmentsBuffer = Buffer.from(JSON.stringify(segments))
+    const compressed = gzipSync(segmentsBuffer)
 
-    // Store in Supabase
+    // 2. Persist to Supabase
     const { data, error } = await supabase
       .from('traffic_snapshots')
       .insert({
         city_id: cityId,
-        source: source || 'Unknown',
-        segment_count: segmentCount,
-        average_congestion: avgCongestion,
-        data: segments.map((s: any) => ({
-            id: s.id,
-            lvl: s.level,
-            spd: s.speedKmh
-        })),
-        weather_impact: weather?.trafficImpact || 'none'
+        fetched_at: new Date().toISOString(),
+        provider: source || 'unknown',
+        stats: stats || {},
+        segments_gz: compressed,
       })
-      .select('id')
+      .select()
       .single()
 
-    if (error) {
-        console.error('[Snapshots API] Supabase error:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    if (error) throw error
 
-    return NextResponse.json({ success: true, snapshotId: data.id })
-  } catch (err) {
-    console.error('[Snapshots API] Server error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ success: true, id: data.id })
+  } catch (err: any) {
+    console.error('[API Snapshots] POST Error:', err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
 
 export async function GET(req: Request) {
+  try {
     const { searchParams } = new URL(req.url)
     const cityId = searchParams.get('cityId')
     const limit = parseInt(searchParams.get('limit') || '10')
-
+    
     if (!cityId) {
-        return NextResponse.json({ error: 'cityId is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Missing cityId' }, { status: 400 })
     }
 
+    const supabase = await createClient()
     const { data, error } = await supabase
-        .from('traffic_snapshots')
-        .select('*')
-        .eq('city_id', cityId)
-        .order('created_at', { ascending: false })
-        .limit(limit)
+      .from('traffic_snapshots')
+      .select('id, fetched_at, provider, stats')
+      .eq('city_id', cityId)
+      .order('fetched_at', { ascending: false })
+      .limit(limit)
 
-    if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    if (error) throw error
 
-    return NextResponse.json({ snapshots: data })
+    return NextResponse.json(data)
+  } catch (err: any) {
+    console.error('[API Snapshots] GET Error:', err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
 }

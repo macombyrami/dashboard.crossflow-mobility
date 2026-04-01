@@ -8,14 +8,14 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Map, LayoutDashboard, TrendingUp, Activity,
   GitBranch, AlertTriangle, Settings, Zap,
-  LogOut, UserCircle, Loader2, Rss,
+  LogOut, UserCircle, Loader2, Rss, Bot,
 } from 'lucide-react'
 import navData from '@/lib/data/navigation.json'
 import appData from '@/lib/data/app.json'
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Map, LayoutDashboard, TrendingUp, Activity,
-  GitBranch, AlertTriangle, Rss,
+  GitBranch, AlertTriangle, Rss, Bot,
 }
 
 const NAV_ITEMS = navData.map(item => ({
