@@ -1,6 +1,5 @@
-'use client'
-import React from 'react'
-import { Info, AlertTriangle, Layers } from 'lucide-react'
+import React, { useState } from 'react'
+import { Info, AlertTriangle, Layers, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 interface MapLegendProps {
@@ -9,11 +8,30 @@ interface MapLegendProps {
 }
 
 export default function MapLegend({ showTraffic = true, showIncidents = true }: MapLegendProps) {
+  const [isOpen, setIsOpen] = useState(false)
+
   if (!showTraffic && !showIncidents) return null
 
   return (
-    <div className="absolute bottom-6 right-6 z-20 pointer-events-auto">
-      <div className="flex flex-col gap-3 p-4 rounded-2xl bg-black/40 backdrop-blur-3xl border border-white/10 shadow-apple ring-1 ring-white/5 w-64 transition-all hover:bg-black/50">
+    <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] md:bottom-6 left-4 md:left-auto md:right-6 z-20 pointer-events-auto">
+      {/* Mobile Toggle Button (48px touch target) */}
+      <button 
+        className="md:hidden flex items-center justify-between w-[calc(100vw-2rem)] h-12 px-4 rounded-xl bg-black/80 backdrop-blur-xl border border-white/10 shadow-apple text-white/80"
+        onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+      >
+        <div className="flex items-center gap-2">
+          <Layers className="w-5 h-5" />
+          <span className="text-sm font-bold">Légende de la carte</span>
+        </div>
+        {isOpen ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+      </button>
+
+      <div className={cn(
+        "flex-col gap-3 p-4 rounded-2xl bg-black/80 backdrop-blur-3xl border border-white/10 shadow-apple ring-1 ring-white/5 w-[calc(100vw-2rem)] md:w-64 transition-all hover:bg-black/90",
+        "absolute md:relative bottom-14 md:bottom-auto",
+        isOpen ? "flex" : "hidden md:flex"
+      )}>
         
         {/* NIVEAU DE CONGESTION (Unified V3) */}
         {showTraffic && (

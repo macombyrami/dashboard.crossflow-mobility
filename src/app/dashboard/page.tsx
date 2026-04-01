@@ -220,7 +220,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="kpi-grid my-4">
         <KPICard
           label={t('dashboard.congestion')}
           value={congPct}

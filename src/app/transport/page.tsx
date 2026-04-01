@@ -115,7 +115,7 @@ function SummaryBar({
     { label: 'Perturbations',  value: disrupted,                  unit: '',     color: disrupted > 0 ? '#EF4444' : '#22C55E', icon: AlertTriangle },
   ]
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="kpi-grid">
       {cards.map(c => (
         <div key={c.label} className="bg-bg-surface border border-bg-border rounded-xl p-4 space-y-1">
           <div className="flex items-center gap-1.5 mb-2">

@@ -99,19 +99,11 @@ export function VehicleFilterPanel({ vehicleCount }: VehicleFilterPanelProps) {
 
   return (
     <div
+      className="absolute z-10 w-[calc(100vw-2rem)] md:w-[280px] top-[72px] md:top-4 left-4 md:left-auto md:right-[156px] border border-white/10 rounded-[18px] p-3 shadow-apple pointer-events-auto"
       style={{
-        position:        'absolute',
-        top:             '60px',
-        right:           '56px',
-        width:           '220px',
         fontFamily:      'Inter, -apple-system, sans-serif',
         background:      'rgba(10,10,16,0.90)',
         backdropFilter:  'blur(18px)',
-        border:          '1px solid rgba(255,255,255,0.09)',
-        borderRadius:    '16px',
-        boxShadow:       '0 8px 32px rgba(0,0,0,0.45)',
-        padding:         '12px',
-        zIndex:          15,
       }}
     >
       {/* Header */}

@@ -21,21 +21,22 @@ export default function LayerControls({ layers, onToggle }: LayerControlsProps) 
   ]
 
   return (
-    <div className="absolute top-20 right-4 flex flex-col gap-2 z-20">
-      <div className="flex flex-col bg-background-panel/80 backdrop-blur-xl border border-white/10 rounded-xl p-1.5 shadow-2xl overflow-hidden active:scale-95 transition-transform">
+    <div className="absolute top-4 right-4 flex flex-col gap-2 z-20">
+      <div className="flex flex-col gap-1.5 bg-background-panel/80 backdrop-blur-xl border border-white/10 rounded-[18px] p-2 shadow-2xl overflow-hidden active:scale-95 transition-transform">
         {controlItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onToggle(item.id)}
             className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-300 group",
+              "flex items-center gap-3 px-3 h-11 min-w-[120px] rounded-xl transition-all duration-300 group touch-manipulation",
               item.active 
                 ? "bg-brand-primary/20 text-brand-primary shadow-[inset_0_0_12px_rgba(34,197,94,0.1)]" 
                 : "text-text-muted hover:bg-white/5 hover:text-white"
             )}
+            aria-pressed={item.active}
           >
             <item.icon className={cn(
-              "w-4 h-4 transition-transform group-hover:scale-110",
+              "w-5 h-5 transition-transform group-hover:scale-110 shrink-0",
               item.active ? "text-brand-primary animate-pulse" : "text-text-muted"
             )} />
             <span className="text-xs font-medium pr-1">{item.label}</span>

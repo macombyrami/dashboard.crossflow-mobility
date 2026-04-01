@@ -1,6 +1,6 @@
 'use client'
 import React, { memo, useState, useEffect, useRef } from 'react'
-import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap, Lock, AlertTriangle, Clock, ShieldCheck, Info } from 'lucide-react'
+import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap, Lock, AlertTriangle, Clock, ShieldCheck, Info, Menu } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useMapStore, geocodingToCity } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils/cn'
 import { formatDistanceToNow } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import { useUIStore } from '@/store/uiStore'
 
 const SEVERITY_COLOR: Record<string, string> = {
   critical: '#FF3B30', // Red
@@ -86,6 +87,7 @@ export function Header() {
   const incidents       = useTrafficStore(s => s.incidents)
   const socialIncidents = useTrafficStore(s => s.socialIncidents)
   const clearIncidents  = useTrafficStore(s => s.clearIncidents)
+  const toggleSidebar   = useUIStore(s => s.toggleSidebar)
   const [alertOpen, setAlertOpen] = useState(false)
   const alertRef                  = useRef<HTMLDivElement>(null)
 
@@ -102,7 +104,14 @@ export function Header() {
       }}
     >
       {/* 🧩 GROUP 1: CONTEXTE GÉOGRAPHIQUE & SYSTÈME */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 md:gap-4">
+        <button
+          onClick={toggleSidebar}
+          aria-label="Ouvrir le menu"
+          className="lg:hidden flex items-center justify-center w-10 h-10 -ml-2 rounded-xl text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
         <CitySearchBar />
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-[0.15em] text-white/40">
            <ShieldCheck className="w-3.5 h-3.5 text-brand-green" />

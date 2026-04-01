@@ -48,7 +48,7 @@ export default async function MonitoringPage() {
       </div>
 
       {/* Grid Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="kpi-grid mb-4">
         {stats.map((s, i) => (
           <div key={i} className="glass p-6 rounded-3xl border border-white/5 space-y-4">
             <div className="flex items-center justify-between">

@@ -76,16 +76,11 @@ export function VehicleInfoCard({ vehicle, isDisrupted }: VehicleInfoCardProps) 
     return (
       <div
         ref={cardRef}
+        className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+140px)] md:bottom-6 left-4 w-[calc(100vw-2rem)] md:w-[300px] z-20 pointer-events-none"
         style={{
-          position:   'absolute',
-          bottom:     '24px',
-          left:       '16px',
-          width:      '300px',
-          transform:  'translateY(100%)',
+          transform:  'translateY(120%)',
           opacity:    0,
           transition: 'transform 0.35s cubic-bezier(0.34,1.2,0.64,1), opacity 0.25s ease',
-          zIndex:     20,
-          pointerEvents: 'none',
         }}
       />
     )
@@ -100,15 +95,11 @@ export function VehicleInfoCard({ vehicle, isDisrupted }: VehicleInfoCardProps) 
   return (
     <div
       ref={cardRef}
+      className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+140px)] md:bottom-6 left-4 w-[calc(100vw-2rem)] md:w-[300px] z-20 pointer-events-auto"
       style={{
-        position:        'absolute',
-        bottom:          '24px',
-        left:            '16px',
-        width:           '300px',
-        transform:       isVisible ? 'translateY(0)' : 'translateY(100%)',
+        transform:       isVisible ? 'translateY(0)' : 'translateY(120%)',
         opacity:         isVisible ? 1 : 0,
         transition:      'transform 0.35s cubic-bezier(0.34,1.2,0.64,1), opacity 0.25s ease',
-        zIndex:          20,
         fontFamily:      'Inter, -apple-system, sans-serif',
         borderRadius:    '20px',
         background:      'rgba(12,12,18,0.92)',

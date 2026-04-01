@@ -11,6 +11,7 @@ import {
   LogOut, UserCircle, Loader2, Rss, Bot,
 } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
+import { useUIStore } from '@/store/uiStore'
 import navData from '@/lib/data/navigation.json'
 import appData from '@/lib/data/app.json'
 
@@ -38,9 +39,12 @@ export function Sidebar() {
   }, [supabase])
 
   const setMode = useMapStore(s => s.setMode)
+  const { isSidebarOpen, setSidebarOpen } = useUIStore()
 
   const handleNav = (href: string) => {
     setNavigatingTo(href)
+    // Close sidebar on mobile after navigation
+    if (window.innerWidth < 1024) setSidebarOpen(false)
     
     // 🌍 Architecture V3: Sidebar drives Map Mode
     if (href === '/map')        setMode('live')
@@ -74,10 +78,24 @@ export function Sidebar() {
   }
 
   return (
-    <aside
-      aria-label="Menu de navigation"
-      className="print-hidden hidden lg:flex flex-col w-[200px] shrink-0 h-full border-r border-white/5 glass shadow-apple"
-    >
+    <>
+      {/* Mobile/Tablet Backdrop */}
+      {isSidebarOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity"
+          aria-hidden="true"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <aside
+        aria-label="Menu de navigation"
+        className={cn(
+          "print-hidden fixed inset-y-0 left-0 z-50 flex flex-col w-[var(--sidebar-w)] shrink-0 h-full border-r border-white/5 bg-bg-base/95 glass shadow-apple transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          "lg:relative lg:translate-x-0 lg:z-0 lg:flex",
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 h-[58px] border-b border-white/5 shrink-0">
         <div className="relative">
@@ -203,5 +221,6 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+    </>
   )
 }
