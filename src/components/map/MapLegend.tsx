@@ -5,15 +5,16 @@ import { cn } from '@/lib/utils/cn'
 interface MapLegendProps {
   showTraffic?: boolean
   showIncidents?: boolean
+  className?: string
 }
 
-export default function MapLegend({ showTraffic = true, showIncidents = true }: MapLegendProps) {
+export default function MapLegend({ showTraffic = true, showIncidents = true, className }: MapLegendProps) {
   const [isOpen, setIsOpen] = useState(false)
 
   if (!showTraffic && !showIncidents) return null
 
   return (
-    <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] md:bottom-6 left-4 md:left-auto md:right-6 z-20 pointer-events-auto">
+    <div className={cn("z-20 pointer-events-auto transition-all duration-500", className)}>
       {/* Mobile Toggle Button (48px touch target) */}
       <button 
         className="md:hidden flex items-center justify-between w-[calc(100vw-2rem)] h-12 px-4 rounded-xl bg-black/80 backdrop-blur-xl border border-white/10 shadow-apple text-white/80"

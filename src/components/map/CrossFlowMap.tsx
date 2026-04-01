@@ -2015,34 +2015,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
         )} 
       />
       
-      {/* Staff Features UI */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-        <LiveSyncBadge />
-      </div>
-
-      <LayerControls 
-        layers={{
-          traffic: activeLayers.has('traffic'),
-          heatmap: activeLayers.has('heatmap'),
-          incidents: activeLayers.has('incidents'),
-          boundary: activeLayers.has('boundary'),
-        }}
-        onToggle={(layer) => useMapStore.getState().toggleLayer(layer as MapLayerId)}
-      />
-
-      <MapLegend 
-        showTraffic={activeLayers.has('traffic')}
-        showIncidents={activeLayers.has('incidents')}
-      />
-      
-      <MapSplitSlider />
-
-      {/* Interactive transit components */}
-      <VehicleFilterPanel vehicleCount={vehicleCount} />
-      <VehicleInfoCard 
-        vehicle={selectedVehicle} 
-        isDisrupted={selectedVehicle ? ratpDisruptedRef.current.has(selectedVehicle.routeRef.toUpperCase()) : false} 
-      />
+      {/* HUD elements are now managed by MapPage for better orchestration with AIPanel */}
 
       {/* Loading overlay — fades out once map tiles are ready */}
       {!mapLoaded && !mapError && (

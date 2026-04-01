@@ -10,9 +10,10 @@ interface LayerControlsProps {
     boundary: boolean
   }
   onToggle: (layer: string) => void
+  className?: string
 }
 
-export default function LayerControls({ layers, onToggle }: LayerControlsProps) {
+export default function LayerControls({ layers, onToggle, className }: LayerControlsProps) {
   const controlItems = [
     { id: 'traffic',   label: 'Traffic',   icon: Activity,      active: layers.traffic },
     { id: 'heatmap',   label: 'Pollution', icon: Thermometer,   active: layers.heatmap },
@@ -21,7 +22,7 @@ export default function LayerControls({ layers, onToggle }: LayerControlsProps) 
   ]
 
   return (
-    <div className="absolute top-4 right-4 flex flex-col gap-2 z-20">
+    <div className={cn("flex flex-col gap-2 z-20 transition-all duration-500", className)}>
       <div className="flex flex-col gap-1.5 bg-background-panel/80 backdrop-blur-xl border border-white/10 rounded-[18px] p-2 shadow-2xl overflow-hidden active:scale-95 transition-transform">
         {controlItems.map((item) => (
           <button

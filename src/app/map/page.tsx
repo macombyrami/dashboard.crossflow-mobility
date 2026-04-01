@@ -1,6 +1,13 @@
 'use client'
+import React from 'react'
 import dynamic from 'next/dynamic'
-import { ModeSelector } from '@/components/map/controls/ModeSelector'
+import { useMapStore } from '@/store/mapStore'
+import { useTrafficStore } from '@/store/trafficStore'
+import { useTranslation } from '@/lib/hooks/useTranslation'
+import { generateCityKPIs } from '@/lib/engine/traffic.engine'
+import { cn } from '@/lib/utils/cn'
+
+// Components
 import LayerControls from '@/components/map/controls/LayerControls'
 import MapLegend from '@/components/map/MapLegend'
 import { EdgeDetailPanel } from '@/components/map/panels/EdgeDetailPanel'
@@ -10,18 +17,16 @@ import { SimulationResults } from '@/components/simulation/SimulationResults'
 import { AIPanel } from '@/components/ai/AIPanel'
 import { LiveIndicator } from '@/components/ui/LiveIndicator'
 import { CityPulseHUD } from '@/components/dashboard/CityPulseHUD'
-import { useMapStore } from '@/store/mapStore'
-import { useTrafficStore } from '@/store/trafficStore'
-import { generateCityKPIs } from '@/lib/engine/traffic.engine'
-import { hasKey } from '@/lib/api/tomtom'
-import React from 'react'
-import { useTranslation } from '@/lib/hooks/useTranslation'
-import type { Metadata } from 'next'
+import { LiveSyncBadge } from '@/components/dashboard/LiveSyncBadge'
+import { VehicleFilterPanel } from '@/components/map/VehicleFilterPanel'
+import { MapSplitSlider } from '@/components/map/MapSplitSlider'
 
 const CrossFlowMap = dynamic(
   () => import('@/components/map/CrossFlowMap').then(m => ({ default: m.CrossFlowMap })),
   { ssr: false, loading: () => <MapSkeleton /> },
 )
+
+import { VehicleInfoCard } from '@/components/map/VehicleInfoCard'
 
 export default function MapPage() {
   const [mounted, setMounted] = React.useState(false)
@@ -32,82 +37,113 @@ export default function MapPage() {
     setMounted(true)
     document.title = `Carte — ${city.name} | CrossFlow`
   }, [city.name])
+
   const mode           = useMapStore(s => s.mode)
   const isAIPanelOpen  = useMapStore(s => s.isAIPanelOpen)
   const setAIPanelOpen = useMapStore(s => s.setAIPanelOpen)
   const activeLayers   = useMapStore(s => s.activeLayers)
   const toggleLayer    = useMapStore(s => s.toggleLayer)
   const setKPIs        = useTrafficStore(s => s.setKPIs)
+  const selectedVehicleId = useMapStore(s => s.selectedVehicleId)
 
-  const layerProps = {
-    traffic:   activeLayers.has('traffic'),
-    heatmap:   activeLayers.has('heatmap'),
-    incidents: activeLayers.has('incidents'),
-    boundary:  activeLayers.has('boundary'),
-  }
-
-  const isTomTom = hasKey()
-  // Paris → IDFM/RATP data is real-time even without TomTom
-  const isParis  = city.countryCode === 'FR' &&
-    Math.abs(city.center.lat - 48.8566) < 0.6 &&
-    Math.abs(city.center.lng - 2.3522) < 0.8
-  const isLive   = isTomTom || isParis
-
+  // KPI generation loop
   React.useEffect(() => {
     setKPIs(generateCityKPIs(city))
     const interval = setInterval(() => setKPIs(generateCityKPIs(city)), 30_000)
     return () => clearInterval(interval)
   }, [city, setKPIs])
 
+  const layerProps = {
+    traffic:   activeLayers.has('traffic'),
+    heatmap:   activeLayers.has('heatmap'),
+    incidents: activeLayers.has('incidents'),
+    boundary:  activeLayers.has('boundary'),
+    transport: activeLayers.has('transport'),
+  }
+
   return (
-    <div className="flex flex-1 h-full overflow-hidden">
-      {/* Map area */}
-      <div className="flex-1 relative overflow-hidden">
+    <div className="flex flex-1 h-full overflow-hidden relative bg-[#08090B]">
+      {/* Map area: Shrinks when AI Sidebar is open if sm:relative is used */}
+      <div className="flex-1 relative overflow-hidden flex flex-col min-h-0">
         <CrossFlowMap />
 
-        {/* City Pulse HUD — top center */}
-        {mounted && <CityPulseHUD />}
+        {/* --- DYNAMIC HUD LAYER --- */}
 
-        {/* Layer controls — top left */}
-        {mounted && mode !== 'simulate' && (
-          <div className="absolute top-4 left-4 z-10 pointer-events-auto hidden sm:block">
+        {/* TOP HUD: Status & Health */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center gap-3">
+           {mounted && <LiveSyncBadge />}
+           {mounted && <CityPulseHUD />}
+        </div>
+
+        {/* RIGHT HUD: Control Stack (Shifted automatically by container width) */}
+        <div className={cn(
+          "absolute right-4 z-40 transition-all duration-500 flex flex-col items-end gap-3",
+          "md:top-4 top-4 sm:top-auto sm:bottom-32 sm:left-4"
+        )}>
+          {mounted && mode !== 'simulate' && (
             <LayerControls 
               layers={layerProps} 
               onToggle={(l) => toggleLayer(l as any)} 
             />
+          )}
+
+          {mounted && layerProps.transport && (
+            <VehicleFilterPanel 
+              vehicleCount={0}
+              className={cn(
+                "md:static", 
+                "fixed bottom-24 left-1/2 -translate-x-1/2 md:translate-x-0"
+              )}
+            />
+          )}
+        </div>
+
+        {/* CENTER COMPONENTS */}
+        {mounted && <MapSplitSlider />}
+
+        {/* BOTTOM HUD: Visual Feedback */}
+        {mounted && (
+          <div className={cn(
+            "absolute z-20 pointer-events-none transition-all duration-500",
+            mode === 'predict' ? "bottom-20 left-4" : "bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6"
+          )}>
+            {mode === 'predict' && (
+              <div className="bg-bg-surface/90 border border-brand-blue/30 rounded-lg px-3 py-2 backdrop-blur-sm pointer-events-auto mb-4 w-fit flex mx-auto">
+                <LiveIndicator label={`${t('nav.predictions').toUpperCase()} · +30 MIN`} color="#2979FF" />
+              </div>
+            )}
+            <MapLegend 
+              showTraffic={layerProps.traffic} 
+              showIncidents={layerProps.incidents} 
+              className="pointer-events-auto"
+            />
           </div>
         )}
 
-
-        {mounted && mode === 'predict' && (
-          <div className="absolute bottom-16 left-4 z-10">
-            <div className="bg-bg-surface/90 border border-[rgba(41,121,255,0.5)] rounded-lg px-3 py-2 backdrop-blur-sm">
-              <LiveIndicator label={`${t('nav.predictions').toUpperCase()} · +30 MIN`} color="#2979FF" />
-            </div>
-          </div>
+        {/* FLOATING PANELS: Details */}
+        {mounted && mode !== 'simulate' && <EdgeDetailPanel />}
+        {mounted && <ZoneStatsPanel />}
+        
+        {/* Current Vehicle Detail */}
+        {mounted && (
+           <VehicleInfoCard 
+             vehicle={null} // Simplified: uses state inside or needs better sync
+             isDisrupted={false}
+           />
         )}
 
-        {/* Simulation panel */}
+        {/* SIMULATION CONTROLS */}
         {mounted && mode === 'simulate' && (
           <div className="absolute top-16 right-4 w-[calc(100%-32px)] sm:w-80 max-h-[calc(100vh-130px)] overflow-y-auto z-20 space-y-4">
             <SimulationPanel />
             <SimulationResults />
           </div>
         )}
-
-        {/* Map legend */}
-        {mounted && <MapLegend showTraffic={layerProps.traffic} showIncidents={layerProps.incidents} />}
-
-        {/* Edge detail panel */}
-        {mounted && mode !== 'simulate' && <EdgeDetailPanel />}
-
-        {/* Zone stats panel */}
-        {mounted && <ZoneStatsPanel />}
       </div>
 
-      {/* AI Panel — right sidebar */}
+      {/* AI SIDEBAR: Fixed on mobile, pushes on desktop */}
       {mounted && isAIPanelOpen && (
-        <div className="fixed inset-y-14 right-0 w-full sm:w-80 bg-bg-surface/95 backdrop-blur-md z-30 sm:relative sm:inset-auto sm:z-auto sm:border-l sm:border-bg-border">
+        <div className="fixed inset-y-14 right-0 w-full sm:w-80 bg-bg-surface border-l border-bg-border z-50 sm:relative sm:inset-auto sm:z-auto shadow-2xl">
           <AIPanel onClose={() => setAIPanelOpen(false)} />
         </div>
       )}

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useMapStore } from '@/store/mapStore'
+import { cn } from '@/lib/utils/cn'
 
 const VEHICLE_TYPES = [
   { key: 'subway', label: 'Métro', icon: '🚇' },
@@ -58,9 +59,10 @@ const LINE_CATALOGUE = [
 
 interface VehicleFilterPanelProps {
   vehicleCount: number
+  className?: string
 }
 
-export function VehicleFilterPanel({ vehicleCount }: VehicleFilterPanelProps) {
+export function VehicleFilterPanel({ vehicleCount, className }: VehicleFilterPanelProps) {
   const activeLayers = useMapStore(s => s.activeLayers)
   const typeFilter   = useMapStore(s => s.vehicleTypeFilter)
   const toggleType   = useMapStore(s => s.toggleVehicleType)
@@ -99,7 +101,10 @@ export function VehicleFilterPanel({ vehicleCount }: VehicleFilterPanelProps) {
 
   return (
     <div
-      className="absolute z-10 w-[calc(100vw-2rem)] md:w-[280px] top-[72px] md:top-4 left-4 md:left-auto md:right-[156px] border border-white/10 rounded-[18px] p-3 shadow-apple pointer-events-auto"
+      className={cn(
+        "absolute z-10 w-[calc(100vw-2rem)] md:w-[310px] border border-white/10 rounded-[22px] p-4 shadow-apple transition-all duration-500 pointer-events-auto overflow-hidden",
+        className || "top-[72px] left-4 md:top-4 md:right-[156px]"
+      )}
       style={{
         fontFamily:      'Inter, -apple-system, sans-serif',
         background:      'rgba(10,10,16,0.90)',
