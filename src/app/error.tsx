@@ -11,27 +11,29 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error('[CrossFlow Error]', error)
-
-    // Check for ChunkLoadError (Standard Next.js / Webpack / Turbopack chunk load failure)
+    // Broad detection: look for chunk loading failures in name, message or string representation
+    const errorStr = (error.message || '') + (error.stack || '') + error.toString()
     const isChunkError = 
       error.name === 'ChunkLoadError' || 
-      error.message?.includes('Failed to load chunk') || 
-      error.message?.includes('Loading chunk')
+      /chunk|loading|failed to load/i.test(errorStr)
 
     if (isChunkError) {
       const now = Date.now()
       const lastReload = Number(sessionStorage.getItem('cf-last-chunk-reload') || '0')
       
-      // Only auto-reload once every 30s to prevent refresh loops if server is really down
-      if (now - lastReload > 30000) {
+      // Auto-reload but limit frequency to prevent infinite refresh if server is broken
+      if (now - lastReload > 10000) {
         sessionStorage.setItem('cf-last-chunk-reload', String(now))
-        console.warn('[CrossFlow] ChunkLoadError detected. Re-syncing client with latest build...')
-        // Short delay to let the UI update before refresh
-        setTimeout(() => window.location.reload(), 1500)
+        console.warn('[CrossFlow] ChunkLoadError: Auto-refreshing to sync with latest build...')
+        // 800ms is enough to let the UI update and user see the message
+        setTimeout(() => window.location.reload(), 800)
       }
     }
   }, [error])
+
+  const isChunkError = 
+    error.name === 'ChunkLoadError' || 
+    /chunk|loading|failed to load/i.test((error.message || '') + error.toString())
 
   return (
     <div
@@ -40,19 +42,25 @@ export default function GlobalError({
       className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-6"
     >
       <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-        <AlertTriangle className="w-8 h-8 text-red-400" aria-hidden="true" />
+        {isChunkError ? (
+          <RefreshCw className="w-8 h-8 text-brand-green animate-spin shadow-glow-sm" aria-hidden="true" />
+        ) : (
+          <AlertTriangle className="w-8 h-8 text-red-100" aria-hidden="true" />
+        )}
       </div>
 
       <div className="space-y-2 max-w-sm">
-        <h1 className="text-lg font-semibold text-text-primary">Une erreur s'est produite</h1>
+        <h1 className="text-lg font-semibold text-text-primary">
+          {isChunkError ? 'Mise à jour requise' : 'Une erreur s\'est produite'}
+        </h1>
         <p className="text-sm text-text-secondary leading-relaxed font-medium">
-          {error.name === 'ChunkLoadError' || error.message?.includes('Failed to load chunk')
-             ? 'Mise à jour de l\'application en cours...'
+          {isChunkError
+             ? 'Nouvelle version détectée. Synchronisation en cours...'
              : error.message?.includes('fetch')
              ? 'Impossible de charger les données. Vérifiez votre connexion internet.'
              : 'Un problème inattendu est survenu. Réessayez ou revenez à l\'accueil.'}
         </p>
-        {error.digest && (
+        {error.digest && !isChunkError && (
           <p className="text-[10px] font-mono text-text-muted mt-2">
             Code : {error.digest}
           </p>
