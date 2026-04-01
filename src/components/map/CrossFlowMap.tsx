@@ -55,6 +55,7 @@ import { fetchCityBoundary, fetchCityDistricts } from '@/lib/api/geocoding'
 import type { Incident, HeatmapMode, CongestionLevel, TrafficSnapshot, TrafficSegment } from '@/types'
 
 const TRAFFIC_SOURCE          = 'cf-traffic'
+const TRAFFIC_PREDICTION_SOURCE = 'cf-traffic-prediction'
 const HEATMAP_SOURCE          = 'cf-heatmap'
 const HEATMAP_PASSAGES_SOURCE = 'cf-heatmap-passages'
 const HEATMAP_CO2_SOURCE      = 'cf-heatmap-co2'
@@ -175,10 +176,10 @@ export function CrossFlowMap() {
   const ratpStatusRef     = useRef<Map<string, string>>(new Map())
   const ratpDisruptedRef  = useRef<Set<string>>(new Set())
   const refreshDataRef  = useRef<() => void>(() => {})
-  const liveVehiclesRef = useRef<import('@/lib/engine/transit.engine').TransitVehicle[]>([])
-  const rafRef          = useRef<number | null>(null)
-  const pulseRef        = useRef<number>(0)
   const lastVehicleUpdateRef = useRef<number>(0)
+  const previousSnapshotRef  = useRef<TrafficSnapshot | null>(null)
+  const lastRefreshRef       = useRef<number>(0)
+  const cityNetworkRef       = useRef<string | null>(null) // Track which city's network is loaded
 
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapError, setMapError]   = useState<string | null>(null)
@@ -244,8 +245,27 @@ export function CrossFlowMap() {
   useEffect(() => { isTrackingRef.current = isTrackingVehicle }, [isTrackingVehicle])
 
 
-  // ─── Cursor change when zone tool is active ──────────────────────────
+  // ─── Flow Animation Loop ───────────────────────────────────────────
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+    const map = mapRef.current
+    let offset = 0
+    let frame: number
 
+    const animate = () => {
+      offset = (offset + 0.15) % 100
+      if (map.getLayer(TRAFFIC_SOURCE + '-lines')) {
+        map.setPaintProperty(TRAFFIC_SOURCE + '-lines', 'line-dash-offset', offset)
+      }
+      frame = requestAnimationFrame(animate)
+    }
+
+    frame = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(frame)
+  }, [mapLoaded])
+
+
+  // ─── Cursor change when zone tool is active ──────────────────────────
   useEffect(() => {
     if (!mapRef.current) return
     mapRef.current.getCanvas().style.cursor = (zoneActive || locationPickerActive) ? 'crosshair' : ''
@@ -1148,11 +1168,42 @@ export function CrossFlowMap() {
       }
     })
   }, [city, mapLoaded]) // eslint-disable-line
+ 
+  // ─── UCTN Initialization (Unified City Traffic Network) ──────────────
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+    const map = mapRef.current
+
+    const initNetwork = async () => {
+      if (cityNetworkRef.current === city.id) return
+      
+      const { NetworkAggregator } = await import('@/lib/engine/NetworkAggregator')
+      const fc = await NetworkAggregator.getCityNetwork(city)
+      
+      const tSrc = map.getSource(TRAFFIC_SOURCE) as maplibregl.GeoJSONSource
+      if (tSrc) {
+        tSrc.setData(fc)
+        cityNetworkRef.current = city.id
+        console.log(`[CrossFlow] UCTN Loaded for ${city.name}: ${fc.features.length} segments.`)
+      }
+    }
+
+    initNetwork()
+  }, [city, mapLoaded])
 
   // ─── Data refresh ─────────────────────────────────────────────────────
 
   const refreshData = useCallback(async () => {
     if (!mapRef.current || !mapLoaded) return
+
+    // CRITICAL: Stop background work if tab is inactive
+    if (document.visibilityState === 'hidden') return
+
+    // Throttle: prevent multiple rapid refreshes (min 5s interval)
+    const nowTs = Date.now()
+    if (nowTs - lastRefreshRef.current < 5000) return
+    lastRefreshRef.current = nowTs
+
     const map = mapRef.current
     const bounds = map.getBounds()
     const viewportBbox: [number, number, number, number] = [
@@ -1274,69 +1325,108 @@ export function CrossFlowMap() {
       setDataSource('synthetic')
     }
 
+    if (!snapshot) return
+
+    const { NetworkAggregator } = await import('@/lib/engine/NetworkAggregator')
+    const snappedSnapshot = NetworkAggregator.snapToNetwork(city, snapshot)
+    
+    setSnapshot(snappedSnapshot)
     setIncidents(incidents)
 
-    // Update synthetic traffic on map
-    // Segments from HERE or OSM have real road geometry → realData:true → full opacity
-    // Segments from synthetic generator → realData:false → barely visible (0.08)
-    const trafficGeo: GeoJSON.FeatureCollection = {
-      type: 'FeatureCollection',
-      features: snapshot.segments.map(seg => ({
-        type:       'Feature' as const,
-        geometry:   { type: 'LineString' as const, coordinates: seg.coordinates },
-        properties: {
-          id:         seg.id,
-          congestion: seg.congestionScore,
-          speed:      seg.speedKmh,
-          level:      seg.level,
-          color:      congestionColor(seg.congestionScore),
-          width:      computeRoadWidth(seg.roadType, seg.level, map.getZoom()),
-          roadType:   seg.roadType,
-          streetName: seg.streetName || 'Rue Urbaine',
-          axisName:   seg.axisName,
-          dist:       seg.arrondissement,
-          realData:   seg.id.startsWith('here-') || seg.id.includes('-osm-') || seg.id.includes('-seg-'),
-        },
-      })),
+    // Helper for feature-state
+    const getLevelCode = (lvl: string) => {
+      const g = { free: 0, slow: 1, congested: 2, critical: 3 }
+      // @ts-ignore
+      return g[lvl] ?? 0
     }
-    const tSrc = map.getSource(TRAFFIC_SOURCE) as maplibregl.GeoJSONSource | undefined
-    if (tSrc) tSrc.setData(trafficGeo)
 
-    // Congestion heatmap
-    const heatGeo: GeoJSON.FeatureCollection = {
-      type: 'FeatureCollection',
-      features: snapshot.heatmap.map(pt => ({
-        type:       'Feature' as const,
-        geometry:   { type: 'Point' as const, coordinates: [pt.lng, pt.lat] },
-        properties: { intensity: pt.intensity },
-      })),
-    }
-    const hSrc = map.getSource(HEATMAP_SOURCE) as maplibregl.GeoJSONSource | undefined
-    if (hSrc) hSrc.setData(heatGeo)
+    // --- High Performance: UCTN Property Updates ---
+    if (map.getSource(TRAFFIC_SOURCE)) {
+      // 1. Identify which roads have active data in this snap
+      const activeIds = new Set(snappedSnapshot.segments.map(s => s.id))
+      
+      // 2. Update state for ALL segments (Efficient Delta)
+      // Note: In a larger network, we'd only update changed features.
+      // For city-scale, setFeatureState is fast enough to call on active segments.
+      snappedSnapshot.segments.forEach(seg => {
+        map.setFeatureState(
+          { source: TRAFFIC_SOURCE, id: seg.id },
+          { hasData: true, levelCode: getLevelCode(seg.level) }
+        )
+      })
 
-    // Passages heatmap
-    const passGeo: GeoJSON.FeatureCollection = {
-      type: 'FeatureCollection',
-      features: snapshot.heatmapPassages.map(pt => ({
-        type: 'Feature' as const,
-        geometry: { type: 'Point' as const, coordinates: [pt.lng, pt.lat] },
-        properties: { intensity: pt.intensity },
-      })),
+      // 3. Reset roads that no longer have data (if they were previously active)
+      if (previousSnapshotRef.current) {
+        previousSnapshotRef.current.segments.forEach(pSeg => {
+          if (!activeIds.has(pSeg.id)) {
+            map.setFeatureState(
+              { source: TRAFFIC_SOURCE, id: pSeg.id },
+              { hasData: false, levelCode: 0 }
+            )
+          }
+        })
+      }
     }
-    const pSrc = map.getSource(HEATMAP_PASSAGES_SOURCE) as maplibregl.GeoJSONSource | undefined
-    if (pSrc) pSrc.setData(passGeo)
 
-    // CO2 heatmap
-    const co2Geo: GeoJSON.FeatureCollection = {
-      type: 'FeatureCollection',
-      features: snapshot.heatmapCo2.map(pt => ({
-        type: 'Feature' as const,
-        geometry: { type: 'Point' as const, coordinates: [pt.lng, pt.lat] },
-        properties: { intensity: pt.intensity },
-      })),
+    // --- 4. Predictive Evolution (+30min) ---
+    if (map.getSource(TRAFFIC_PREDICTION_SOURCE)) {
+      // For now, we simulate prediction by adding a slight delta to current congestion
+      // In prod, this would come from a dedicated ML endpoint
+      snappedSnapshot.segments.forEach(seg => {
+        const predictedLevel = seg.level === 'free' ? 'slow' : 
+                               seg.level === 'slow' ? 'congested' : 
+                               seg.level === 'congested' ? 'critical' : 'critical'
+        map.setFeatureState(
+          { source: TRAFFIC_PREDICTION_SOURCE, id: seg.id },
+          { levelCode: getLevelCode(predictedLevel) }
+        )
+      })
+      
+      // Sync geometry once per city change for prediction source too
+      if (cityNetworkRef.current === city.id) {
+        const pSrc = map.getSource(TRAFFIC_PREDICTION_SOURCE) as maplibregl.GeoJSONSource
+        const currentData = (map.getSource(TRAFFIC_SOURCE) as any)._data
+        if (pSrc && currentData) pSrc.setData(currentData)
+      }
     }
-    const cSrc = map.getSource(HEATMAP_CO2_SOURCE) as maplibregl.GeoJSONSource | undefined
-    if (cSrc) cSrc.setData(co2Geo)
+
+    // --- Conditional Heatmaps (only update if layer is visible) ---
+    if (activeLayers.has('heatmap')) {
+      const heatGeo: GeoJSON.FeatureCollection = {
+        type: 'FeatureCollection',
+        features: snapshot.heatmap.map(pt => ({
+          type:       'Feature' as const,
+          geometry:   { type: 'Point' as const, coordinates: [pt.lng, pt.lat] },
+          properties: { intensity: pt.intensity },
+        })),
+      }
+      const hSrc = map.getSource(HEATMAP_SOURCE) as maplibregl.GeoJSONSource | undefined
+      if (hSrc) hSrc.setData(heatGeo)
+
+      const pSrc = map.getSource(HEATMAP_PASSAGES_SOURCE) as maplibregl.GeoJSONSource | undefined
+      if (pSrc) {
+        pSrc.setData({
+          type: 'FeatureCollection',
+          features: snapshot.heatmapPassages.map(pt => ({
+            type: 'Feature' as const,
+            geometry: { type: 'Point' as const, coordinates: [pt.lng, pt.lat] },
+            properties: { intensity: pt.intensity },
+          })),
+        })
+      }
+
+      const cSrc = map.getSource(HEATMAP_CO2_SOURCE) as maplibregl.GeoJSONSource | undefined
+      if (cSrc) {
+        cSrc.setData({
+          type: 'FeatureCollection',
+          features: snapshot.heatmapCo2.map(pt => ({
+            type: 'Feature' as const,
+            geometry: { type: 'Point' as const, coordinates: [pt.lng, pt.lat] },
+            properties: { intensity: pt.intensity },
+          })),
+        })
+      }
+    }
 
     // Incidents
     const incGeo: GeoJSON.FeatureCollection = {
@@ -1362,7 +1452,8 @@ export function CrossFlowMap() {
 
     // NOTE: Météo gérée globalement par WeatherProvider (AppShell)
     // Plus besoin de l'appeler ici — évite les appels dupliqués à OpenMeteo
-  }, [city, mapLoaded, useLiveData, setSnapshot, setIncidents, setDataSource, dataSource])
+    previousSnapshotRef.current = snapshot
+  }, [city, mapLoaded, activeLayers, useLiveData, setSnapshot, setIncidents, setDataSource])
 
   // Keep refreshDataRef in sync so OSM loader can call it after roads are cached
   useEffect(() => { refreshDataRef.current = refreshData }, [refreshData])
@@ -1789,7 +1880,39 @@ function initStaticSources(map: maplibregl.Map) {
       type: 'geojson',
       data: { type: 'FeatureCollection', features: [] },
       lineMetrics: true, // required for gradients/stretching
+      promoteId: 'id',
     })
+  }
+
+  if (!map.getSource(TRAFFIC_PREDICTION_SOURCE)) {
+    map.addSource(TRAFFIC_PREDICTION_SOURCE, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+      promoteId: 'id',
+    })
+
+    map.addLayer({
+      id:     TRAFFIC_PREDICTION_SOURCE + '-lines',
+      type:   'line',
+      source: TRAFFIC_PREDICTION_SOURCE,
+      minzoom: 12,
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': [
+          'match', ['feature-state', 'levelCode'],
+          0, '#22C55E', 1, '#FAFA33', 2, '#FF9100', 3, '#FF0000',
+          '#666666'
+        ],
+        'line-width': [
+          'interpolate', ['linear'], ['zoom'],
+          11, 1,
+          16, 3
+        ],
+        'line-dasharray': [1, 2],
+        'line-opacity': 0.4,
+        'line-offset': 4 // Offset to show parallel to current traffic
+      }
+    }, TRAFFIC_SOURCE + '-lines')
   }
   const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
@@ -1804,17 +1927,43 @@ function initStaticSources(map: maplibregl.Map) {
     source: TRAFFIC_SOURCE,
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint:  {
-      'line-color':   ['get', 'color'],
-      'line-width': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.5, ['get', 'width']], 13, ['*', 2, ['get', 'width']], 17, ['*', 3, ['get', 'width']]],
-      // Ne rendre visible que les données RÉELLES (HERE/OSM) — masquer la grille synthétique
-      'line-opacity': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        10, ['case', ['boolean', ['get', 'realData'], false], 0.12, 0],
-        14, ['case', ['boolean', ['get', 'realData'], false], 0.25, 0]
+      'line-color': [
+        'case',
+        ['boolean', ['feature-state', 'hasData'], false],
+        ['match', ['feature-state', 'levelCode'],
+          0, '#22C55E',
+          1, '#EAB308',
+          2, '#F97316',
+          3, '#EF4444',
+          '#22C55E'
+        ],
+        '#1A1C22' // Base gray for roads with no data
       ],
-      'line-blur':    10,
+      'line-width': [
+        'interpolate', ['linear'], ['zoom'],
+        11, [
+          '*',
+          ['match', ['get', 'highway'], 
+            'motorway', 6, 'trunk', 5, 'primary', 4, 'secondary', 2.5, 
+            'motorway_link', 4, 'trunk_link', 3.5, 1.5
+          ],
+          0.6 // Glow base multiplier
+        ],
+        16, [
+          '*',
+          ['match', ['get', 'highway'], 
+            'motorway', 14, 'trunk', 12, 'primary', 10, 'secondary', 6, 
+            'motorway_link', 8, 'trunk_link', 7, 4
+          ],
+          0.8 // Glow zoom multiplier
+        ]
+      ],
+      'line-opacity': [
+        'interpolate', ['linear'], ['zoom'],
+        10, 0.15,
+        14, 0.25
+      ],
+      'line-blur': 3,
     },
   })
 
@@ -1824,10 +1973,35 @@ function initStaticSources(map: maplibregl.Map) {
     source: TRAFFIC_SOURCE,
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint:  {
-      'line-color':   ['get', 'color'],
-      'line-width': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.4, ['get', 'width']], 13, ['get', 'width'], 17, ['*', 1.4, ['get', 'width']]],
-      // realData=false → grille synthétique → complètement masquée (ne pas afficher sur routes fantômes)
-      'line-opacity': ['case', ['boolean', ['get', 'realData'], false], 0.88, 0],
+      'line-color': [
+        'case',
+        ['boolean', ['feature-state', 'hasData'], false],
+        ['match', ['feature-state', 'levelCode'],
+          0, '#22C55E', // Green
+          1, '#EAB308', // Yellow
+          2, '#F97316', // Orange
+          3, '#EF4444', // Red
+          '#22C55E'
+        ],
+        '#2A2D35' // Light gray for base coverage
+      ],
+      'line-width': [
+        'interpolate', ['linear'], ['zoom'],
+        11, ['match', ['get', 'highway'], 
+          'motorway', 6, 'trunk', 5, 'primary', 4, 'secondary', 2.5, 
+          'motorway_link', 4, 'trunk_link', 3.5, 1.5
+        ],
+        16, ['match', ['get', 'highway'], 
+          'motorway', 14, 'trunk', 12, 'primary', 10, 'secondary', 6, 
+          'motorway_link', 8, 'trunk_link', 7, 4
+        ]
+      ],
+      'line-opacity': [
+        'interpolate', ['linear'], ['zoom'],
+        10, ['case', ['boolean', ['feature-state', 'hasData'], false], 0.88, 0.4],
+        14, ['case', ['boolean', ['feature-state', 'hasData'], false], 1.0, 0.6]
+      ],
+      'line-dasharray': [2, 2], // For directional flow animation
     },
   })
 
