@@ -13,6 +13,11 @@ interface TrafficStore {
   openMeteoWeather:     OpenMeteoWeather | null
   airQuality:           AirQuality | null
   lastUpdate:           Date | null
+  
+  // LIVE Sync metadata (Staff Engineer Feature)
+  lastSync:             Date | null
+  isSyncing:            boolean
+  
   dataSource:           'live' | 'synthetic'
 
   setSnapshot:          (s: TrafficSnapshot) => void
@@ -23,6 +28,10 @@ interface TrafficStore {
   setOpenMeteoWeather:  (w: OpenMeteoWeather | null) => void
   setAirQuality:        (a: AirQuality | null) => void
   setDataSource:        (src: 'live' | 'synthetic') => void
+  
+  setLastSync:          (d: Date | null) => void
+  setIsSyncing:         (b: boolean) => void
+
   clearIncidents:       () => void
   clearAll:             () => void
 }
@@ -37,6 +46,8 @@ export const useTrafficStore = create<TrafficStore>()((set) => ({
   openMeteoWeather:     null,
   airQuality:           null,
   lastUpdate:           null,
+  lastSync:             null,
+  isSyncing:            false,
   dataSource:           'synthetic',
 
   setSnapshot:         (s)   => set({ snapshot: s, lastUpdate: new Date() }),
@@ -51,6 +62,10 @@ export const useTrafficStore = create<TrafficStore>()((set) => ({
   setOpenMeteoWeather: (w)   => set({ openMeteoWeather: w }),
   setAirQuality:       (a)   => set({ airQuality: a }),
   setDataSource:       (src) => set({ dataSource: src }),
+  
+  setLastSync:         (d)   => set({ lastSync: d }),
+  setIsSyncing:        (b)   => set({ isSyncing: b }),
+
   clearIncidents:      ()    => set((state) => ({ 
     dismissedIncidentIds: new Set([
       ...state.dismissedIncidentIds, 
@@ -63,6 +78,7 @@ export const useTrafficStore = create<TrafficStore>()((set) => ({
   clearAll:            ()    => set({
     snapshot: null, incidents: [], socialIncidents: [], kpis: null,
     weather: null, openMeteoWeather: null, airQuality: null,
-    lastUpdate: null, dismissedIncidentIds: new Set(),
+    lastUpdate: null, lastSync: null, isSyncing: false, 
+    dismissedIncidentIds: new Set(), dataSource: 'synthetic'
   }),
 }))

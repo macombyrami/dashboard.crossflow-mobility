@@ -35,7 +35,7 @@ import {
 } from '@/lib/engine/sytadin.engine'
 import type { OSMRoad, OSMPOIPoint, OSMRouteGeometry, MetroStation } from '@/lib/api/overpass'
 import { fetchAllTrafficStatus, LINE_COLORS } from '@/lib/api/ratp'
-import { simulateTransitVehicles } from '@/lib/engine/transit.engine'
+import { simulateTransitVehicles, type TransitVehicle } from '@/lib/engine/transit.engine'
 import {
   hasKey,
   getTrafficFlowTileUrl,
@@ -180,10 +180,13 @@ export function CrossFlowMap() {
   const previousSnapshotRef  = useRef<TrafficSnapshot | null>(null)
   const lastRefreshRef       = useRef<number>(0)
   const cityNetworkRef       = useRef<string | null>(null) // Track which city's network is loaded
+  const liveVehiclesRef      = useRef<TransitVehicle[]>([])
+  const pulseRef             = useRef<number>(0)
+  const rafRef               = useRef<number>(0)
 
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapError, setMapError]   = useState<string | null>(null)
-  const [selectedVehicle, setSelectedVehicleState] = useState<import('@/lib/engine/transit.engine').TransitVehicle | null>(null)
+  const [selectedVehicle, setSelectedVehicleState] = useState<TransitVehicle | null>(null)
   const [vehicleCount, setVehicleCount] = useState(0)
 
 
@@ -192,6 +195,7 @@ export function CrossFlowMap() {
   const setCityBoundary = useMapStore(s => s.setCityBoundary)
   const activeLayers    = useMapStore(s => s.activeLayers)
   const setMapReady     = useMapStore(s => s.setMapReady)
+  const mode            = useMapStore(s => s.mode)
   const selectSegment   = useMapStore(s => s.selectSegment)
   const heatmapMode     = useMapStore(s => s.heatmapMode)
   const zoneActive      = useMapStore(s => s.zoneActive)
@@ -1333,102 +1337,64 @@ export function CrossFlowMap() {
     setSnapshot(snappedSnapshot)
     setIncidents(incidents)
 
-    // Helper for feature-state
-    const getLevelCode = (lvl: string) => {
-      const g = { free: 0, slow: 1, congested: 2, critical: 3 }
-      // @ts-ignore
-      return g[lvl] ?? 0
-    }
-
     // --- High Performance: UCTN Property Updates ---
     if (map.getSource(TRAFFIC_SOURCE)) {
-      // 1. Identify which roads have active data in this snap
       const activeIds = new Set(snappedSnapshot.segments.map(s => s.id))
       
-      // 2. Update state for ALL segments (Efficient Delta)
-      // Note: In a larger network, we'd only update changed features.
-      // For city-scale, setFeatureState is fast enough to call on active segments.
+      // Update state for current live data
       snappedSnapshot.segments.forEach(seg => {
         map.setFeatureState(
           { source: TRAFFIC_SOURCE, id: seg.id },
-          { hasData: true, levelCode: getLevelCode(seg.level) }
+          { hasData: true, levelCode: scoreToCongestionLevel(seg.congestionScore) === 'free' ? 0 : 
+                                    scoreToCongestionLevel(seg.congestionScore) === 'slow' ? 1 :
+                                    scoreToCongestionLevel(seg.congestionScore) === 'congested' ? 2 : 3 }
         )
       })
 
-      // 3. Reset roads that no longer have data (if they were previously active)
-      if (previousSnapshotRef.current) {
-        previousSnapshotRef.current.segments.forEach(pSeg => {
-          if (!activeIds.has(pSeg.id)) {
-            map.setFeatureState(
-              { source: TRAFFIC_SOURCE, id: pSeg.id },
-              { hasData: false, levelCode: 0 }
-            )
-          }
-        })
-      }
-    }
-
-    // --- 4. Predictive Evolution (+30min) ---
-    if (map.getSource(TRAFFIC_PREDICTION_SOURCE)) {
-      // For now, we simulate prediction by adding a slight delta to current congestion
-      // In prod, this would come from a dedicated ML endpoint
+      // Update state for prediction
       snappedSnapshot.segments.forEach(seg => {
-        const predictedLevel = seg.level === 'free' ? 'slow' : 
-                               seg.level === 'slow' ? 'congested' : 
-                               seg.level === 'congested' ? 'critical' : 'critical'
+        // Simulated +30m delta
+        const currentScore = seg.congestionScore
+        const predictedScore = Math.min(1, currentScore + 0.15)
         map.setFeatureState(
           { source: TRAFFIC_PREDICTION_SOURCE, id: seg.id },
-          { levelCode: getLevelCode(predictedLevel) }
+          { levelCode: scoreToCongestionLevel(predictedScore) === 'free' ? 0 : 
+                       scoreToCongestionLevel(predictedScore) === 'slow' ? 1 :
+                       scoreToCongestionLevel(predictedScore) === 'congested' ? 2 : 3 }
         )
       })
-      
-      // Sync geometry once per city change for prediction source too
-      if (cityNetworkRef.current === city.id) {
-        const pSrc = map.getSource(TRAFFIC_PREDICTION_SOURCE) as maplibregl.GeoJSONSource
-        const currentData = (map.getSource(TRAFFIC_SOURCE) as any)._data
-        if (pSrc && currentData) pSrc.setData(currentData)
+
+      // Sync geometries if city changed
+      if (cityNetworkRef.current !== city.id) {
+        const geo: GeoJSON.FeatureCollection = {
+          type: 'FeatureCollection',
+          features: snappedSnapshot.segments.map(s => ({
+            type: 'Feature',
+            id: s.id,
+            geometry: { type: 'LineString', coordinates: s.coordinates },
+            properties: { highway: s.roadType }
+          }))
+        }
+        ;(map.getSource(TRAFFIC_SOURCE) as maplibregl.GeoJSONSource).setData(geo)
+        ;(map.getSource(TRAFFIC_PREDICTION_SOURCE) as maplibregl.GeoJSONSource).setData(geo)
+        cityNetworkRef.current = city.id
       }
     }
 
-    // --- Conditional Heatmaps (only update if layer is visible) ---
+    // --- Heatmaps & Incidents ---
     if (activeLayers.has('heatmap')) {
       const heatGeo: GeoJSON.FeatureCollection = {
         type: 'FeatureCollection',
         features: snapshot.heatmap.map(pt => ({
-          type:       'Feature' as const,
-          geometry:   { type: 'Point' as const, coordinates: [pt.lng, pt.lat] },
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: [pt.lng, pt.lat] },
           properties: { intensity: pt.intensity },
         })),
       }
       const hSrc = map.getSource(HEATMAP_SOURCE) as maplibregl.GeoJSONSource | undefined
       if (hSrc) hSrc.setData(heatGeo)
-
-      const pSrc = map.getSource(HEATMAP_PASSAGES_SOURCE) as maplibregl.GeoJSONSource | undefined
-      if (pSrc) {
-        pSrc.setData({
-          type: 'FeatureCollection',
-          features: snapshot.heatmapPassages.map(pt => ({
-            type: 'Feature' as const,
-            geometry: { type: 'Point' as const, coordinates: [pt.lng, pt.lat] },
-            properties: { intensity: pt.intensity },
-          })),
-        })
-      }
-
-      const cSrc = map.getSource(HEATMAP_CO2_SOURCE) as maplibregl.GeoJSONSource | undefined
-      if (cSrc) {
-        cSrc.setData({
-          type: 'FeatureCollection',
-          features: snapshot.heatmapCo2.map(pt => ({
-            type: 'Feature' as const,
-            geometry: { type: 'Point' as const, coordinates: [pt.lng, pt.lat] },
-            properties: { intensity: pt.intensity },
-          })),
-        })
-      }
     }
 
-    // Incidents
     const incGeo: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
       features: incidents.map(inc => ({
@@ -1440,22 +1406,13 @@ export function CrossFlowMap() {
     const iSrc = map.getSource(INCIDENT_SOURCE) as maplibregl.GeoJSONSource | undefined
     if (iSrc) iSrc.setData(incGeo)
 
-    // Boundary layer update
+    // Boundary
     const bSrc = map.getSource(BOUNDARY_SOURCE) as maplibregl.GeoJSONSource | undefined
-    if (bSrc) {
-      if (cityBoundary) {
-        bSrc.setData(cityBoundary)
-      } else {
-        bSrc.setData({ type: 'FeatureCollection', features: [] })
-      }
-    }
+    if (bSrc && cityBoundary) bSrc.setData(cityBoundary)
 
-    // NOTE: Météo gérée globalement par WeatherProvider (AppShell)
-    // Plus besoin de l'appeler ici — évite les appels dupliqués à OpenMeteo
     previousSnapshotRef.current = snapshot
   }, [city, mapLoaded, activeLayers, useLiveData, setSnapshot, setIncidents, setDataSource])
 
-  // Keep refreshDataRef in sync so OSM loader can call it after roads are cached
   useEffect(() => { refreshDataRef.current = refreshData }, [refreshData])
 
   useEffect(() => {
@@ -1472,6 +1429,37 @@ export function CrossFlowMap() {
       mapRef.current?.off('moveend', onMoveEnd)
     }
   }, [mapLoaded, refreshData])
+
+  // ─── 10-Minute Persistence Scheduler ──────────────────────────────────
+  useEffect(() => {
+    if (!mapLoaded || !snapshot || mode !== 'live') return
+
+    const captureSnapshot = async () => {
+      if (document.visibilityState !== 'visible') return
+      
+      console.log('[Snapshot Scheduler] Capturing 10-min sample...')
+      try {
+        await fetch('/api/snapshots', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cityId:   city.id,
+            source:   dataSource,
+            segments: snapshot.segments,
+            weather:  {} // Could be enriched with weather state
+          })
+        })
+      } catch (err) {
+        console.warn('[Snapshot Scheduler] Failed to persist:', err)
+      }
+    }
+
+    // Capture immediately, then every 10m
+    captureSnapshot()
+    const interval = setInterval(captureSnapshot, 10 * 60 * 1000)
+    
+    return () => clearInterval(interval)
+  }, [mapLoaded, city.id, mode, dataSource, snapshot]) // eslint-disable-line
 
   // ─── Simulation overlay — tint segment colors by delta ────────────────
 
