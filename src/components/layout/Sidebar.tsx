@@ -10,6 +10,7 @@ import {
   GitBranch, AlertTriangle, Settings, Zap,
   LogOut, UserCircle, Loader2, Rss, Bot,
 } from 'lucide-react'
+import { useMapStore } from '@/store/mapStore'
 import navData from '@/lib/data/navigation.json'
 import appData from '@/lib/data/app.json'
 
@@ -36,10 +37,23 @@ export function Sidebar() {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
   }, [supabase])
 
+  const setMode = useMapStore(s => s.setMode)
+
   const handleNav = (href: string) => {
     setNavigatingTo(href)
+    
+    // 🌍 Architecture V3: Sidebar drives Map Mode
+    if (href === '/map')        setMode('live')
+    if (href === '/prediction') setMode('predict')
+    if (href === '/simulation') setMode('simulate')
+
     startTransition(() => {
-      router.push(href)
+      // If it's a map mode, we stay on /map but change state
+      if (['/prediction', '/simulation'].includes(href)) {
+        router.push('/map')
+      } else {
+        router.push(href)
+      }
     })
   }
 
@@ -90,28 +104,28 @@ export function Sidebar() {
                   aria-label={ariaLabel}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-[12px] text-sm transition-all duration-300 group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50',
+                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-[12px] text-sm transition-all duration-300 group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green/50',
                     active
-                      ? 'bg-white/10 text-brand font-semibold shadow-sm'
+                      ? 'bg-brand-green/10 text-brand-green font-black shadow-sm'
                       : 'text-text-secondary hover:text-text-primary hover:bg-white/5',
                   )}
                 >
                   {active && (
-                    <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-brand shadow-glow animate-pulse" aria-hidden="true" />
+                    <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-3 rounded-full bg-brand-green shadow-[0_0_10px_rgba(0,230,118,0.5)]" aria-hidden="true" />
                   )}
                   {loading ? (
-                    <Loader2 className="w-4.5 h-4.5 shrink-0 text-brand animate-spin" aria-hidden="true" />
+                    <Loader2 className="w-4 h-4 shrink-0 text-brand-green animate-spin" aria-hidden="true" />
                   ) : (
                     <Icon
                       className={cn(
-                        'w-4.5 h-4.5 shrink-0 transition-all duration-300',
-                        active ? 'text-brand scale-110' : 'text-text-muted group-hover:text-text-secondary group-hover:scale-105',
+                        'w-4 h-4 shrink-0 transition-all duration-300',
+                        active ? 'text-brand-green scale-110' : 'text-text-muted group-hover:text-text-secondary group-hover:scale-105',
                       )}
-                      strokeWidth={active ? 2.25 : 1.75}
+                      strokeWidth={active ? 2.5 : 1.75}
                       aria-hidden="true"
                     />
                   )}
-                  <span className={cn('text-[13px] tracking-tight', active && 'translate-x-0.5 transition-transform')}>
+                  <span className={cn('text-[12px] uppercase font-black tracking-widest', active && 'translate-x-0.5 transition-transform')}>
                     {label}
                   </span>
                 </button>
@@ -144,25 +158,25 @@ export function Sidebar() {
           aria-label="Accéder aux paramètres"
           aria-current={pathname === '/settings' ? 'page' : undefined}
           className={cn(
-            'w-full flex items-center gap-3 px-3 py-2.5 rounded-[12px] text-sm transition-all duration-300 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50',
+            'w-full flex items-center gap-3 px-3 py-2.5 rounded-[12px] text-sm transition-all duration-300 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green/50',
             pathname === '/settings'
-              ? 'bg-white/10 text-brand font-semibold shadow-sm'
+              ? 'bg-brand-green/10 text-brand-green font-black shadow-sm'
               : 'text-text-secondary hover:text-text-primary hover:bg-white/5',
           )}
         >
           {navigatingTo === '/settings' && isPending ? (
-            <Loader2 className="w-4.5 h-4.5 shrink-0 text-brand animate-spin" aria-hidden="true" />
+            <Loader2 className="w-4 h-4 shrink-0 text-brand-green animate-spin" aria-hidden="true" />
           ) : (
             <Settings
               className={cn(
-                'w-4.5 h-4.5 shrink-0 transition-all duration-300',
-                pathname === '/settings' ? 'text-brand scale-110' : 'text-text-muted group-hover:text-text-secondary group-hover:rotate-12',
+                'w-4 h-4 shrink-0 transition-all duration-300',
+                pathname === '/settings' ? 'text-brand-green scale-110' : 'text-text-muted group-hover:text-text-secondary group-hover:rotate-12',
               )}
               strokeWidth={1.75}
               aria-hidden="true"
             />
           )}
-          <span className="text-[13px] tracking-tight">Réglages</span>
+          <span className="text-[12px] uppercase font-black tracking-widest">Réglages</span>
         </button>
 
         <button

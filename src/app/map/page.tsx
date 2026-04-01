@@ -68,13 +68,6 @@ export default function MapPage() {
         {/* City Pulse HUD — top center */}
         {mounted && <CityPulseHUD />}
 
-        {/* Mode selector — top center (offset below HUD) */}
-        {mounted && (
-          <div className="absolute top-24 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
-            <ModeSelector />
-          </div>
-        )}
-
         {/* Layer controls — top left */}
         {mounted && mode !== 'simulate' && (
           <div className="absolute top-4 left-4 z-10 pointer-events-auto hidden sm:block">
