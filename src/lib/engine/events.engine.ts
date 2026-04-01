@@ -2,22 +2,23 @@ import type { UrbanEvent } from '../api/events'
 import { City } from '@/types'
 
 /**
- * Featured events for Paris — updated with musical + sports categories.
- * Pinned to current sprint (Mar 25-26, 2026).
+ * Featured events for Paris — updated with accurate Mar 2026 data.
+ * These reflect the specific events and metrics requested for the dashboard.
  */
 const FEATURED_PARIS_EVENTS: Partial<UrbanEvent>[] = [
   {
-    title: 'Julius Rodriguez',
-    category: 'concert',
-    startDate: '2026-03-25T19:30:00',
-    endDate:   '2026-03-25T23:00:00',
-    location:  { lat: 48.8660, lng: 2.3477, address: 'Le Duc des Lombards, Paris 1er', district: '75001' },
-    venue:     'Le Duc des Lombards',
-    attendance: 300,
-    trafficScore: 0.55,
-    impactLabel: 'Impact modéré',
-    trafficIncrease: 35,
-    source: 'predicthq',
+    title: 'Marathon de Paris 2026 — Passage',
+    category: 'sport',
+    startDate: '2026-03-26T08:00:00',
+    endDate:   '2026-03-26T15:00:00',
+    location:  { lat: 48.8698, lng: 2.3078, address: 'Avenue des Champs-Élysées, Paris 8ème', district: '75008' },
+    venue:     'Avenue des Champs-Élysées',
+    attendance: 55000,
+    trafficScore: 0.95,
+    impactLabel: 'Impact critique',
+    trafficIncrease: 80,
+    distanceKm: 5.0,
+    source: 'crossflow-engine',
   },
   {
     title: 'PSG vs Rennes — Ligue 1',
@@ -26,10 +27,11 @@ const FEATURED_PARIS_EVENTS: Partial<UrbanEvent>[] = [
     endDate:   '2026-03-26T23:00:00',
     location:  { lat: 48.8414, lng: 2.2530, address: 'Parc des Princes, Paris 16ème', district: '75016' },
     venue:     'Parc des Princes',
-    attendance: 47000,
+    attendance: 48000,
     trafficScore: 0.87,
     impactLabel: 'Impact fort',
     trafficIncrease: 68,
+    distanceKm: 3.8,
     source: 'predicthq',
   },
   {
@@ -37,12 +39,27 @@ const FEATURED_PARIS_EVENTS: Partial<UrbanEvent>[] = [
     category: 'festival',
     startDate: '2026-03-25T14:00:00',
     endDate:   '2026-03-26T22:00:00',
-    location:  { lat: 48.9283, lng: 2.2520, address: 'La Seine Musicale, Boulogne-Billancourt', district: '92100' },
+    location:  { lat: 48.8351, lng: 2.2223, address: 'La Seine Musicale, Boulogne-Billancourt', district: '92100' },
     venue:     'La Seine Musicale',
     attendance: 5000,
     trafficScore: 0.72,
     impactLabel: 'Impact fort',
     trafficIncrease: 52,
+    distanceKm: 0.9,
+    source: 'predicthq',
+  },
+  {
+    title: 'Julius Rodriguez',
+    category: 'concert',
+    startDate: '2026-03-25T19:30:00',
+    endDate:   '2026-03-25T23:00:00',
+    location:  { lat: 48.8660, lng: 2.3477, address: 'Le Duc des Lombards, Paris 1er', district: '75001' },
+    venue:     'Le Duc des Lombards',
+    attendance: 35,
+    trafficScore: 0.45,
+    impactLabel: 'Impact modéré',
+    trafficIncrease: 35,
+    distanceKm: 7.5,
     source: 'predicthq',
   },
   {
@@ -51,23 +68,13 @@ const FEATURED_PARIS_EVENTS: Partial<UrbanEvent>[] = [
     startDate: '2026-03-25T09:30:00',
     endDate:   '2026-03-25T19:00:00',
     location:  { lat: 48.8540, lng: 2.3330, address: '4 Place Saint-Germain des Prés, 75006', district: '75006' },
-    attendance: 300,
+    venue:     'Saint-Germain des Prés',
+    attendance: 18,
     trafficScore: 0.28,
     impactLabel: 'Impact léger',
     trafficIncrease: 18,
+    distanceKm: 2.2,
     source: 'predicthq',
-  },
-  {
-    title: 'Marathon de Paris 2026 — Passage',
-    category: 'sport',
-    startDate: '2026-03-26T08:00:00',
-    endDate:   '2026-03-26T15:00:00',
-    location:  { lat: 48.8698, lng: 2.3078, address: 'Avenue des Champs-Élysées, Paris 8ème', district: '75008' },
-    attendance: 50000,
-    trafficScore: 0.92,
-    impactLabel: 'Impact critique',
-    trafficIncrease: 80,
-    source: 'crossflow-engine',
   },
 ]
 
@@ -118,8 +125,8 @@ export function generateEventsForCity(city: City): UrbanEvent[] {
       startDate:  e.startDate ?? new Date().toISOString(),
       radius:     e.radius ?? 800,
       source:     e.source ?? 'crossflow-engine',
-      distanceKm: parseFloat((Math.random() * 8 + 0.5).toFixed(1)),
-      proximityScore: parseFloat((0.3 + Math.random() * 0.6).toFixed(2)),
+      distanceKm: e.distanceKm ?? parseFloat((Math.random() * 8 + 0.5).toFixed(1)),
+      proximityScore: e.trafficScore ?? parseFloat((0.3 + Math.random() * 0.6).toFixed(2)),
     } as UrbanEvent))
   }
 
