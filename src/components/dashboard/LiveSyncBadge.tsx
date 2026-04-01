@@ -9,9 +9,18 @@ import { cn } from '@/lib/utils/cn'
  * Informs the user of the current telemetry synchronization state.
  * Staff Engineer UX: Data reliability confirmation.
  */
-export function LiveSyncBadge({ className }: { className?: string }) {
-  const isSyncing = useTrafficStore(s => s.isSyncing)
-  const lastSync  = useTrafficStore(s => s.lastSync)
+interface LiveSyncBadgeProps {
+  className?: string
+  refreshing?: boolean
+  lastSync?: string
+}
+
+export function LiveSyncBadge({ className, refreshing, lastSync: propsLastSync }: LiveSyncBadgeProps) {
+  const storeIsSyncing = useTrafficStore(s => s.isSyncing)
+  const storeLastSync  = useTrafficStore(s => s.lastSync)
+  
+  const isSyncing = refreshing ?? storeIsSyncing
+  const lastSync  = propsLastSync ?? (storeLastSync ? new Date(storeLastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null)
   
   return (
     <div className={cn(
@@ -34,7 +43,7 @@ export function LiveSyncBadge({ className }: { className?: string }) {
         )}
       </div>
       
-      <div className="flex flex-col -space-y-0.5">
+      <div className="flex flex-col -space-y-0.5 text-left">
         <span className={cn(
           "text-[10px] font-black uppercase tracking-widest",
           isSyncing ? "text-brand" : "text-text-secondary"
@@ -43,7 +52,7 @@ export function LiveSyncBadge({ className }: { className?: string }) {
         </span>
         {lastSync && !isSyncing && (
           <span className="text-[8px] font-bold text-text-muted opacity-60 uppercase tracking-tighter">
-            Dernier push: {new Date(lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            Dernier push: {lastSync}
           </span>
         )}
       </div>

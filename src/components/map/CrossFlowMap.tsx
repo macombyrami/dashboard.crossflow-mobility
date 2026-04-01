@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo, memo } from 'react'
 
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -173,7 +173,7 @@ function computeRoadWidth(roadType: string | undefined, level: CongestionLevel, 
   return Math.round(baseWidth * multiplier * zoomFactor * 10) / 10
 }
 
-export function CrossFlowMap() {
+export const CrossFlowMap = memo(function CrossFlowMap() {
   const mapRef          = useRef<maplibregl.Map | null>(null)
   const containerRef    = useRef<HTMLDivElement>(null)
   const popupRef        = useRef<maplibregl.Popup | null>(null)
@@ -276,15 +276,19 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     let frame: number
 
     const animate = () => {
+      if (document.hidden) {
+        rafRef.current = requestAnimationFrame(animate)
+        return
+      }
       offset = (offset + 0.15) % 100
       if (map.getLayer(TRAFFIC_SOURCE + '-lines')) {
         map.setPaintProperty(TRAFFIC_SOURCE + '-lines', 'line-dash-offset', offset)
       }
-      frame = requestAnimationFrame(animate)
+      rafRef.current = requestAnimationFrame(animate)
     }
 
-    frame = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(frame)
+    rafRef.current = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(rafRef.current)
   }, [mapLoaded])
 
   // ─── Split View Lng Calculation ─────────────────────────────────────
@@ -1627,14 +1631,11 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
     if (!mapLoaded) return
     refreshData()
-    const interval = setInterval(refreshData, platformConfig.traffic.refreshIntervalMs)
-    
     // Viewport-aware refresh: update when user stops moving/zooming
     const onMoveEnd = () => refreshData()
     mapRef.current?.on('moveend', onMoveEnd)
 
     return () => {
-      clearInterval(interval)
       mapRef.current?.off('moveend', onMoveEnd)
     }
   }, [mapLoaded, refreshData])
@@ -2026,7 +2027,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       )}
     </div>
   )
-}
+})
 
 // ─── Sources init ─────────────────────────────────────────────────────────────
 
@@ -2311,8 +2312,14 @@ function initStaticSources(map: maplibregl.Map) {
     }
   })
 
-  // Incidents (Luminous dots)
-  map.addSource(INCIDENT_SOURCE, { type: 'geojson', data: emptyFC })
+  // Incidents (Luminous dots) - STAFF: CLUSTERING ENABLED
+  map.addSource(INCIDENT_SOURCE, { 
+    type: 'geojson', 
+    data: emptyFC,
+    cluster: true,
+    clusterMaxZoom: 14, 
+    clusterRadius: 50 
+  })
 
   // Outer glow for incidents
   map.addLayer({
@@ -2917,7 +2924,13 @@ function initZoneLayers(map: maplibregl.Map) {
 
 function initSocialLayers(map: maplibregl.Map) {
   const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
-  map.addSource(SOCIAL_SOURCE, { type: 'geojson', data: emptyFC })
+  map.addSource(SOCIAL_SOURCE, { 
+    type: 'geojson', 
+    data: emptyFC,
+    cluster: true,
+    clusterMaxZoom: 14,
+    clusterRadius: 40
+  })
 
   map.addLayer({
     id: SOCIAL_SOURCE + '-glow',

@@ -49,6 +49,8 @@ export const viewport: Viewport = {
   themeColor:   appData.themeColor,
 }
 
+import { QueryProvider } from '@/components/providers/QueryProvider'
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang={appData.lang} suppressHydrationWarning>
@@ -62,11 +64,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <AppShell>
-          {children}
-          <Analytics />
-          <SpeedInsights />
-        </AppShell>
+        <QueryProvider>
+          <AppShell>
+            {children}
+            <Analytics />
+            <SpeedInsights />
+          </AppShell>
+        </QueryProvider>
       </body>
     </html>
   )

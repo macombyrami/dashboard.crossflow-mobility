@@ -1,13 +1,18 @@
 'use client'
-import React from 'react'
+import React, { lazy, Suspense } from 'react'
 import { usePathname } from 'next/navigation'
-import { Sidebar }         from './Sidebar'
-import { Header }          from './Header'
-import { BottomNav }       from './BottomNav'
 import { UserCityProvider } from '@/components/auth/UserCityProvider'
 import { SwipeNavigation }   from './SwipeNavigation'
 import { WeatherProvider }   from '@/components/providers/WeatherProvider'
 import { TrafficSyncManager } from '@/components/dashboard/TrafficSyncManager'
+
+// 🚀 STAFF ENGINEER PERFORMANCE: Lazy-load heavy chrome components
+const Sidebar   = lazy(() => import('./Sidebar').then(m => ({ default: m.Sidebar })))
+const Header    = lazy(() => import('./Header').then(m => ({ default: m.Header })))
+const BottomNav = lazy(() => import('./BottomNav').then(m => ({ default: m.BottomNav })))
+
+// Skeleton for layout components (Minimal footprint)
+const LayoutSkeleton = () => <div className="animate-pulse bg-white/5 border border-white/10 rounded-xl" />
 
 // Pages that must NOT have the app shell (sidebar / header / bottom nav)
 const PUBLIC_PREFIXES = ['/login', '/onboarding', '/auth']
@@ -43,16 +48,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <UserCityProvider>
         <WeatherProvider />
         <TrafficSyncManager />
-        <Sidebar />
+        
+        <Suspense fallback={<LayoutSkeleton />}>
+          <Sidebar />
+        </Suspense>
+
         <div className="main-content relative pt-safe">
-          <Header />
+          <Suspense fallback={<div className="h-16 w-full bg-white/5 animate-pulse" />}>
+            <Header />
+          </Suspense>
+
           <div className="flex-1 overflow-hidden relative flex flex-col min-h-0 z-0 pb-safe">
             <SwipeNavigation>
               {children}
             </SwipeNavigation>
           </div>
         </div>
-        <BottomNav />
+
+        <Suspense fallback={<div className="h-20 w-full fixed bottom-0 bg-white/5 animate-pulse" />}>
+          <BottomNav />
+        </Suspense>
       </UserCityProvider>
     </div>
   )

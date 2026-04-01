@@ -30,12 +30,18 @@ const CrossFlowMap = dynamic(
 
 import { VehicleInfoCard } from '@/components/map/VehicleInfoCard'
 
+import { useTrafficData } from '@/lib/hooks/useTrafficData'
+
 export default function MapPage() {
   const [mounted, setMounted] = React.useState(false)
   const [isFilterSheetOpen, setIsFilterSheetOpen] = React.useState(false)
-  const [isVehicleSheetOpen, setIsVehicleSheetOpen] = React.useState(false)
+  const [isTransportSheetOpen, setIsTransportSheetOpen] = React.useState(false) // STAFF OPTIMIZATION: Track open state
+  
   const { t } = useTranslation()
   const city  = useMapStore(s => s.city)
+
+  // 🔄 HIGH-PERFORMANCE DATA FETCHING (STAFF ENGINEER LAYER)
+  const { lastUpdated, manualRefresh, isFetching, timeSinceUpdate } = useTrafficData()
 
   React.useEffect(() => {
     setMounted(true)
@@ -49,12 +55,12 @@ export default function MapPage() {
   const toggleLayer    = useMapStore(s => s.toggleLayer)
   const setKPIs        = useTrafficStore(s => s.setKPIs)
 
-  // KPI generation loop
+  // Optimized KPI generation - only re-gen when traffic data actually updates
   React.useEffect(() => {
-    setKPIs(generateCityKPIs(city))
-    const interval = setInterval(() => setKPIs(generateCityKPIs(city)), 30_000)
-    return () => clearInterval(interval)
-  }, [city, setKPIs])
+    if (mounted) {
+      setKPIs(generateCityKPIs(city))
+    }
+  }, [city, setKPIs, lastUpdated, mounted])
 
   const layerProps = {
     traffic:   activeLayers.has('traffic'),
@@ -63,6 +69,11 @@ export default function MapPage() {
     boundary:  activeLayers.has('boundary'),
     transport: activeLayers.has('transport'),
   }
+
+  // 🧪 LAZY LOADING: Re-open transport sheet if layer toggled on mobile
+  React.useEffect(() => {
+    if (layerProps.transport) setIsTransportSheetOpen(true)
+  }, [layerProps.transport])
 
   return (
     <div className="flex flex-1 h-full overflow-hidden relative bg-[#030303]">
@@ -77,11 +88,24 @@ export default function MapPage() {
         {/* --- DYNAMIC HUD LAYER --- */}
 
         {/* TOP HUD: Status & Health (Centralized for scannability) */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center gap-2 w-full px-4">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center gap-2 w-full px-4 text-center">
            {mounted && (
              <div className="flex flex-col items-center gap-1.5 opacity-90 backdrop-blur-sm px-4 py-2 rounded-2xl">
-               <LiveSyncBadge />
+               <div className="flex items-center gap-2 pointer-events-auto">
+                 <LiveSyncBadge refreshing={isFetching} lastSync={lastUpdated?.toLocaleTimeString()} />
+                 <button 
+                   onClick={manualRefresh}
+                   className="p-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                 >
+                   <span className={cn("text-[10px] block", isFetching && "animate-spin")}>🔄</span>
+                 </button>
+               </div>
                <CityPulseHUD />
+               {timeSinceUpdate > 1 && (
+                 <span className="text-[9px] font-black text-white/30 uppercase tracking-widest animate-pulse">
+                   Mise à jour il y a {timeSinceUpdate} min
+                 </span>
+               )}
              </div>
            )}
         </div>
@@ -110,13 +134,14 @@ export default function MapPage() {
 
             {layerProps.transport && (
               <BottomSheet
-                isOpen={true} // Persistent draggable sheet on mobile if transport active
-                onClose={() => {}}
+                isOpen={isTransportSheetOpen} 
+                onClose={() => setIsTransportSheetOpen(false)}
                 title="Réseau de Transport"
                 snapPoints={[0.2, 0.5, 0.9]}
                 initialSnap={0.2}
               >
-                <VehicleFilterPanel vehicleCount={0} />
+                {/* 🚀 LAZY MOUNT: Panel only active when sheet is visible */}
+                {isTransportSheetOpen && <VehicleFilterPanel vehicleCount={0} />}
               </BottomSheet>
             )}
           </>
@@ -134,7 +159,9 @@ export default function MapPage() {
           )}
 
           {mounted && layerProps.transport && (
-            <VehicleFilterPanel vehicleCount={0} />
+            <div className="bg-black/40 backdrop-blur-3xl p-4 rounded-3xl border border-white/5 w-80 shadow-2xl">
+              <VehicleFilterPanel vehicleCount={0} />
+            </div>
           )}
         </div>
 

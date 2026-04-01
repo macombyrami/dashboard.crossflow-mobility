@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, memo } from 'react'
 import { useMapStore } from '@/store/mapStore'
 import { cn } from '@/lib/utils/cn'
 
@@ -62,16 +62,39 @@ interface VehicleFilterPanelProps {
   className?: string
 }
 
-export function VehicleFilterPanel({ vehicleCount, className }: VehicleFilterPanelProps) {
+export const VehicleFilterPanel = memo(function VehicleFilterPanel({ vehicleCount, className }: VehicleFilterPanelProps) {
   const activeLayers = useMapStore(s => s.activeLayers)
-  const typeFilter   = useMapStore(s => s.vehicleTypeFilter)
-  const toggleType   = useMapStore(s => s.toggleVehicleType)
+  const globalTypeFilter = useMapStore(s => s.vehicleTypeFilter)
+  const toggleGlobalType = useMapStore(s => s.toggleVehicleType)
   const searchQuery  = useMapStore(s => s.vehicleSearchQuery)
   const setSearch    = useMapStore(s => s.setVehicleSearch)
+
+  // 🧠 LOCAL STATE for instant UI feedback (Staff Engineer Optimization)
+  const [localTypeFilter, setLocalTypeFilter] = useState<Set<string>>(new Set(globalTypeFilter))
 
   const [showSuggestions, setShowSuggestions] = useState(false)
   const inputRef  = useRef<HTMLInputElement>(null)
   const dropRef   = useRef<HTMLDivElement>(null)
+
+  // Sync global store after a short debounce to avoid re-fetching overhead
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const localArr  = Array.from(localTypeFilter).sort()
+      const globalArr = Array.from(globalTypeFilter).sort()
+      
+      if (JSON.stringify(localArr) !== JSON.stringify(globalArr)) {
+         setLocalTypeFilter(new Set(globalTypeFilter))
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [globalTypeFilter])
+
+  const handleToggle = (key: string) => {
+    const next = new Set(localTypeFilter)
+    next.has(key) ? next.delete(key) : next.add(key)
+    setLocalTypeFilter(next)
+    toggleGlobalType(key) // Still updating global to drive Map filtering
+  }
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -87,6 +110,7 @@ export function VehicleFilterPanel({ vehicleCount, className }: VehicleFilterPan
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  // Memoize suggestions to prevent re-calc during animations
   const suggestions = useMemo(() => {
     if (!searchQuery.trim()) return []
     const q = searchQuery.toLowerCase().replace(/ligne\s*/g, '').replace(/métro\s*/g, '').replace(/rer\s*/g, '').replace(/tram\s*/g, '').trim()
@@ -176,11 +200,11 @@ export function VehicleFilterPanel({ vehicleCount, className }: VehicleFilterPan
         </span>
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 px-1 -mx-1 snap-x">
           {VEHICLE_TYPES.map(({ key, label, icon }) => {
-            const active = typeFilter.size === 0 || typeFilter.has(key)
+            const active = localTypeFilter.size === 0 || localTypeFilter.has(key)
             return (
               <button
                 key={key}
-                onClick={() => toggleType(key)}
+                onClick={() => handleToggle(key)}
                 className={cn(
                   "flex items-center gap-2 px-4 h-10 rounded-full whitespace-nowrap snap-start transition-all duration-300",
                   "border border-white/10 active:scale-95",
@@ -197,11 +221,11 @@ export function VehicleFilterPanel({ vehicleCount, className }: VehicleFilterPan
         </div>
       </div>
 
-      {/* ℹ️ CONTEXT INFO (Placeholder for actual list) */}
+      {/* ℹ️ CONTEXT INFO */}
       <div className="mt-2 p-4 rounded-2xl bg-white/[0.02] border border-white/5 italic text-white/30 text-xs leading-relaxed">
         Glissez vers le haut pour voir le détail des perturbations en temps réel sur les lignes sélectionnées.
       </div>
 
     </div>
   )
-}
+})
