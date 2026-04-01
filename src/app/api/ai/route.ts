@@ -1,17 +1,55 @@
 /**
- * OpenRouter AI — Server-side route
- * Key stays server-side (never exposed to browser)
+ * CrossFlow Intelligence — Data-Grounded AI Advisor
+ * Strictly adheres to cityContext, no hallucinations allowed.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import aiData from '@/lib/data/ai.json'
 import appData from '@/lib/data/app.json'
 import { rateLimit, getClientIp } from '@/lib/rateLimit'
+import { z } from 'zod'
 
 const OPENROUTER_BASE = aiData.openrouter.baseUrl
 const DEFAULT_MODEL   = aiData.openrouter.defaultModel
 
+// ─── AI Response Schema (Strict) ─────────────────────────────────────────────
+
+const AIResponseSchema = z.object({
+  ville: z.string(),
+  horodatage_local: z.string(),
+  situation: z.object({
+    congestion_pct: z.number().nullable(),
+    meteo: z.object({
+      temp_c: z.number().nullable(),
+      description: z.string().default('inconnu')
+    }),
+    incidents_total: z.number().default(0),
+    ralentissements_axes: z.array(z.string()).default([])
+  }),
+  sources_utilisees: z.object({
+    trafic: z.boolean(),
+    meteo: z.boolean(),
+    transport: z.boolean(),
+    evenements: z.boolean(),
+    social: z.boolean()
+  }),
+  evenements: z.array(z.string()).default([]),
+  transport_perturbations: z.array(z.string()).default([]),
+  analyse: z.object({
+    causes_probables: z.array(z.string())
+  }),
+  recommandations: z.array(z.string()),
+  projection: z.object({
+    projection_possible: z.boolean(),
+    t_plus_30_min_congestion_pct: z.number().nullable(),
+    t_plus_60_min_congestion_pct: z.number().nullable(),
+    confiance: z.enum(['faible', 'moyenne', 'elevee'])
+  }),
+  limites: z.array(z.string())
+})
+
+// ─── Route Handler ───────────────────────────────────────────────────────────
+
 export async function POST(req: NextRequest) {
-  // Rate limit: 20 requests per minute per IP
   const ip = getClientIp(req.headers)
   const rl = await rateLimit(ip, 'ai', 20, 60)
   if (!rl.allowed) {
@@ -23,17 +61,19 @@ export async function POST(req: NextRequest) {
 
   const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) {
-    return NextResponse.json(
-      { error: 'OPENROUTER_API_KEY manquant dans .env.local' },
-      { status: 503 },
-    )
+    return NextResponse.json({ error: 'OPENROUTER_API_KEY manquant' }, { status: 503 })
   }
 
   try {
     const body = await req.json()
-    const { messages, model = DEFAULT_MODEL, cityContext } = body
+    const { 
+      messages, 
+      model = DEFAULT_MODEL, 
+      cityContext,
+      sources = { trafic: true, meteo: true, transport: false, evenements: false, social: false }
+    } = body
 
-    const systemPrompt = buildSystemPrompt(cityContext)
+    const systemPrompt = buildSystemPrompt(cityContext, sources)
 
     const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
       method:  'POST',
@@ -41,7 +81,7 @@ export async function POST(req: NextRequest) {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type':  'application/json',
         'HTTP-Referer':  process.env.NEXT_PUBLIC_APP_URL ?? appData.url,
-        'X-Title':       aiData.openrouter.xTitle,
+        'X-Title':       'CrossFlow Intelligence (Strict)',
       },
       body: JSON.stringify({
         model,
@@ -49,21 +89,67 @@ export async function POST(req: NextRequest) {
           { role: 'system', content: systemPrompt },
           ...messages,
         ],
-        temperature: aiData.main.temperature,
+        temperature: 0.1, // Deterministic
         max_tokens:  aiData.main.maxTokens,
+        response_format: { type: 'json_object' },
         stream:      false,
       }),
     })
 
     if (!response.ok) {
       const err = await response.text()
-      return NextResponse.json({ error: `OpenRouter: ${err}` }, { status: response.status })
+      return NextResponse.json({ error: `AI Provider: ${err}` }, { status: response.status })
     }
 
     const data    = await response.json()
-    const content = data.choices?.[0]?.message?.content ?? ''
+    const rawContent = data.choices?.[0]?.message?.content ?? ''
+    
+    // Split JSON block from Markdown summary
+    // Expected format: JSON... \n\n Markdown...
+    let jsonPart = ''
+    let markdownPart = ''
+    
+    try {
+      const firstBrace = rawContent.indexOf('{')
+      const lastBrace = rawContent.lastIndexOf('}')
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        jsonPart = rawContent.substring(firstBrace, lastBrace + 1)
+        markdownPart = rawContent.substring(lastBrace + 1).trim()
+      } else {
+        throw new Error('Structure JSON absente')
+      }
 
-    return NextResponse.json({ content, model: data.model, usage: data.usage })
+      const parsedJSON = JSON.parse(jsonPart)
+      const validated = AIResponseSchema.safeParse(parsedJSON)
+
+      if (!validated.success) {
+        console.error('[AI Refinement] Zod Validation Failed:', validated.error)
+        return NextResponse.json({ error: 'Contexte insuffisant pour une réponse fiable (Validation KO)' }, { status: 422 })
+      }
+
+      // Hallucination Guard: ensure Markdown summary doesn't contain terms not in context
+      // Simple implementation: check if Markdown mentions words like "PSG" or "Match" if not in JSON events
+      const sensitiveTerms = ['psg', 'match', 'olympia', 'travaux', 'incident', 'manifestation']
+      const halluTerms = sensitiveTerms.filter(term => 
+        markdownPart.toLowerCase().includes(term) && 
+        !jsonPart.toLowerCase().includes(term)
+      )
+
+      if (halluTerms.length > 0) {
+        console.warn('[AI Refinement] Hallucination Flagged:', halluTerms)
+        markdownPart = "💡 L'IA a détecté une possible incohérence avec les données réelles et a tronqué son analyse narrative par sécurité."
+      }
+
+      return NextResponse.json({ 
+        content: markdownPart, 
+        data: validated.data,
+        usage: data.usage 
+      })
+
+    } catch (parseErr) {
+      console.error('[AI Refinement] Parse Error:', parseErr, 'Raw Content:', rawContent)
+      return NextResponse.json({ error: 'Erreur formatage IA (JSON invalide)' }, { status: 500 })
+    }
   } catch (e) {
     return NextResponse.json(
       { error: `Erreur serveur: ${e instanceof Error ? e.message : 'unknown'}` },
@@ -74,69 +160,36 @@ export async function POST(req: NextRequest) {
 
 // ─── System prompt builder ────────────────────────────────────────────────────
 
-function buildSystemPrompt(ctx?: CityContext): string {
-  const now  = new Date()
-  const time = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-  const date = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+function buildSystemPrompt(ctx?: CityContext, sources?: any): string {
+  const jsonContext = JSON.stringify(ctx || {}, null, 2)
+  const hasHistoryOrPred = !!(ctx?.history || ctx?.prediction)
 
-  let contextBlock = ''
-  if (ctx) {
-    const weatherLine = ctx.weather
-      ? `\n- **Météo**: ${ctx.weather.emoji} ${ctx.weather.description}, ${ctx.weather.temp}°C, vent ${ctx.weather.windKmh} km/h, visibilité ${ctx.weather.visibilityKm} km${ctx.weather.precipMm > 0 ? `, précip. ${ctx.weather.precipMm} mm` : ''}${ctx.weather.snowDepthCm > 0 ? `, neige ${ctx.weather.snowDepthCm} cm` : ''} → impact trafic: **${ctx.weather.trafficImpact}**`
-      : ''
+  return `Tu es **CrossFlow Intelligence**. Tu DOIS t’en tenir STRICTEMENT au contexte fourni ci-dessous.
 
-    const aqLine = ctx.airQuality
-      ? `\n- **Qualité air**: IQA EU ${ctx.airQuality.aqiEU} (${ctx.airQuality.level}), PM2.5 ${ctx.airQuality.pm25} µg/m³, NO₂ ${ctx.airQuality.no2} µg/m³${ctx.airQuality.trafficImpact > 0 ? ` → +${Math.round(ctx.airQuality.trafficImpact * 100)}% congestion estimée` : ''}`
-      : ''
+## CONTEXTE VILLE (JSON)
+\`\`\`json
+${jsonContext}
+\`\`\`
 
-    const cityStatsLine = ctx.cityStats
-      ? `\n- **Stats ville**: pop. ${ctx.cityStats.population?.toLocaleString('fr-FR') ?? '—'}, densité ${ctx.cityStats.density?.toLocaleString('fr-FR') ?? '—'} hab/km²`
-      : ''
+## SOURCES ACTIVÉES
+- Trafic: ${sources?.trafic ? 'OUI' : 'NON'}
+- Météo: ${sources?.meteo ? 'OUI' : 'NON'}
+- Transport: ${sources?.transport ? 'OUI' : 'NON'}
+- Événements: ${sources?.evenements ? 'OUI' : 'NON'}
+- Social: ${sources?.social ? 'OUI' : 'NON'}
 
-    const zoneLine = ctx.zone?.active
-      ? `\n\n### ANALYSE DE ZONE (Focus Localisé)
-- **Zone active**: OUI (l'utilisateur analyse un secteur spécifique)
-- **Segments dans la zone**: ${ctx.zone.segmentCount}
-- **Congestion moyenne zone**: ${Math.round(ctx.zone.avgCongestion * 100)}%
-- **Incidents dans la zone**: ${ctx.zone.incidentCount}
-- **Rues principales analysées**: ${ctx.zone.streets?.join(', ') || 'n/a'}
-${ctx.zone.topIncidents?.length ? `- **Incidents locaux**: ${ctx.zone.topIncidents.join('; ')}` : ''}`
-      : ''
+## RÈGLES D'OR (INTERDICTIONS ABSOLUES)
+1. Ne JAMAIS citer d’événement (match, équipe, lieu), travaux ou incident s’ils ne figurent pas explicitement dans les champs fournis.
+2. Ne pas inférer d’“heure de pointe” ou “charge élevée” sans indicateur explicite.
+3. Toute affirmation chiffrée doit citer la clé contextuelle entre ctx:key (ex: ctx:traffic.congestion).
+4. Si une info manque, écrire “non_disponible” ou “inconnu”.
+5. Projection = possible UNIQUEMENT si cityContext.history ou prediction est fourni (ici: ${hasHistoryOrPred ? 'OUI' : 'NON'}).
 
-    contextBlock = `
-## Contexte temps réel — ${ctx.cityName}${ctx.country ? `, ${ctx.country}` : ''}
+## FORMAT DE SORTIE OBLIGATOIRE
+1. Un bloc JSON compact validé par le schéma attendu.
+2. Un résumé Markdown court (≤120 mots) purement factuel.
 
-- **Heure locale**: ${time} — ${date}
-- **Congestion globale**: ${Math.round((ctx.congestionRate ?? 0) * 100)}%
-- **Temps de trajet moyen**: ${ctx.avgTravelMin ?? '—'} min
-- **Indice pollution**: ${ctx.pollutionIndex ?? '—'} / 10
-- **Incidents actifs**: ${ctx.activeIncidents ?? 0}
-- **Source données trafic**: ${ctx.dataSource ?? 'synthétique'}${weatherLine}${aqLine}${cityStatsLine}${zoneLine}
-`
-  }
-
-  return `Tu es **CrossFlow Intelligence**, l'IA embarquée de la plateforme CrossFlow Mobility — plateforme Smart City d'analyse et d'optimisation du trafic urbain.
-${contextBlock}
-## Tes expertises
-
-- Analyse de patterns de trafic et détection d'anomalies
-- Optimisations concrètes et actionnables (signalisation, itinéraires, régulation)
-- Interprétation météo + qualité de l'air sur le flux de circulation
-- Prédictions d'évolution trafic selon heure, météo, événements
-- Scénarios de simulation (voie réservée, carrefour intelligent, déviation)
-- Mobilité multimodale (TC, vélo, piéton, voiture)
-- Impact environnemental et calculs d'émissions CO₂
-
-## Style de réponse
-
-- Concis, structuré, orienté action — pas de remplissage
-- Chiffres et pourcentages quand disponibles
-- Markdown avec titres, puces et **gras** pour les points clés
-- Pense en ingénieur de terrain, propose des mesures concrètes
-- Réponds en français sauf si demandé autrement
-- **IMPORTANT**: Si une zone est active, focalise ton analyse prioritairement sur les données de cette zone.
-
-Si aucun contexte de ville n'est fourni, réponds en mode général sur la mobilité urbaine.`
+Exemple d'analyse attendue: "Hausse congestion alignée sur trafic.congestion (0.32) ctx:traffic.congestion"`
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -149,14 +202,13 @@ interface CityContext {
   pollutionIndex?:  number
   activeIncidents?: number
   dataSource?:      string
-  zone?: {
-    active:         boolean
-    segmentCount:   number
-    incidentCount:  number
-    avgCongestion:  number
-    topIncidents?:  string[]
-    streets?:       string[]
+  events?:          string[]
+  transport?: {
+    disruptions?: string[]
+    status?:      string
   }
+  history?:         any[]
+  prediction?:      any[]
   weather?: {
     emoji:         string
     description:   string
@@ -173,10 +225,5 @@ interface CityContext {
     pm25:          number
     no2:           number
     trafficImpact: number
-  }
-  cityStats?: {
-    population?: number
-    density?:    number
-    area?:       number
   }
 }

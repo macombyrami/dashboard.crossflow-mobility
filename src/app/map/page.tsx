@@ -1,8 +1,8 @@
 'use client'
 import dynamic from 'next/dynamic'
 import { ModeSelector } from '@/components/map/controls/ModeSelector'
-import { LayerControls } from '@/components/map/controls/LayerControls'
-import { MapLegend } from '@/components/map/MapLegend'
+import LayerControls from '@/components/map/controls/LayerControls'
+import MapLegend from '@/components/map/MapLegend'
 import { EdgeDetailPanel } from '@/components/map/panels/EdgeDetailPanel'
 import { ZoneStatsPanel } from '@/components/map/panels/ZoneStatsPanel'
 import { SimulationPanel } from '@/components/simulation/SimulationPanel'
@@ -35,7 +35,16 @@ export default function MapPage() {
   const mode           = useMapStore(s => s.mode)
   const isAIPanelOpen  = useMapStore(s => s.isAIPanelOpen)
   const setAIPanelOpen = useMapStore(s => s.setAIPanelOpen)
+  const activeLayers   = useMapStore(s => s.activeLayers)
+  const toggleLayer    = useMapStore(s => s.toggleLayer)
   const setKPIs        = useTrafficStore(s => s.setKPIs)
+
+  const layerProps = {
+    traffic:   activeLayers.has('traffic'),
+    heatmap:   activeLayers.has('heatmap'),
+    incidents: activeLayers.has('incidents'),
+    boundary:  activeLayers.has('boundary'),
+  }
 
   const isTomTom = hasKey()
   // Paris → IDFM/RATP data is real-time even without TomTom
@@ -69,7 +78,10 @@ export default function MapPage() {
         {/* Layer controls — top left */}
         {mounted && mode !== 'simulate' && (
           <div className="absolute top-4 left-4 z-10 pointer-events-auto hidden sm:block">
-            <LayerControls />
+            <LayerControls 
+              layers={layerProps} 
+              onToggle={(l) => toggleLayer(l as any)} 
+            />
           </div>
         )}
 
@@ -105,7 +117,7 @@ export default function MapPage() {
         )}
 
         {/* Map legend */}
-        {mounted && <MapLegend />}
+        {mounted && <MapLegend showTraffic={layerProps.traffic} showIncidents={layerProps.incidents} />}
 
         {/* Edge detail panel */}
         {mounted && mode !== 'simulate' && <EdgeDetailPanel />}
