@@ -69,16 +69,16 @@ export default function MapPage() {
 
         {/* --- DYNAMIC HUD LAYER --- */}
 
-        {/* TOP HUD: Status & Health */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center gap-3">
+        {/* TOP HUD: Status & Health (Centralized for scannability) */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center gap-3 w-full px-4">
            {mounted && <LiveSyncBadge />}
            {mounted && <CityPulseHUD />}
         </div>
 
-        {/* RIGHT HUD: Control Stack (Shifted automatically by container width) */}
+        {/* RIGHT HUD: Interaction Stack */}
         <div className={cn(
           "absolute right-4 z-40 transition-all duration-500 flex flex-col items-end gap-3",
-          "md:top-4 top-4 sm:top-auto sm:bottom-32 sm:left-4"
+          "md:top-4 top-24" // Push down on mobile to avoid CityPulseHUD overlap if stacked
         )}>
           {mounted && mode !== 'simulate' && (
             <LayerControls 
@@ -88,34 +88,31 @@ export default function MapPage() {
           )}
 
           {mounted && layerProps.transport && (
-            <VehicleFilterPanel 
-              vehicleCount={0}
-              className={cn(
-                "md:static", 
-                "fixed bottom-24 left-1/2 -translate-x-1/2 md:translate-x-0"
-              )}
-            />
+            <div className="md:static fixed bottom-24 left-1/2 -translate-x-1/2 md:translate-x-0 w-fit">
+              <VehicleFilterPanel vehicleCount={0} />
+            </div>
           )}
         </div>
 
         {/* CENTER COMPONENTS */}
         {mounted && <MapSplitSlider />}
 
-        {/* BOTTOM HUD: Visual Feedback */}
+        {/* BOTTOM HUD: Contextual Legends */}
         {mounted && (
           <div className={cn(
             "absolute z-20 pointer-events-none transition-all duration-500",
-            mode === 'predict' ? "bottom-20 left-4" : "bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6"
+            "bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6",
+            mode === 'predict' && "bottom-20"
           )}>
             {mode === 'predict' && (
-              <div className="bg-bg-surface/90 border border-brand-blue/30 rounded-lg px-3 py-2 backdrop-blur-sm pointer-events-auto mb-4 w-fit flex mx-auto">
+              <div className="bg-bg-surface/90 border border-brand-blue/30 rounded-full px-4 py-2 backdrop-blur-md pointer-events-auto mb-4 w-fit flex mx-auto shadow-glow-blue/10">
                 <LiveIndicator label={`${t('nav.predictions').toUpperCase()} · +30 MIN`} color="#2979FF" />
               </div>
             )}
             <MapLegend 
               showTraffic={layerProps.traffic} 
               showIncidents={layerProps.incidents} 
-              className="pointer-events-auto"
+              className="pointer-events-auto shadow-2xl"
             />
           </div>
         )}

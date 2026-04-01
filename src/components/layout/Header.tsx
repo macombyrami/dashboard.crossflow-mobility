@@ -104,7 +104,7 @@ export function Header() {
       }}
     >
       {/* 🧩 GROUP 1: CONTEXTE GÉOGRAPHIQUE & SYSTÈME */}
-      <div className="flex items-center gap-3 md:gap-4">
+      <div className="flex items-center gap-2 md:gap-4 shrink-0">
         <button
           onClick={toggleSidebar}
           aria-label="Ouvrir le menu"
@@ -113,28 +113,30 @@ export function Header() {
           <Menu className="w-5 h-5" />
         </button>
         <CitySearchBar />
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-[0.15em] text-white/40">
+        <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-[0.15em] text-white/40">
            <ShieldCheck className="w-3.5 h-3.5 text-brand-green" />
            Système Sécurisé
         </div>
       </div>
 
       {/* 🚀 Actions & Controls */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 md:gap-2">
         
-        {/* 🧩 GROUP 2: CONDITIONS & STATUS LIVE */}
-        <div className="flex items-center gap-2 px-1 py-1 rounded-2xl bg-black/30 border border-white/5">
+        {/* 🧩 GROUP 2: CONDITIONS & STATUS LIVE (Hidden on small mobile) */}
+        <div className="hidden xs:flex items-center gap-2 px-1 py-1 rounded-2xl bg-black/30 border border-white/5">
            {weather && (
              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5">
                <span className="text-base leading-none">{weather.icon}</span>
                <span className="text-[13px] font-black text-white tabular-nums tracking-tight">{weather.temp}°</span>
              </div>
            )}
-           <LiveClock />
+           <div className="hidden sm:block">
+             <LiveClock />
+           </div>
         </div>
 
         {/* 🔔 Notifications */}
-        <div ref={alertRef} className="relative ml-2">
+        <div ref={alertRef} className="relative ml-1">
           <button
             onClick={() => setAlertOpen(!alertOpen)}
             className={cn(
@@ -149,10 +151,9 @@ export function Header() {
               </span>
             )}
           </button>
-          {/* Notification List logic... */}
         </div>
 
-        {/* 🧩 GROUP 3: INFO & AI ANALYST (Minimal) */}
+        {/* 🧩 GROUP 3: INFO & AI ANALYST */}
         <button
           onClick={() => setAIPanelOpen(!isAIPanelOpen)}
           className={cn(
@@ -162,7 +163,6 @@ export function Header() {
           title="Analyse Intelligence"
         >
           <Sparkles className={cn('w-4.5 h-4.5', isAIPanelOpen ? 'text-black' : 'text-brand-green')} />
-          {/* Audit: Tooltip instead of text label to reduce clutter */}
           <div className="absolute top-full right-0 mt-3 px-3 py-2 bg-black/95 border border-white/10 rounded-xl text-[10px] text-white/60 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all pointer-events-none translate-y-2 group-hover:translate-y-0 shadow-2xl z-50">
              Activer l'Analyse Prédictive IA
           </div>
