@@ -45,6 +45,22 @@ export interface City {
 
 // ─── Traffic ──────────────────────────────────────────────────────────────────
 
+export interface ContextFactors {
+  weatherImpact:  'none' | 'minor' | 'moderate' | 'severe'
+  eventIntensity: number // 0 (none) to 1 (major)
+  hourOfDay:      number
+  isWeekend:      boolean
+  publicTransportLoad: number // 0-1
+  socialPulse:    number // 0-1
+}
+
+export interface IntelligenceResult {
+  score:       number
+  level:       CongestionLevel
+  anomalyScore:number // 0-1
+  multipliers: Record<string, number>
+}
+
 export interface TrafficSegment {
   id:               string
   name?:            string
@@ -69,6 +85,7 @@ export interface TrafficSegment {
   priorityAxis?:    number   // 0-1 (importance score)
   axisName?:        string   // e.g. "Boulevard Saint-Michel"
   flowTrend?:       'improving' | 'stable' | 'worsening'
+  anomalyScore?:    number   // 0-1 (V4 Engine Delta)
 }
 
 export interface HeatmapPoint {

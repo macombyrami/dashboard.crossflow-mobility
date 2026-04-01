@@ -20,7 +20,7 @@ import type { OSMRoad } from '@/lib/api/overpass'
 import { platformConfig } from '@/config/platform.config'
 import { scoreToCongestionLevel } from '@/lib/utils/congestion'
 import type { KPISnapshot } from '@/store/kpiHistoryStore'
-import { calculateEnrichedTrafficScore } from './TrafficScoreService'
+import { calculateV4TrafficScore } from './TrafficScoreService'
 import { enrichSegmentWithStreetMetadata } from './StreetMapper'
 
 // ─── Map Matching & Stitching (Turf.js) ───────────────────────────────────
@@ -158,13 +158,15 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
     const freeFlow = road.type === 'highway' ? 110 : 50
     const length   = road.type === 'highway' ? 1200 : 350
 
-    // ─── Urban Intelligence Enrichment ───
-    const enriched = calculateEnrichedTrafficScore(baseRaw, {
+    // ─── Urban Intelligence Enrichment (V4) ───
+    const typicalRaw = Math.max(0, Math.min(1, baseCongestion * spatial))
+    const enriched = calculateV4TrafficScore(baseRaw, typicalRaw, {
       weatherImpact: 'none', // To be connected to WeatherProvider
       eventIntensity: 0,     // To be connected to EventStore
       hourOfDay: hour,
       isWeekend: isWE,
-      publicTransportLoad: 0.1
+      publicTransportLoad: 0.1,
+      socialPulse: 0
     })
 
     const speedKmh = freeFlow * (1 - enriched.score * 0.7)
@@ -173,6 +175,7 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
       id: `${city.id}-synthetic-${idx}`,
       coordinates: road.coords,
       congestionScore: enriched.score,
+      anomalyScore: enriched.anomalyScore,
       level: enriched.level,
       speedKmh: Math.round(speedKmh * 10) / 10,
       freeFlowSpeedKmh: freeFlow,
@@ -217,18 +220,29 @@ export function generateTrafficFromOSMRoads(city: City, osmRoads: OSMRoad[]): Tr
       Math.pow((midPt[1] - city.center.lat) / 0.1, 2),
     )
     const spatial = Math.max(0, 1 - distFromCenter * 0.8)
-    const congestion = Math.max(0, Math.min(1, baseCongestion * spatial + (rng() - 0.5) * 0.2))
-    const level = scoreToCongestionLevel(congestion)
+    const baseRaw = Math.max(0, Math.min(1, baseCongestion * spatial + (rng() - 0.5) * 0.2))
+    const typicalRaw = baseCongestion * spatial
+    
+    // ─── Urban Intelligence Enrichment (V4) ───
+    const enriched = calculateV4TrafficScore(baseRaw, typicalRaw, {
+      weatherImpact: 'none',
+      eventIntensity: 0,
+      hourOfDay: hour,
+      isWeekend: isWE,
+      publicTransportLoad: 0.15,
+      socialPulse: 0.05
+    })
     
     const freeFlow = 50
-    const speedKmh = freeFlow * (1 - congestion * 0.6)
+    const speedKmh = freeFlow * (1 - enriched.score * 0.6)
     const length   = 400
-
+ 
     segments.push({
       id: `${city.id}-osm-${idx}`,
       coordinates: coords,
-      congestionScore: congestion,
-      level,
+      congestionScore: enriched.score,
+      anomalyScore: enriched.anomalyScore,
+      level: enriched.level,
       speedKmh: Math.round(speedKmh * 10) / 10,
       freeFlowSpeedKmh: freeFlow,
       flowVehiclesPerHour: Math.round((freeFlow - speedKmh) * 35 + (rng() * 80)),
@@ -237,7 +251,7 @@ export function generateTrafficFromOSMRoads(city: City, osmRoads: OSMRoad[]): Tr
       lastUpdated: now.toISOString(),
       mode: 'car'
     })
-    coords.forEach(pt => heatmap.push({ lng: pt[0], lat: pt[1], intensity: congestion }))
+    coords.forEach(pt => heatmap.push({ lng: pt[0], lat: pt[1], intensity: enriched.score }))
   })
 
   return {

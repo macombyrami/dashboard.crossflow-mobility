@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { TrafficSnapshot, Incident, CityKPIs } from '@/types'
 import type { WeatherData } from '@/lib/api/tomtom'
 import type { OpenMeteoWeather, AirQuality } from '@/lib/api/openmeteo'
+import { mobilityCore } from '@/lib/engine/MobilityCore'
 
 interface TrafficStore {
   snapshot:             TrafficSnapshot | null
@@ -51,15 +52,37 @@ export const useTrafficStore = create<TrafficStore>()((set) => ({
   isSyncing:            false,
   dataSource:           'synthetic',
 
-  setSnapshot:         (s)   => set({ snapshot: s, lastUpdate: new Date() }),
-  setIncidents:        (i)   => set((state) => ({ 
-    incidents: i.filter(inc => !state.dismissedIncidentIds.has(inc.id)) 
-  })),
-  setSocialIncidents:  (i)   => set((state) => ({ 
-    socialIncidents: i.filter(inc => !state.dismissedIncidentIds.has(inc.id)) 
-  })),
+  setSnapshot: (s) => {
+    // 🧠 V4 Core Normalization
+    const typical = null // In a real system, this would be fetched from history
+    const normalized = mobilityCore.normalizeTraffic(s, typical)
+    set({ snapshot: normalized, lastUpdate: new Date() })
+  },
+
+  setIncidents: (i) => {
+    mobilityCore.setIncidents(i)
+    set((state) => ({ 
+      incidents: i.filter(inc => !state.dismissedIncidentIds.has(inc.id)) 
+    }))
+  },
+
+  setSocialIncidents: (i) => {
+    // Calculate social pulse intensity for the core
+    const intensity = Math.min(1, i.length / 10) 
+    mobilityCore.updateSocialPulse(intensity)
+    
+    set((state) => ({ 
+      socialIncidents: i.filter(inc => !state.dismissedIncidentIds.has(inc.id)) 
+    }))
+  },
+
   setKPIs:             (k)   => set({ kpis: k }),
-  setWeather:          (w)   => set({ weather: w }),
+  setWeather:          (w)   => {
+    if (w) {
+      mobilityCore.updateWeather(w.trafficImpact)
+    }
+    set({ weather: w })
+  },
   setOpenMeteoWeather: (w)   => set({ openMeteoWeather: w }),
   setAirQuality:       (a)   => set({ airQuality: a }),
   setDataSource:       (src) => set({ dataSource: src }),

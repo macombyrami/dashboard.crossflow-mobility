@@ -815,7 +815,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       const snapshot = await generateTrafficSnapshot(city)
       const map = mapRef.current
 
-      // Update Feature State (High Performance)
+      // Update Feature State (High Performance) - V4 Extended Metadata
       snapshot.segments.forEach(seg => {
         map.setFeatureState(
           { source: TRAFFIC_SOURCE, id: seg.id },
@@ -823,7 +823,9 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
             hasData: true, 
             levelCode: seg.level === 'free' ? 0 : seg.level === 'slow' ? 1 : seg.level === 'congested' ? 2 : 3,
             congestion: seg.congestionScore,
-            speed: seg.speedKmh
+            speed: seg.speedKmh,
+            anomaly: seg.anomalyScore || 0,
+            arrondissement: seg.arrondissement || ''
           }
         )
       })
@@ -1532,9 +1534,14 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       snappedSnapshot.segments.forEach(seg => {
         map.setFeatureState(
           { source: TRAFFIC_SOURCE, id: seg.id },
-          { hasData: true, levelCode: scoreToCongestionLevel(seg.congestionScore) === 'free' ? 0 : 
-                                    scoreToCongestionLevel(seg.congestionScore) === 'slow' ? 1 :
-                                    scoreToCongestionLevel(seg.congestionScore) === 'congested' ? 2 : 3 }
+          { 
+            hasData: true, 
+            levelCode: scoreToCongestionLevel(seg.congestionScore) === 'free' ? 0 : 
+                      scoreToCongestionLevel(seg.congestionScore) === 'slow' ? 1 :
+                      scoreToCongestionLevel(seg.congestionScore) === 'congested' ? 2 : 3,
+            anomaly: seg.anomalyScore || 0,
+            arrondissement: seg.arrondissement || ''
+          }
         )
       })
 
@@ -2175,8 +2182,13 @@ function initStaticSources(map: maplibregl.Map) {
         'transparent' 
       ],
       'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 16, 12],
-      'line-opacity': ['case', ['>=', ['zoom'], 12], 0.25, 0],
-      'line-blur': 3,
+      'line-opacity': [
+        'case',
+        ['>=', ['feature-state', 'anomaly'], 0.6], 0.65, // V4: Anomaly Intensity
+        ['>=', ['zoom'], 12], 0.25,
+        0
+      ],
+      'line-blur': ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 6, 3],
     },
   })
 

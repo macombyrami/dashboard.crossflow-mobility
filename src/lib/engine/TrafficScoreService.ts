@@ -1,68 +1,103 @@
 /**
- * TrafficScoreService
- * 🧠 Core Intelligence Engine for Correlation & Weighting
+ * TrafficScoreService (V4)
+ * 🧠 Core Intelligence Engine for Correlation, Weighting & Anomaly Detection
  */
-import type { TrafficSegment, CongestionLevel } from '@/types'
+import type { TrafficSegment, CongestionLevel, IncidentSeverity } from '@/types'
 import { scoreToCongestionLevel } from '@/lib/utils/congestion'
 
 export interface ContextFactors {
   weatherImpact:  'none' | 'minor' | 'moderate' | 'severe'
-  eventIntensity: number // 0 (none) to 1 (major concert/match)
+  eventIntensity: number // 0 to 1
   hourOfDay:      number
   isWeekend:      boolean
-  publicTransportLoad: number // 0-1 (e.g. RATP incidents or peak hours)
+  publicTransportLoad: number // 0-1
+  socialPulse:    number // 0-1 (derived from NLP anomalies/complaints)
+}
+
+export interface IntelligenceResult {
+  score:       number
+  level:       CongestionLevel
+  anomalyScore:number // 0-1 (Current vs Typical)
+  multipliers: Record<string, number>
 }
 
 /**
- * Calculates a consolidated "Traffic Score" incorporating multi-source factors.
- * Formula: Score = Base * (1 + WeatherFactor + EventFactor + PTFactor)
+ * Calculates a consolidated "Intelligence Score" using a multi-factor weighting engine.
+ * V4 adds Social NLP signals and Anomaly Detection metrics.
  */
-export function calculateEnrichedTrafficScore(
+export function calculateV4TrafficScore(
   baseCongestion: number,
+  typicalCongestion: number,
   context: ContextFactors
-): { score: number; level: CongestionLevel; multipliers: Record<string, number> } {
+): IntelligenceResult {
   
-  // 1. Weather multiplier (Rain/Snow increases density)
+  // 🌦️ 1. Weather multiplier (Dynamic based on intensity)
   const weatherMult = 
-    context.weatherImpact === 'severe'   ? 0.45 :
-    context.weatherImpact === 'moderate' ? 0.25 :
-    context.weatherImpact === 'minor'    ? 0.10 : 0
+    context.weatherImpact === 'severe'   ? 0.50 :
+    context.weatherImpact === 'moderate' ? 0.30 :
+    context.weatherImpact === 'minor'    ? 0.15 : 0
   
-  // 2. Local Event multiplier (e.g. Football match at Stade de France)
-  const eventMult = context.eventIntensity * 0.50
+  // 🏟️ 2. Local Event multiplier (e.g. Olympics, Matches)
+  const eventMult = context.eventIntensity * 0.60
   
-  // 3. Public Transport multiplier (Strike or Breakdown = More cars)
-  const ptMult = context.publicTransportLoad * 0.35
+  // 🚆 3. Public Transport multiplier (Strike/Breakdown = Modal Shift)
+  const ptMult = context.publicTransportLoad * 0.40
   
-  // 4. Temporal multiplier (Rush hours amplify all impacts)
-  const isRushHour = 
-    (!context.isWeekend && ((context.hourOfDay >= 8 && context.hourOfDay <= 10) || (context.hourOfDay >= 17 && context.hourOfDay <= 19)))
-  
-  const rushHourAmplifier = isRushHour ? 1.4 : 1.0
+  // 📱 4. Social Pulse multiplier (Digital signal of physical congestion)
+  const socialMult = context.socialPulse * 0.25
 
-  // Combine
-  const rawScore = baseCongestion * (1 + weatherMult + eventMult + ptMult) * rushHourAmplifier
+  // ⏰ 5. Temporal multiplier (Rush hours amplify all impacts)
+  const isMorningRush = !context.isWeekend && context.hourOfDay >= 8 && context.hourOfDay <= 10
+  const isEveningRush = !context.isWeekend && context.hourOfDay >= 17 && context.hourOfDay <= 19
+  const rushHourAmplifier = (isMorningRush || isEveningRush) ? 1.5 : 1.0
+
+  // 🧠 6. Combine Core Score
+  const rawScore = baseCongestion * (1 + weatherMult + eventMult + ptMult + socialMult) * rushHourAmplifier
   const finalScore = Math.min(1, Math.max(0, rawScore))
   
+  // 🚨 7. Anomaly Score (Current vs Typical delta)
+  // An anomaly is a significant deviation from what's "typical" for this segment
+  const anomalyScore = Math.max(0, Math.min(1, (finalScore - typicalCongestion) / (typicalCongestion || 0.1)))
+
   return {
     score:  Math.round(finalScore * 100) / 100,
     level:  scoreToCongestionLevel(finalScore),
+    anomalyScore: Math.round(anomalyScore * 100) / 100,
     multipliers: {
       weather: weatherMult,
       event:   eventMult,
       pt:      ptMult,
-      rush:    rushHourAmplifier
+      social:  socialMult,
+      rush:    rushHourAmplifier,
+      base:    baseCongestion
     }
   }
 }
 
 /**
- * Provides qualitative insight based on the score delta
+ * Determines severity for an incident or anomaly
  */
-export function getTrafficInsight(current: number, historical: number): string {
-  const delta = current - historical
-  if (delta > 0.3) return "Congestion majeure inhabituelle"
-  if (delta > 0.15) return "Circulation plus dense que la normale"
-  if (delta < -0.2) return "Conditions de circulation fluides"
-  return "Trafic conforme aux prévisions"
+export function calculateSeverity(anomalyScore: number): IncidentSeverity {
+  if (anomalyScore > 0.8) return 'critical'
+  if (anomalyScore > 0.5) return 'high'
+  if (anomalyScore > 0.2) return 'medium'
+  return 'low'
+}
+
+/**
+ * Staff-Engineer Insight Utility
+ */
+export function getMobilityInsight(res: IntelligenceResult): string {
+  const { anomalyScore, multipliers } = res
+  
+  if (anomalyScore > 0.4) {
+    let reason = "Anomalie détectée."
+    if (multipliers.weather > 0.2) reason = "Conditions météo sévères impactant l'axe."
+    if (multipliers.event > 0.3)   reason = "Événement local saturant le réseau."
+    if (multipliers.social > 0.1)  reason = "Signalements sociaux confirmant l'incident."
+    return `🚨 ${reason} (${Math.round(anomalyScore * 100)}% de déviation)`
+  }
+  
+  if (anomalyScore < -0.15) return "✅ Trafic plus fluide que la normale."
+  return "🟢 Conditions normales conformes aux prévisions."
 }

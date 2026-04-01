@@ -15,11 +15,15 @@ const STREET_DICTIONARY: Record<string, { street: string; axis?: string; arrondi
   'champs': { street: 'Avenue des Champs-Élysées', axis: 'Étoile-Concorde', arrondissement: '8e arr.' },
 }
 
+import { findArrondissement } from '@/lib/data/paris_districts'
+
 /**
- * Enriches a segment with real-world metadata based on ID or simple spatial heuristic
+ * Enriches a segment with real-world metadata based on ID or spatial centroid logic.
+ * V4: Adds administrative zone detection (Arrondissements).
  */
 export function enrichSegmentWithStreetMetadata(segment: TrafficSegment): TrafficSegment {
   const s = { ...segment }
+  const mid = s.coordinates[Math.floor(s.coordinates.length / 2)] || [0, 0]
   
   // 1. Try reverse-search by segment ID keywords
   const lowerId = (s.id || '').toLowerCase()
@@ -27,16 +31,22 @@ export function enrichSegmentWithStreetMetadata(segment: TrafficSegment): Traffi
     if (lowerId.includes(key)) {
       s.streetName     = meta.street
       s.axisName       = meta.axis
-      s.arrondissement = meta.arrondissement
+      s.arrondissement = meta.arrondissement || s.arrondissement
       return s
     }
   }
 
-  // 2. Generic heuristics if no match
+  // 2. Spatial Admin Check (V4 GIS Requirement)
+  if (!s.arrondissement && mid[0] !== 0) {
+    const arr = findArrondissement(mid[0], mid[1])
+    if (arr) s.arrondissement = arr.name
+  }
+
+  // 3. Generic heuristics if no match
   if (!s.streetName) {
     if (s.roadType === 'motorway') s.streetName = 'Autoroute / Voie Rapide'
     else if (s.roadType === 'trunk') s.streetName = 'Axe Majeur'
-    else s.streetName = 'Rue Urbaine'
+    else s.streetName = 'Axe Urbain'
   }
 
   return s
