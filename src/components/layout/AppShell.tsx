@@ -39,14 +39,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="app-shell animate-in fade-in duration-500">
+    <div className="app-shell animate-in fade-in duration-500 bg-[#030303]">
       <UserCityProvider>
         <WeatherProvider />
         <TrafficSyncManager />
         <Sidebar />
-        <div className="main-content relative">
+        <div className="main-content relative pt-safe">
           <Header />
-          <div className="flex-1 overflow-hidden relative flex flex-col min-h-0 z-0">
+          <div className="flex-1 overflow-hidden relative flex flex-col min-h-0 z-0 pb-safe">
             <SwipeNavigation>
               {children}
             </SwipeNavigation>

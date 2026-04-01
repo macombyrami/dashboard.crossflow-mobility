@@ -12,9 +12,11 @@ export function CityPulseHUD() {
   if (mode === 'simulate') return null
 
   return (
-    <div className="w-fit pointer-events-auto">
+    <div className="w-full max-w-full md:w-fit pointer-events-auto">
       <div className={cn(
-        "flex flex-col md:flex-row items-stretch gap-2 p-1.5 bg-black/40 backdrop-blur-3xl border border-white/10 rounded-2xl shadow-apple ring-1 ring-white/5 transition-all max-h-[80vh] overflow-y-auto md:overflow-visible",
+        "flex flex-row md:flex-row items-center justify-center gap-2 p-1 md:p-1.5 transition-all w-full md:w-auto",
+        "bg-transparent md:bg-black/40 md:backdrop-blur-3xl md:border md:border-white/10 md:rounded-2xl md:shadow-apple md:ring-1 md:ring-white/5",
+        "overflow-x-auto no-scrollbar pb-2 md:pb-0"
       )}>
         
         <DataCard
@@ -25,6 +27,18 @@ export function CityPulseHUD() {
           context={city.name}
           badge="✅ BON"
           variant="success"
+          mini={true}
+          className="md:hidden"
+        />
+        <DataCard
+          icon={CheckCircle2}
+          value={58}
+          scale="/100"
+          metric="SANTÉ URBAINE"
+          context={city.name}
+          badge="✅ BON"
+          variant="success"
+          className="hidden md:flex"
         />
 
         <DataCard
@@ -34,6 +48,17 @@ export function CityPulseHUD() {
           context="Mode FLUX"
           badge="⚠️ MODÉRÉ"
           variant="warning"
+          mini={true}
+          className="md:hidden"
+        />
+        <DataCard
+          icon={AlertTriangle}
+          value="32%"
+          metric="CONGESTION"
+          context="Mode FLUX"
+          badge="⚠️ MODÉRÉ"
+          variant="warning"
+          className="hidden md:flex"
         />
 
         <DataCard
@@ -43,6 +68,17 @@ export function CityPulseHUD() {
           context="Événements"
           badge="🔴 CRITIQUE"
           variant="danger"
+          mini={true}
+          className="md:hidden"
+        />
+        <DataCard
+          icon={ShieldAlert}
+          value={8}
+          metric="PERTURBATIONS"
+          context="Événements"
+          badge="🔴 CRITIQUE"
+          variant="danger"
+          className="hidden md:flex"
         />
       </div>
     </div>

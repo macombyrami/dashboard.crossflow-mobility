@@ -1,18 +1,16 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Map, LayoutDashboard, AlertTriangle, Rss, Settings, TrendingUp, Cpu, Bus } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Map, TrendingUp, Cpu, AlertTriangle, Rss } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 const TABS = [
-  { href: '/map',        icon: Map,             label: 'Carte',     ariaLabel: 'Carte du trafic en temps réel', primary: true  },
-  { href: '/dashboard',  icon: LayoutDashboard, label: 'Tableau',   ariaLabel: 'Tableau de bord',              primary: true  },
-  { href: '/prediction', icon: TrendingUp,      label: 'Prévisions',ariaLabel: 'Prévisions de trafic',         primary: true  },
-  { href: '/simulation', icon: Cpu,             label: 'Simul.',    ariaLabel: 'Simulation de scénarios',      primary: false },
-  { href: '/transport',  icon: Bus,             label: 'Transp.',   ariaLabel: 'Transports en commun',         primary: true  },
-  { href: '/incidents',  icon: AlertTriangle,   label: 'Alertes',   ariaLabel: 'Incidents actifs',             primary: true  },
-  { href: '/social',     icon: Rss,             label: 'Social',    ariaLabel: 'Feed social',                  primary: false },
-  { href: '/settings',   icon: Settings,        label: 'Param.',    ariaLabel: 'Paramètres',                   primary: false },
+  { href: '/map',        icon: Map,             label: 'Carte' },
+  { href: '/prediction', icon: TrendingUp,      label: 'Prévisions' },
+  { href: '/simulation', icon: Cpu,             label: 'Simulation' },
+  { href: '/incidents',  icon: AlertTriangle,   label: 'Alertes' },
+  { href: '/social',     icon: Rss,             label: 'Social' },
 ]
 
 export function BottomNav() {
@@ -21,52 +19,52 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Navigation principale mobile"
-      className="print-hidden md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-bg-border"
+      className="print-hidden md:hidden fixed bottom-0 left-0 right-0 z-[100] border-t border-white/5 bg-[#030303]/90 backdrop-blur-2xl"
       style={{
-        background:              'rgba(12,13,16,0.94)',
-        backdropFilter:          'blur(24px) saturate(180%)',
-        WebkitBackdropFilter:    'blur(24px) saturate(180%)',
-        paddingBottom:           'max(env(safe-area-inset-bottom), 4px)',
-        height:                  'calc(60px + max(env(safe-area-inset-bottom), 4px))',
+        paddingBottom:           'env(safe-area-inset-bottom)',
+        height:                  'calc(64px + env(safe-area-inset-bottom))',
       }}
     >
-      <div className="flex h-[60px]" role="list">
-        {TABS.map(({ href, icon: Icon, label, ariaLabel, primary }) => {
+      <div className="flex h-16 items-center justify-around px-2" role="list">
+        {TABS.map(({ href, icon: Icon, label }) => {
           const active = pathname === href || (href !== '/' && pathname.startsWith(href))
           return (
             <Link
               key={href}
               href={href}
               role="listitem"
-              aria-label={ariaLabel}
-              aria-current={active ? 'page' : undefined}
               className={cn(
-                // On xs (<375px) hide secondary tabs → 5 primary tabs at ~75px each
-                // On sm+ show all 8 tabs
-                'flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-inset rounded-lg',
-                !primary && !active && 'hidden xs:flex',
-                !primary && active  && 'flex',   // always show active tab even if secondary
+                'relative flex flex-col items-center justify-center gap-1.5 flex-1 min-w-0 transition-all duration-200 active:scale-90',
+                active ? 'text-brand-green' : 'text-zinc-500'
               )}
             >
-              <div className={cn(
-                'relative flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-200',
-                active ? 'bg-brand/15' : '',
-              )}>
+              <div className="relative">
                 <Icon
                   className={cn(
-                    'w-[18px] h-[18px] transition-all duration-200',
-                    active ? 'text-brand' : 'text-text-muted',
+                    'w-6 h-6 transition-all duration-300',
+                    active ? 'scale-110' : 'opacity-70'
                   )}
-                  strokeWidth={active ? 2.25 : 1.75}
-                  aria-hidden="true"
+                  strokeWidth={active ? 2.5 : 2}
                 />
+                {active && (
+                  <motion.div
+                    layoutId="glow"
+                    className="absolute inset-0 bg-brand-green/20 blur-xl rounded-full"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  />
+                )}
               </div>
               <span className={cn(
-                'text-[8.5px] leading-none transition-colors duration-200',
-                active ? 'text-brand font-medium' : 'text-text-muted',
+                'text-[9px] font-black uppercase tracking-[0.05em] transition-all',
+                active ? 'opacity-100 translate-y-0.5' : 'opacity-40'
               )}>
                 {label}
               </span>
+              
+              {active && (
+                <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-8 h-px bg-brand-green shadow-glow-green" />
+              )}
             </Link>
           )
         })}

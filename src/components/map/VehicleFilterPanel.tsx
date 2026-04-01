@@ -100,166 +100,108 @@ export function VehicleFilterPanel({ vehicleCount, className }: VehicleFilterPan
   if (!activeLayers.has('transport')) return null
 
   return (
-    <div
-      className={cn(
-        "absolute z-10 w-[calc(100vw-2rem)] md:w-[310px] border border-white/10 rounded-[22px] p-4 shadow-apple transition-all duration-500 pointer-events-auto overflow-hidden",
-        className || "top-[72px] left-4 md:top-4 md:right-[156px]"
-      )}
-      style={{
-        fontFamily:      'Inter, -apple-system, sans-serif',
-        background:      'rgba(10,10,16,0.90)',
-        backdropFilter:  'blur(18px)',
-      }}
-    >
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-        <span style={{ fontSize: '11px', fontWeight: 700, color: '#86868B', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          Véhicules
-        </span>
-        <span style={{
-          fontSize: '10px', fontWeight: 700,
-          padding: '2px 8px', borderRadius: '20px',
-          background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)',
-          color: '#22C55E',
-        }}>
-          {vehicleCount} actifs
-        </span>
-      </div>
-
-      {/* Search with autocomplete */}
-      <div style={{ position: 'relative', marginBottom: '10px' }}>
-        <span style={{
-          position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)',
-          fontSize: '12px', color: '#86868B', pointerEvents: 'none',
-        }}>🔍</span>
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder="Ligne, ex: 1, Bus 47…"
-          value={searchQuery}
-          onChange={e => { setSearch(e.target.value); setShowSuggestions(true) }}
-          onFocus={() => { if (searchQuery) setShowSuggestions(true) }}
-          style={{
-            width:        '100%',
-            padding:      '7px 10px 7px 28px',
-            borderRadius: showSuggestions && suggestions.length > 0 ? '10px 10px 0 0' : '10px',
-            border:       '1px solid rgba(255,255,255,0.08)',
-            background:   'rgba(255,255,255,0.05)',
-            color:        '#F5F5F7',
-            fontSize:     '12px',
-            outline:      'none',
-            boxSizing:    'border-box',
-            fontFamily:   'inherit',
-          }}
-          onMouseOver={e => (e.currentTarget.style.border = '1px solid rgba(34,197,94,0.4)')}
-          onMouseOut={e => (e.currentTarget.style.border = '1px solid rgba(255,255,255,0.08)')}
-        />
-        {searchQuery && (
-          <button
-            onClick={() => { setSearch(''); setShowSuggestions(false) }}
-            style={{
-              position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
-              background: 'none', border: 'none', color: '#86868B', cursor: 'pointer', fontSize: '12px',
-            }}
-          >✕</button>
-        )}
-
-        {/* Autocomplete dropdown */}
-        {showSuggestions && suggestions.length > 0 && (
-          <div
-            ref={dropRef}
-            style={{
-              position:    'absolute',
-              top:         '100%',
-              left:        0,
-              right:       0,
-              background:  'rgba(18,18,28,0.98)',
-              border:      '1px solid rgba(255,255,255,0.12)',
-              borderTop:   'none',
-              borderRadius:'0 0 10px 10px',
-              overflow:    'hidden',
-              zIndex:      20,
-            }}
-          >
-            {suggestions.map(s => (
-              <button
-                key={s.slug}
-                onMouseDown={e => {
-                  e.preventDefault()
-                  setSearch(s.slug)
-                  setShowSuggestions(false)
-                }}
-                style={{
-                  display:     'flex',
-                  alignItems:  'center',
-                  gap:         '8px',
-                  width:       '100%',
-                  padding:     '7px 10px',
-                  background:  'none',
-                  border:      'none',
-                  borderBottom:'1px solid rgba(255,255,255,0.05)',
-                  color:       '#F5F5F7',
-                  fontSize:    '12px',
-                  cursor:      'pointer',
-                  textAlign:   'left',
-                  fontFamily:  'inherit',
-                }}
-                onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
-                onMouseOut={e  => (e.currentTarget.style.background = 'none')}
-              >
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: '22px', height: '22px', borderRadius: '6px',
-                  background: s.color + '33', border: `1px solid ${s.color}66`,
-                  fontSize: '11px', fontWeight: 800, color: s.color,
-                  flexShrink: 0,
-                }}>
-                  {s.slug.slice(0, 3)}
-                </span>
-                <span>{s.label}</span>
-              </button>
-            ))}
+    <div className={cn("flex flex-col gap-4 w-full h-full pb-8", className)}>
+      
+      {/* 🔍 STICKY SEARCH AREA */}
+      <div className="sticky top-0 bg-transparent z-20 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-black text-white/40 uppercase tracking-[0.15em]">
+            Rechercher une ligne
+          </span>
+          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-brand-green/10 text-brand-green border border-brand-green/20">
+            {vehicleCount} ACTIFS
+          </span>
+        </div>
+        
+        <div className="relative">
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30">
+            <span className="text-sm">🔍</span>
           </div>
-        )}
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder="Ligne, arrêt ou trajet…"
+            value={searchQuery}
+            onChange={e => { setSearch(e.target.value); setShowSuggestions(true) }}
+            onFocus={() => { if (searchQuery) setShowSuggestions(true) }}
+            className={cn(
+              "w-full h-12 pl-10 pr-10 rounded-2xl bg-white/5 border border-white/10 text-white placeholder:text-white/20 text-sm outline-none transition-all",
+              "focus:border-brand-green/50 focus:bg-white/[0.08] focus:ring-1 focus:ring-brand-green/20",
+              showSuggestions && suggestions.length > 0 && "rounded-b-none border-b-transparent"
+            )}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => { setSearch(''); setShowSuggestions(false) }}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full bg-white/10 text-white/40 hover:text-white transition-colors"
+            >
+              <span className="text-xs">✕</span>
+            </button>
+          )}
+
+          {/* Autocomplete dropdown */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div
+              ref={dropRef}
+              className="absolute top-full left-0 right-0 bg-[#121212] border border-white/10 border-top-none rounded-b-2xl shadow-2xl overflow-hidden z-[100]"
+            >
+              {suggestions.map(s => (
+                <button
+                  key={s.slug}
+                  onMouseDown={e => {
+                    e.preventDefault()
+                    setSearch(s.slug)
+                    setShowSuggestions(false)
+                  }}
+                  className="flex items-center gap-3 w-full p-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-none"
+                >
+                  <span 
+                    className="flex items-center justify-center w-8 h-8 rounded-lg text-xs font-black"
+                    style={{ background: s.color + '22', border: `1px solid ${s.color}66`, color: s.color }}
+                  >
+                    {s.slug}
+                  </span>
+                  <span className="text-sm font-medium text-white/90">{s.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Type filter pills */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-        {VEHICLE_TYPES.map(({ key, label, icon }) => {
-          const active = typeFilter.size === 0 || typeFilter.has(key)
-          const exclusive = typeFilter.size === 1 && typeFilter.has(key)
-          return (
-            <button
-              key={key}
-              onClick={() => {
-                if (exclusive) {
-                  const next = useMapStore.getState().vehicleTypeFilter
-                  next.forEach(t => useMapStore.getState().toggleVehicleType(t))
-                } else {
-                  toggleType(key)
-                }
-              }}
-              style={{
-                display:      'inline-flex',
-                alignItems:   'center',
-                gap:          '4px',
-                padding:      '4px 9px',
-                borderRadius: '20px',
-                border:       active ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.07)',
-                background:   active ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)',
-                color:        active ? '#F5F5F7' : '#555',
-                fontSize:     '11px',
-                fontWeight:   active ? 600 : 400,
-                cursor:       'pointer',
-                transition:   'all 0.15s ease',
-                fontFamily:   'inherit',
-              }}
-            >
-              {icon} {label}
-            </button>
-          )
-        })}
+      {/* 🚀 HORIZONTAL TYPE CHIPS */}
+      <div className="flex flex-col gap-2">
+        <span className="text-[11px] font-black text-white/40 uppercase tracking-[0.15em] px-1">
+          Filtres rapides
+        </span>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 px-1 -mx-1 snap-x">
+          {VEHICLE_TYPES.map(({ key, label, icon }) => {
+            const active = typeFilter.size === 0 || typeFilter.has(key)
+            return (
+              <button
+                key={key}
+                onClick={() => toggleType(key)}
+                className={cn(
+                  "flex items-center gap-2 px-4 h-10 rounded-full whitespace-nowrap snap-start transition-all duration-300",
+                  "border border-white/10 active:scale-95",
+                  active 
+                    ? "bg-brand-green/20 border-brand-green/40 text-brand-green shadow-glow-green/10" 
+                    : "bg-white/5 text-white/40 opacity-70"
+                )}
+              >
+                <span className="text-sm">{icon}</span>
+                <span className="text-xs font-black uppercase tracking-tight">{label}</span>
+              </button>
+            )
+          })}
+        </div>
       </div>
+
+      {/* ℹ️ CONTEXT INFO (Placeholder for actual list) */}
+      <div className="mt-2 p-4 rounded-2xl bg-white/[0.02] border border-white/5 italic text-white/30 text-xs leading-relaxed">
+        Glissez vers le haut pour voir le détail des perturbations en temps réel sur les lignes sélectionnées.
+      </div>
+
     </div>
   )
 }
