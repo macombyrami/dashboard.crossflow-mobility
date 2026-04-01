@@ -63,10 +63,10 @@ export function ConsultantChat({ initialContext }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-280px)] max-w-4xl mx-auto w-full relative">
+    <div className="flex flex-col h-[calc(100vh-280px)] min-h-[500px] sm:min-h-[600px] max-w-4xl mx-auto w-full relative">
       
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+      <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent pb-4">
         <ConsultantQuickActions onAction={handleSend} disabled={isLoading} />
         
         {messages.map((m, i) => (
@@ -81,7 +81,7 @@ export function ConsultantChat({ initialContext }: Props) {
         {isLoading && (
           <div className="flex items-center gap-3 animate-pulse mb-8 ml-4">
              <div className="w-8 h-8 rounded-full bg-brand/10 border border-brand/30 flex items-center justify-center">
-               <Loader2 className="w-4 h-4 text-brand animate-spin" />
+                <Loader2 className="w-4 h-4 text-brand animate-spin" />
              </div>
              <span className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em]">Consultant IA en train de réfléchir...</span>
           </div>
@@ -101,36 +101,36 @@ export function ConsultantChat({ initialContext }: Props) {
       </div>
 
       {/* Input Section */}
-      <div className="mt-4 pt-4 border-t border-white/5">
+      <div className="mt-4 pt-4 border-t border-white/10">
         <form 
           onSubmit={(e) => { e.preventDefault(); handleSend(input) }}
           className="relative group lg:px-4"
         >
-          <div className="absolute inset-0 bg-brand/5 blur-2xl opacity-0 group-focus-within:opacity-40 transition-opacity duration-1000" />
-          <div className="relative glass p-2 rounded-[24px] border border-white/5 bg-[#141519]/50 shadow-2xl focus-within:border-brand/40 transition-all flex items-center gap-2">
-             <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                <Bot className="w-5 h-5 text-text-muted" />
+          <div className="absolute inset-0 bg-brand/5 blur-3xl opacity-0 group-focus-within:opacity-40 transition-opacity duration-1000" />
+          <div className="relative glass p-2 rounded-[28px] border border-white/10 bg-[#141519]/60 shadow-2xl focus-within:border-brand/40 transition-all flex items-center gap-2">
+             <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center shrink-0">
+                <Bot className="w-6 h-6 text-text-muted" />
              </div>
              <input
                value={input}
                onChange={(e) => setInput(e.target.value)}
                disabled={isLoading}
-               placeholder="Posez votre question sur la mobilité urbaine..."
-               className="flex-1 bg-transparent border-none focus:ring-0 text-[14px] text-white placeholder:text-text-muted/60 pl-2 py-3"
+               placeholder="Posez votre question sur la mobilité..."
+               className="flex-1 bg-transparent border-none focus:ring-0 text-base text-white placeholder:text-text-muted/60 pl-2 py-4"
              />
              <button
                type="submit"
                disabled={isLoading || !input.trim()}
                className={cn(
-                 "w-10 h-10 rounded-full flex items-center justify-center transition-all",
+                 "w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0",
                  input.trim() ? "bg-brand text-black shadow-glow" : "bg-white/5 text-text-muted opacity-50"
                )}
              >
-               <Send className="w-4.5 h-4.5" />
+               <Send className="w-5 h-5" />
              </button>
           </div>
         </form>
-        <p className="text-[9px] text-center text-text-muted/40 font-bold uppercase tracking-[0.2em] mt-4 select-none">
+        <p className="text-[10px] text-center text-text-muted/40 font-bold uppercase tracking-[0.2em] mt-6 select-none">
            IA décisionnelle · Analyse basée sur des données probantes · CrossFlow 2026
         </p>
       </div>

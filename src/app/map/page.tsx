@@ -78,21 +78,7 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* Status indicators */}
-        {mounted && mode === 'live' && isLive && (
-          <div className="absolute bottom-16 left-4 z-10 pointer-events-none">
-            <div className="bg-bg-surface/85 border border-bg-border rounded-lg px-3 py-2 backdrop-blur-sm">
-              <LiveIndicator
-                label={
-                  isTomTom && isParis ? 'TEMPS RÉEL · IDFM + TOMTOM' :
-                  isTomTom           ? 'TEMPS RÉEL · TOMTOM' :
-                                       'TEMPS RÉEL · IDFM'
-                }
-                color="#00E676"
-              />
-            </div>
-          </div>
-        )}
+
         {mounted && mode === 'predict' && (
           <div className="absolute bottom-16 left-4 z-10">
             <div className="bg-bg-surface/90 border border-[rgba(41,121,255,0.5)] rounded-lg px-3 py-2 backdrop-blur-sm">

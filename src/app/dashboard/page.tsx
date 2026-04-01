@@ -13,6 +13,7 @@ import { EventsWidget } from '@/components/dashboard/EventsWidget'
 import { TimelineScrubber } from '@/components/dashboard/TimelineScrubber'
 import { ZoneExportTool } from '@/components/dashboard/ZoneExportTool'
 import { TrafficStabilityWidget } from '@/components/dashboard/TrafficStabilityWidget'
+import { LiveSyncBadge } from '@/components/dashboard/LiveSyncBadge'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useKPIHistoryStore } from '@/store/kpiHistoryStore'
@@ -137,6 +138,7 @@ export default function DashboardPage() {
                 <Zap className="w-2 h-2" />Live
               </span>
             )}
+            <LiveSyncBadge className="scale-90 origin-left" />
           </p>
         </div>
         <div className="flex items-center gap-3 sm:gap-4">

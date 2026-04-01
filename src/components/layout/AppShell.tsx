@@ -7,6 +7,7 @@ import { BottomNav }       from './BottomNav'
 import { UserCityProvider } from '@/components/auth/UserCityProvider'
 import { SwipeNavigation }   from './SwipeNavigation'
 import { WeatherProvider }   from '@/components/providers/WeatherProvider'
+import { TrafficSyncManager } from '@/components/dashboard/TrafficSyncManager'
 
 // Pages that must NOT have the app shell (sidebar / header / bottom nav)
 const PUBLIC_PREFIXES = ['/login', '/onboarding', '/auth']
@@ -41,6 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="app-shell animate-in fade-in duration-500">
       <UserCityProvider>
         <WeatherProvider />
+        <TrafficSyncManager />
         <Sidebar />
         <div className="main-content relative">
           <Header />

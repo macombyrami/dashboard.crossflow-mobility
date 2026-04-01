@@ -28,48 +28,46 @@ export default function ConsultantAIPage() {
   }, [city, kpis, weather, incidents])
 
   return (
-    <main className="min-h-full p-4 lg:p-8 flex flex-col gap-8 animate-in fade-in duration-1000">
-      
-      {/* Header Section: Apple/Palantir Style */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2 border-b border-white/5">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand to-brand-green flex items-center justify-center shadow-glow rotation-animation">
-               <Bot className="w-6 h-6 text-black" />
-             </div>
-             <div>
-               <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-                 Consultant IA CrossFlow
-                 <div className="px-2 py-0.5 rounded-md bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold uppercase tracking-widest">
-                    Expert Beta
-                 </div>
-               </h1>
-               <p className="text-[14px] text-text-muted mt-1 font-medium italic underline underline-offset-4 decoration-brand/20">
-                 Votre copilote intelligent pour comprendre et optimiser la mobilité urbaine
-               </p>
-             </div>
-          </div>
-        </div>
-
-        {/* Live Intelligence Badges */}
-        <div className="flex flex-wrap items-center gap-3">
-           <StatusBadge 
-             icon={<ShieldCheck className="w-3.5 h-3.5" />} 
-             label="Mode Décisionnel" 
-             color="text-emerald-400 bg-emerald-400/5" 
-           />
-           <StatusBadge 
-             icon={<Database className="w-3.5 h-3.5" />} 
-             label="Données Temps Réel" 
-             color="text-brand bg-brand/5" 
-           />
-           <StatusBadge 
-             icon={<Globe className="w-3.5 h-3.5" />} 
-             label="Multi-Sources" 
-             color="text-blue-400 bg-blue-400/5" 
-           />
+    <main className="min-h-full p-4 sm:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8 animate-in fade-in duration-1000 pb-safe">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-white/5">
+      <div className="space-y-4">
+        <div className="flex items-start sm:items-center gap-4">
+           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand to-brand-green flex items-center justify-center shadow-glow-sm shrink-0 rotation-animation">
+             <Bot className="w-7 h-7 text-black" />
+           </div>
+           <div>
+             <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex flex-wrap items-center gap-3">
+               Consultant IA
+               <div className="px-2 py-0.5 rounded-md bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold uppercase tracking-widest">
+                  Expert Beta
+               </div>
+             </h1>
+             <p className="text-sm text-text-secondary mt-1.5 font-medium leading-relaxed max-w-2xl">
+               Votre copilote intelligent pour comprendre et optimiser la mobilité urbaine à <span className="text-white font-bold">{city.name}</span>.
+             </p>
+           </div>
         </div>
       </div>
+
+      {/* Live Intelligence Badges */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+         <StatusBadge 
+           icon={<ShieldCheck className="w-3.5 h-3.5" />} 
+           label="Mode Décisionnel" 
+           color="text-emerald-400 bg-emerald-400/5 border-emerald-400/10" 
+         />
+         <StatusBadge 
+           icon={<Database className="w-3.5 h-3.5" />} 
+           label="Live Data" 
+           color="text-brand bg-brand/5 border-brand/10" 
+         />
+         <StatusBadge 
+           icon={<Globe className="w-3.5 h-3.5" />} 
+           label="Multi-Sources" 
+           color="text-blue-400 bg-blue-400/5 border-blue-400/10" 
+         />
+      </div>
+    </div>
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-8 flex-1">
@@ -117,9 +115,9 @@ export default function ConsultantAIPage() {
 
 function StatusBadge({ icon, label, color }: { icon: React.ReactNode, label: string, color: string }) {
   return (
-    <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/5 font-bold text-[10px] uppercase tracking-wider", color)}>
+    <div className={cn("flex items-center gap-2 px-3 h-8 rounded-lg border font-bold text-[10px] uppercase tracking-wider shrink-0 transition-all", color)}>
       {icon}
-      {label}
+      <span>{label}</span>
     </div>
   )
 }

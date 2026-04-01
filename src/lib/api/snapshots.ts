@@ -1,24 +1,33 @@
-import { TrafficSnapshot } from '@/types'
+import { compressJSON } from '@/lib/utils/compression'
 
 export interface SnapshotSaveData {
-  city_id: string
-  provider: string
-  fetched_at: string
+  city_id:      string
+  provider:     string
+  fetched_at:   string
   stats: {
-    avg_congestion: number
-    incident_count: number
+    avg_congestion:  number
+    incident_count:  number
     active_segments: number
   }
-  segments_gz?: string // Optionnel si on passe tout par stats ou raw
-  bbox: number[]
+  segments_gz?:  string
+  bbox?:         number[]
+  raw_segments?: any // Temporary for compression
 }
 
 export async function saveSnapshot(data: SnapshotSaveData): Promise<boolean> {
   try {
+    const payload = { ...data }
+    
+    // 🛰️ Staff Engineer Compression Pipeline
+    if (data.raw_segments && !data.segments_gz) {
+      payload.segments_gz = await compressJSON(data.raw_segments)
+      delete payload.raw_segments
+    }
+
     const res = await fetch('/api/snapshots', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify(payload)
     })
     return res.ok
   } catch (err) {
