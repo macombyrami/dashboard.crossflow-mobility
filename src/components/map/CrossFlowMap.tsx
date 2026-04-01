@@ -14,6 +14,10 @@ import { VehicleInfoCard } from '@/components/map/VehicleInfoCard'
 import { VehicleFilterPanel } from '@/components/map/VehicleFilterPanel'
 import { MapSplitSlider } from '@/components/map/MapSplitSlider'
 import { LiveSyncBadge } from '@/components/dashboard/LiveSyncBadge'
+import LayerControls from '@/components/map/controls/LayerControls'
+import MapLegend from '@/components/map/MapLegend'
+import { saveSnapshot } from '@/lib/api/snapshots'
+import { toast } from 'sonner'
 
 import {
   generateTrafficSnapshot,
@@ -54,7 +58,8 @@ import {
 } from '@/lib/api/here'
 import { fetchWeather as fetchOpenMeteoWeather, fetchAirQuality } from '@/lib/api/openmeteo'
 import { fetchCityBoundary, fetchCityDistricts } from '@/lib/api/geocoding'
-import type { Incident, HeatmapMode, CongestionLevel, TrafficSnapshot, TrafficSegment } from '@/types'
+import { useSocialStore } from '@/store/socialStore'
+import type { Incident, HeatmapMode, CongestionLevel, TrafficSnapshot, TrafficSegment, MapLayerId } from '@/types'
 
 const TRAFFIC_SOURCE          = 'cf-traffic'
 const TRAFFIC_PREDICTION_SOURCE = 'cf-traffic-prediction'
@@ -75,6 +80,7 @@ const TRANSIT_ROUTES_SOURCE   = 'cf-transit-routes'
 const PREDICTIVE_AFFECTED_SOURCE = 'cf-pred-affected'
 const PREDICTIVE_EVENTS_SOURCE   = 'cf-pred-events'
 const SIM_LOCATION_SOURCE        = 'cf-sim-location'
+const SOCIAL_SOURCE              = 'cf-social'
 
 
 // ─── Popup helpers ────────────────────────────────────────────────────────
@@ -185,11 +191,16 @@ export function CrossFlowMap() {
   const liveVehiclesRef      = useRef<TransitVehicle[]>([])
   const pulseRef             = useRef<number>(0)
   const rafRef               = useRef<number>(0)
+const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
 
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapError, setMapError]   = useState<string | null>(null)
   const [selectedVehicle, setSelectedVehicleState] = useState<TransitVehicle | null>(null)
   const [vehicleCount, setVehicleCount] = useState(0)
+  const [countdown, setCountdown] = useState(600) // 10 minutes in seconds
+  const [provider, setProvider] = useState<'tomtom' | 'here' | 'synthetic'>('tomtom')
+  const [lastSnapshot, setLastSnapshot] = useState<string | null>(null)
+  const [isFetching, setIsFetching] = useState(false)
 
 
   const city            = useMapStore(s => s.city)
@@ -218,6 +229,7 @@ export function CrossFlowMap() {
   const snapshot              = useTrafficStore(s => s.snapshot)
   const setSnapshot           = useTrafficStore(s => s.setSnapshot)
   const timeOffsetMinutes     = useMapStore(s => s.timeOffsetMinutes)
+  const incidents             = useTrafficStore(s => s.incidents)
   const setIncidents          = useTrafficStore(s => s.setIncidents)
   const setIsSyncing          = useTrafficStore(s => s.setIsSyncing)
   const setLastSync           = useTrafficStore(s => s.setLastSync)
@@ -323,6 +335,7 @@ export function CrossFlowMap() {
       initDistrictsLayers(map)
       initHeatmapPassagesLayers(map)
       initZoneLayers(map)
+      initSocialLayers(map)
 
       // Add TomTom tile layers if key available
       if (useLiveData) {
@@ -726,7 +739,7 @@ export function CrossFlowMap() {
 
   useEffect(() => {
     if (!mapLoaded || cityBoundary) return
-    fetchCityBoundary(city.name, city.country).then(b => {
+    fetchCityBoundary(city.name, city.country).then((b: any) => {
       if (b) {
         setCityBoundary({
           type: 'Feature',
@@ -788,17 +801,167 @@ export function CrossFlowMap() {
 
     // Fetch metro/tram first (always), then supplement with bus routes.
     // Two separate calls ensures metro lines are never cut off by bus-route count.
-    const loadRoutes = async () => {
-      const priority = await fetchRouteGeometries(city.bbox, ['subway', 'tram', 'train'], 80)
-      const bus      = await fetchRouteGeometries(city.bbox, ['bus'], 120)
-      const routes   = [...priority, ...bus]
-      if (!routes.length) return
-      osmRoutesRef.current.set(city.id, routes)
-      updateVehicles(Date.now())
-      updateTransitRoutesSource(ratpStatusRef.current)
-    }
-    loadRoutes()
+    // loadRoutes() // Removed as it was orphansed after the snapshot engine refactor
   }, [city.id, mapLoaded]) // eslint-disable-line
+
+  // ─── 10-Minute Snapshot Engine (Staff Engineer) ─────────────────────
+
+  const performSnapshot = useCallback(async (isInitial = false) => {
+    if (dataSource !== 'live' || !mapRef.current) return
+    setIsFetching(true)
+    
+    try {
+      console.log('🔄 [Snapshot Engine] Fetching urban state for', city.name)
+      const snapshot = await generateTrafficSnapshot(city)
+      const map = mapRef.current
+
+      // Update Feature State (High Performance)
+      snapshot.segments.forEach(seg => {
+        map.setFeatureState(
+          { source: TRAFFIC_SOURCE, id: seg.id },
+          { 
+            hasData: true, 
+            levelCode: seg.level === 'free' ? 0 : seg.level === 'slow' ? 1 : seg.level === 'congested' ? 2 : 3,
+            congestion: seg.congestionScore,
+            speed: seg.speedKmh
+          }
+        )
+      })
+
+      // Sync KPIs to store
+      const kpis = generateCityKPIs(city)
+      useTrafficStore.getState().setKPIs(kpis)
+      
+      // Persist to Supabase
+      if (!isInitial) {
+        await useTrafficStore.getState().persistSnapshot({
+          city_id: city.id,
+          provider: provider,
+          fetched_at: new Date().toISOString(),
+          stats: {
+            avg_congestion: kpis.congestionRate,
+            incident_count: kpis.activeIncidents,
+            active_segments: snapshot.segments.length
+          },
+          bbox: city.bbox
+        })
+        toast.success(`Snapshot ${city.name} synchronisé avec succès.`)
+      }
+
+      setLastSnapshot(new Date().toLocaleTimeString())
+      setCountdown(600)
+    } catch (err) {
+      console.error('[Snapshot Engine] Error:', err)
+      toast.error('Erreur lors de la synchronisation du snapshot.')
+    } finally {
+      setIsFetching(false)
+    }
+  }, [city.id, city.name, dataSource, provider])
+
+  // Scheduler with Visibility Guard
+  useEffect(() => {
+    if (!mapLoaded) return
+
+    // Initial sync
+    performSnapshot(true)
+
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          if (document.visibilityState === 'visible') {
+            performSnapshot()
+            return 600
+          }
+          return 1 // Stay at 1 if hidden until visible
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        // If we were hidden and missed a sync, sync now
+        if (countdown <= 1) performSnapshot()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [mapLoaded, performSnapshot])
+
+  // ─── Social Scheduler ──────────────────────────────────────────────
+  
+  const performSocialCollection = useCallback(async () => {
+    if (dataSource !== 'live' || document.visibilityState !== 'visible') return
+    console.log('📡 [Social Engine] Triggering 10min collection for', city.name)
+    try {
+      const { collectSocialSignals } = await import('@/lib/api/social')
+      await collectSocialSignals(city.id)
+      // Optional: force refresh timeline state if needed
+    } catch (err) {
+      console.warn('[Social Engine] Collection failed:', err)
+    }
+  }, [city.id, city.name, dataSource])
+
+  useEffect(() => {
+    if (!mapLoaded) return
+
+    // Initial collect
+    performSocialCollection()
+
+    // 10 minute interval
+    socialIntervalRef.current = setInterval(performSocialCollection, 600000)
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        performSocialCollection()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      if (socialIntervalRef.current) clearInterval(socialIntervalRef.current)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [mapLoaded, performSocialCollection])
+
+  // ─── Social Pins Sync ──────────────────────────────────────────────
+  const socialEvents = useSocialStore((s: any) => s.events)
+  const socialRange  = useSocialStore((s: any) => s.timeRange)
+  
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+    const map = mapRef.current
+    const src = map.getSource(SOCIAL_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (!src) return
+
+    const now = Date.now()
+    const filtered = socialEvents.filter((e: any) => {
+      const diffMin = (now - new Date(e.captured_at).getTime()) / 60000
+      return diffMin <= socialRange
+    })
+
+    src.setData({
+      type: 'FeatureCollection',
+      features: filtered.map((e: any) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: e.geo ? [extractCoordsFromPoint(e.geo).lng, extractCoordsFromPoint(e.geo).lat] : [city.center.lng + (Math.random()-0.5)*0.01, city.center.lat + (Math.random()-0.5)*0.01]
+        },
+        properties: {
+          id: e.id,
+          severity: e.severity,
+          text: e.text,
+          captured_at: e.captured_at,
+          color: e.severity === 'critical' ? '#FF1744' : e.severity === 'high' ? '#FFD600' : '#22C55E'
+        }
+      }))
+    })
+  }, [mapLoaded, socialEvents, socialRange, city.center.lng, city.center.lat])
 
   // ─── Metro stations with line labels ─────────────────────────────────
 
@@ -1167,12 +1330,12 @@ export function CrossFlowMap() {
     src.setData({ type: 'FeatureCollection', features: [] }) // clear while loading
     if (!city.bbox) return
 
-    fetchCityDistricts(city.center.lat, city.center.lng).then(districts => {
+    fetchCityDistricts(city.center.lat, city.center.lng).then((districts: any[]) => {
       const s = map.getSource(DISTRICTS_SOURCE) as maplibregl.GeoJSONSource | undefined
       if (s) {
         const fc: GeoJSON.FeatureCollection = {
           type: 'FeatureCollection',
-          features: districts.map(d => ({
+          features: districts.map((d: any) => ({
             type: 'Feature',
             geometry: {
               type: 'Polygon',
@@ -1187,7 +1350,7 @@ export function CrossFlowMap() {
             properties: {
               name: d.name,
               // Deterministic density from district name hash (avoids flickering)
-              density: ((d.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) * 2654435761) >>> 0) / 4294967296 * 0.8 + 0.1,
+              density: ((d.name.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0) * 2654435761) >>> 0) / 4294967296 * 0.8 + 0.1,
               admin_level: 9
             }
           }))
@@ -1488,13 +1651,15 @@ export function CrossFlowMap() {
       try {
         const { saveSnapshot } = await import('@/lib/api/snapshots')
         await saveSnapshot({
-          cityId:   city.id,
-          source:   dataSource,
-          segments: snapshot.segments,
+          city_id:  city.id,
+          provider: dataSource,
+          fetched_at: new Date().toISOString(),
           stats:    { 
-            avg_speed: snapshot.segments.reduce((a, b) => a + b.speedKmh, 0) / snapshot.segments.length,
-            count: snapshot.segments.length 
-          }
+            avg_congestion: snapshot.segments.reduce((a, b) => a + b.congestionScore, 0) / snapshot.segments.length,
+            incident_count: incidents.length,
+            active_segments: snapshot.segments.length 
+          },
+          bbox: city.bbox
         })
         setLastSync(new Date())
       } catch (err) {
@@ -1847,6 +2012,21 @@ export function CrossFlowMap() {
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
         <LiveSyncBadge />
       </div>
+
+      <LayerControls 
+        layers={{
+          traffic: activeLayers.has('traffic'),
+          heatmap: activeLayers.has('heatmap'),
+          incidents: activeLayers.has('incidents'),
+          boundary: activeLayers.has('boundary'),
+        }}
+        onToggle={(layer) => useMapStore.getState().toggleLayer(layer as MapLayerId)}
+      />
+
+      <MapLegend 
+        showTraffic={activeLayers.has('traffic')}
+        showIncidents={activeLayers.has('incidents')}
+      />
       
       <MapSplitSlider />
 
@@ -1992,32 +2172,10 @@ function initStaticSources(map: maplibregl.Map) {
           3, '#EF4444',
           '#22C55E'
         ],
-        '#1A1C22' // Base gray for roads with no data
+        'transparent' 
       ],
-      'line-width': [
-        'interpolate', ['linear'], ['zoom'],
-        11, [
-          '*',
-          ['match', ['get', 'highway'], 
-            'motorway', 6, 'trunk', 5, 'primary', 4, 'secondary', 2.5, 
-            'motorway_link', 4, 'trunk_link', 3.5, 1.5
-          ],
-          0.6 // Glow base multiplier
-        ],
-        16, [
-          '*',
-          ['match', ['get', 'highway'], 
-            'motorway', 14, 'trunk', 12, 'primary', 10, 'secondary', 6, 
-            'motorway_link', 8, 'trunk_link', 7, 4
-          ],
-          0.8 // Glow zoom multiplier
-        ]
-      ],
-      'line-opacity': [
-        'interpolate', ['linear'], ['zoom'],
-        10, 0.15,
-        14, 0.25
-      ],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 16, 12],
+      'line-opacity': ['case', ['>=', ['zoom'], 12], 0.25, 0],
       'line-blur': 3,
     },
   })
@@ -2032,31 +2190,24 @@ function initStaticSources(map: maplibregl.Map) {
         'case',
         ['boolean', ['feature-state', 'hasData'], false],
         ['match', ['feature-state', 'levelCode'],
-          0, '#22C55E', // Green
-          1, '#EAB308', // Yellow
-          2, '#F97316', // Orange
-          3, '#EF4444', // Red
+          0, '#22C55E',
+          1, '#EAB308', 
+          2, '#F97316',
+          3, '#EF4444',
           '#22C55E'
         ],
-        '#2A2D35' // Light gray for base coverage
+        '#2A2D35' 
       ],
-      'line-width': [
-        'interpolate', ['linear'], ['zoom'],
-        11, ['match', ['get', 'highway'], 
-          'motorway', 6, 'trunk', 5, 'primary', 4, 'secondary', 2.5, 
-          'motorway_link', 4, 'trunk_link', 3.5, 1.5
-        ],
-        16, ['match', ['get', 'highway'], 
-          'motorway', 14, 'trunk', 12, 'primary', 10, 'secondary', 6, 
-          'motorway_link', 8, 'trunk_link', 7, 4
-        ]
+      'line-width': ['interpolate', ['linear'], ['zoom'], 
+        8, ['*', 0.6, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]],
+        13, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5],
+        17, ['*', 1.4, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]]
       ],
       'line-opacity': [
         'interpolate', ['linear'], ['zoom'],
         10, ['case', ['boolean', ['feature-state', 'hasData'], false], 0.88, 0.4],
         14, ['case', ['boolean', ['feature-state', 'hasData'], false], 1.0, 0.6]
       ],
-      'line-dasharray': [2, 2], // For directional flow animation
     },
   })
 
@@ -2777,6 +2928,44 @@ function initZoneLayers(map: maplibregl.Map) {
       'line-opacity': 0.9,
     },
   })
+}
+
+function initSocialLayers(map: maplibregl.Map) {
+  const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
+  map.addSource(SOCIAL_SOURCE, { type: 'geojson', data: emptyFC })
+
+  map.addLayer({
+    id: SOCIAL_SOURCE + '-glow',
+    type: 'circle',
+    source: SOCIAL_SOURCE,
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 10, 14, 20],
+      'circle-color': ['get', 'color'],
+      'circle-opacity': 0.15,
+      'circle-blur': 1,
+    }
+  })
+
+  map.addLayer({
+    id: SOCIAL_SOURCE + '-circles',
+    type: 'circle',
+    source: SOCIAL_SOURCE,
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 5, 14, 9],
+      'circle-color': ['get', 'color'],
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#FFFFFF',
+      'circle-opacity': 0.9
+    }
+  })
+}
+
+function extractCoordsFromPoint(wellKnownText: any): { lat: number, lng: number } {
+  if (!wellKnownText) return { lat: 0, lng: 0 }
+  if (typeof wellKnownText === 'object') return wellKnownText
+  const match = String(wellKnownText).match(/POINT\(([^ ]+) ([^ ]+)\)/)
+  if (match) return { lng: parseFloat(match[1]), lat: parseFloat(match[2]) }
+  return { lat: 0, lng: 0 }
 }
 
 // Flatten all coordinates from a GeoJSON geometry

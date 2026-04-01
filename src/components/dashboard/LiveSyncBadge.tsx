@@ -35,18 +35,18 @@ export function LiveSyncBadge() {
         "flex items-center gap-2.5 px-3 py-1.5 rounded-full border transition-all duration-300 shadow-apple animate-in fade-in slide-in-from-top-2",
         dataSource === 'live' 
           ? "bg-brand/10 border-brand/20 text-brand" 
-          : "bg-white/5 border-white/10 text-text-muted"
+          : "bg-orange-500/10 border-orange-500/20 text-orange-400"
       )}>
         <div className="relative">
           <Activity className={cn("w-3.5 h-3.5", isSyncing && "animate-pulse")} />
           {isSyncing && (
-            <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-brand rounded-full animate-ping" />
+            <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-current rounded-full animate-ping" />
           )}
         </div>
         
         <div className="flex flex-col leading-none">
           <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">
-            {dataSource === 'live' ? 'LIVE' : 'SYNTHETIC'}
+            {dataSource === 'live' ? 'LIVE • TOMTOM' : 'SYNTHETIC (fallback)'}
           </span>
           <span className="text-[11px] font-bold tabular-nums">
             {isSyncing ? 'Synchronisation...' : `Prochain snapshot : ${countdownStr}`}

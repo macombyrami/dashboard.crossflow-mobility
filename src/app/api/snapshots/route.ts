@@ -1,71 +1,54 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { gzipSync } from 'zlib'
 
-/**
- * Staff Engineer Persistence API: /api/snapshots
- * Handles 10-minute traffic samples and historical retrieval.
- */
-
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const supabase = await createClient()
   try {
-    const supabase = await createClient()
     const body = await req.json()
-    const { cityId, source, segments, stats } = body
+    const { city_id, fetched_at, provider, stats, segments_gz, bbox } = body
 
-    if (!cityId || !segments) {
-      return NextResponse.json({ error: 'Missing cityId or segments' }, { status: 400 })
-    }
-
-    // 1. Gzip the segments JSON for storage efficiency (Staff Optimization)
-    const segmentsBuffer = Buffer.from(JSON.stringify(segments))
-    const compressed = gzipSync(segmentsBuffer)
-
-    // 2. Persist to Supabase
     const { data, error } = await supabase
       .from('traffic_snapshots')
-      .insert({
-        city_id: cityId,
-        fetched_at: new Date().toISOString(),
-        provider: source || 'unknown',
-        stats: stats || {},
-        segments_gz: compressed,
-      })
-      .select()
-      .single()
+      .upsert({
+        city_id,
+        fetched_at,
+        provider,
+        stats,
+        segments_gz: segments_gz ? Buffer.from(segments_gz, 'base64') : null,
+        bbox
+      }, { onConflict: 'city_id,fetched_at' })
 
     if (error) throw error
-
-    return NextResponse.json({ success: true, id: data.id })
+    return NextResponse.json({ success: true, data })
   } catch (err: any) {
-    console.error('[API Snapshots] POST Error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('API Snapshots POST Error:', err)
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 })
   }
 }
 
-export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url)
-    const cityId = searchParams.get('cityId')
-    const limit = parseInt(searchParams.get('limit') || '10')
-    
-    if (!cityId) {
-      return NextResponse.json({ error: 'Missing cityId' }, { status: 400 })
-    }
+export async function GET(req: NextRequest) {
+  const supabase = await createClient()
+  const { searchParams } = new URL(req.url)
+  const cityId = searchParams.get('cityId')
+  const minutes = parseInt(searchParams.get('minutes') || '60')
 
-    const supabase = await createClient()
+  if (!cityId) {
+    return NextResponse.json({ success: false, error: 'cityId is required' }, { status: 400 })
+  }
+
+  try {
+    const startTime = new Date(Date.now() - minutes * 60 * 1000).toISOString()
     const { data, error } = await supabase
       .from('traffic_snapshots')
-      .select('id, fetched_at, provider, stats')
+      .select('*')
       .eq('city_id', cityId)
+      .gte('fetched_at', startTime)
       .order('fetched_at', { ascending: false })
-      .limit(limit)
 
     if (error) throw error
-
     return NextResponse.json(data)
   } catch (err: any) {
-    console.error('[API Snapshots] GET Error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('API Snapshots GET Error:', err)
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 })
   }
 }

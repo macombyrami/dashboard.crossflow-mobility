@@ -1,26 +1,39 @@
-import type { TrafficSnapshot } from '@/types'
+import { TrafficSnapshot } from '@/types'
 
-/**
- * Staff Engineer Client API: Snapshots
- */
-
-export async function saveSnapshot(payload: {
-  cityId: string
-  source: string
-  segments: any[]
-  stats?: any
-}) {
-  const resp = await fetch('/api/snapshots', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-  if (!resp.ok) throw new Error(`Snapshot persistence failed: ${resp.statusText}`)
-  return resp.json()
+export interface SnapshotSaveData {
+  city_id: string
+  provider: string
+  fetched_at: string
+  stats: {
+    avg_congestion: number
+    incident_count: number
+    active_segments: number
+  }
+  segments_gz?: string // Optionnel si on passe tout par stats ou raw
+  bbox: number[]
 }
 
-export async function getSnapshots(cityId: string, limit: number = 20) {
-  const resp = await fetch(`/api/snapshots?cityId=${cityId}&limit=${limit}`)
-  if (!resp.ok) throw new Error(`Snapshot fetch failed: ${resp.statusText}`)
-  return resp.json()
+export async function saveSnapshot(data: SnapshotSaveData): Promise<boolean> {
+  try {
+    const res = await fetch('/api/snapshots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    return res.ok
+  } catch (err) {
+    console.error('Failed to save snapshot:', err)
+    return false
+  }
+}
+
+export async function getSnapshots(cityId: string, minutes: number = 60): Promise<any[]> {
+  try {
+    const res = await fetch(`/api/snapshots?cityId=${cityId}&minutes=${minutes}`)
+    if (!res.ok) return []
+    return await res.json()
+  } catch (err) {
+    console.error('Failed to fetch snapshots:', err)
+    return []
+  }
 }

@@ -31,6 +31,7 @@ interface TrafficStore {
   
   setLastSync:          (d: Date | null) => void
   setIsSyncing:         (b: boolean) => void
+  persistSnapshot:      (data: any) => Promise<void>
 
   clearIncidents:       () => void
   clearAll:             () => void
@@ -65,6 +66,14 @@ export const useTrafficStore = create<TrafficStore>()((set) => ({
   
   setLastSync:         (d)   => set({ lastSync: d }),
   setIsSyncing:        (b)   => set({ isSyncing: b }),
+
+  persistSnapshot: async (data: any) => {
+    const { saveSnapshot } = await import('@/lib/api/snapshots')
+    const success = await saveSnapshot(data)
+    if (success) {
+      set({ lastSync: new Date() })
+    }
+  },
 
   clearIncidents:      ()    => set((state) => ({ 
     dismissedIncidentIds: new Set([
