@@ -48,8 +48,16 @@ export function UserCityProvider({ children }: { children: React.ReactNode }) {
     })
 
     return () => {
-      // 🚀 Staff Engineer: Prevent zombie listeners during HMR / Fast Refresh
-      if (subscription) subscription.unsubscribe()
+      // 🚀 Staff Engineer: Stable cleanup for auth listeners.
+      // Defends against connection closed / disconnected states during unmounts.
+      try {
+        if (subscription) {
+          subscription.unsubscribe()
+        }
+      } catch (err) {
+        // Silent swallow for cleanup failures during connection reset
+        console.debug('[UserCityProvider] Auth cleanup suppressed due to disconnected state.')
+      }
     }
   }, [setCity, setLockedCity])
 

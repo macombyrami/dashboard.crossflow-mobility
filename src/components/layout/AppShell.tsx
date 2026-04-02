@@ -27,13 +27,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     setMounted(true)
 
-    // 🚀 STAFF ENGINEER: Global Safety Net for transient connectivity drops
-    // Prevents "Uncaught (in promise) Error: Connection closed" during migrations/restarts.
+    // 🚀 STAFF ENGINEER: Ultimate Global Safety Net
+    // Captures transient connectivity drops (Supabase resets/migrations) before they bubble up.
+    // Broader detection for 'Connection closed', 'fetch failed', and 'Aborted'.
     const handleRejection = (event: PromiseRejectionEvent) => {
-      const msg = event.reason?.message || ''
-      if (msg.includes('Connection closed')) {
+      const reason = event.reason
+      // Normalize reason to string. Some libraries throw strings, some Errors, some nested objects.
+      const msg = (reason?.message || reason?.error || reason || '').toString()
+      const transientErrors = ['Connection closed', 'fetch failed', 'Aborted', 'Load failed', 'NetworkError']
+      
+      if (transientErrors.some(err => msg.includes(err))) {
         event.preventDefault()
-        console.debug('[AppShell] Suppressed transient "Connection closed" rejection during DB reset.')
+        // Silence noise during development resets
+        if (process.env.NODE_ENV === 'development') {
+           console.debug(`[AppShell] Suppressed transient network rejection: "${msg}"`)
+        }
       }
     }
 
