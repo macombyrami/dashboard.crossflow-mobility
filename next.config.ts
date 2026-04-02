@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
       "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' data: https://fonts.gstatic.com https://fonts.openmaptiles.org",
-      "img-src 'self' blob: data: https://*.cartocdn.com https://*.tile.openstreetmap.org https://api.tomtom.com https://tile.tomtom.com",
+      "img-src 'self' blob: data: https://*.cartocdn.com https://*.tile.openstreetmap.org https://api.tomtom.com https://tile.tomtom.com https://grainy-gradients.vercel.app",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.tomtom.com https://router.hereapi.com https://traffic.ls.hereapi.com https://overpass-api.de https://nominatim.openstreetmap.org https://api.open-meteo.com https://air-quality-api.open-meteo.com https://*.cartocdn.com https://*.tile.openstreetmap.org https://tiles.stadiamaps.com https://prim.iledefrance-mobilites.fr https://data.sytadin.fr",
       "worker-src blob: 'self'",
       "frame-ancestors 'none'",
