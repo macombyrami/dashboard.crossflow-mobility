@@ -268,28 +268,37 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => { isTrackingRef.current = isTrackingVehicle }, [isTrackingVehicle])
 
 
-  // ─── Flow Animation Loop ───────────────────────────────────────────
+  // ─── Unified Animation Loop (Flow + Pulse) ──────────────────────────────────
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
     const map = mapRef.current
     let offset = 0
-    let frame: number
 
     const animate = () => {
       if (document.hidden) {
         rafRef.current = requestAnimationFrame(animate)
         return
       }
+
+      const now = Date.now()
+      
+      // 1. Traffic Dash Animation
       offset = (offset + 0.15) % 100
       if (map.getLayer(TRAFFIC_SOURCE + '-lines')) {
         map.setPaintProperty(TRAFFIC_SOURCE + '-lines', 'line-dash-offset', offset)
       }
+
+      // 2. Pulse Animation (Vehicles + Station Alerts)
+      updateVehicles(now)
+
       rafRef.current = requestAnimationFrame(animate)
     }
 
     rafRef.current = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [mapLoaded])
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
+  }, [mapLoaded, updateVehicles])
 
   // ─── Split View Lng Calculation ─────────────────────────────────────
   useEffect(() => {
@@ -1123,19 +1132,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     }
   }, [city.id])
 
-  useEffect(() => {
-    if (!mapLoaded) return
-    
-    const animate = () => {
-      updateVehicles(Date.now())
-      rafRef.current = requestAnimationFrame(animate)
-    }
-    
-    rafRef.current = requestAnimationFrame(animate)
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    }
-  }, [mapLoaded, updateVehicles])
+
 
   // ─── Transit route polylines (bus + metro as colored lines) ──────────
 
@@ -2113,6 +2110,7 @@ function initStaticSources(map: maplibregl.Map) {
           10, ['case', ['boolean', ['feature-state', 'hasData'], false], 0.88, 0.4],
           14, ['case', ['boolean', ['feature-state', 'hasData'], false], 1.0, 0.6]
         ],
+        'line-dasharray': [8, 0.1]
       },
     })
   }
