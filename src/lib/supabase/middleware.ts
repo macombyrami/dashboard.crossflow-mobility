@@ -44,7 +44,13 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // refreshing the auth token
+  // ⚡ STAFF ENGINEER PERFORMANCE: Skip session refresh for Public Entry Points
+  // This avoids expensive network calls and fixes 504 Middleware Timeouts.
+  if (isPublic) {
+    return supabaseResponse
+  }
+
+  // Refreshing the auth token (only for protected routes)
   const {
     data: { user },
   } = await supabase.auth.getUser()
