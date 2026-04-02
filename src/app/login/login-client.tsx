@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { validateSupabaseConfig } from '@/lib/config/env'
 import { getAuthCallbackUrl } from '@/lib/utils/url'
 import { Zap, Mail, Lock, Loader2, ArrowRight, Eye, EyeOff, ShieldCheck, Server } from 'lucide-react'
 import appData from '@/lib/data/app.json'
@@ -57,6 +58,17 @@ function LoginForm() {
     e.preventDefault()
     setLoading(true)
     setMessage(null)
+
+    // 🛰️ STAFF ENGINEER: Infrastructure Guard (Phase 2)
+    const { isValid, missing } = validateSupabaseConfig()
+    if (!isValid) {
+      setMessage({ 
+        type: 'error', 
+        text: `Configuration système incomplète (${missing.join(', ')}). Vérifiez vos variables d'environnement.` 
+      })
+      setLoading(false)
+      return
+    }
 
     // Client-side validation for signup
     if (isSignUp && password !== confirmPassword) {
