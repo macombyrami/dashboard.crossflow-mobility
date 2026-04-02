@@ -45,6 +45,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-shell animate-in fade-in duration-500 bg-[#030303]">
+      {/* Skip Navigation Link — WCAG 2.2 requirement */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:bg-brand focus:text-black focus:px-4 focus:py-2 focus:rounded-lg focus:font-bold focus:shadow-lg"
+      >
+        Aller au contenu principal
+      </a>
+
       <UserCityProvider>
         <WeatherProvider />
         <TrafficSyncManager />

@@ -35,6 +35,16 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
+
+  // 🔐 Require authentication on reads — prevents public data enumeration
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
   const { searchParams } = new URL(req.url)
   const cityId = searchParams.get('cityId')
   const minutes = parseInt(searchParams.get('minutes') || '60')

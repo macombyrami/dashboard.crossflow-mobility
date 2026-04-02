@@ -214,36 +214,60 @@ export const useMapStore = create<MapStore>()(
       setSplitRatio: (ratio) => set({ splitRatio: ratio }),
     })),
     {
-      name: 'cf-map-storage',
-      // Since activeLayers is a Set, we need to handle its serialization
+      name: 'cf-map-storage-v2', // v2 — incompatible shape from v1 (cityId vs city object)
       storage: {
         getItem: (name) => {
           const str = localStorage.getItem(name)
           if (!str) return null
           const data = JSON.parse(str)
-          if (data.state && data.state.activeLayers) {
+          // Rehydrate activeLayers Set from persisted array
+          if (data.state?.activeLayers) {
             data.state.activeLayers = new Set(data.state.activeLayers)
+          }
+          // Rehydrate city from persisted cityId
+          if (data.state?.cityId) {
+            const found = CITIES.find(c => c.id === data.state.cityId)
+            data.state.city = found ?? defaultCity
+            delete data.state.cityId
+          }
+          // Rehydrate cityHistory from persisted IDs
+          if (data.state?.cityHistoryIds) {
+            data.state.cityHistory = data.state.cityHistoryIds
+              .map((id: string) => CITIES.find(c => c.id === id))
+              .filter(Boolean) as City[]
+            delete data.state.cityHistoryIds
           }
           return data
         },
         setItem: (name, value) => {
-          const data = { ...value }
-          if (data.state && data.state.activeLayers instanceof Set) {
-            // @ts-ignore
-            data.state.activeLayers = Array.from(data.state.activeLayers)
+          const data = { ...value } as any
+          if (data.state) {
+            // Serialize Set → Array
+            if (data.state.activeLayers instanceof Set) {
+              data.state.activeLayers = Array.from(data.state.activeLayers)
+            }
+            // Persist only city ID — not the full object (~5KB → 20 bytes)
+            if (data.state.city) {
+              data.state.cityId = data.state.city.id
+              delete data.state.city
+            }
+            // Persist only city history IDs
+            if (Array.isArray(data.state.cityHistory)) {
+              data.state.cityHistoryIds = data.state.cityHistory.map((c: City) => c.id)
+              delete data.state.cityHistory
+            }
           }
           localStorage.setItem(name, JSON.stringify(data))
         },
         removeItem: (name) => localStorage.removeItem(name),
       },
-      // We only want to persist some parts of the store
       partialize: (state) => ({
-        city:         state.city,
-        cityHistory:  state.cityHistory,
+        city:         state.city,        // serialized as cityId by setItem above
+        cityHistory:  state.cityHistory, // serialized as cityHistoryIds by setItem above
         activeLayers: state.activeLayers,
         mode:         state.mode,
-        // cityBoundary intentionally NOT persisted (large JSON)
-      } as MapStore), // Cast to satisfy the expected type, though only data is returned
+        lockedCityId: state.lockedCityId,
+      } as MapStore),
     }
   )
 )

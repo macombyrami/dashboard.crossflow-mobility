@@ -48,12 +48,14 @@ export default function MapPage() {
     document.title = `Carte — ${city.name} | CrossFlow`
   }, [city.name])
 
-  const mode           = useMapStore(s => s.mode)
-  const isAIPanelOpen  = useMapStore(s => s.isAIPanelOpen)
-  const setAIPanelOpen = useMapStore(s => s.setAIPanelOpen)
-  const activeLayers   = useMapStore(s => s.activeLayers)
-  const toggleLayer    = useMapStore(s => s.toggleLayer)
-  const setKPIs        = useTrafficStore(s => s.setKPIs)
+  const mode            = useMapStore(s => s.mode)
+  const isAIPanelOpen   = useMapStore(s => s.isAIPanelOpen)
+  const setAIPanelOpen  = useMapStore(s => s.setAIPanelOpen)
+  const activeLayers    = useMapStore(s => s.activeLayers)
+  const toggleLayer     = useMapStore(s => s.toggleLayer)
+  const setKPIs         = useTrafficStore(s => s.setKPIs)
+  // Track the selected vehicle to conditionally mount VehicleInfoCard
+  const selectedVehicleId = useMapStore(s => s.selectedVehicleId)
 
   // Optimized KPI generation - only re-gen when traffic data actually updates
   React.useEffect(() => {
@@ -76,7 +78,7 @@ export default function MapPage() {
   }, [layerProps.transport])
 
   return (
-    <div className="flex flex-1 h-full overflow-hidden relative bg-[#030303]">
+    <main id="main-content" aria-label="Carte de mobilité urbaine" className="flex flex-1 h-full overflow-hidden relative bg-[#030303]">
       
       {/* 🌑 TOP OVERLAY: Gradient for UI legibility */}
       <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[#030303]/80 via-[#030303]/40 to-transparent z-10 pointer-events-none" />
@@ -165,8 +167,8 @@ export default function MapPage() {
           )}
         </div>
 
-        {/* CENTER COMPONENTS */}
-        {mounted && <MapSplitSlider />}
+        {/* CENTER COMPONENTS — only in predict mode */}
+        {mounted && mode === 'predict' && <MapSplitSlider />}
 
         {/* BOTTOM HUD: Contextual Legends (Desktop only or pushed up by sheet) */}
         {mounted && (
@@ -193,10 +195,10 @@ export default function MapPage() {
         {mounted && mode !== 'simulate' && <EdgeDetailPanel />}
         {mounted && <ZoneStatsPanel />}
         
-        {/* Current Vehicle Detail */}
-        {mounted && (
+        {/* Current Vehicle Detail — only mount when a vehicle is selected */}
+        {mounted && selectedVehicleId && (
            <VehicleInfoCard 
-             vehicle={null} 
+             vehicle={null}
              isDisrupted={false}
            />
         )}
@@ -216,7 +218,7 @@ export default function MapPage() {
           <AIPanel onClose={() => setAIPanelOpen(false)} />
         </div>
       )}
-    </div>
+    </main>
   )
 }
 
