@@ -139,12 +139,15 @@ export function Header() {
         <div ref={alertRef} className="relative ml-1">
           <button
             onClick={() => setAlertOpen(!alertOpen)}
+            aria-label={`${incidentCount} notifications de trafic`}
+            aria-haspopup="true"
+            aria-expanded={alertOpen}
             className={cn(
               'w-10 h-10 flex items-center justify-center rounded-xl border transition-all relative', 
               alertOpen ? 'bg-white/15 border-white/20' : 'bg-white/5 border-white/5 hover:bg-white/10'
             )}
           >
-            <Bell className="w-4.5 h-4.5 text-white/60" strokeWidth={2} />
+            <Bell className="w-4.5 h-4.5 text-white/60" strokeWidth={2} aria-hidden="true" />
             {incidentCount > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] rounded-lg bg-red-600 text-white text-[9px] font-black leading-[17px] text-center border border-white/10">
                 {incidentCount}
@@ -156,13 +159,15 @@ export function Header() {
         {/* 🧩 GROUP 3: INFO & AI ANALYST */}
         <button
           onClick={() => setAIPanelOpen(!isAIPanelOpen)}
+          aria-label={isAIPanelOpen ? "Masquer l'analyse IA" : "Afficher l'analyse IA prédictive"}
+          aria-pressed={isAIPanelOpen}
           className={cn(
             'w-10 h-10 flex items-center justify-center rounded-xl border transition-all relative group',
             isAIPanelOpen ? 'bg-brand-green border-brand-green shadow-glow' : 'bg-white/5 border-white/5 hover:bg-white/10'
           )}
           title="Analyse Intelligence"
         >
-          <Sparkles className={cn('w-4.5 h-4.5', isAIPanelOpen ? 'text-black' : 'text-brand-green')} />
+          <Sparkles className={cn('w-4.5 h-4.5', isAIPanelOpen ? 'text-black' : 'text-brand-green')} aria-hidden="true" />
           <div className="absolute top-full right-0 mt-3 px-3 py-2 bg-black/95 border border-white/10 rounded-xl text-[10px] text-white/60 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all pointer-events-none translate-y-2 group-hover:translate-y-0 shadow-2xl z-50">
              Activer l'Analyse Prédictive IA
           </div>

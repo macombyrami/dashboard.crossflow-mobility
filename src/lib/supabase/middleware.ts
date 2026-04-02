@@ -10,7 +10,7 @@ export async function updateSession(request: NextRequest) {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   const pathname = request.nextUrl.pathname
-  const isPublic = pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/auth')
+  const isPublic = pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/auth') || pathname === '/robots.txt' || pathname === '/sitemap.xml'
   const isOnboarding = pathname.startsWith('/onboarding')
 
   if (!url || !key) {

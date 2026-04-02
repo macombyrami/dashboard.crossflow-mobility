@@ -31,9 +31,15 @@ export function UserCityProvider({ children }: { children: React.ReactNode }) {
       setLockedCity(cityId)
     }
 
-    // Initial load
+    // Initial load - Fetch user and redirect if missing on protected routes
     supabase.auth.getUser()
-      .then(({ data }) => applyUserCity(data.user))
+      .then(({ data }) => {
+        applyUserCity(data.user)
+        const isProtected = !['/login', '/onboarding', '/auth', '/'].some(p => window.location.pathname.startsWith(p))
+        if (!data.user && isProtected) {
+          window.location.href = '/login'
+        }
+      })
       .catch(err => {
         if (err.message?.includes('Connection closed')) {
            console.warn('[UserCityProvider] Supabase connection dropped during migration/reset. Retrying...')
@@ -45,6 +51,9 @@ export function UserCityProvider({ children }: { children: React.ReactNode }) {
     // React to sign-in / sign-out events
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       applyUserCity(session?.user ?? null)
+      if (!session && !['/login', '/onboarding', '/auth', '/'].some(p => window.location.pathname.startsWith(p))) {
+        window.location.href = '/login'
+      }
     })
 
     return () => {

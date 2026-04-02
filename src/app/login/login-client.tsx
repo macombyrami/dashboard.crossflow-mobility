@@ -122,34 +122,41 @@ function LoginForm() {
 
       <form onSubmit={handleAuth} className="space-y-4" noValidate>
         {/* Email */}
-        <div className="space-y-1.5">
-          <label htmlFor="email" className="label ml-1">Email</label>
+        <div className="space-y-1.5 flex flex-col">
+          <label htmlFor="email" className="label ml-1 cursor-pointer">
+            Adresse Email <span className="text-traffic-critical">*</span>
+          </label>
           <div className="relative group">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-brand transition-colors" aria-hidden="true" />
             <input
               id="email"
+              name="email"
               type="email"
               required
               autoComplete="email"
-              placeholder="nom@entreprise.com"
-              className="w-full bg-bg-elevated border border-bg-border rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-brand/50 transition-all"
+              placeholder="votre-nom@ville-partenaire.fr"
+              className="w-full bg-bg-elevated border border-bg-border rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/20 transition-all"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               aria-required="true"
+              aria-label="Saisissez votre adresse email"
             />
           </div>
         </div>
 
         {/* Password */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 flex flex-col">
           <div className="flex items-center justify-between ml-1">
-            <label htmlFor="password" className="label">Mot de passe</label>
+            <label htmlFor="password" className="label cursor-pointer">
+              Mot de passe <span className="text-traffic-critical">*</span>
+            </label>
             {!isSignUp && (
               <button
                 type="button"
                 onClick={handleForgotPassword}
                 disabled={loading}
-                className="text-[11px] text-text-muted hover:text-brand transition-colors disabled:opacity-50"
+                className="text-[11px] font-bold text-brand hover:text-brand-light transition-colors disabled:opacity-50 underline underline-offset-2"
+                aria-label="Mot de passe oublié ? Récupérez votre accès par email."
               >
                 Mot de passe oublié ?
               </button>
