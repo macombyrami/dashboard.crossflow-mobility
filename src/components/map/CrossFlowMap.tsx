@@ -1762,30 +1762,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     }
   }, [currentResult, snapshot, mapLoaded]) // eslint-disable-line
 
-  useEffect(() => {
-    if (!mapRef.current || !mapLoaded) return
-    const map = mapRef.current
 
-    if (!map.getLayer(TRAFFIC_SOURCE + '-lines')) {
-      map.addLayer({
-        id:     TRAFFIC_SOURCE + '-lines',
-        type:   'line',
-        source: TRAFFIC_SOURCE,
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint:  {
-          'line-color': ['get', 'color'],
-          'line-width': ['get', 'width'],
-          'line-opacity': [
-            'interpolate', ['linear'], ['zoom'],
-            10, 0.6,
-            14, 0.85,
-            17, 1.0
-          ],
-          'line-blur': 0.8
-        }
-      })
-    }
-  }, [mapLoaded, mapRef])
 
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return
@@ -2090,12 +2067,13 @@ function initStaticSources(map: maplibregl.Map) {
     })
   }
 
-  // ─── Traffic Source ───────────────────────────────────────────────────
+  // ─── Traffic Sources & Fundamental Layers ─────────────────────────────
+  
   if (!map.getSource(TRAFFIC_SOURCE)) {
     map.addSource(TRAFFIC_SOURCE, {
       type: 'geojson',
       data: { type: 'FeatureCollection', features: [] },
-      lineMetrics: true, // required for gradients/stretching
+      lineMetrics: true,
       promoteId: 'id',
     })
   }
@@ -2106,7 +2084,41 @@ function initStaticSources(map: maplibregl.Map) {
       data: { type: 'FeatureCollection', features: [] },
       promoteId: 'id',
     })
+  }
 
+  // 1. Primary Traffic Lines
+  if (!map.getLayer(TRAFFIC_SOURCE + '-lines')) {
+    map.addLayer({
+      id:     TRAFFIC_SOURCE + '-lines',
+      type:   'line',
+      source: TRAFFIC_SOURCE,
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint:  {
+        'line-color': [
+          'case',
+          ['boolean', ['feature-state', 'hasData'], false],
+          ['match', ['feature-state', 'levelCode'],
+            0, '#22C55E', 1, '#EAB308', 2, '#F97316', 3, '#EF4444',
+            '#22C55E'
+          ],
+          '#2A2D35' 
+        ],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 
+          8, ['*', 0.6, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]],
+          13, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5],
+          17, ['*', 1.4, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]]
+        ],
+        'line-opacity': [
+          'interpolate', ['linear'], ['zoom'],
+          10, ['case', ['boolean', ['feature-state', 'hasData'], false], 0.88, 0.4],
+          14, ['case', ['boolean', ['feature-state', 'hasData'], false], 1.0, 0.6]
+        ],
+      },
+    })
+  }
+
+  // 2. Prediction Overlays (Dashed)
+  if (!map.getLayer(TRAFFIC_PREDICTION_SOURCE + '-lines')) {
     map.addLayer({
       id:     TRAFFIC_PREDICTION_SOURCE + '-lines',
       type:   'line',
@@ -2119,83 +2131,46 @@ function initStaticSources(map: maplibregl.Map) {
           0, '#22C55E', 1, '#FAFA33', 2, '#FF9100', 3, '#FF0000',
           '#666666'
         ],
-        'line-width': [
-          'interpolate', ['linear'], ['zoom'],
-          11, 1,
-          16, 3
-        ],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1, 16, 3],
         'line-dasharray': [1, 2],
         'line-opacity': 0.4,
-        'line-offset': 4 // Offset to show parallel to current traffic
+        'line-offset': 4 
       }
     }, TRAFFIC_SOURCE + '-lines')
   }
-  const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
-  // Synthetic traffic lines
+  // 3. Traffic Glow (Underlay)
+  if (!map.getLayer(TRAFFIC_SOURCE + '-glow')) {
+    map.addLayer({
+      id:     TRAFFIC_SOURCE + '-glow',
+      type:   'line',
+      source: TRAFFIC_SOURCE,
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint:  {
+        'line-color': [
+          'case',
+          ['boolean', ['feature-state', 'hasData'], false],
+          ['match', ['feature-state', 'levelCode'],
+            0, '#22C55E', 1, '#EAB308', 2, '#F97316', 3, '#EF4444',
+            '#22C55E'
+          ],
+          'transparent' 
+        ],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 16, 12],
+        'line-opacity': [
+          'interpolate', ['linear'], ['zoom'],
+          11, 0,
+          12, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.65, 0.25],
+          17, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.65, 0.4]
+        ],
+        'line-blur': ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 6, 3],
+      },
+    }, TRAFFIC_SOURCE + '-lines')
+  }
+
+  const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
   map.addSource(PREDICTIVE_AFFECTED_SOURCE, { type: 'geojson', data: emptyFC })
   map.addSource(PREDICTIVE_EVENTS_SOURCE,   { type: 'geojson', data: emptyFC })
-
-
-  map.addLayer({
-    id:     TRAFFIC_SOURCE + '-glow',
-    type:   'line',
-    source: TRAFFIC_SOURCE,
-    layout: { 'line-join': 'round', 'line-cap': 'round' },
-    paint:  {
-      'line-color': [
-        'case',
-        ['boolean', ['feature-state', 'hasData'], false],
-        ['match', ['feature-state', 'levelCode'],
-          0, '#22C55E',
-          1, '#EAB308',
-          2, '#F97316',
-          3, '#EF4444',
-          '#22C55E'
-        ],
-        'transparent' 
-      ],
-      'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 16, 12],
-      'line-opacity': [
-        'case',
-        ['>=', ['feature-state', 'anomaly'], 0.6], 0.65, // V4: Anomaly Intensity
-        ['>=', ['zoom'], 12], 0.25,
-        0
-      ],
-      'line-blur': ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 6, 3],
-    },
-  })
-
-  map.addLayer({
-    id:     TRAFFIC_SOURCE + '-lines',
-    type:   'line',
-    source: TRAFFIC_SOURCE,
-    layout: { 'line-join': 'round', 'line-cap': 'round' },
-    paint:  {
-      'line-color': [
-        'case',
-        ['boolean', ['feature-state', 'hasData'], false],
-        ['match', ['feature-state', 'levelCode'],
-          0, '#22C55E',
-          1, '#EAB308', 
-          2, '#F97316',
-          3, '#EF4444',
-          '#22C55E'
-        ],
-        '#2A2D35' 
-      ],
-      'line-width': ['interpolate', ['linear'], ['zoom'], 
-        8, ['*', 0.6, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]],
-        13, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5],
-        17, ['*', 1.4, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]]
-      ],
-      'line-opacity': [
-        'interpolate', ['linear'], ['zoom'],
-        10, ['case', ['boolean', ['feature-state', 'hasData'], false], 0.88, 0.4],
-        14, ['case', ['boolean', ['feature-state', 'hasData'], false], 1.0, 0.6]
-      ],
-    },
-  })
 
   // ── PREDICTIVE AFFECTED ROADS ──────────────────
   map.addLayer({

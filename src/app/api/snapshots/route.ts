@@ -3,6 +3,13 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
+  
+  // 🛰️ Staff Engineer Auth Verification
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ success: false, error: 'Unauthorized: Valid Supabase session required' }, { status: 401 })
+  }
+
   try {
     const body = await req.json()
     const { city_id, fetched_at, provider, stats, segments_gz, bbox } = body

@@ -29,7 +29,7 @@ export function MapSplitSlider() {
           onChange={(e) => setSplitRatio(parseFloat(e.target.value))}
           className="absolute inset-0 opacity-0 cursor-ew-resize"
         />
-        <div className="w-8 h-8 rounded-full bg-brand border-2 border-white/20 shadow-apple flex items-center justify-center transition-transform group-hover:scale-110 active:scale-95">
+        <div className="w-8 h-8 rounded-full bg-brand/10 border-2 border-white/5 flex items-center justify-center transition-transform group-hover:scale-110 active:scale-95 invisible">
           <div className="flex gap-0.5">
             <div className="w-0.5 h-3 bg-white/40 rounded-full" />
             <div className="w-0.5 h-3 bg-white/40 rounded-full" />

@@ -14,7 +14,7 @@ export interface SnapshotSaveData {
   raw_segments?: any // Temporary for compression
 }
 
-export async function saveSnapshot(data: SnapshotSaveData): Promise<boolean> {
+export async function saveSnapshot(data: SnapshotSaveData, token?: string): Promise<boolean> {
   try {
     const payload = { ...data }
     
@@ -24,9 +24,14 @@ export async function saveSnapshot(data: SnapshotSaveData): Promise<boolean> {
       delete payload.raw_segments
     }
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) {
+       headers['Authorization'] = `Bearer ${token}`
+    }
+
     const res = await fetch('/api/snapshots', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload)
     })
     return res.ok
