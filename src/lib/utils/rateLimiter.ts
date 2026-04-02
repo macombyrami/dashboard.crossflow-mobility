@@ -99,3 +99,6 @@ export const overpassLimiter = new RateLimiter(1, 2_000)
 
 /** Nominatim OSM geocoding: 1 req/s (OSM usage policy) */
 export const nominatimLimiter = new RateLimiter(1, 1_000)
+
+/** 🛰️ Supabase Auth: 30 req/min (Conservative safety for Free Tier) */
+export const supabaseAuthLimiter = new RateLimiter(30, 60_000)
