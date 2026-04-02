@@ -18,6 +18,8 @@ import LayerControls from '@/components/map/controls/LayerControls'
 import MapLegend from '@/components/map/MapLegend'
 import { saveSnapshot } from '@/lib/api/snapshots'
 import { toast } from 'sonner'
+import { GeolocationControl } from '@/components/map/controls/GeolocationControl'
+import type { UserPosition } from '@/hooks/useGeolocation'
 
 import {
   generateTrafficSnapshot,
@@ -202,6 +204,12 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   const [provider, setProvider] = useState<'tomtom' | 'here' | 'synthetic'>('tomtom')
   const [lastSnapshot, setLastSnapshot] = useState<string | null>(null)
   const [isFetching, setIsFetching] = useState(false)
+
+  // ─── Geolocation State ────────────────────────────────────────────────
+  const [userPosition, setUserPosition] = useState<UserPosition | null>(null)
+  const userMarkerRef  = useRef<maplibregl.Marker | null>(null)
+  const userSourceReady = useRef(false)
+  const USER_LOCATION_SOURCE = 'cf-user-location'
 
 
   const city            = useMapStore(s => s.city)
@@ -1977,6 +1985,136 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     }
   }, [zoneDraft, zonePolygon, mapLoaded])
 
+  // ─── User Location Marker (MapLibre custom animated element) ─────────
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapLoaded) return
+
+    if (!userPosition) {
+      // Remove marker if position cleared
+      userMarkerRef.current?.remove()
+      userMarkerRef.current = null
+      return
+    }
+
+    const { lat, lng, accuracy, heading } = userPosition
+
+    if (userMarkerRef.current) {
+      // Update existing marker position
+      userMarkerRef.current.setLngLat([lng, lat])
+      return
+    }
+
+    // Build custom DOM element
+    const el = document.createElement('div')
+    el.className = 'user-location-marker'
+    el.style.cssText = `
+      position: relative;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `
+
+    // Accuracy ring (translucent)
+    const ring = document.createElement('div')
+    ring.style.cssText = `
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(0, 255, 157, 0.12);
+      border: 1.5px solid rgba(0, 255, 157, 0.4);
+      animation: user-location-pulse 2.5s ease-out infinite;
+    `
+
+    // Blue dot (main indicator) — matching Google Maps style
+    const dot = document.createElement('div')
+    dot.style.cssText = `
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #00FF9D;
+      border: 3px solid #ffffff;
+      box-shadow: 0 0 0 2px rgba(0,255,157,0.3), 0 2px 8px rgba(0,0,0,0.5);
+      z-index: 2;
+    `
+
+    // Heading arrow (only when heading is available)
+    if (heading !== null && heading !== undefined) {
+      const arrow = document.createElement('div')
+      arrow.style.cssText = `
+        position: absolute;
+        width: 0;
+        height: 0;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-bottom: 10px solid rgba(0,255,157,0.8);
+        transform: rotate(${heading}deg) translateY(-14px);
+        z-index: 1;
+        transform-origin: center bottom;
+      `
+      el.appendChild(arrow)
+    }
+
+    el.appendChild(ring)
+    el.appendChild(dot)
+
+    // Add CSS animation if not already injected
+    if (!document.getElementById('user-location-style')) {
+      const style = document.createElement('style')
+      style.id = 'user-location-style'
+      style.textContent = `
+        @keyframes user-location-pulse {
+          0%   { transform: scale(1);   opacity: 0.8; }
+          70%  { transform: scale(2.4); opacity: 0; }
+          100% { transform: scale(1);   opacity: 0; }
+        }
+      `
+      document.head.appendChild(style)
+    }
+
+    userMarkerRef.current = new maplibregl.Marker({ element: el, anchor: 'center' })
+      .setLngLat([lng, lat])
+      .addTo(map)
+
+    return () => {
+      userMarkerRef.current?.remove()
+      userMarkerRef.current = null
+    }
+  }, [mapLoaded, userPosition])
+
+  // Track if first-fix toast was already shown
+  const geoToastShownRef = useRef(false)
+
+  // ─── Geolocation callbacks ───────────────────────────────────────────
+  const handleUserPosition = useCallback((pos: UserPosition | null) => {
+    setUserPosition(pos)
+    // Only toast once on first fix (not on every continuous GPS update)
+    if (pos && !geoToastShownRef.current) {
+      geoToastShownRef.current = true
+      toast.success(`📍 Position détectée`, {
+        description: `Précision GPS : ±${Math.round(pos.accuracy)}m • Données locales actives`,
+        duration: 4000,
+      })
+    }
+    // Reset flag when position is cleared
+    if (!pos) geoToastShownRef.current = false
+  }, [])
+
+
+  const handleGeoFlyTo = useCallback((lat: number, lng: number) => {
+    mapRef.current?.flyTo({
+      center:    [lng, lat],
+      zoom:      15,
+      duration:  1200,
+      essential: true,
+    })
+  }, [])
+
+
   return (
     <div className="w-full h-full relative">
       {mapError && (
@@ -2008,6 +2146,16 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       />
       
       {/* HUD elements are now managed by MapPage for better orchestration with AIPanel */}
+
+      {/* ─── Geolocation Control ───────────────────────────────────── */}
+      {mapLoaded && (
+        <div className="absolute bottom-24 right-3 z-[400]">
+          <GeolocationControl
+            onPositionChange={handleUserPosition}
+            onFlyTo={handleGeoFlyTo}
+          />
+        </div>
+      )}
 
       {/* Loading overlay — fades out once map tiles are ready */}
       {!mapLoaded && !mapError && (
