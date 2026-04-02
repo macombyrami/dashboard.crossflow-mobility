@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' data: https://fonts.gstatic.com https://fonts.openmaptiles.org",
       "img-src 'self' blob: data: https://*.cartocdn.com https://*.tile.openstreetmap.org https://api.tomtom.com https://tile.tomtom.com",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.tomtom.com https://router.hereapi.com https://traffic.ls.hereapi.com https://overpass-api.de https://nominatim.openstreetmap.org https://api.open-meteo.com https://api.air-quality-api.open-meteo.com https://prim.iledefrance-mobilites.fr https://data.sytadin.fr",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.tomtom.com https://router.hereapi.com https://traffic.ls.hereapi.com https://overpass-api.de https://nominatim.openstreetmap.org https://api.open-meteo.com https://air-quality-api.open-meteo.com https://*.cartocdn.com https://*.tile.openstreetmap.org https://prim.iledefrance-mobilites.fr https://data.sytadin.fr",
       "worker-src blob: 'self'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
