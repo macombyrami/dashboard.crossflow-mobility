@@ -45,7 +45,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width:        'device-width',
   initialScale: 1,
-  maximumScale: 1,
+  // maximumScale intentionally removed — blocking zoom violates WCAG 1.4.4
+  // Users (especially visually impaired) must be able to zoom freely.
+  userScalable: true,
   themeColor:   appData.themeColor,
 }
 
