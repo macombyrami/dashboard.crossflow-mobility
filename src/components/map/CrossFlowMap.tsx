@@ -268,7 +268,115 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => { isTrackingRef.current = isTrackingVehicle }, [isTrackingVehicle])
 
 
+
+  // ─── Vehicle position update & smooth animation (RAF loop) ───────────
+
+  const updateVehicles = useCallback((nowMs: number) => {
+    const map    = mapRef.current
+    const routes = osmRoutesRef.current.get(city.id)
+    if (!map || !routes?.length) return
+
+    // 1. Simulate all vehicles at current time
+    const allVehicles = simulateTransitVehicles(routes, nowMs)
+    liveVehiclesRef.current = allVehicles
+
+    // 2. Apply Filters (Type + Search)
+    const filtered = allVehicles.filter(v => {
+      // Type filter
+      if (vehicleTypeFilterRef.current.size > 0 && !vehicleTypeFilterRef.current.has(v.routeType)) {
+        return false
+      }
+      // Search filter
+      if (vehicleSearchRef.current) {
+        const q = vehicleSearchRef.current.toLowerCase()
+          .replace(/ligne\s+/g, '')
+          .replace(/bus\s+/g, '')
+          .replace(/metro\s+/g, '')
+          .replace(/m\d/g, m => m.slice(1)) // "M14" -> "14"
+          .trim()
+        const match = v.routeRef.toLowerCase().includes(q) || v.routeName.toLowerCase().includes(q)
+        if (!match) return false
+      }
+      return true
+    })
+
+    // 3. Update Map Source
+    const src = map.getSource(VEHICLES_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (src) {
+      src.setData({
+        type: 'FeatureCollection',
+        features: filtered.map(v => ({
+          type:       'Feature' as const,
+          geometry:   { type: 'Point' as const, coordinates: [v.lng, v.lat] },
+          properties: {
+            id:        v.id,
+            routeType: v.routeType,
+            routeRef:  v.routeRef,
+            routeName: v.routeName,
+            color:     v.color,
+            bearing:   v.bearing,
+            speedKmh:  v.speedKmh,
+          },
+        })),
+      })
+    }
+
+    // 4. Handle Selected Vehicle & Tracking
+    const selId = useMapStore.getState().selectedVehicleId
+    if (selId) {
+      const active = allVehicles.find(v => v.id === selId)
+      if (active) {
+        // Update selection highlight source
+        const hSrc = map.getSource(VEHICLES_SOURCE + '-selected') as maplibregl.GeoJSONSource | undefined
+        if (hSrc) {
+          hSrc.setData({
+            type: 'Feature' as const,
+            geometry: { type: 'Point' as const, coordinates: [active.lng, active.lat] },
+            properties: active,
+          })
+        }
+        // Sync React state for InfoCard (throttled)
+        if (nowMs - lastVehicleUpdateRef.current > 100) {
+          setSelectedVehicleState(active)
+          lastVehicleUpdateRef.current = nowMs
+        }
+        // Camera follow
+        if (isTrackingRef.current) {
+          map.easeTo({ center: [active.lng, active.lat], duration: 100, easing: (t) => t })
+        }
+      } else {
+        // Vehicle likely disappeared (off routes)
+        setSelectedVehicleState(null)
+      }
+    } else {
+      // Clear highlight if nothing selected
+      const hSrc = map.getSource(VEHICLES_SOURCE + '-selected') as maplibregl.GeoJSONSource | undefined
+      if (hSrc) hSrc.setData({ type: 'FeatureCollection', features: [] })
+      setSelectedVehicleState(null)
+    }
+
+    setVehicleCount(allVehicles.length)
+
+    // 5. Global Animations (Pulse for disrupted stations + selected vehicles)
+    pulseRef.current = (nowMs % 1500) / 1500 // 1.5s cycle
+    const p = pulseRef.current
+    const pulseOpacity = 0.7 * (1 - p)
+
+    if (map.getLayer(METRO_STATIONS_SOURCE + '-alert')) {
+      map.setPaintProperty(METRO_STATIONS_SOURCE + '-alert', 'circle-opacity', pulseOpacity)
+    }
+    if (map.getLayer(VEHICLES_SOURCE + '-selected-ring')) {
+      map.setPaintProperty(VEHICLES_SOURCE + '-selected-ring', 'circle-opacity', pulseOpacity * 0.6)
+      map.setPaintProperty(VEHICLES_SOURCE + '-selected-ring', 'circle-radius', [
+        'interpolate', ['linear'], ['zoom'],
+        10, 12 + (p * 8),
+        15, 24 + (p * 12)
+      ])
+    }
+  }, [city.id])
+
   // ─── Unified Animation Loop (Flow + Pulse) ──────────────────────────────────
+
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
     const map = mapRef.current
@@ -1024,113 +1132,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
 
   // ─── Vehicle position update (every 10 seconds) ───────────────────────
 
-  // ─── Vehicle position update & smooth animation (RAF loop) ───────────
 
-  const updateVehicles = useCallback((nowMs: number) => {
-    const map    = mapRef.current
-    const routes = osmRoutesRef.current.get(city.id)
-    if (!map || !routes?.length) return
-
-    // 1. Simulate all vehicles at current time
-    const allVehicles = simulateTransitVehicles(routes, nowMs)
-    liveVehiclesRef.current = allVehicles
-
-    // 2. Apply Filters (Type + Search)
-    const filtered = allVehicles.filter(v => {
-      // Type filter
-      if (vehicleTypeFilterRef.current.size > 0 && !vehicleTypeFilterRef.current.has(v.routeType)) {
-        return false
-      }
-      // Search filter
-      if (vehicleSearchRef.current) {
-        const q = vehicleSearchRef.current.toLowerCase()
-          .replace(/ligne\s+/g, '')
-          .replace(/bus\s+/g, '')
-          .replace(/metro\s+/g, '')
-          .replace(/m\d/g, m => m.slice(1)) // "M14" -> "14"
-          .trim()
-        const match = v.routeRef.toLowerCase().includes(q) || v.routeName.toLowerCase().includes(q)
-        if (!match) return false
-      }
-      return true
-    })
-
-
-
-    // 3. Update Map Source
-    const src = map.getSource(VEHICLES_SOURCE) as maplibregl.GeoJSONSource | undefined
-    if (src) {
-      src.setData({
-        type: 'FeatureCollection',
-        features: filtered.map(v => ({
-          type:       'Feature' as const,
-          geometry:   { type: 'Point' as const, coordinates: [v.lng, v.lat] },
-          properties: {
-            id:        v.id,
-            routeType: v.routeType,
-            routeRef:  v.routeRef,
-            routeName: v.routeName,
-            color:     v.color,
-            bearing:   v.bearing,
-            speedKmh:  v.speedKmh,
-          },
-        })),
-      })
-    }
-
-    // 4. Handle Selected Vehicle & Tracking
-    const selId = useMapStore.getState().selectedVehicleId
-    if (selId) {
-      const active = allVehicles.find(v => v.id === selId)
-      if (active) {
-        // Update selection highlight source
-        const hSrc = map.getSource(VEHICLES_SOURCE + '-selected') as maplibregl.GeoJSONSource | undefined
-        if (hSrc) {
-          hSrc.setData({
-            type: 'Feature' as const,
-            geometry: { type: 'Point' as const, coordinates: [active.lng, active.lat] },
-            properties: active,
-          })
-        }
-        // Sync React state for InfoCard (throttled)
-        if (nowMs - lastVehicleUpdateRef.current > 100) {
-          setSelectedVehicleState(active)
-          lastVehicleUpdateRef.current = nowMs
-        }
-        // Camera follow
-        if (isTrackingRef.current) {
-          map.easeTo({ center: [active.lng, active.lat], duration: 100, easing: (t) => t })
-        }
-      } else {
-        // Vehicle likely disappeared (off routes)
-        setSelectedVehicleState(null)
-      }
-    } else {
-      // Clear highlight if nothing selected
-      const hSrc = map.getSource(VEHICLES_SOURCE + '-selected') as maplibregl.GeoJSONSource | undefined
-      if (hSrc) hSrc.setData({ type: 'FeatureCollection', features: [] })
-      setSelectedVehicleState(null)
-    }
-
-    setVehicleCount(allVehicles.length)
-
-    // 5. Global Animations (Pulse for disrupted stations + selected vehicles)
-    pulseRef.current = (nowMs % 1500) / 1500 // 1.5s cycle
-    const p = pulseRef.current
-    const pulseOpacity = 0.7 * (1 - p)
-
-    if (map.getLayer(METRO_STATIONS_SOURCE + '-alert')) {
-      map.setPaintProperty(METRO_STATIONS_SOURCE + '-alert', 'circle-opacity', pulseOpacity)
-    }
-    if (map.getLayer(VEHICLES_SOURCE + '-selected-ring')) {
-      map.setPaintProperty(VEHICLES_SOURCE + '-selected-ring', 'circle-opacity', pulseOpacity * 0.6)
-      map.setPaintProperty(VEHICLES_SOURCE + '-selected-ring', 'circle-radius', [
-        'interpolate', ['linear'], ['zoom'],
-        10, 12 + (p * 8),
-        15, 24 + (p * 12)
-      ])
-    }
-  }, [city.id])
 
 
 

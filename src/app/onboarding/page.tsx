@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { CITIES } from '@/config/cities.config'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, Variants } from 'framer-motion'
 import {
   Zap, ArrowRight, MapPin, BarChart3, Brain, Layers,
   Car, CheckCircle2, ChevronRight, PenLine, Sparkles
@@ -38,7 +38,7 @@ export default function OnboardingPage() {
 
   const selectedCity = CITIES.find(c => c.id === cityId) ?? CITIES[0]
 
-  const variants = {
+  const variants: Variants = {
     initial: { opacity: 0, x: 20 },
     enter:   { opacity: 1, x: 0, transition: { duration: 0.4, ease: [0.23, 1, 0.32, 1] } },
     exit:    { opacity: 0, x: -20, transition: { duration: 0.3, ease: 'easeIn' } }
@@ -136,7 +136,7 @@ export default function OnboardingPage() {
                         />
                       </div>
                       <div className="lg:col-span-3 space-y-4">
-                        <label className="text-[11px] font-black uppercase tracking-[0.2em] text-text-muted italic">Mision</label>
+                        <label className="text-[11px] font-black uppercase tracking-[0.2em] text-text-muted italic">Mission</label>
                         <div className="grid grid-cols-2 gap-3">
                           {ROLES.map(r => (
                             <button
