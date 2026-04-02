@@ -32,14 +32,25 @@ export function UserCityProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Initial load
-    supabase.auth.getUser().then(({ data }) => applyUserCity(data.user))
+    supabase.auth.getUser()
+      .then(({ data }) => applyUserCity(data.user))
+      .catch(err => {
+        if (err.message?.includes('Connection closed')) {
+           console.warn('[UserCityProvider] Supabase connection dropped during migration/reset. Retrying...')
+        } else {
+           console.error('[UserCityProvider] Auth fetch failed:', err)
+        }
+      })
 
     // React to sign-in / sign-out events
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       applyUserCity(session?.user ?? null)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      // 🚀 Staff Engineer: Prevent zombie listeners during HMR / Fast Refresh
+      if (subscription) subscription.unsubscribe()
+    }
   }, [setCity, setLockedCity])
 
   return <>{children}</>

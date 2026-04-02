@@ -26,6 +26,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     setMounted(true)
+
+    // 🚀 STAFF ENGINEER: Global Safety Net for transient connectivity drops
+    // Prevents "Uncaught (in promise) Error: Connection closed" during migrations/restarts.
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      const msg = event.reason?.message || ''
+      if (msg.includes('Connection closed')) {
+        event.preventDefault()
+        console.debug('[AppShell] Suppressed transient "Connection closed" rejection during DB reset.')
+      }
+    }
+
+    window.addEventListener('unhandledrejection', handleRejection)
+    return () => window.removeEventListener('unhandledrejection', handleRejection)
   }, [])
 
   if (isPublic) {

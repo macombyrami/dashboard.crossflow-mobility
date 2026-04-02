@@ -91,10 +91,18 @@ export const useTrafficStore = create<TrafficStore>()((set) => ({
   setIsSyncing:        (b)   => set({ isSyncing: b }),
 
   persistSnapshot: async (data: any) => {
-    const { saveSnapshot } = await import('@/lib/api/snapshots')
-    const success = await saveSnapshot(data)
-    if (success) {
-      set({ lastSync: new Date() })
+    try {
+      const { saveSnapshot } = await import('@/lib/api/snapshots')
+      const success = await saveSnapshot(data)
+      if (success) {
+        set({ lastSync: new Date() })
+      }
+    } catch (err: any) {
+      if (err.message?.includes('Connection closed')) {
+        console.warn('[TrafficStore] Persistence connection closed by server (likely DB reset/migration).')
+      } else {
+        console.error('[TrafficStore] Critical persistence error:', err)
+      }
     }
   },
 
