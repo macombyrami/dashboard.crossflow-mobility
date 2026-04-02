@@ -2,28 +2,27 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
-/* ─── Design Tokens ────────────────────────────────────────────────────── */
+/* ─── Prestige Design System (SaaS v4.0) ────────────────────────────── */
 :root {
-  --bg-base:     #030303; /* Ultra Dark Minimal */
-  --bg-surface:  #0A0A0A;
-  --bg-elevated: #121212;
-  --bg-border:   rgba(255,255,255,0.06);
+  --bg-base:     #030303; /* Obsidian Black */
+  --bg-surface:  #080808;
+  --bg-elevated: #111111;
+  --bg-border:   rgba(255,255,255,0.08); /* Elite fine border */
   --bg-subtle:   rgba(255,255,255,0.03);
-  --bg-hover:    rgba(255,255,255,0.08);
+  --bg-hover:    rgba(255,255,255,0.1);
 
-  --text-primary:   #F5F5F7;
+  --text-primary:   #FFFFFF;
   --text-secondary: #A1A1AA;
   --text-muted:     #52525B;
 
-  --brand:      #22C55E; /* Neon Green */
-  --brand-dim:  rgba(34,197,94,0.12);
-  --brand-glow:    rgba(34,197,94,0.3);
-  --brand-glow-lg: rgba(34,197,94,0.5);
+  --brand:        #00FF9D; /* Signal Green */
+  --brand-dim:    rgba(0,255,157,0.12);
+  --brand-glow:   rgba(0,255,157,0.3);
+  --brand-glow-lg:rgba(0,255,157,0.5);
   --prestige-silver: linear-gradient(135deg, #FFF 0%, rgba(255,255,255,0.4) 100%);
-  --prestige-gold:   linear-gradient(135deg, #FDE68A 0%, #F59E0B 100%);
-  --brand-glow-xlg:  rgba(34,197,94,0.6);
+  --prestige-glow: 0 0 40px -10px rgba(0, 255, 157, 0.3);
 
-  --traffic-free:      #22C55E;
+  --traffic-free:      #00FF9D;
   --traffic-slow:      #FACD15;
   --traffic-congested: #F97316;
   --traffic-critical:  #EF4444;
@@ -33,7 +32,7 @@
   --radius-md:  16px;
   --radius-lg:  20px;
   --radius-xl:  24px;
-  --radius-2xl: 32px;
+  --radius-2xl: 40px; /* Expansive for bento cards */
 
   /* ─── Standard Breakpoints ─── */
   --screen-xs: 320px;
@@ -43,16 +42,10 @@
   --screen-xl: 1440px;
 
   /* ─── Responsive Layout ─── */
-  --header-h:  52px;
-  --sidebar-w: 220px;
-  --mini-sidebar-w: 72px;
-  --nav-h:     60px; /* mobile bottom nav */
-  
-  /* ─── Spacing Scale (Responsive) ─── */
-  --space-unit: 8px;
-  --p-mobile:  16px;
-  --p-tablet:  24px;
-  --p-desktop: 32px;
+  --header-h:  64px;
+  --sidebar-w: 240px;
+  --mini-sidebar-w: 80px;
+  --nav-h:     64px;
 }
 
 /* ─── Reset & Base ─────────────────────────────────────────────────────── */
@@ -106,29 +99,25 @@ body {
 }
 
 .glass-card {
-  background: rgba(18,19,24,0.72);
-  backdrop-filter: blur(24px) saturate(190%);
-  -webkit-backdrop-filter: blur(24px) saturate(190%);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 18px;
+  background: rgba(10, 10, 10, 0.45);
+  backdrop-filter: blur(40px) saturate(210%);
+  -webkit-backdrop-filter: blur(40px) saturate(210%);
+  border: 1px solid rgba(255,255,255,0.08); /* Ultra fine line */
+  border-radius: var(--radius-2xl);
   box-shadow:
-    0 2px 4px rgba(0,0,0,0.1),
-    0 12px 32px rgba(0,0,0,0.35),
-    inset 0 1px 0 rgba(255,255,255,0.04);
-  transition: border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow   0.3s cubic-bezier(0.16, 1, 0.3, 1),
-              transform    0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform;
-  transform: translateZ(0);
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 10px 40px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-card:hover {
-  border-color: rgba(255,255,255,0.12);
-  transform: translateY(-2px) translateZ(0);
+  background: rgba(15, 15, 15, 0.6);
+  border-color: rgba(255,255,255,0.15);
+  transform: translateY(-4px);
   box-shadow:
-    0 4px 8px rgba(0,0,0,0.2),
-    0 16px 48px rgba(0,0,0,0.45),
-    inset 0 1px 0 rgba(255,255,255,0.08);
+    0 20px 60px -10px rgba(0,0,0,0.6),
+    0 0 40px -10px var(--brand-glow);
 }
 
 .shadow-brand-glow-lg {
@@ -233,6 +222,17 @@ body {
 .btn-icon:hover { background: var(--bg-elevated); color: var(--text-primary); }
 .btn-icon:active { transform: scale(0.93); }
 
+.btn-prestige {
+  @apply relative px-8 py-4 rounded-2xl bg-white text-black font-black uppercase tracking-[0.2em] text-[10px] 
+         hover:bg-brand hover:text-black transition-all duration-500 flex items-center justify-center gap-3
+         shadow-[0_0_30px_-10px_rgba(255,255,255,0.3)] border-none outline-none;
+}
+
+.btn-prestige:hover {
+  box-shadow: 0 0 50px -5px var(--brand-glow-lg);
+  transform: translateY(-2px);
+}
+
 /* ─── Status Pills ─────────────────────────────────────────────────────── */
 .pill {
   display: inline-flex;
@@ -245,7 +245,7 @@ body {
   letter-spacing: 0.01em;
 }
 
-.pill-green  { background: rgba(34,197,94,0.14);  color: #4ade80; }
+.pill-green  { background: rgba(0,255,157,0.14);  color: #00FF9D; }
 .pill-yellow { background: rgba(255,214,0,0.14);  color: #FFD600; }
 .pill-orange { background: rgba(255,159,10,0.14); color: #FF9F0A; }
 .pill-red    { background: rgba(255,59,48,0.14);  color: #FF6B6B; }
@@ -369,6 +369,15 @@ body {
 .animate-pulse,
 .animate-live-dot {
   will-change: opacity, box-shadow;
+}
+
+.text-prestige-gradient {
+  @apply bg-clip-text text-transparent bg-gradient-to-br from-white via-white/80 to-white/40;
+}
+
+.noise-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  @apply pointer-events-none fixed inset-0 z-[1000] opacity-[0.04] mix-blend-overlay;
 }
 
 /* ─── Layout Shell ─────────────────────────────────────────────────────── */
