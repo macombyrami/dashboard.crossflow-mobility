@@ -48,31 +48,32 @@ export function FeaturesGrid() {
         <h3 className="text-3xl md:text-5xl font-black uppercase tracking-tight italic">UNE ARCHITECTURE DE CONTRÔLE SANS ÉGALE.</h3>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6" role="list">
         {Features.map((f, i) => (
           <motion.div
             key={i}
+            role="listitem"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: i * 0.1 }}
             className={cn(
-               "glass-card p-10 rounded-3xl border border-white/5 transition-all duration-500 hover:border-white/10 group overflow-hidden relative",
+               "glass-card p-6 md:p-10 rounded-2xl md:rounded-3xl border border-white/5 transition-all duration-500 hover:border-white/10 group overflow-hidden relative",
                f.grid
             )}
           >
             {/* Visual Depth */}
-            <div className={cn("absolute -top-10 -right-10 w-40 h-40 blur-[80px] opacity-20", f.bg.replace('bg-', 'bg-'))} />
+            <div className={cn("absolute -top-10 -right-10 w-40 h-40 blur-[80px] opacity-20", f.bg)} aria-hidden="true" />
             
-            <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mb-10 transition-transform group-hover:scale-110", f.bg)}>
-              <f.icon className={cn("w-7 h-7", f.color)} strokeWidth={2.5} />
+            <div className={cn("w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center mb-6 md:mb-10 transition-transform group-hover:scale-110 flex-shrink-0", f.bg)}>
+              <f.icon className={cn("w-6 h-6 md:w-7 md:h-7", f.color)} strokeWidth={2.5} aria-hidden="true" />
             </div>
 
-            <h4 className="text-xl font-black uppercase tracking-widest mb-4 italic group-hover:text-brand transition-colors">
+            <h4 className="text-lg md:text-xl font-black uppercase tracking-widest mb-3 md:mb-4 italic group-hover:text-brand transition-colors">
               {f.title}
             </h4>
             
-            <p className="text-base text-text-muted leading-relaxed font-medium">
+            <p className="text-sm md:text-base text-text-muted leading-relaxed font-medium">
               {f.description}
             </p>
           </motion.div>
