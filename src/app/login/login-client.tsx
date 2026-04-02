@@ -98,8 +98,19 @@ function LoginForm() {
   }
 
   return (
-    <div className="glass-card p-8 relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-brand/30 to-transparent" />
+    <div className="glass-card p-8 relative overflow-hidden group">
+      <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-brand to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
+      
+      {/* 💎 Phase 10: Rarity & Social Proof Banner */}
+      <div className="mb-8 p-3 rounded-xl bg-brand/5 border border-brand/10 flex items-center gap-3 animate-pulse-slow">
+        <div className="w-8 h-8 rounded-lg bg-brand/20 flex items-center justify-center shrink-0">
+          <Zap className="w-4 h-4 text-brand" />
+        </div>
+        <div className="flex-1">
+          <p className="text-[10px] font-black text-brand uppercase tracking-widest leading-none mb-1 italic">Accès Prioritaire IDF</p>
+          <p className="text-[9px] font-bold text-text-muted uppercase tracking-tight">Postes de commande & Collectivités partenaires</p>
+        </div>
+      </div>
 
       <div className="mb-6">
         <h2 className="heading-2 mb-1">{isSignUp ? 'Créer un compte' : 'Bienvenue'}</h2>
@@ -235,20 +246,26 @@ function LoginForm() {
         </button>
       </p>
 
-      {/* Trust signals */}
-      <div className="mt-5 pt-4 border-t border-white/5 flex items-center justify-center gap-5 text-[10px] text-text-muted">
-        <span className="flex items-center gap-1.5">
-          <ShieldCheck className="w-3 h-3 text-brand/60" aria-hidden="true" />
-          SSL Sécurisé
-        </span>
-        <span className="flex items-center gap-1.5">
-          <Lock className="w-3 h-3 text-brand/60" aria-hidden="true" />
-          RGPD Conforme
-        </span>
-        <span className="flex items-center gap-1.5">
-          <Server className="w-3 h-3 text-brand/60" aria-hidden="true" />
-          Données UE
-        </span>
+      {/* Trust signals — Phase 7: Authorized Authority */}
+      <div className="mt-8 pt-6 border-t border-white/5 grid grid-cols-3 gap-2">
+        <div className="flex flex-col items-center text-center gap-2 group/tip">
+          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover/tip:bg-brand/10 transition-colors">
+            <ShieldCheck className="w-3.5 h-3.5 text-text-muted group-hover/tip:text-brand" />
+          </div>
+          <span className="text-[8px] font-black uppercase tracking-widest text-text-muted group-hover/tip:text-text-primary">SSL / TLS 1.3</span>
+        </div>
+        <div className="flex flex-col items-center text-center gap-2 group/tip">
+          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover/tip:bg-brand/10 transition-colors">
+            <Lock className="w-3.5 h-3.5 text-text-muted group-hover/tip:text-brand" />
+          </div>
+          <span className="text-[8px] font-black uppercase tracking-widest text-text-muted group-hover/tip:text-text-primary">RGPD Compliance</span>
+        </div>
+        <div className="flex flex-col items-center text-center gap-2 group/tip">
+          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover/tip:bg-brand/10 transition-colors">
+            <Server className="w-3.5 h-3.5 text-text-muted group-hover/tip:text-brand" />
+          </div>
+          <span className="text-[8px] font-black uppercase tracking-widest text-text-muted group-hover/tip:text-text-primary">Data Hosting EU</span>
+        </div>
       </div>
     </div>
   )

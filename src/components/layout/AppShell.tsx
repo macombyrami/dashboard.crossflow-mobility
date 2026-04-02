@@ -10,17 +10,19 @@ import { TrafficSyncManager } from '@/components/dashboard/TrafficSyncManager'
 const Sidebar   = lazy(() => import('./Sidebar').then(m => ({ default: m.Sidebar })))
 const Header    = lazy(() => import('./Header').then(m => ({ default: m.Header })))
 const BottomNav = lazy(() => import('./BottomNav').then(m => ({ default: m.BottomNav })))
+const AIAssistantOverlay = lazy(() => import('../ai/AIAssistantOverlay').then(m => ({ default: m.AIAssistantOverlay })))
 
 // Skeleton for layout components (Minimal footprint)
 const LayoutSkeleton = () => <div className="animate-pulse bg-white/5 border border-white/10 rounded-xl" />
 
 // Pages that must NOT have the app shell (sidebar / header / bottom nav)
 const PUBLIC_PREFIXES = ['/login', '/onboarding', '/auth']
+const NO_SHELL_ROUTES = ['/', ...PUBLIC_PREFIXES]
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname   = usePathname()
   const [mounted, setMounted] = React.useState(false)
-  const isPublic   = PUBLIC_PREFIXES.some(p => pathname.startsWith(p))
+  const isPublic   = NO_SHELL_ROUTES.some(p => pathname === p || (p !== '/' && pathname.startsWith(p)))
 
   React.useEffect(() => {
     setMounted(true)
@@ -71,6 +73,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {children}
             </SwipeNavigation>
           </div>
+          
+          {/* 🧠 Proactive AI Guidance */}
+          <Suspense fallback={null}>
+            <AIAssistantOverlay />
+          </Suspense>
         </div>
 
         <Suspense fallback={<div className="h-20 w-full fixed bottom-0 bg-white/5 animate-pulse" />}>

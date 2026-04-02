@@ -224,7 +224,7 @@ export default function DashboardPage() {
       {/* KPI grid */}
       <div className="kpi-grid my-4">
         <KPICard
-          label={t('dashboard.congestion')}
+          label="Temps perdu cumulé"
           value={congPct}
           unit="%"
           delta={congDelta}           // undefined = pas d'affichage si pas encore d'historique 24h
@@ -234,10 +234,10 @@ export default function DashboardPage() {
           color={congCrit ? '#FF1744' : congWarn ? '#FF6D00' : '#00E676'}
           warning={congWarn}
           critical={congCrit}
-          sub={`Target: ${Math.round(targets.congestion_rate.warning * 100)}%`}
+          sub={`${Math.round(kpis.congestionRate * 4200)} heures perdues par jour / 100k hab.`}
         />
         <KPICard
-          label={t('dashboard.travel_time')}
+          label="Retard par trajet"
           value={kpis.avgTravelMin.toFixed(0)}
           unit="min"
           delta={travelDelta}         // undefined = pas d'affichage si pas encore d'historique 24h
@@ -246,25 +246,24 @@ export default function DashboardPage() {
           icon={Clock}
           color={travelWarn ? '#FF6D00' : '#2979FF'}
           warning={travelWarn}
-          sub="Avg trip duration"
+          sub="Impact direct sur la productivité urbaine"
         />
         <KPICard
-          label="Congestion-Pollution"
+          label="Impact Sanitaire"
           value={kpis.pollutionIndex.toFixed(1)}
           unit="/ 10"
-          // Pas de delta pollution — valeur dérivée de la congestion, pas de mesure indépendante
           inverse
           icon={Wind}
           color={pollColor}
           warning={pollWarn}
-          sub={`Indice trafic · ${pollutionLabel(kpis.pollutionIndex).label}`}
+          sub={`Exposition NO2 · ${pollutionLabel(kpis.pollutionIndex).label}`}
         />
         <KPICard
-          label={t('dashboard.active_incidents')}
+          label="Coût des Incidents"
           value={incidents.length}
           icon={AlertTriangle}
           color={incidents.length > 5 ? '#FF6D00' : '#FFD600'}
-          sub="Accidents + travaux"
+          sub={`Est. ${incidents.length * 450}€ de perte sèche / heure`}
         />
       </div>
 

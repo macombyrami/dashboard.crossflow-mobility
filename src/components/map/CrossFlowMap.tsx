@@ -190,6 +190,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   const cityNetworkRef       = useRef<string | null>(null) // Track which city's network is loaded
   const liveVehiclesRef      = useRef<TransitVehicle[]>([])
   const pulseRef             = useRef<number>(0)
+  const scanRef              = useRef<number>(0) // Phase 5: Radial Scan
   const rafRef               = useRef<number>(0)
 const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
 
@@ -394,6 +395,20 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       offset = (offset + 0.15) % 100
       if (map.getLayer(TRAFFIC_SOURCE + '-lines')) {
         map.setPaintProperty(TRAFFIC_SOURCE + '-lines', 'line-dash-offset', offset)
+      }
+
+      // 1b. Phase 5: Radial Scan & Critical Pulse
+      // Scan starts at 0 and grows to 1 then stays there
+      if (scanRef.current < 1) {
+        scanRef.current += 0.005
+        if (map.getLayer('cf-traffic-glow')) {
+           map.setPaintProperty('cf-traffic-glow', 'line-opacity', [
+             'interpolate', ['linear'], ['line-progress'],
+             scanRef.current - 0.1, 0,
+             scanRef.current, 0.8,
+             scanRef.current + 0.1, 0
+           ])
+        }
       }
 
       // 2. Pulse Animation (Vehicles + Station Alerts)
