@@ -57,7 +57,7 @@ const nextConfig: NextConfig = {
       },
       // Long-term cache for immutable static assets
       {
-        source:  '/(.*)\\.(?:js|css|woff2|png|svg|ico|webp)',
+        source:  '/(.+)\\.(js|css|woff2|png|svg|ico|webp)',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
