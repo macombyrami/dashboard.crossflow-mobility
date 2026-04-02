@@ -1,7 +1,7 @@
-import { HeroSection }    from '@/components/landing/hero-experience'
-import { FeaturesGrid }   from '@/components/landing/features-grid'
-import { ImpactMetrics }  from '@/components/landing/impact-metrics'
-import { CTAFinal }       from '@/components/landing/cta-final'
+import { HeroSection }    from './landing/hero-experience'
+import { FeaturesGrid }   from './landing/features-grid'
+import { ImpactMetrics }  from './landing/impact-metrics'
+import { CTAFinal }       from './landing/cta-final'
 
 /**
  * 🛰️ Redesigned Elite Landing Experience (One-Pager v4.0)
