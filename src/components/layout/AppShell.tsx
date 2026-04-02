@@ -30,23 +30,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // 🚀 STAFF ENGINEER: Ultimate Global Safety Net
     // Captures transient connectivity drops (Supabase resets/migrations) before they bubble up.
     // Broader detection for 'Connection closed', 'fetch failed', and 'Aborted'.
-    const handleRejection = (event: PromiseRejectionEvent) => {
-      const reason = event.reason
-      // Normalize reason to string. Some libraries throw strings, some Errors, some nested objects.
-      const msg = (reason?.message || reason?.error || reason || '').toString()
-      const transientErrors = ['Connection closed', 'fetch failed', 'Aborted', 'Load failed', 'NetworkError']
+    const handleTransientError = (errorMessage: string) => {
+      const msg = errorMessage.toLowerCase()
+      const transientPatterns = ['connection closed', 'fetch failed', 'aborted', 'load failed', 'networkerror']
       
-      if (transientErrors.some(err => msg.includes(err))) {
-        event.preventDefault()
+      if (transientPatterns.some(pat => msg.includes(pat))) {
         // Silence noise during development resets
         if (process.env.NODE_ENV === 'development') {
-           console.debug(`[AppShell] Suppressed transient network rejection: "${msg}"`)
+           console.debug(`[AppShell] Suppressed transient network rejection: "${errorMessage}"`)
         }
+        return true // Handled
+      }
+      return false
+    }
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason
+      const msg = (reason?.message || reason?.error || reason || '').toString()
+      if (handleTransientError(msg)) {
+        event.preventDefault()
+      }
+    }
+
+    const handleError = (event: ErrorEvent) => {
+      if (handleTransientError(event.message)) {
+        event.preventDefault()
       }
     }
 
     window.addEventListener('unhandledrejection', handleRejection)
-    return () => window.removeEventListener('unhandledrejection', handleRejection)
+    window.addEventListener('error', handleError)
+    
+    return () => {
+      window.removeEventListener('unhandledrejection', handleRejection)
+      window.removeEventListener('error', handleError)
+    }
   }, [])
 
   if (isPublic) {

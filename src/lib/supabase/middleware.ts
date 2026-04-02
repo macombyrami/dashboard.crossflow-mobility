@@ -9,10 +9,12 @@ export async function updateSession(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+  const pathname = request.nextUrl.pathname
+  const isPublic = pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/auth')
+  const isOnboarding = pathname.startsWith('/onboarding')
+
   if (!url || !key) {
-    // Supabase not configured — block all non-public routes
-    const pathname = request.nextUrl.pathname
-    const isPublic = pathname.startsWith('/login') || pathname.startsWith('/auth')
+    // 🛰️ STAFF ENGINEER: Supabase not configured — still allow Landing Page
     if (!isPublic) {
       const redirectUrl = request.nextUrl.clone()
       redirectUrl.pathname = '/login'
@@ -56,9 +58,7 @@ export async function updateSession(request: NextRequest) {
     return meta.onboarding_completed === true || Boolean(meta.default_city)
   }
 
-  const pathname = request.nextUrl.pathname
-  const isPublic = pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/auth')
-  const isOnboarding = pathname.startsWith('/onboarding')
+  // Logic continues using the synchronized isPublic/isOnboarding flags
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone()

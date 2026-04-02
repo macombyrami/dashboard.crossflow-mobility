@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
     // ──────────────────────────────────────────────────────────────────
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' https://vercel.live https://va.vercel-scripts.com",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' data: https://fonts.gstatic.com https://fonts.openmaptiles.org",
       "img-src 'self' blob: data: https://*.cartocdn.com https://*.tile.openstreetmap.org https://api.tomtom.com https://tile.tomtom.com",
