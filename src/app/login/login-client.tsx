@@ -1,14 +1,15 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { validateSupabaseConfig } from '@/lib/config/env'
 import { getAuthCallbackUrl } from '@/lib/utils/url'
-import { Zap, Mail, Lock, Loader2, ArrowRight, Eye, EyeOff, ShieldCheck, Server } from 'lucide-react'
+import { Zap, Mail, Lock, Loader2, ArrowRight, Eye, EyeOff, ShieldCheck, Server, AlertTriangle, Clock } from 'lucide-react'
 import appData from '@/lib/data/app.json'
 import Image from 'next/image'
 import { cn } from '@/lib/utils/cn'
+import { installAuthSessionGuard, loginCircuitBreaker } from '@/lib/supabase/authGuard'
 
 function LoginForm() {
   const [email,           setEmail]           = useState('')
@@ -17,18 +18,42 @@ function LoginForm() {
   const [showPassword,    setShowPassword]    = useState(false)
   const [loading,         setLoading]         = useState(false)
   const [isSignUp,        setIsSignUp]        = useState(false)
-  const [message,         setMessage]         = useState<{ type: 'error' | 'success'; text: string } | null>(null)
+  const [message,         setMessage]         = useState<{ type: 'error' | 'success' | 'degraded'; text: string } | null>(null)
+  const [circuitCooldown, setCircuitCooldown] = useState(0) // seconds remaining
+  const cooldownRef = useRef<NodeJS.Timeout | null>(null)
 
   const router       = useRouter()
   const searchParams = useSearchParams()
   const supabase     = createClient()
 
+  // ─── Solution 1: TOKEN_REFRESH_FAILED loop breaker ─────────────────────
   useEffect(() => {
-    const error = searchParams.get('error')
+    const cleanup = installAuthSessionGuard(supabase)
+    return cleanup
+  }, []) // eslint-disable-line
+
+  useEffect(() => {
+    const error  = searchParams.get('error')
+    const reason = searchParams.get('reason')
+
     if (error === 'auth-code-error') {
       setMessage({ type: 'error', text: 'Échec de la validation de la session. Veuillez réessayer.' })
     }
+    if (reason === 'session_expired') {
+      setMessage({ type: 'error', text: 'Votre session a expiré. Reconnectez-vous pour continuer.' })
+    }
   }, [searchParams])
+
+  // Cooldown ticker for circuit breaker UI
+  useEffect(() => {
+    if (circuitCooldown <= 0) return
+    cooldownRef.current = setInterval(() => {
+      const remaining = loginCircuitBreaker.cooldownRemaining
+      setCircuitCooldown(remaining)
+      if (remaining <= 0) clearInterval(cooldownRef.current!)
+    }, 1000)
+    return () => clearInterval(cooldownRef.current!)
+  }, [circuitCooldown])
 
   // Reset form when switching between login / signup
   useEffect(() => {
@@ -59,7 +84,19 @@ function LoginForm() {
     setLoading(true)
     setMessage(null)
 
-    // 🛰️ STAFF ENGINEER: Infrastructure Guard (Phase 2)
+    // 🛰️ Solution 2: Circuit Breaker — block retries after 2 failures
+    if (loginCircuitBreaker.isOpen) {
+      const remaining = loginCircuitBreaker.cooldownRemaining
+      setCircuitCooldown(remaining)
+      setMessage({
+        type: 'degraded',
+        text: `Service temporairement indisponible. Réessayez dans ${remaining} seconde${remaining > 1 ? 's' : ''}.`,
+      })
+      setLoading(false)
+      return
+    }
+
+    // 🛰️ Infrastructure Guard
     const { isValid, missing } = validateSupabaseConfig()
     if (!isValid) {
       setMessage({ 
@@ -90,21 +127,43 @@ function LoginForm() {
           options: { emailRedirectTo: getAuthCallbackUrl('/map') },
         })
         if (error) throw error
+        loginCircuitBreaker.reset() // Success — reset circuit
         setMessage({ type: 'success', text: 'Vérifiez votre boîte mail pour confirmer votre inscription !' })
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
+        loginCircuitBreaker.reset() // Success — reset circuit
         window.location.href = '/map'
         return
       }
     } catch (error: any) {
+      // 🛰️ Solution 2: Record failure in circuit breaker
+      const isNetworkError = error?.message?.includes('fetch') || error?.name === 'TypeError'
+      const isServerError  = error?.status >= 500 || error?.message?.includes('unavailable')
+
+      if (isNetworkError || isServerError) {
+        loginCircuitBreaker.recordFailure()
+      }
+
+      // 🛰️ Solution 3: SaaS-grade UX — differentiate backend KO from user errors
+      if (isNetworkError) {
+        setMessage({
+          type: 'degraded',
+          text: 'Service temporairement indisponible. Vérifiez votre connexion et réessayez dans quelques instants.',
+        })
+        setCircuitCooldown(loginCircuitBreaker.cooldownRemaining)
+        setLoading(false)
+        return
+      }
+
       // Humanize common Supabase error messages
       const msg: Record<string, string> = {
         'Invalid login credentials': 'Email ou mot de passe incorrect.',
         'Email not confirmed':        'Confirmez votre email avant de vous connecter.',
         'User already registered':   'Un compte existe déjà avec cet email.',
+        'Too Many Requests':         'Trop de tentatives. Patientez quelques instants.',
       }
-      setMessage({ type: 'error', text: msg[error.message] ?? error.message ?? 'Une erreur est survenue' })
+      setMessage({ type: 'error', text: msg[error.message] ?? error.message ?? 'Une erreur est survenue.' })
     } finally {
       setLoading(false)
     }
@@ -239,29 +298,54 @@ function LoginForm() {
           </div>
         )}
 
-        {/* Error / Success message */}
+        {/* Error / Success / Degraded message */}
         {message && (
           <div
             role="alert"
-            className={`text-xs p-3 rounded-lg border flex items-start gap-2 animate-scale-in ${
-              message.type === 'error'
-                ? 'bg-traffic-critical/10 border-traffic-critical/20 text-traffic-critical'
-                : 'bg-brand/10 border-brand/20 text-brand'
-            }`}
+            aria-live="assertive"
+            className={cn(
+              'text-xs p-3 rounded-lg border flex items-start gap-2.5 animate-scale-in',
+              message.type === 'error'    && 'bg-traffic-critical/10 border-traffic-critical/20 text-traffic-critical',
+              message.type === 'success'  && 'bg-brand/10 border-brand/20 text-brand',
+              message.type === 'degraded' && 'bg-amber-500/10 border-amber-500/20 text-amber-400',
+            )}
           >
-            <div className={`w-1 h-1 rounded-full mt-1.5 shrink-0 ${message.type === 'error' ? 'bg-traffic-critical' : 'bg-brand'}`} />
-            {message.text}
+            {/* Icon */}
+            {message.type === 'degraded' ? (
+              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-400" />
+            ) : (
+              <div className={cn(
+                'w-1.5 h-1.5 rounded-full mt-1.5 shrink-0',
+                message.type === 'error'   ? 'bg-traffic-critical' : 'bg-brand'
+              )} />
+            )}
+            <div className="flex-1">
+              {message.text}
+              {/* Cooldown countdown for circuit breaker */}
+              {message.type === 'degraded' && circuitCooldown > 0 && (
+                <div className="flex items-center gap-1.5 mt-2 text-amber-500/70">
+                  <Clock className="w-3 h-3" />
+                  <span className="font-mono font-bold tabular-nums">{circuitCooldown}s</span>
+                  <span>avant le prochain essai</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || loginCircuitBreaker.isOpen}
           className="w-full btn btn-primary justify-center py-3 rounded-xl mt-2 group disabled:opacity-60 disabled:cursor-not-allowed"
           aria-busy={loading}
         >
           {loading ? (
             <Loader2 className="w-4 h-4 animate-spin" aria-label="Chargement…" />
+          ) : loginCircuitBreaker.isOpen ? (
+            <>
+              <Clock className="w-4 h-4" aria-hidden="true" />
+              <span>Patienter ({circuitCooldown}s)</span>
+            </>
           ) : (
             <>
               <span>{isSignUp ? "S'inscrire" : 'Se connecter'}</span>
