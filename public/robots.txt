@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard/
+Disallow: /map/
+Disallow: /onboarding/
+Disallow: /api/
+Disallow: /auth/
+
+Sitemap: https://myaccount.crossflow-mobility.com/sitemap.xml

@@ -35,6 +35,10 @@ const nextConfig: NextConfig = {
         key:   'Strict-Transport-Security',
         value: 'max-age=63072000; includeSubDomains; preload',
       },
+      {
+        key:   'Access-Control-Allow-Origin',
+        value: 'https://myaccount.crossflow-mobility.com, http://localhost:3000',
+      },
     ]
 
     return [

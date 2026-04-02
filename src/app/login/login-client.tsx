@@ -7,6 +7,7 @@ import { getAuthCallbackUrl } from '@/lib/utils/url'
 import { Zap, Mail, Lock, Loader2, ArrowRight, Eye, EyeOff, ShieldCheck, Server } from 'lucide-react'
 import appData from '@/lib/data/app.json'
 import Image from 'next/image'
+import { cn } from '@/lib/utils/cn'
 
 function LoginForm() {
   const [email,           setEmail]           = useState('')
@@ -162,10 +163,11 @@ function LoginForm() {
               required
               autoComplete={isSignUp ? 'new-password' : 'current-password'}
               placeholder="••••••••"
-              className="w-full bg-bg-elevated border border-bg-border rounded-xl py-2.5 pl-10 pr-11 text-sm focus:outline-none focus:border-brand/50 transition-all"
+              className="w-full bg-bg-elevated border border-bg-border rounded-xl py-2.5 pl-10 pr-11 text-sm focus:outline-none focus:border-brand/50 transition-all font-mono"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               aria-required="true"
+              aria-label="Votre mot de passe"
               minLength={isSignUp ? 8 : undefined}
             />
             <button
@@ -177,8 +179,23 @@ function LoginForm() {
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
-          {isSignUp && (
-            <p className="text-[10px] text-text-muted ml-1">8 caractères minimum</p>
+          {isSignUp && password && (
+            <div className="mt-2 space-y-1">
+              <div className="flex gap-1">
+                {[1, 2, 3, 4].map((i) => (
+                  <div 
+                    key={i} 
+                    className={cn(
+                      "h-1 flex-1 rounded-full bg-white/5 transition-colors",
+                      password.length >= i * 2 ? (password.length > 10 ? "bg-brand" : "bg-orange-500") : ""
+                    )} 
+                  />
+                ))}
+              </div>
+              <p className="text-[9px] font-bold text-text-muted uppercase tracking-tight">
+                Force : {password.length > 10 ? "Excellent" : password.length > 7 ? "Acceptable" : "Trop court"}
+              </p>
+            </div>
           )}
         </div>
 

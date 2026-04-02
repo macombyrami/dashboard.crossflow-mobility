@@ -57,7 +57,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   const pathname = request.nextUrl.pathname
-  const isPublic = pathname.startsWith('/login') || pathname.startsWith('/auth')
+  const isPublic = pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/auth')
   const isOnboarding = pathname.startsWith('/onboarding')
 
   if (!user && !isPublic) {

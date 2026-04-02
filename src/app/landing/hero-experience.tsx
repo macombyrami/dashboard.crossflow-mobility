@@ -54,6 +54,8 @@ export function HeroExperience() {
         >
           <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse shadow-glow" />
           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted italic">Centre Opérationnel Live — Paris IDF</span>
+          <div className="w-px h-3 bg-white/10 mx-1" />
+          <span className="text-[9px] font-bold text-brand uppercase tracking-tighter">Bêta Fermée : 8 places restantes</span>
         </motion.div>
 
         {/* H1 — The Power Projection */}
@@ -86,9 +88,9 @@ export function HeroExperience() {
         >
           <Link href="/map" className="group relative">
             <div className="absolute inset-0 bg-brand blur-2xl opacity-20 group-hover:opacity-40 transition-opacity" />
-            <div className="relative btn btn-primary px-10 py-5 rounded-2xl text-lg flex items-center gap-3 active:scale-95 transition-transform">
-              <span>Optimiser le Réseau Urbain</span>
-              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+            <div className="relative btn btn-primary px-10 py-5 rounded-2xl text-lg flex items-center gap-3 active:scale-95 transition-transform overflow-hidden shadow-[0_0_40px_rgba(34,197,94,0.15)]">
+              <span className="relative z-10">Optimiser le Réseau Urbain</span>
+              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1 relative z-10" />
             </div>
           </Link>
           
@@ -135,11 +137,13 @@ export function HeroExperience() {
           <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em]">
             <ShieldCheck className="w-4 h-4" /> Certifié Smart City EU
           </span>
+          <div className="w-1 h-1 rounded-full bg-white/10" />
           <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em]">
-            <BarChart3 className="w-4 h-4" /> ISO-9001 Decision Ready
+            <BarChart3 className="w-4 h-4" /> 1.2M de trajets analysés / jour
           </span>
+          <div className="w-1 h-1 rounded-full bg-white/10" />
           <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em]">
-            <Zap className="w-4 h-4" /> Low Latency Pipeline
+            <Zap className="w-4 h-4" /> Latence &lt; 200ms
           </span>
         </motion.div>
       </main>
