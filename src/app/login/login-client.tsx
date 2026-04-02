@@ -410,10 +410,19 @@ export default function LoginPageClient() {
         Aller au formulaire
       </a>
 
-      {/* Top-Left Logo */}
-      <div className="absolute top-8 left-8 flex items-center gap-3 animate-fade-in pointer-events-none select-none z-40" aria-hidden="true">
-        <Image src="/logo-crossflow.png" alt="" width={32} height={32} className="w-8 h-8 object-contain" />
-        <span className="text-sm font-bold tracking-tight text-text-primary uppercase opacity-90">{appData.name}</span>
+      {/* Top-Left Logo — brand name is meaningful, image is decorative */}
+      <div className="absolute top-8 left-8 flex items-center gap-3 animate-fade-in pointer-events-none select-none z-40">
+        <Image
+          src="/logo-crossflow.png"
+          alt=""               
+          aria-hidden="true"  
+          width={32}
+          height={32}
+          className="w-8 h-8 object-contain"
+        />
+        <span className="text-sm font-bold tracking-tight text-text-primary uppercase opacity-90">
+          {appData.name}
+        </span>
       </div>
 
       {/* Splash Animation Overlay */}

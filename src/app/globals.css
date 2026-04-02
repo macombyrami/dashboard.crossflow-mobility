@@ -187,7 +187,7 @@ body {
   cursor: pointer;
   transition: all 0.15s ease;
   border: none;
-  outline: none;
+  /* outline: none intentionally removed — focus ring is handled by :focus-visible below */
 }
 
 .btn:active { transform: scale(0.97); }
@@ -526,4 +526,156 @@ body {
   .text-white         { color: #000 !important; }
 
   @page { margin: 1.5cm; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ♿ ACCESSIBILITY — WCAG 2.1 AA Compliance Layer
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Focus Visible Ring — WCAG 2.4.7 (Focus Visible)
+ *
+ * Rules:
+ * - :focus-visible  → only shows ring when navigating by keyboard (not mouse click)
+ * - :focus:not(:focus-visible) → hides ring on mouse/touch interactions (clean UX)
+ * - Applies to ALL interactive elements: buttons, links, inputs, selects, textareas
+ *
+ * Color: #00FF9D (brand Signal Green) — contrasts against both dark and glass backgrounds
+ * Offset: 3px — prevents ring from merging with element border
+ */
+:focus-visible {
+  outline: 2px solid #00FF9D;
+  outline-offset: 3px;
+  border-radius: 4px; /* Slightly soften angular focus rings */
+}
+
+/* Hide ring on mouse/touch — only show for keyboard navigation */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/*
+ * High-contrast mode override (Windows/macOS forced colors)
+ * Ensures focus ring remains visible in high-contrast system themes
+ */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 3px solid ButtonText;
+    outline-offset: 3px;
+  }
+}
+
+/*
+ * Input fields — dedicated focus style matching the glass design system
+ * Overrides the default browser blue ring with the brand palette
+ */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #00FF9D;
+  outline-offset: 0;
+  border-color: #00FF9D !important;
+  box-shadow: 0 0 0 4px rgba(0, 255, 157, 0.12);
+}
+
+/*
+ * .btn-prestige uses Tailwind's outline-none — override it for keyboard users
+ * without breaking the mouse UX
+ */
+.btn-prestige:focus-visible {
+  outline: 2px solid #00FF9D !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 4px rgba(0, 255, 157, 0.15), 0 0 50px -5px rgba(0, 255, 157, 0.5) !important;
+}
+
+/* btn-icon: expand touch target to WCAG 44×44px minimum */
+.btn-icon {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/*
+ * Skip Link — WCAG 2.4.1 (Bypass Blocks)
+ * Visually hidden until focused, then appears at top-left for keyboard users
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   📱 RESPONSIVE SAFETY — Overflow & Layout Shift Prevention
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Responsive Images & Media — WCAG 1.4.10 (Reflow)
+ * Prevents images from causing horizontal scroll on narrow viewports
+ */
+img,
+video,
+canvas,
+svg,
+iframe {
+  max-width: 100%;
+  height: auto;
+  display: block; /* Eliminates the default inline bottom gap (layout shift source) */
+}
+
+/*
+ * Global overflow guard — prevents any single wide element from breaking layout
+ * Only hides overflow-x; overflow-y remains scroll for normal page flow
+ */
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/*
+ * Prevent fixed-width elements from causing horizontal scroll
+ * Targets common offenders: pre-formatted code and wide tables
+ */
+pre,
+table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   🎛 REDUCED MOTION — WCAG 2.3.3 (Animation from Interactions)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Respect user's "Reduce Motion" system preference
+ * Affects all CSS transitions and animations site-wide
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Keep loading spinners functional but reduce to minimum */
+  .animate-spin {
+    animation: none !important;
+    opacity: 0.7;
+  }
+
+  /* Disable radar sweep and pulse animations */
+  .radar-sweep,
+  .animate-pulse-slow,
+  .animate-live-dot {
+    animation: none !important;
+  }
 }
