@@ -16,8 +16,10 @@ export function TrafficSyncManager() {
   const persist       = useTrafficStore(s => s.persistSnapshot)
   const setIsSyncing  = useTrafficStore(s => s.setIsSyncing)
   
-  const lastSyncRef   = useRef<number>(0)
-  const SYNC_INTERVAL = 5 * 60 * 1000 // 5 minutes standard for analytics persistence
+  const lastSyncRef     = useRef<number>(0)
+  const lastScoreRef    = useRef<number>(0)
+  const SYNC_INTERVAL   = 5 * 60 * 1000 // 5 minutes 
+  const DIRTY_THRESHOLD = 0.02 // 2% change required to justify DB Write
 
   useEffect(() => {
     if (!snapshot || isSyncing) return
@@ -28,22 +30,36 @@ export function TrafficSyncManager() {
     async function sync() {
       setIsSyncing(true)
       try {
+        const totalSegments = snapshot!.segments.length
+        const avgCongestion = snapshot!.segments.reduce((acc, s) => acc + s.congestionScore, 0) / totalSegments
+        
+        // 🧠 DIRTY CHECK: Is this significantly different from last sync?
+        // Prevents write-amplification on stable traffic states.
+        const delta = Math.abs(avgCongestion - lastScoreRef.current)
+        if (delta < DIRTY_THRESHOLD && lastSyncRef.current !== 0) {
+          console.debug(`[SyncManager] Change too small (${(delta*100).toFixed(2)}%). Skipping DB write to save IOPS.`)
+          lastSyncRef.current = now
+          return
+        }
+
         const stats = {
-          avg_congestion:  snapshot!.segments.reduce((acc, s) => acc + s.congestionScore, 0) / snapshot!.segments.length,
-          incident_count:  0, // To be linked to incident store
-          active_segments: snapshot!.segments.length
+          avg_congestion:  avgCongestion,
+          incident_count:  0, 
+          active_segments: totalSegments
         }
 
         await persist({
           city_id:      city.id,
-          provider:     'tomtom', // Fallback context
+          provider:     'tomtom', 
           fetched_at:   new Date().toISOString(),
           stats,
-          raw_segments: snapshot!.segments, // Compressed by api wrapper
+          // 📦 PAYLOAD COMPRESSION: Only store ID and score to minimize JSONB size
+          raw_segments: snapshot!.segments.map(s => ({ i: s.id, c: s.congestionScore })), 
           bbox:         city.bbox
         })
         
-        lastSyncRef.current = Date.now()
+        lastSyncRef.current = now
+        lastScoreRef.current = avgCongestion
       } catch (err) {
         console.error('[SyncManager] Persistence failed:', err)
       } finally {
@@ -52,7 +68,7 @@ export function TrafficSyncManager() {
     }
 
     sync()
-  }, [snapshot, city, isSyncing, persist, setIsSyncing])
+  }, [snapshot, city.id, city.bbox, isSyncing, persist, setIsSyncing])
 
   return null // Headless orchestrator
 }

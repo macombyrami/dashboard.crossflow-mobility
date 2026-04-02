@@ -1,74 +1,80 @@
 'use client'
-/**
- * UserCityProvider
- * Reads the authenticated user's `default_city` from Supabase metadata
- * and locks the map to that city. Also listens for auth state changes
- * (sign-in / sign-out) to update or clear the lock.
- */
+
 import { useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useMapStore } from '@/store/mapStore'
 import { CITIES } from '@/config/cities.config'
+import { useAuthStore } from '@/store/useAuthStore'
 
+/**
+ * 🛰️ UserCityProvider (Staff Engineer Optimized)
+ * 
+ * Logic:
+ * 1. Checks useAuthStore for an existing session.
+ * 2. If not initialized, calls Supabase ONCE and caches the result.
+ * 3. Syncs auth state changes to the global store.
+ * 4. Redirects to /login if a protected route is accessed without a session.
+ */
 export function UserCityProvider({ children }: { children: React.ReactNode }) {
-  const setCity       = useMapStore(s => s.setCity)
-  const setLockedCity = useMapStore(s => s.setLockedCity)
+  const setCity         = useMapStore(s => s.setCity)
+  const setLockedCity   = useMapStore(s => s.setLockedCity)
+  
+  const user            = useAuthStore(s => s.user)
+  const isInitialized   = useAuthStore(s => s.isInitialized)
+  const setAuth         = useAuthStore(s => s.setAuth)
 
   useEffect(() => {
     const supabase = createClient()
 
-    const applyUserCity = (user: any) => {
-      if (!user) {
-        // Signed out — release the lock
+    const applyUserCity = (u: any) => {
+      if (!u) {
         setLockedCity(null)
         return
       }
-      const cityId = user.user_metadata?.default_city as string | undefined
-      if (!cityId) return                          // no city chosen yet (mid-onboarding)
+      const cityId = u.user_metadata?.default_city as string | undefined
+      if (!cityId) return
       const city = CITIES.find(c => c.id === cityId)
       if (!city) return
       setCity(city)
       setLockedCity(cityId)
     }
 
-    // Initial load - Fetch user and redirect if missing on protected routes
-    supabase.auth.getUser()
-      .then(({ data }) => {
-        applyUserCity(data.user)
-        const isProtected = !['/login', '/onboarding', '/auth', '/'].some(p => window.location.pathname.startsWith(p))
-        if (!data.user && isProtected) {
-          window.location.href = '/login'
-        }
-      })
-      .catch(err => {
-        if (err.message?.includes('Connection closed')) {
-           console.warn('[UserCityProvider] Supabase connection dropped during migration/reset. Retrying...')
-        } else {
-           console.error('[UserCityProvider] Auth fetch failed:', err)
-        }
-      })
+    // ⚡ PREVENT REDUNDANT FETCH: If already initialized, we trust the store.
+    if (!isInitialized) {
+      supabase.auth.getUser()
+        .then(({ data }) => {
+          setAuth(data.user, null)
+          applyUserCity(data.user)
 
-    // React to sign-in / sign-out events
+          const isProtected = !['/login', '/onboarding', '/auth', '/'].some(p => window.location.pathname.startsWith(p))
+          if (!data.user && isProtected) {
+            window.location.href = '/login'
+          }
+        })
+        .catch(err => {
+          console.error('[UserCityProvider] Auth fetch failed:', err)
+          setAuth(null, null)
+        })
+    }
+
+    // React to sign-in / sign-out events (Updates Global Store)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      applyUserCity(session?.user ?? null)
-      if (!session && !['/login', '/onboarding', '/auth', '/'].some(p => window.location.pathname.startsWith(p))) {
+      const newUser = session?.user ?? null
+      setAuth(newUser, session)
+      applyUserCity(newUser)
+
+      const isProtected = !['/login', '/onboarding', '/auth', '/'].some(p => window.location.pathname.startsWith(p))
+      if (!session && isProtected) {
         window.location.href = '/login'
       }
     })
 
     return () => {
-      // 🚀 Staff Engineer: Stable cleanup for auth listeners.
-      // Defends against connection closed / disconnected states during unmounts.
       try {
-        if (subscription) {
-          subscription.unsubscribe()
-        }
-      } catch (err) {
-        // Silent swallow for cleanup failures during connection reset
-        console.debug('[UserCityProvider] Auth cleanup suppressed due to disconnected state.')
-      }
+        if (subscription) subscription.unsubscribe()
+      } catch (e) {}
     }
-  }, [setCity, setLockedCity])
+  }, [isInitialized, setAuth, setCity, setLockedCity])
 
   return <>{children}</>
 }

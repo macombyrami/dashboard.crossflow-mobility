@@ -1,31 +1,44 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { ENV, validateSupabaseConfig } from '@/lib/config/env'
 
+/**
+ * 🚀 Fix 3: Resilient Session Handler (SaaS Standard)
+ * 
+ * Logic Flow:
+ * 1. Validate environment configuration.
+ * 2. If invalid, inject 'X-Supabase-Misconfigured' header and return NextResponse.next().
+ * 3. Prevents infinite loop by allowing the route to resolve, then showing UI diagnostic.
+ */
 export async function updateSession(request: NextRequest) {
+  const { isValid, missing } = validateSupabaseConfig()
+  const pathname = request.nextUrl.pathname
+  const isPublic = pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/auth') || pathname === '/robots.txt' || pathname === '/sitemap.xml'
+  
+  if (!isValid) {
+    if (isPublic) return NextResponse.next({ request })
+
+    // 🛰️ STAFF ENGINEER: Diagnostic Fallback (Fix 3)
+    // Instead of redirecting back to /login (The Loop), we resolve the request
+    // but signal the UI that the backend is non-functional.
+    const response = NextResponse.next({ request })
+    response.headers.set('X-Supabase-Misconfigured', missing.join(','))
+    
+    // Also set a temporary cookie for client-side detection if needed
+    response.cookies.set('sb_config_error', 'true', { maxAge: 60 })
+    
+    return response
+  }
+
+  // --- Normal Auth Flow ---
+
   let supabaseResponse = NextResponse.next({
     request,
   })
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  const pathname = request.nextUrl.pathname
-  const isPublic = pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/auth') || pathname === '/robots.txt' || pathname === '/sitemap.xml'
-  const isOnboarding = pathname.startsWith('/onboarding')
-
-  if (!url || !key) {
-    // 🛰️ STAFF ENGINEER: Supabase not configured — still allow Landing Page
-    if (!isPublic) {
-      const redirectUrl = request.nextUrl.clone()
-      redirectUrl.pathname = '/login'
-      return NextResponse.redirect(redirectUrl)
-    }
-    return supabaseResponse
-  }
-
   const supabase = createServerClient(
-    url,
-    key,
+    ENV.SUPABASE_URL,
+    ENV.SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() {
@@ -44,48 +57,41 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // ⚡ STAFF ENGINEER PERFORMANCE: Skip session refresh for Public Entry Points
-  // This avoids expensive network calls and fixes 504 Middleware Timeouts.
+  // ⚡ Performance Optimized Skip for Public Pages
   if (isPublic) {
     return supabaseResponse
   }
 
-  // Refreshing the auth token (only for protected routes)
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // An account is considered onboarded if:
-  // - the explicit flag is set, OR
-  // - it already has a default_city (account predates onboarding feature)
+  // Onboarding Logic (Redundant check but good for safety)
   function isOnboardingDone(u: typeof user): boolean {
     if (!u) return false
     const meta = u.user_metadata ?? {}
     return meta.onboarding_completed === true || Boolean(meta.default_city)
   }
 
-  // Logic continues using the synchronized isPublic/isOnboarding flags
-
-  if (!user && !isPublic) {
+  // Redirect Logic
+  if (!user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  if (user && isPublic) {
-    const needsOnboarding = !isOnboardingDone(user)
+  // If onboarded, don't stay in onboarding flow
+  if (user && pathname.startsWith('/onboarding') && isOnboardingDone(user)) {
     const url = request.nextUrl.clone()
-    url.pathname = needsOnboarding ? '/onboarding' : '/map'
+    url.pathname = '/map'
     return NextResponse.redirect(url)
   }
 
-  // Authenticated user not yet onboarded → force onboarding (only for brand-new accounts)
-  if (user && !isOnboarding && !isPublic) {
-    if (!isOnboardingDone(user)) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/onboarding'
-      return NextResponse.redirect(url)
-    }
+  // If not onboarded, force onboarding
+  if (user && !pathname.startsWith('/onboarding') && !isOnboardingDone(user)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/onboarding'
+    return NextResponse.redirect(url)
   }
 
   return supabaseResponse

@@ -15,6 +15,7 @@ import { useMapStore } from '@/store/mapStore'
 import { useUIStore } from '@/store/uiStore'
 import navGroups from '@/lib/data/navigation.json'
 import appData from '@/lib/data/app.json'
+import { useAuthStore } from '@/store/useAuthStore'
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Map, LayoutDashboard, TrendingUp, Activity,
@@ -24,15 +25,15 @@ const ICON_MAP: Record<string, LucideIcon> = {
 export function Sidebar() {
   const pathname    = usePathname()
   const router      = useRouter()
-  const [user, setUser]         = useState<any>(null)
+  
+  // 🛰️ STAFF ENGINEER: Use Global Session Cache
+  const user           = useAuthStore(s => s.user)
+  const signOutStore   = useAuthStore(s => s.signOut)
+
   const [isPending, startTransition] = useTransition()
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
   const [confirmSignOut, setConfirmSignOut] = useState(false)
   const supabase = createClient()
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
-  }, [supabase])
 
   const setMode = useMapStore(s => s.setMode)
   const { isSidebarOpen, setSidebarOpen } = useUIStore()
@@ -65,7 +66,11 @@ export function Sidebar() {
       setTimeout(() => setConfirmSignOut(false), 3000)
       return
     }
+    
+    // 🛰️ STAFF ENGINEER: Concurrent SignOut Cleanup
     await supabase.auth.signOut()
+    signOutStore()
+    
     router.push('/login')
     router.refresh()
   }
@@ -183,7 +188,7 @@ export function Sidebar() {
                   OPERATOR
                 </div>
                 <div className="text-[9px] font-bold text-text-muted truncate lowercase tracking-tight opacity-60">
-                   {user?.email?.split('@')[0]}@idf.gov
+                   {user?.email?.split('@')[0] || 'GUEST'}@idf.gov
                 </div>
              </div>
           </div>

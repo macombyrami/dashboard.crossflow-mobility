@@ -5,6 +5,7 @@ import { UserCityProvider } from '@/components/auth/UserCityProvider'
 import { SwipeNavigation }   from './SwipeNavigation'
 import { WeatherProvider }   from '@/components/providers/WeatherProvider'
 import { TrafficSyncManager } from '@/components/dashboard/TrafficSyncManager'
+import { ConfigGuard }      from '@/components/auth/ConfigGuard'
 
 // 🚀 STAFF ENGINEER PERFORMANCE: Lazy-load heavy chrome components
 const Sidebar   = lazy(() => import('./Sidebar').then(m => ({ default: m.Sidebar })))
@@ -94,35 +95,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         Aller au contenu principal
       </a>
 
-      <UserCityProvider>
-        <WeatherProvider />
-        <TrafficSyncManager />
-        
-        <Suspense fallback={<LayoutSkeleton />}>
-          <Sidebar />
-        </Suspense>
-
-        <div className="main-content relative pt-safe">
-          <Suspense fallback={<div className="h-16 w-full bg-white/5 animate-pulse" />}>
-            <Header />
-          </Suspense>
-
-          <div className="flex-1 overflow-hidden relative flex flex-col min-h-0 z-0 pb-safe">
-            <SwipeNavigation>
-              {children}
-            </SwipeNavigation>
-          </div>
+      <ConfigGuard>
+        <UserCityProvider>
+          <WeatherProvider />
+          <TrafficSyncManager />
           
-          {/* 🧠 Proactive AI Guidance */}
-          <Suspense fallback={null}>
-            <AIAssistantOverlay />
+          <Suspense fallback={<LayoutSkeleton />}>
+            <Sidebar />
           </Suspense>
-        </div>
 
-        <Suspense fallback={<div className="h-20 w-full fixed bottom-0 bg-white/5 animate-pulse" />}>
-          <BottomNav />
-        </Suspense>
-      </UserCityProvider>
+          <div className="main-content relative pt-safe">
+            <Suspense fallback={<div className="h-16 w-full bg-white/5 animate-pulse" />}>
+              <Header />
+            </Suspense>
+
+            <div className="flex-1 overflow-hidden relative flex flex-col min-h-0 z-0 pb-safe">
+              <SwipeNavigation>
+                {children}
+              </SwipeNavigation>
+            </div>
+            
+            {/* 🧠 Proactive AI Guidance */}
+            <Suspense fallback={null}>
+              <AIAssistantOverlay />
+            </Suspense>
+          </div>
+
+          <Suspense fallback={<div className="h-20 w-full fixed bottom-0 bg-white/5 animate-pulse" />}>
+            <BottomNav />
+          </Suspense>
+        </UserCityProvider>
+      </ConfigGuard>
     </div>
   )
 }
