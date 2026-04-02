@@ -11,6 +11,10 @@ interface SimulationStore {
   magnitude:       number // 0.3–2.0, user-defined intensity
   timeWindowStart: number
   timeWindowEnd:   number
+  
+  // Engine lifecycle status
+  status: 'idle' | 'initializing' | 'ready' | 'error'
+  lastError: string | null
 
   setScenarioType:    (t: ScenarioType) => void
   setScenarioName:    (n: string) => void
@@ -39,6 +43,8 @@ interface SimulationStore {
   backendOnline: boolean
   setGraphLoaded: (l: boolean) => void
   setBackendOnline:(o: boolean) => void
+  setEngineStatus: (s: 'idle' | 'initializing' | 'ready' | 'error') => void
+  setLastError: (err: string | null) => void
 
   // Event location picker (map click to place simulation zone)
   eventLocation:         { lat: number; lng: number } | null
@@ -57,6 +63,8 @@ export const useSimulationStore = create<SimulationStore>()(
       magnitude:       1.0,
       timeWindowStart: 8,
       timeWindowEnd:   10,
+      status:          'idle',
+      lastError:       null,
 
       setScenarioType:  (t: ScenarioType) => {
         const cfg = platformConfig.simulation.scenarioConfig[t]
@@ -96,6 +104,8 @@ export const useSimulationStore = create<SimulationStore>()(
       backendOnline: false,
       setGraphLoaded: (l: boolean) => set({ graphLoaded: l }),
       setBackendOnline:(o: boolean) => set({ backendOnline: o }),
+      setEngineStatus: (s) => set({ status: s }),
+      setLastError: (err) => set({ lastError: err }),
 
       eventLocation:        null,
       locationPickerActive: false,

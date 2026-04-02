@@ -6,6 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useSimulationStore } from '@/store/simulationStore'
+import { simulationService } from '@/lib/services/SimulationService'
 import { platformConfig } from '@/config/platform.config'
 import { congestionColor, scoreToCongestionLevel } from '@/lib/utils/congestion'
 import { cn } from '@/lib/utils/cn'
@@ -1871,6 +1872,56 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
 
     return removeIdfLayer
   }, [currentResult, mapLoaded]) // eslint-disable-line
+
+  // ─── Predictive Backend Sync (Affected roads + Events) ──────────────
+
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return
+    const map = mapRef.current
+
+    if (!currentResult || !currentResult.predictive) {
+      const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
+      const affSrc = map.getSource(PREDICTIVE_AFFECTED_SOURCE) as maplibregl.GeoJSONSource
+      const evtSrc = map.getSource(PREDICTIVE_EVENTS_SOURCE) as maplibregl.GeoJSONSource
+      if (affSrc) affSrc.setData(empty)
+      if (evtSrc) evtSrc.setData(empty)
+      return
+    }
+
+    // Fetch and sync affected edges (real OSM segments from backend)
+    simulationService.getAffectedEdges().then(geojson => {
+      const src = map.getSource(PREDICTIVE_AFFECTED_SOURCE) as maplibregl.GeoJSONSource
+      if (src && geojson) src.setData(geojson)
+    })
+
+    // Fetch and sync active events (labels + icons)
+    simulationService.getEvents().then(geojson => {
+      const src = map.getSource(PREDICTIVE_EVENTS_SOURCE) as maplibregl.GeoJSONSource
+      if (src && geojson) src.setData(geojson)
+    })
+  }, [currentResult, mapLoaded])
+
+  // ─── Simulation Click Location ──────────────────────────────────────
+
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return
+    const map = mapRef.current
+    const loc = useSimulationStore.getState().eventLocation
+
+    const src = map.getSource(SIM_LOCATION_SOURCE) as maplibregl.GeoJSONSource
+    if (!src) return
+
+    if (!loc) {
+      src.setData({ type: 'FeatureCollection', features: [] })
+      return
+    }
+
+    src.setData({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [loc.lng, loc.lat] },
+      properties: {}
+    })
+  }, [useSimulationStore.getState().eventLocation, mapLoaded])
 
   // ─── Layer visibility ─────────────────────────────────────────────────
 

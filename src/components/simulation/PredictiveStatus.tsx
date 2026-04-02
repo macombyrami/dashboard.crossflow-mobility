@@ -1,129 +1,87 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { Server, CheckCircle, XCircle, RefreshCw, Map, Activity } from 'lucide-react'
+import { useEffect } from 'react'
+import { Server, CheckCircle, XCircle, RefreshCw, Map, Activity, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { useMapStore } from '@/store/mapStore'
 import { useSimulationStore } from '@/store/simulationStore'
-
-
-
-
-interface BackendHealth {
-  online: boolean
-  version?: string
-  graph_loaded?: boolean
-  node_count?: number
-  edge_count?: number
-}
+import { simulationService } from '@/lib/services/SimulationService'
 
 export function PredictiveStatus() {
   const city = useMapStore((s: any) => s.city)
-  const { setGraphLoaded, setBackendOnline } = useSimulationStore()
+  const { status, graphLoaded, backendOnline, lastError } = useSimulationStore()
 
-  const [health,       setHealth]       = useState<BackendHealth | null>(null)
-  const [loading,      setLoading]      = useState(true)
-  const [graphLoading, setGraphLoading] = useState(false)
-  const [loadError,    setLoadError]    = useState<string | null>(null)
-
+  const loading = status === 'initializing'
 
   const check = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch('/api/predictive/health')
-      const data: BackendHealth = await res.json()
-      setHealth(data)
-      setBackendOnline(data.online)
-      if (data.graph_loaded) setGraphLoaded(true)
-      return data
-    } catch {
-      setHealth({ online: false })
-      setBackendOnline(false)
-    } finally {
-      setLoading(false)
-    }
-
+    simulationService.initEngine(city)
   }
-
-  const loadGraph = async () => {
-    setGraphLoading(true)
-    setLoadError(null)
-    // OSMnx needs the full city name, e.g. "Paris, France"
-    const cityName = `${city.name}, ${city.country}`
-    try {
-      const res = await fetch(
-        `/api/predictive/graph/load?city=${encodeURIComponent(cityName)}`,
-        { method: 'POST', signal: AbortSignal.timeout(180_000) }, // 3 min — large cities can be slow
-      )
-      if (!res.ok) {
-        const errText = await res.text().catch(() => res.statusText)
-        const msg = `Erreur ${res.status} : ${errText.slice(0, 120)}`
-        setLoadError(msg)
-        console.error('[PredictiveStatus] loadGraph failed:', msg)
-      } else {
-        // Re-check health after a short delay to update node/edge counts
-        setTimeout(check, 1500)
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Timeout ou réseau indisponible'
-      setLoadError(msg.slice(0, 120))
-      console.error('[PredictiveStatus] loadGraph error:', err)
-    } finally {
-      setGraphLoading(false)
-    }
-  }
-
 
   useEffect(() => {
-    check().then(data => {
-      // Auto-load graph if backend is online but graph not yet loaded
-      if (data?.online && !data?.graph_loaded) {
-        loadGraph()
-      }
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    // Only auto-init if not already online/loaded for this city
+    if (city.name === 'Gennevilliers' && (!backendOnline || !graphLoaded)) {
+      simulationService.initEngine(city)
+    }
+  }, [city.name, backendOnline, graphLoaded, city])
 
-  if (!health && loading) return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-surface border border-bg-border">
-      <RefreshCw className="w-3.5 h-3.5 text-text-muted animate-spin" />
-      <span className="text-xs text-text-muted">Connexion backend…</span>
-    </div>
-  )
+  if (status === 'idle' && !backendOnline) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-surface border border-bg-border">
+        <Loader2 className="w-3.5 h-3.5 text-text-muted animate-spin" />
+        <span className="text-xs text-text-muted">Connexion backend…</span>
+      </div>
+    )
+  }
 
-  if (!health?.online) return (
-    <div className="rounded-xl border border-bg-border bg-bg-surface p-3 space-y-2">
-      <div className="flex items-center gap-2">
-        <XCircle className="w-4 h-4 text-[#FF1744]" />
-        <span className="text-xs font-semibold text-[#FF1744]">Backend hors-ligne</span>
+  if (!backendOnline) {
+    return (
+      <div className="rounded-xl border border-bg-border bg-bg-surface p-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <XCircle className="w-4 h-4 text-[#FF1744]" />
+          <span className="text-xs font-semibold text-[#FF1744]">Backend hors-ligne</span>
+        </div>
+        <p className="text-[10px] text-text-muted leading-relaxed">
+          Le moteur prédictif Python (FastAPI) n'est pas détecté au démarrage.
+        </p>
+        <div className="bg-bg-elevated rounded-lg p-2 font-mono text-[10px] text-text-muted">
+          <div>cd crossflow-mobility-predictive-main</div>
+          <div>uvicorn backend.main:app --port 8000</div>
+        </div>
+        <button
+          onClick={check}
+          className="w-full text-xs text-brand border border-brand/20 rounded-lg py-1.5 hover:bg-brand/5 transition-colors cursor-pointer"
+        >
+          Réessayer la connexion
+        </button>
       </div>
-      <p className="text-[10px] text-text-muted leading-relaxed">
-        Le moteur prédictif Python (FastAPI) n'est pas démarré.
-      </p>
-      <div className="bg-bg-elevated rounded-lg p-2 font-mono text-[10px] text-text-muted">
-        <div>cd crossflow-mobility-predictive-main</div>
-        <div>uvicorn backend.main:app --port 8000</div>
-      </div>
-      <button
-        onClick={check}
-        className="w-full text-xs text-brand border border-brand/20 rounded-lg py-1.5 hover:bg-brand/5 transition-colors"
-      >
-        Réessayer
-      </button>
-    </div>
-  )
+    )
+  }
 
   return (
-    <div className="rounded-xl border border-[rgba(0,230,118,0.25)] bg-[rgba(0,230,118,0.06)] p-3 space-y-3">
+    <div className={cn(
+      "rounded-xl border p-3 space-y-3 transition-all",
+      graphLoaded 
+        ? "border-[rgba(0,230,118,0.25)] bg-[rgba(0,230,118,0.06)]" 
+        : "border-orange-500/20 bg-orange-500/5"
+    )}>
       {/* Status */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <CheckCircle className="w-4 h-4 text-brand-green" />
-          <span className="text-xs font-semibold text-brand-green">Backend connecté</span>
+          {graphLoaded ? (
+            <CheckCircle className="w-4 h-4 text-brand-green" />
+          ) : (
+            <Activity className="w-4 h-4 text-orange-400 animate-pulse" />
+          )}
+          <span className={cn(
+            "text-xs font-semibold",
+            graphLoaded ? "text-brand-green" : "text-orange-400"
+          )}>
+            {graphLoaded ? 'Moteur Prédictif Connecté' : 'Initialisation Graphe'}
+          </span>
         </div>
         <button
           onClick={check}
           disabled={loading}
-          className="p-1 rounded hover:bg-brand-green/10 transition-colors"
+          className="p-1 rounded hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-50"
         >
           <RefreshCw className={cn('w-3 h-3 text-text-muted', loading && 'animate-spin')} />
         </button>
@@ -133,57 +91,39 @@ export function PredictiveStatus() {
       <div className="grid grid-cols-2 gap-2">
         <StatTile
           icon={<Server className="w-3 h-3" />}
-          label="API"
-          value={`v${health.version ?? '1.0.0'}`}
-          color="text-brand-green"
+          label="API Status"
+          value={backendOnline ? 'Online' : 'Offline'}
+          color={backendOnline ? 'text-brand-green' : 'text-red-400'}
         />
         <StatTile
           icon={<Map className="w-3 h-3" />}
-          label="Graphe"
-          value={health.graph_loaded ? 'Chargé' : 'Non chargé'}
-          color={health.graph_loaded ? 'text-brand-green' : 'text-[#FFB300]'}
+          label="Graphe OSM"
+          value={graphLoaded ? 'Chargé' : 'Non chargé'}
+          color={graphLoaded ? 'text-brand-green' : 'text-orange-400'}
         />
-        {health.node_count !== undefined && (
-          <StatTile
-            icon={<Activity className="w-3 h-3" />}
-            label="Nœuds"
-            value={health.node_count.toLocaleString('fr-FR')}
-            color="text-text-primary"
-          />
-        )}
-        {health.edge_count !== undefined && (
-          <StatTile
-            icon={<Activity className="w-3 h-3" />}
-            label="Segments"
-            value={health.edge_count.toLocaleString('fr-FR')}
-            color="text-text-primary"
-          />
-        )}
       </div>
 
       {/* Error message */}
-      {loadError && (
+      {lastError && (
         <div className="rounded-lg bg-[rgba(255,23,68,0.08)] border border-[rgba(255,23,68,0.2)] px-3 py-2 text-[10px] text-[#FF1744] leading-relaxed">
-          {loadError}
+          {lastError}
         </div>
       )}
 
-      {/* Load graph button */}
-      {!health.graph_loaded && (
+      {/* Action button if not loaded */}
+      {!graphLoaded && (
         <button
-          onClick={loadGraph}
-          disabled={graphLoading}
-          className="w-full text-xs bg-brand-green/10 text-brand-green border border-brand-green/30 rounded-lg py-2 hover:bg-brand-green/20 transition-colors font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60"
+          onClick={check}
+          disabled={loading}
+          className="w-full text-xs bg-orange-500/10 text-orange-400 border border-orange-500/30 rounded-lg py-2 hover:bg-orange-500/20 transition-colors font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60 cursor-pointer"
         >
-          {graphLoading ? (
+          {loading ? (
             <>
               <RefreshCw className="w-3 h-3 animate-spin" />
               Chargement OSM — {city.name}…
             </>
-          ) : loadError ? (
-            'Réessayer le chargement'
           ) : (
-            `Charger le graphe OSM — ${city.name}`
+            `Forcer chargement OSM — ${city.name}`
           )}
         </button>
       )}

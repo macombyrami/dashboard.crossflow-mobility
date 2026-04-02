@@ -1,12 +1,12 @@
 'use client'
-import { useState } from 'react'
-import { Play, Ban, TrafficCone, Bike, Gauge, Train, Calendar, Cpu, MapPin, X } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Play, Ban, TrafficCone, Bike, Gauge, Train, Calendar, Cpu, MapPin, X, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useSimulationStore } from '@/store/simulationStore'
 import { useMapStore } from '@/store/mapStore'
 import { runSimulation } from '@/lib/engine/simulation.engine'
+import { simulationService } from '@/lib/services/SimulationService'
 import { platformConfig } from '@/config/platform.config'
 import { cn } from '@/lib/utils/cn'
-import { predictiveApi, scenarioToEventType, scenarioRadius } from '@/lib/api/predictive'
 import type { ScenarioType, SimulationResult } from '@/types'
 
 import { useTranslation } from '@/lib/hooks/useTranslation'
@@ -20,34 +20,6 @@ const ICONS: Record<ScenarioType, typeof Play> = {
   event:            Calendar,
 }
 
-/** Try to apply the scenario on the predictive backend and return route delta. */
-async function runPredictiveStrategy(
-  eventCenter: { lat: number; lng: number },
-  scenarioType: ScenarioType,
-  scenarioName: string,
-  magnitude: number,
-) {
-  const health = await predictiveApi.health()
-  if (!health?.online || !health?.graph_loaded) return undefined
-
-  // Reset previous state, then apply scenario at the selected (or city center) location
-  await predictiveApi.resetSimulation()
-  const eventType = scenarioToEventType(scenarioType)
-  const radius    = scenarioRadius(scenarioType, magnitude)
-  await predictiveApi.addEvent(eventCenter, eventType, radius, scenarioName)
-
-  // Compare a representative route through the event zone
-  const start = { lat: eventCenter.lat - 0.008, lng: eventCenter.lng - 0.008 }
-  const end   = { lat: eventCenter.lat + 0.008, lng: eventCenter.lng + 0.008 }
-  const cmp   = await predictiveApi.compareRoutes(start, end)
-
-  if (!cmp.delta) return undefined
-  return {
-    normal:    { total_distance_m: cmp.normal.total_distance_m, total_time_s: cmp.normal.total_time_s },
-    simulated: { total_distance_m: cmp.simulated.total_distance_m, total_time_s: cmp.simulated.total_time_s },
-    delta:     cmp.delta,
-  }
-}
 
 export function SimulationPanel() {
   const { t } = useTranslation()
@@ -55,6 +27,13 @@ export function SimulationPanel() {
   const store         = useSimulationStore()
   const scenarioTypes = platformConfig.simulation.scenarioTypes
   const cfg           = platformConfig.simulation.scenarioConfig
+
+  // Auto-init connection to predictive backend
+  useEffect(() => {
+    if (city.name === 'Gennevilliers') {
+      simulationService.initEngine(city)
+    }
+  }, [city.name])
 
   const [backendActive, setBackendActive] = useState(false)
 
@@ -67,29 +46,49 @@ export function SimulationPanel() {
 
     try {
       const scenario = store.buildScenario()
-
-      // 1. Try predictive backend — use pinned location or city center as fallback
-      let predictive: SimulationResult['predictive'] | undefined
       const eventCenter = store.eventLocation ?? city.center
-      try {
-        predictive = await runPredictiveStrategy(
-          eventCenter,
-          store.scenarioType,
-          scenario.name,
-          store.magnitude,
-        )
-        if (predictive) setBackendActive(true)
-      } catch {
-        // Backend unavailable — graceful degradation to synthetic engine
+
+      // 1. Run Predictive simulation on backend
+      let predictive: SimulationResult['predictive'] | undefined
+      
+      if (store.status === 'ready') {
+        store.setProgress(20)
+        try {
+          const res = await simulationService.runPredictiveSimulation(
+            city,
+            eventCenter,
+            store.scenarioType,
+            scenario.name,
+            store.magnitude
+          )
+          
+          if (res.comparison.delta) {
+            predictive = {
+              normal:    { total_distance_m: res.comparison.normal.total_distance_m, total_time_s: res.comparison.normal.total_time_s },
+              simulated: { total_distance_m: res.comparison.simulated.total_distance_m, total_time_s: res.comparison.simulated.total_time_s },
+              delta:     res.comparison.delta,
+            }
+            setBackendActive(true)
+          }
+          store.setProgress(60)
+        } catch (err: any) {
+          console.warn('[SimulationPanel] Backend simulation failed, checking fallback...', err)
+          store.setLastError(`Simulation failed: ${err.message}`)
+        }
       }
 
-      // 2. Run synthetic engine for KPI metrics (always)
-      const result = await runSimulation(city, scenario, (pct) => store.setProgress(pct))
+      // 2. Run local engine logic for baseline comparison/visuals
+      const result = await runSimulation(city, scenario, (pct) => {
+        // Offset progress if backend already did some work
+        const offset = predictive ? 60 : 0
+        store.setProgress(offset + (pct * (1 - offset / 100)))
+      })
 
       const finalResult: SimulationResult = predictive ? { ...result, predictive } : result
 
       store.addResult(finalResult)
       store.setCurrentResult(finalResult)
+      store.setProgress(100)
     } finally {
       store.setRunning(false)
     }
@@ -99,6 +98,48 @@ export function SimulationPanel() {
 
   return (
     <div className="space-y-4">
+      {/* Backend Engine Status */}
+      <div className={cn(
+        "px-4 py-3 rounded-2xl border flex items-center justify-between transition-all",
+        store.status === 'ready' ? "bg-brand-green/5 border-brand-green/20" : 
+        store.status === 'error' ? "bg-red-500/5 border-red-500/20" : 
+        "bg-bg-elevated border-bg-border"
+      )}>
+        <div className="flex items-center gap-3">
+          {store.status === 'initializing' ? (
+            <Loader2 className="w-4 h-4 animate-spin text-brand-green" />
+          ) : store.status === 'ready' ? (
+            <CheckCircle2 className="w-4 h-4 text-brand-green" />
+          ) : store.status === 'error' ? (
+            <AlertCircle className="w-4 h-4 text-red-500" />
+          ) : (
+            <Cpu className="w-4 h-4 text-text-muted" />
+          )}
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-text-primary">
+              {store.status === 'initializing' ? 'Initialisation...' : 
+               store.status === 'ready' ? 'Moteur Prédictif Prêt' : 
+               store.status === 'error' ? 'Erreur Moteur' : 'Moteur en attente'}
+            </p>
+            <p className="text-[10px] text-text-secondary leading-tight">
+              {store.status === 'initializing' ? 'Chargement du graphe OSMnx (30s+)' : 
+               store.status === 'ready' ? 'Simulation temps-réel activée' : 
+               store.status === 'error' ? (store.lastError || 'Backend inaccessible') : 
+               'Sélectionnez une zone pour démarrer'}
+            </p>
+          </div>
+        </div>
+        
+        {store.status === 'error' && (
+          <button 
+            onClick={() => simulationService.initEngine(city)}
+            className="text-[10px] font-bold text-brand-green hover:underline cursor-pointer"
+          >
+            Réessayer
+          </button>
+        )}
+      </div>
+
       {/* Scenario Type */}
       <div className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
         <div className="px-5 py-4 border-b border-bg-border">
