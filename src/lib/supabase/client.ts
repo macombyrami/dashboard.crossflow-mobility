@@ -50,17 +50,17 @@ function createDiagnosticClient(missing: string[]) {
 /**
  * 🛰️ STAFF ENGINEER: Supabase Browser Singleton (Phase 2 Hardened)
  */
-export function createClient() {
-  if (supabaseInstance) return supabaseInstance
+export function createClient(): SupabaseClient {
+  if (supabaseInstance) return supabaseInstance as SupabaseClient
 
   const { isValid, missing } = validateSupabaseConfig()
 
   if (!isValid) {
     console.warn(`[Supabase Diagnostic] Auth is locked until environment variables are restored.`)
     supabaseInstance = createDiagnosticClient(missing) as any
-    return supabaseInstance
+    return supabaseInstance as SupabaseClient
   }
 
   supabaseInstance = createBrowserClient(ENV.SUPABASE_URL, ENV.SUPABASE_ANON_KEY)
-  return supabaseInstance
+  return supabaseInstance as SupabaseClient
 }
