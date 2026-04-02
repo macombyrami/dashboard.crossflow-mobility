@@ -75,26 +75,36 @@ export async function POST(req: NextRequest) {
 
     const systemPrompt = buildSystemPrompt(cityContext, sources)
 
-    const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-      method:  'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type':  'application/json',
-        'HTTP-Referer':  process.env.NEXT_PUBLIC_APP_URL ?? appData.url,
-        'X-Title':       'CrossFlow Intelligence (Strict)',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages,
-        ],
-        temperature: 0.1, // Deterministic
-        max_tokens:  aiData.main.maxTokens,
-        response_format: { type: 'json_object' },
-        stream:      false,
-      }),
-    })
+    // Abort after 20s — OpenRouter free-tier can hang
+    const controller = new AbortController()
+    const timeout    = setTimeout(() => controller.abort(), 20_000)
+
+    let response: Response
+    try {
+      response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+        method:  'POST',
+        signal:  controller.signal,
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type':  'application/json',
+          'HTTP-Referer':  process.env.NEXT_PUBLIC_APP_URL ?? appData.url,
+          'X-Title':       'CrossFlow Intelligence (Strict)',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...messages,
+          ],
+          temperature: 0.1,
+          max_tokens:  aiData.main.maxTokens,
+          response_format: { type: 'json_object' },
+          stream:      false,
+        }),
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
 
     if (!response.ok) {
       const err = await response.text()
@@ -123,8 +133,15 @@ export async function POST(req: NextRequest) {
       const validated = AIResponseSchema.safeParse(parsedJSON)
 
       if (!validated.success) {
-        console.error('[AI Refinement] Zod Validation Failed:', validated.error)
-        return NextResponse.json({ error: 'Contexte insuffisant pour une réponse fiable (Validation KO)' }, { status: 422 })
+        console.warn('[AI Refinement] Zod Validation: partial schema match, using raw data')
+        // Return raw parsed JSON as degraded response rather than a 422
+        // This prevents silent failures on the client side
+        return NextResponse.json({
+          content: markdownPart || 'Analyse disponible (validation partielle).',
+          data:    parsedJSON,  // unvalidated but still useful
+          usage:   data.usage,
+          warning: 'partial_validation',
+        })
       }
 
       // Hallucination Guard: ensure Markdown summary doesn't contain terms not in context
@@ -150,10 +167,14 @@ export async function POST(req: NextRequest) {
       console.error('[AI Refinement] Parse Error:', parseErr, 'Raw Content:', rawContent)
       return NextResponse.json({ error: 'Erreur formatage IA (JSON invalide)' }, { status: 500 })
     }
-  } catch (e) {
+  } catch (e: any) {
+    const isTimeout = e?.name === 'AbortError'
+    const message   = isTimeout
+      ? 'Délai d\'attente dépassé — le service IA est temporairement lent.'
+      : `Erreur serveur: ${e instanceof Error ? e.message : 'unknown'}`
     return NextResponse.json(
-      { error: `Erreur serveur: ${e instanceof Error ? e.message : 'unknown'}` },
-      { status: 500 },
+      { error: message, code: isTimeout ? 'timeout' : 'server_error' },
+      { status: isTimeout ? 504 : 500 },
     )
   }
 }

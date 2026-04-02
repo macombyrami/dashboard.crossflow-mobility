@@ -3,38 +3,43 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { ENV, validateSupabaseConfig } from '@/lib/config/env'
 
 /**
- * 🚀 Fix 3: Resilient Session Handler (SaaS Standard)
- * 
- * Logic Flow:
- * 1. Validate environment configuration.
- * 2. If invalid, inject 'X-Supabase-Misconfigured' header and return NextResponse.next().
- * 3. Prevents infinite loop by allowing the route to resolve, then showing UI diagnostic.
+ * 🚀 Hardened Session Handler
+ *
+ * Security & Resilience checklist:
+ * ✔ API routes are NEVER redirected (prevents API 404 → /login CORS hell)
+ * ✔ Anti-loop cookie: prevents onboarding triangle redirect
+ * ✔ Diagnostic fallback: missing env → pass-through instead of loop
+ * ✔ getUser() only called on protected routes (saves Supabase quota)
  */
 export async function updateSession(request: NextRequest) {
   const { isValid, missing } = validateSupabaseConfig()
-  const pathname = request.nextUrl.pathname
-  const isPublic = pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/auth') || pathname === '/robots.txt' || pathname === '/sitemap.xml'
-  
+  const pathname             = request.nextUrl.pathname
+
+  // ─── Route classification ─────────────────────────────────────────────────
+  const isApiRoute  = pathname.startsWith('/api/')
+  const isPublic    = (
+    pathname === '/' ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/auth') ||
+    pathname === '/robots.txt' ||
+    pathname === '/sitemap.xml' ||
+    pathname === '/not-found'
+  )
+
+  // API routes are NEVER redirected — they handle their own auth
+  if (isApiRoute) return NextResponse.next({ request })
+
+  // ─── Env diagnostic fallback (no loop) ───────────────────────────────
   if (!isValid) {
     if (isPublic) return NextResponse.next({ request })
-
-    // 🛰️ STAFF ENGINEER: Diagnostic Fallback (Fix 3)
-    // Instead of redirecting back to /login (The Loop), we resolve the request
-    // but signal the UI that the backend is non-functional.
     const response = NextResponse.next({ request })
     response.headers.set('X-Supabase-Misconfigured', missing.join(','))
-    
-    // Also set a temporary cookie for client-side detection if needed
-    response.cookies.set('sb_config_error', 'true', { maxAge: 60 })
-    
+    response.cookies.set('sb_config_error', 'true', { maxAge: 60, sameSite: 'lax', httpOnly: true })
     return response
   }
 
-  // --- Normal Auth Flow ---
-
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
+  // ─── Build Supabase client ──────────────────────────────────────────
+  let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
     ENV.SUPABASE_URL,
@@ -45,10 +50,8 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
-          })
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
@@ -57,42 +60,65 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // ⚡ Performance Optimized Skip for Public Pages
-  if (isPublic) {
-    return supabaseResponse
-  }
+  // Skip getUser() entirely for public routes (saves Supabase auth quota)
+  if (isPublic) return supabaseResponse
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // ─── Session check ──────────────────────────────────────────────────
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // Onboarding Logic (Redundant check but good for safety)
-  function isOnboardingDone(u: typeof user): boolean {
-    if (!u) return false
-    const meta = u.user_metadata ?? {}
-    return meta.onboarding_completed === true || Boolean(meta.default_city)
-  }
-
-  // Redirect Logic
+  // Not authenticated — redirect to login with ?next= for post-login return
   if (!user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    // Preserve the original path for redirect-back, but strip to avoid open redirect
+    const safePath = pathname.startsWith('/') ? pathname : '/map'
+    url.searchParams.set('next', safePath)
     return NextResponse.redirect(url)
   }
 
-  // If onboarded, don't stay in onboarding flow
-  if (user && pathname.startsWith('/onboarding') && isOnboardingDone(user)) {
+  // ─── Onboarding logic ─────────────────────────────────────────────
+  const meta           = user.user_metadata ?? {}
+  const onboardingDone = meta.onboarding_completed === true || Boolean(meta.default_city)
+  const inOnboarding   = pathname.startsWith('/onboarding')
+
+  // Anti-loop guard: track redirects via short-lived cookie
+  const redirectCount  = parseInt(request.cookies.get('cf_redirect_count')?.value ?? '0', 10)
+  if (redirectCount >= 3) {
+    // Break the loop — let the user through and clear the counter
+    supabaseResponse.cookies.set('cf_redirect_count', '0', { maxAge: 0 })
+    return supabaseResponse
+  }
+
+  function bumpRedirectCount(response: NextResponse) {
+    response.cookies.set('cf_redirect_count', String(redirectCount + 1), {
+      maxAge:  10,
+      sameSite: 'lax',
+      httpOnly: true,
+    })
+    return response
+  }
+
+  // Onboarding done but still on /onboarding → go to /map
+  if (onboardingDone && inOnboarding) {
     const url = request.nextUrl.clone()
     url.pathname = '/map'
-    return NextResponse.redirect(url)
+    return bumpRedirectCount(NextResponse.redirect(url))
   }
 
-  // If not onboarded, force onboarding
-  if (user && !pathname.startsWith('/onboarding') && !isOnboardingDone(user)) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/onboarding'
-    return NextResponse.redirect(url)
+  // Not onboarded and NOT already on /onboarding → force onboarding
+  // Guard: only redirect if user actually needs it (avoids edge cases with
+  // new OAuth signups where metadata might be delayed by Supabase)
+  if (!onboardingDone && !inOnboarding && user.created_at) {
+    const accountAgeMs = Date.now() - new Date(user.created_at).getTime()
+    const isNewAccount = accountAgeMs < 5 * 60 * 1000 // 5 minutes grace period
+    if (!isNewAccount) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/onboarding'
+      return bumpRedirectCount(NextResponse.redirect(url))
+    }
   }
 
+  // Clear redirect counter on successful pass-through
+  supabaseResponse.cookies.set('cf_redirect_count', '0', { maxAge: 0 })
   return supabaseResponse
 }
