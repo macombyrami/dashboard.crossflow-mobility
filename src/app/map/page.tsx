@@ -43,6 +43,29 @@ import { VehicleInfoCard } from '@/components/map/VehicleInfoCard'
 
 import { useTrafficData } from '@/lib/hooks/useTrafficData'
 
+// ─── SKELETONS ───
+function PanelSkeleton({ label }: { label: string }) {
+  return (
+    <div className="w-full h-full bg-bg-surface/80 backdrop-blur-xl flex flex-col p-6 items-center justify-center border-l border-white/5 animate-pulse">
+      <div className="w-10 h-10 rounded-full bg-brand/10 mb-4 flex items-center justify-center">
+        <span className="text-xl">✨</span>
+      </div>
+      <p className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em]">{label} — Chargement...</p>
+    </div>
+  )
+}
+
+function MapSkeleton() {
+  return (
+    <div className="absolute inset-0 bg-[#08090B] flex items-center justify-center">
+       <div className="relative flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-full border-4 border-white/5 border-t-brand animate-spin" />
+          <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] animate-pulse">Initialisation Carte...</p>
+       </div>
+    </div>
+  )
+}
+
 export default function MapPage() {
   const [mounted, setMounted] = React.useState(false)
   const [isFilterSheetOpen, setIsFilterSheetOpen] = React.useState(false)
@@ -230,19 +253,5 @@ export default function MapPage() {
         </div>
       )}
     </main>
-  )
-}
-
-  )
-}
-
-function PanelSkeleton({ label }: { label: string }) {
-  return (
-    <div className="w-full h-full bg-bg-surface/80 backdrop-blur-xl flex flex-col p-6 items-center justify-center border-l border-white/5 animate-pulse">
-      <div className="w-10 h-10 rounded-full bg-brand/10 mb-4 flex items-center justify-center">
-        <span className="text-xl">✨</span>
-      </div>
-      <p className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em]">{label} — Chargement...</p>
-    </div>
   )
 }
