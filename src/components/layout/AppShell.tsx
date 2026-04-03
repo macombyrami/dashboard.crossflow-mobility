@@ -12,6 +12,8 @@ const Sidebar   = lazy(() => import('./Sidebar').then(m => ({ default: m.Sidebar
 const Header    = lazy(() => import('./Header').then(m => ({ default: m.Header })))
 const BottomNav = lazy(() => import('./BottomNav').then(m => ({ default: m.BottomNav })))
 const AIAssistantOverlay = lazy(() => import('../ai/AIAssistantOverlay').then(m => ({ default: m.AIAssistantOverlay })))
+const NotificationHub    = lazy(() => import('../notifications/NotificationHub').then(m => ({ default: m.NotificationHub })))
+const CommandPalette     = lazy(() => import('../ui/CommandPalette').then(m => ({ default: m.CommandPalette })))
 
 // Skeleton for layout components (Minimal footprint)
 const LayoutSkeleton = () => <div className="animate-pulse bg-white/5 border border-white/10 rounded-xl" />
@@ -115,9 +117,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </SwipeNavigation>
             </div>
             
-            {/* 🧠 Proactive AI Guidance */}
+            {/* 🧠 Proactive AI Guidance & Global Hubs */}
             <Suspense fallback={null}>
               <AIAssistantOverlay />
+              <NotificationHub />
+              <CommandPalette />
             </Suspense>
           </div>
 

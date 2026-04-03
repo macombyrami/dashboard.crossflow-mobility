@@ -88,8 +88,8 @@ export function Header() {
   const socialIncidents = useTrafficStore(s => s.socialIncidents)
   const clearIncidents  = useTrafficStore(s => s.clearIncidents)
   const toggleSidebar   = useUIStore(s => s.toggleSidebar)
-  const [alertOpen, setAlertOpen] = useState(false)
-  const alertRef                  = useRef<HTMLDivElement>(null)
+  const isNotificationOpen = useUIStore(s => s.isNotificationOpen)
+  const setNotificationOpen  = useUIStore(s => s.setNotificationOpen)
 
   const allIncidents  = [...socialIncidents, ...incidents]
   const incidentCount = allIncidents.length
@@ -136,15 +136,15 @@ export function Header() {
         </div>
 
         {/* 🔔 Notifications */}
-        <div ref={alertRef} className="relative ml-1">
+        <div className="relative ml-1">
           <button
-            onClick={() => setAlertOpen(!alertOpen)}
+            onClick={() => setNotificationOpen(!isNotificationOpen)}
             aria-label={`${incidentCount} notifications de trafic`}
             aria-haspopup="true"
-            aria-expanded={alertOpen}
+            aria-expanded={isNotificationOpen}
             className={cn(
               'w-10 h-10 flex items-center justify-center rounded-xl border transition-all relative', 
-              alertOpen ? 'bg-white/15 border-white/20' : 'bg-white/5 border-white/5 hover:bg-white/10'
+              isNotificationOpen ? 'bg-white/15 border-white/20' : 'bg-white/5 border-white/5 hover:bg-white/10'
             )}
           >
             <Bell className="w-4.5 h-4.5 text-white/60" strokeWidth={2} aria-hidden="true" />
