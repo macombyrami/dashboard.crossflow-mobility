@@ -1,17 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Activity, AlertCircle, BarChart3, TrendingUp, Info } from 'lucide-react'
+import { Activity, TrendingUp, Info } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
-import { getSnapshots } from '@/lib/api/snapshots'
+import { getTrafficVariance } from '@/lib/api/snapshots'
 import { cn } from '@/lib/utils/cn'
 
 /**
  * Staff Engineer Feature: TrafficStabilityWidget
- * Visualizes road segment variance and standard deviation.
+ * Visualizes road network temporal stability and variance.
  */
-import { getTrafficVariance } from '@/lib/api/snapshots'
-import { cn } from '@/lib/utils/cn'
-
 export function TrafficStabilityWidget() {
   const { city } = useMapStore()
   const [stabilityData, setStabilityData] = useState<any[] | null>(null)
@@ -107,7 +104,5 @@ export function TrafficStabilityWidget() {
         </div>
       </div>
     </div>
-  )
-}
   )
 }
