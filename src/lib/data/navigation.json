@@ -1,15 +1,20 @@
 [
+  {
+    "group": "PILOTAGE",
+    "items": [
+      { "href": "/dashboard", "iconName": "LayoutDashboard", "label": "Tableau de bord", "description": "Analytics et KPI", "ariaLabel": "Tableau de bord et métriques KPI" }
+    ]
+  },
   { 
     "group": "OBSERVER",
     "items": [
-      { "href": "/map", "iconName": "Activity", "label": "Temps Réel", "description": "Vérité terrain", "ariaLabel": "Carte du trafic en temps réel" }
+      { "href": "/map", "iconName": "Activity", "label": "Temps Réel", "description": "Vérité terrain", "ariaLabel": "Carte du trafic en temps réel" },
+      { "href": "/social", "iconName": "Rss", "label": "Social NLP", "description": "Feed X/Sytadin", "ariaLabel": "Feed social trafic" }
     ]
   },
   {
     "group": "COMPRENDRE",
     "items": [
-      { "href": "/dashboard", "iconName": "LayoutDashboard", "label": "Indicateurs", "description": "Analytics", "ariaLabel": "Tableau de bord et métriques KPI" },
-      { "href": "/social", "iconName": "Rss", "label": "Social NLP", "description": "Feed X/Sytadin", "ariaLabel": "Feed social trafic" },
       { "href": "/dashboard/consultant-ai", "iconName": "Bot", "label": "Assistant IA", "description": "Insights proactifs", "ariaLabel": "Assistant intelligent" }
     ]
   },
