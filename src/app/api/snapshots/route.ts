@@ -5,14 +5,25 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   
   // 🛰️ Staff Engineer Auth Verification
+  // Allow if standard user session IS present OR if CRON_SECRET header matches
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized: Valid Supabase session required' }, { status: 401 })
+  const authHeader = req.headers.get('Authorization')
+  const cronSecret = process.env.CRON_SECRET
+  const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`
+
+  if (!user && !isCron) {
+    return NextResponse.json({ success: false, error: 'Unauthorized: Valid session or Cron secret required' }, { status: 401 })
   }
 
   try {
     const body = await req.json()
     const { city_id, fetched_at, provider, stats, segments_gz, bbox } = body
+
+    // Logic: if segments_gz is provided as base64 string, convert to Buffer for BYTEA
+    let binarySegments = null
+    if (segments_gz) {
+      binarySegments = Buffer.from(segments_gz, 'base64')
+    }
 
     const { data, error } = await supabase
       .from('traffic_snapshots')
@@ -21,7 +32,7 @@ export async function POST(req: NextRequest) {
         fetched_at,
         provider,
         stats,
-        segments_gz: segments_gz ? Buffer.from(segments_gz, 'base64') : null,
+        segments_gz: binarySegments,
         bbox
       }, { onConflict: 'city_id,fetched_at' })
 
@@ -55,6 +66,19 @@ export async function GET(req: NextRequest) {
 
   try {
     const startTime = new Date(Date.now() - minutes * 60 * 1000).toISOString()
+    
+    // 🛰️ Staff Engineer: Analytics Dispatcher
+    const type = searchParams.get('type')
+    
+    if (type === 'variance') {
+      const { data, error } = await supabase.rpc('get_traffic_variance', {
+        p_city_id: cityId,
+        p_hours:   Math.ceil(minutes / 60)
+      })
+      if (error) throw error
+      return NextResponse.json(data)
+    }
+
     const { data, error } = await supabase
       .from('traffic_snapshots')
       .select('*')

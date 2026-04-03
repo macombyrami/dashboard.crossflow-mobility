@@ -354,7 +354,12 @@ function IntelligenceDashboard() {
 
 export default function SocialPage() {
   const [activeTab, setActiveTab] = React.useState<SocialTab>('sytadin')
+  const [counts, setCounts] = React.useState({ ratp: 0, sytadin: 0, community: 0, x: 0 })
   const city = useMapStore(s => s.city)
+
+  const updateCount = (key: keyof typeof counts, val: number) => {
+    setCounts(prev => ({ ...prev, [key]: val }))
+  }
 
   return (
     <div className="flex flex-col lg:flex-row min-h-full overflow-hidden bg-bg-base">
@@ -401,14 +406,20 @@ export default function SocialPage() {
 
       {/* ── Right Content ── */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Social Pulse Overview */}
+        <SocialPulse 
+          ratpCount={counts.ratp} 
+          sytadinCount={counts.sytadin} 
+          communityCount={counts.community} 
+          xCount={counts.x} 
+        />
+
         <div className="relative z-10 flex-1 flex flex-col overflow-hidden h-full p-6">
           {activeTab === 'intelligence' && <IntelligenceDashboard />}
-          {activeTab === 'ratp' && <RatpFeed />}
-          {(activeTab === 'sytadin' || activeTab === 'community' || activeTab === 'xpulse') && (
-            <div className="flex items-center justify-center h-full text-text-muted text-xs italic">
-              Module en cours d'initialisation...
-            </div>
-          )}
+          {activeTab === 'ratp' && <RatpFeed onUpdate={(n) => updateCount('ratp', n)} />}
+          {activeTab === 'sytadin' && <SytadinFeed onUpdate={(n) => updateCount('sytadin', n)} />}
+          {activeTab === 'community' && <CommunityFeed onUpdate={(n) => updateCount('community', n)} />}
+          {activeTab === 'xpulse' && <XPulseFeed onUpdate={(n) => updateCount('x', n)} />}
         </div>
       </div>
     </div>

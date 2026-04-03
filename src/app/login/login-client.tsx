@@ -19,6 +19,8 @@ function LoginForm() {
   const [loading,         setLoading]         = useState(false)
   const [isSignUp,        setIsSignUp]        = useState(false)
   const [message,         setMessage]         = useState<{ type: 'error' | 'success' | 'degraded'; text: string } | null>(null)
+  const [errors,          setErrors]          = useState<{ email?: boolean; password?: boolean }>({})
+  const [submitted,       setSubmitted]       = useState(false)
   const [circuitCooldown, setCircuitCooldown] = useState(0) // seconds remaining
   const cooldownRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -81,6 +83,19 @@ function LoginForm() {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitted(true)
+    
+    // Client-side validation
+    const newErrors: { email?: boolean; password?: boolean } = {}
+    if (!email) newErrors.email = true
+    if (!password) newErrors.password = true
+    setErrors(newErrors)
+
+    if (Object.keys(newErrors).length > 0) {
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     setMessage(null)
 
@@ -206,9 +221,16 @@ function LoginForm() {
               required
               autoComplete="email"
               placeholder="votre-nom@ville-partenaire.fr"
-              className="w-full bg-bg-elevated border border-bg-border rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/20 transition-all"
+              className={cn(
+                "w-full bg-bg-elevated border rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-brand/20 transition-all",
+                errors.email ? "border-traffic-critical shadow-[0_0_10px_rgba(255,23,68,0.1)]" : "border-bg-border focus:border-brand/50",
+                submitted && !email && "animate-shake"
+              )}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                if (errors.email) setErrors(prev => ({ ...prev, email: false }))
+              }}
               aria-required="true"
               aria-label="Saisissez votre adresse email"
             />
@@ -241,9 +263,16 @@ function LoginForm() {
               required
               autoComplete={isSignUp ? 'new-password' : 'current-password'}
               placeholder="••••••••"
-              className="w-full bg-bg-elevated border border-bg-border rounded-xl py-2.5 pl-10 pr-11 text-sm focus:outline-none focus:border-brand/50 transition-all font-mono"
+              className={cn(
+                "w-full bg-bg-elevated border rounded-xl py-2.5 pl-10 pr-11 text-sm focus:outline-none transition-all font-mono",
+                errors.password ? "border-traffic-critical shadow-[0_0_10px_rgba(255,23,68,0.1)]" : "border-bg-border focus:border-brand/50",
+                submitted && !password && "animate-shake"
+              )}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                if (errors.password) setErrors(prev => ({ ...prev, password: false }))
+              }}
               aria-required="true"
               aria-label="Votre mot de passe"
               minLength={isSignUp ? 8 : undefined}

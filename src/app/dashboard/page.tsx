@@ -1,19 +1,35 @@
 'use client'
 import { useEffect, useState, useMemo, memo } from 'react'
-import { Activity, Clock, Wind, AlertTriangle, Network, Zap, Download } from 'lucide-react'
-import { KPICard } from '@/components/dashboard/KPICard'
+import dynamic from 'next/dynamic'
+import { Activity, Clock, Wind, AlertTriangle, Zap, Download } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import appData from '@/lib/data/app.json'
-import { TrafficChart } from '@/components/dashboard/TrafficChart'
+
+// Components
+import { KPICard } from '@/components/dashboard/KPICard'
 import { IncidentFeed } from '@/components/dashboard/IncidentFeed'
-import { ModalSplitChart } from '@/components/dashboard/ModalSplitChart'
-import { WeatherCard } from '@/components/dashboard/WeatherCard'
-import { AirQualityCard } from '@/components/dashboard/AirQualityCard'
 import { EventsWidget } from '@/components/dashboard/EventsWidget'
 import { TimelineScrubber } from '@/components/dashboard/TimelineScrubber'
 import { ZoneExportTool } from '@/components/dashboard/ZoneExportTool'
-import { TrafficStabilityWidget } from '@/components/dashboard/TrafficStabilityWidget'
 import { LiveSyncBadge } from '@/components/dashboard/LiveSyncBadge'
+
+// Dynamic Imports for heavy widgets
+const TrafficChart = dynamic(() => import('@/components/dashboard/TrafficChart').then(m => m.TrafficChart), { 
+  ssr: false, 
+  loading: () => <ChartSkeleton /> 
+})
+const ModalSplitChart = dynamic(() => import('@/components/dashboard/ModalSplitChart').then(m => m.ModalSplitChart), { 
+  ssr: false, 
+  loading: () => <CardSkeleton height="200px" /> 
+})
+const TrafficStabilityWidget = dynamic(() => import('@/components/dashboard/TrafficStabilityWidget').then(m => m.TrafficStabilityWidget), { 
+  ssr: false, 
+  loading: () => <CardSkeleton height="150px" /> 
+})
+const WeatherCard = dynamic(() => import('@/components/dashboard/WeatherCard').then(m => m.WeatherCard), { ssr: false })
+const AirQualityCard = dynamic(() => import('@/components/dashboard/AirQualityCard').then(m => m.AirQualityCard), { ssr: false })
+
+// Hooks & Store
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useKPIHistoryStore } from '@/store/kpiHistoryStore'
@@ -22,9 +38,23 @@ import { generateCityKPIs, generateIncidents } from '@/lib/engine/traffic.engine
 import { exportToPdf } from '@/lib/utils/export'
 import { platformConfig } from '@/config/platform.config'
 import { pollutionLabel } from '@/lib/utils/congestion'
+import { getSnapshots } from '@/lib/api/snapshots'
 import type { CityKPIs, TrafficSnapshot } from '@/types'
 
-import type { Metadata } from 'next'
+// Helpers
+function ChartSkeleton() {
+  return (
+    <div className="w-full h-[320px] bg-bg-elevated/40 border border-bg-border rounded-3xl animate-pulse flex items-center justify-center">
+      <Activity className="w-8 h-8 text-white/10" />
+    </div>
+  )
+}
+
+function CardSkeleton({ height }: { height: string }) {
+  return (
+    <div className="w-full bg-bg-elevated/40 border border-bg-border rounded-3xl animate-pulse" style={{ height }} />
+  )
+}
 
 function kpisFromSnapshot(cityId: string, snapshot: TrafficSnapshot, incidentCount: number, base: CityKPIs): CityKPIs {
   const segs = snapshot.segments
@@ -59,11 +89,29 @@ export default function DashboardPage() {
   const setWeather          = useTrafficStore(s => s.setWeather)  // legacy shape lu par le Header
   const airQuality          = useTrafficStore(s => s.airQuality)
   const setAirQuality       = useTrafficStore(s => s.setAirQuality)
-  const addSnapshot  = useKPIHistoryStore(s => s.addSnapshot)
+  const addSnapshot         = useKPIHistoryStore(s => s.addSnapshot)
+  const syncSnapshots       = useKPIHistoryStore(s => s.syncHistoricalSnapshots)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
   useEffect(() => { document.title = `Tableau de bord — ${city.name} | CrossFlow` }, [city.name])
+
+  // 🛰️ Staff Engineer: Historical Hydration Pipeline
+  // Fetches last 24h of real snapshots to populate charts immediately
+  useEffect(() => {
+    if (!mounted) return
+    async function hydrate() {
+      try {
+        const history = await getSnapshots(city.id, 1440) // 24h
+        if (history && history.length > 0) {
+          syncSnapshots(city.id, history)
+        }
+      } catch (err) {
+        console.warn('[Dashboard Hydration] Failed to fetch history, falling back to synthetic.', err)
+      }
+    }
+    hydrate()
+  }, [mounted, city.id, syncSnapshots])
 
   // Synthetic KPIs + incidents baseline (only when no live data)
   useEffect(() => {

@@ -51,3 +51,14 @@ export async function getSnapshots(cityId: string, minutes: number = 60): Promis
     return []
   }
 }
+
+export async function getTrafficVariance(cityId: string, hours: number = 24): Promise<any[]> {
+  try {
+    const res = await fetch(`/api/snapshots?cityId=${cityId}&minutes=${hours * 60}&type=variance`)
+    if (!res.ok) return []
+    return await res.json()
+  } catch (err) {
+    console.error('Failed to fetch traffic variance:', err)
+    return []
+  }
+}

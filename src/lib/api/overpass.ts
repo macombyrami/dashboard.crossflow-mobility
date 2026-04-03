@@ -60,7 +60,7 @@ export async function fetchRoads(
     (
       way["highway"~"^(${highwayTypes.join('|')})$"](${south},${west},${north},${east});
     );
-    out body;
+    out tags qt;
     >;
     out skel qt;
   `
@@ -97,7 +97,7 @@ export async function fetchTrafficPOIs(
       node["railway"="subway_entrance"](${south},${west},${north},${east});
       node["amenity"="charging_station"](${south},${west},${north},${east});
     );
-    out body qt 500;
+    out tags center qt 500;
   `
 
   try {
@@ -144,7 +144,7 @@ export async function fetchCycleNetwork(
       way["highway"="cycleway"](${south},${west},${north},${east});
       way["cycleway"~"^(lane|track|shared_lane)$"](${south},${west},${north},${east});
     );
-    out body;
+    out tags qt;
     >;
     out skel qt;
   `
@@ -258,7 +258,7 @@ export async function fetchMetroStations(
       relation["type"="route"]["route"="tram"](${south},${west},${north},${east});
       relation["type"="route"]["route"="train"]["network"~"RATP|SNCF|Transilien|RER",i](${south},${west},${north},${east});
     );
-    out body qt 2000;
+    out tags center qt 2000;
   `
   try {
     await overpassLimiter.acquire()

@@ -2,15 +2,24 @@ import type { UrbanEvent } from '../api/events'
 import { City } from '@/types'
 
 /**
- * Featured events for Paris — updated with accurate Mar 2026 data.
- * These reflect the specific events and metrics requested for the dashboard.
+ * Utility to generate a date relative to now in ISO format.
+ */
+function getRelativeDate(daysOffset: number, hour: number = 8): string {
+  const d = new Date()
+  d.setDate(d.getDate() + daysOffset)
+  d.setHours(hour, 0, 0, 0)
+  return d.toISOString().split('.')[0]
+}
+
+/**
+ * Featured events for Paris — updated with dynamic 2026 data.
  */
 const FEATURED_PARIS_EVENTS: Partial<UrbanEvent>[] = [
   {
     title: 'Marathon de Paris 2026 — Passage',
     category: 'sport',
-    startDate: '2026-03-26T08:00:00',
-    endDate:   '2026-03-26T15:00:00',
+    startDate: getRelativeDate(2, 8),
+    endDate:   getRelativeDate(2, 15),
     location:  { lat: 48.8698, lng: 2.3078, address: 'Avenue des Champs-Élysées, Paris 8ème', district: '75008' },
     venue:     'Avenue des Champs-Élysées',
     attendance: 55000,
@@ -23,8 +32,8 @@ const FEATURED_PARIS_EVENTS: Partial<UrbanEvent>[] = [
   {
     title: 'PSG vs Rennes — Ligue 1',
     category: 'sport',
-    startDate: '2026-03-26T21:00:00',
-    endDate:   '2026-03-26T23:00:00',
+    startDate: getRelativeDate(0, 21),
+    endDate:   getRelativeDate(0, 23),
     location:  { lat: 48.8414, lng: 2.2530, address: 'Parc des Princes, Paris 16ème', district: '75016' },
     venue:     'Parc des Princes',
     attendance: 48000,
@@ -37,8 +46,8 @@ const FEATURED_PARIS_EVENTS: Partial<UrbanEvent>[] = [
   {
     title: 'Festival Chorus — Les voix du monde',
     category: 'festival',
-    startDate: '2026-03-25T14:00:00',
-    endDate:   '2026-03-26T22:00:00',
+    startDate: getRelativeDate(1, 14),
+    endDate:   getRelativeDate(2, 22),
     location:  { lat: 48.8351, lng: 2.2223, address: 'La Seine Musicale, Boulogne-Billancourt', district: '92100' },
     venue:     'La Seine Musicale',
     attendance: 5000,
@@ -51,8 +60,8 @@ const FEATURED_PARIS_EVENTS: Partial<UrbanEvent>[] = [
   {
     title: 'Julius Rodriguez',
     category: 'concert',
-    startDate: '2026-03-25T19:30:00',
-    endDate:   '2026-03-25T23:00:00',
+    startDate: getRelativeDate(-1, 19),
+    endDate:   getRelativeDate(-1, 23),
     location:  { lat: 48.8660, lng: 2.3477, address: 'Le Duc des Lombards, Paris 1er', district: '75001' },
     venue:     'Le Duc des Lombards',
     attendance: 35,
@@ -65,8 +74,8 @@ const FEATURED_PARIS_EVENTS: Partial<UrbanEvent>[] = [
   {
     title: 'Regards de Femmes 2026 : Industri\'ELLES',
     category: 'congrès',
-    startDate: '2026-03-25T09:30:00',
-    endDate:   '2026-03-25T19:00:00',
+    startDate: getRelativeDate(3, 9),
+    endDate:   getRelativeDate(3, 19),
     location:  { lat: 48.8540, lng: 2.3330, address: '4 Place Saint-Germain des Prés, 75006', district: '75006' },
     venue:     'Saint-Germain des Prés',
     attendance: 18,

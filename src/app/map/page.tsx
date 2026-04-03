@@ -14,9 +14,20 @@ import LayerControls   from '@/components/map/controls/LayerControls'
 import MapLegend       from '@/components/map/MapLegend'
 import { EdgeDetailPanel } from '@/components/map/panels/EdgeDetailPanel'
 import { ZoneStatsPanel } from '@/components/map/panels/ZoneStatsPanel'
-import { SimulationPanel } from '@/components/simulation/SimulationPanel'
-import { SimulationResults } from '@/components/simulation/SimulationResults'
-import { AIPanel } from '@/components/ai/AIPanel'
+const AIPanel = dynamic(
+  () => import('@/components/ai/AIPanel').then(m => m.AIPanel),
+  { ssr: false, loading: () => <PanelSkeleton label="Consultant IA" /> }
+)
+
+const SimulationPanel = dynamic(
+  () => import('@/components/simulation/SimulationPanel').then(m => m.SimulationPanel),
+  { ssr: false, loading: () => <PanelSkeleton label="Moteur Simulation" /> }
+)
+
+const SimulationResults = dynamic(
+  () => import('@/components/simulation/SimulationResults').then(m => m.SimulationResults),
+  { ssr: false }
+)
 import { LiveIndicator } from '@/components/ui/LiveIndicator'
 import { CityPulseHUD } from '@/components/dashboard/CityPulseHUD'
 import { LiveSyncBadge } from '@/components/dashboard/LiveSyncBadge'
@@ -222,16 +233,16 @@ export default function MapPage() {
   )
 }
 
-function MapSkeleton() {
-  const { t } = useTranslation()
+  )
+}
+
+function PanelSkeleton({ label }: { label: string }) {
   return (
-    <div className="w-full h-full bg-bg-surface flex items-center justify-center">
-      <div className="text-center space-y-3">
-        <div className="w-12 h-12 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center mx-auto">
-          <span className="text-2xl animate-pulse">⚡</span>
-        </div>
-        <p className="text-sm text-text-secondary">{t('common.calculating')}</p>
+    <div className="w-full h-full bg-bg-surface/80 backdrop-blur-xl flex flex-col p-6 items-center justify-center border-l border-white/5 animate-pulse">
+      <div className="w-10 h-10 rounded-full bg-brand/10 mb-4 flex items-center justify-center">
+        <span className="text-xl">✨</span>
       </div>
+      <p className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em]">{label} — Chargement...</p>
     </div>
   )
 }
