@@ -19,33 +19,52 @@ class SimulationService {
     return SimulationService.instance
   }
 
-  /** Initialize the backend graph for the given city */
+  /** Initialize the backend graph for any city */
   async initEngine(city: City) {
     const store = useSimulationStore.getState()
     
-    // Check if already ready
+    // Check if already ready for this city
     if (store.status === 'ready' && store.graphLoaded) return
 
     store.setEngineStatus('initializing')
     store.setLastError(null)
 
     try {
-      console.log(`[SimulationService] Initializing graph for ${city.name}...`)
-      const res = await predictiveApi.loadGraph(`${city.name}, France`)
+      console.log(`[SimulationService] Initializing OSMnx graph for ${city.name} (${city.country || 'France'})...`)
+      
+      // We normalize the search string for OSMnx
+      const locationQuery = city.fullName || `${city.name}, ${city.country || 'France'}`
+      const res = await predictiveApi.loadGraph(locationQuery)
       
       if (res.success) {
         store.setEngineStatus('ready')
         store.setGraphLoaded(true)
         store.setBackendOnline(true)
-        console.log(`[SimulationService] Engine ready.`)
+        console.log(`[SimulationService] Engine ready for ${city.name}.`)
       } else {
         throw new Error(res.message || 'Failed to initialize graph')
       }
     } catch (err: any) {
-      console.error(`[SimulationService] Init failed:`, err)
+      console.error(`[SimulationService] Init failed for ${city.name}:`, err)
+      const msg = err.message?.includes('timeout') 
+        ? 'Le chargement de la ville a expiré (Backend débordé).'
+        : (err.message || 'Backend inaccessible')
+        
       store.setEngineStatus('error')
-      store.setLastError(err.message || 'Backend offline or timed out')
+      store.setLastError(msg)
       store.setGraphLoaded(false)
+    }
+  }
+
+  /** Proactive check of backend availability */
+  async checkHealth() {
+    try {
+      const status = await predictiveApi.health()
+      useSimulationStore.getState().setBackendOnline(status.online)
+      return status.online
+    } catch {
+      useSimulationStore.getState().setBackendOnline(false)
+      return false
     }
   }
 

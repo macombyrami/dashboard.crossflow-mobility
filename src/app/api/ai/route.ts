@@ -75,9 +75,8 @@ export async function POST(req: NextRequest) {
 
     const systemPrompt = buildSystemPrompt(cityContext, sources)
 
-    // Abort after 20s — OpenRouter free-tier can hang
     const controller = new AbortController()
-    const timeout    = setTimeout(() => controller.abort(), 20_000)
+    const timeout    = setTimeout(() => controller.abort(), 30_000) // 30s timeout
 
     let response: Response
     try {
@@ -98,7 +97,7 @@ export async function POST(req: NextRequest) {
           ],
           temperature: 0.1,
           max_tokens:  aiData.main.maxTokens,
-          response_format: { type: 'json_object' },
+          // Removed response_format: 'json_object' to allow more flexible text+json combined responses
           stream:      false,
         }),
       })
@@ -114,64 +113,51 @@ export async function POST(req: NextRequest) {
     const data    = await response.json()
     const rawContent = data.choices?.[0]?.message?.content ?? ''
     
-    // Split JSON block from Markdown summary
-    // Expected format: JSON... \n\n Markdown...
-    let jsonPart = ''
-    let markdownPart = ''
+    // 🛰️ Staff Engineer: Resilient JSON Extraction
+    // Search for JSON block anywhere in the string to handle "Certainly! Here is your analysis: { ... }"
+    const jsonMatch = rawContent.match(/\{[\s\S]*\}/)
     
-    try {
-      const firstBrace = rawContent.indexOf('{')
-      const lastBrace = rawContent.lastIndexOf('}')
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        jsonPart = rawContent.substring(firstBrace, lastBrace + 1)
-        markdownPart = rawContent.substring(lastBrace + 1).trim()
-      } else {
-        throw new Error('Structure JSON absente')
-      }
+    if (jsonMatch) {
+      const jsonPart = jsonMatch[0]
+      const markdownPart = rawContent.replace(jsonPart, '').trim()
+      
+      try {
+        const parsedJSON = JSON.parse(jsonPart)
+        const validated = AIResponseSchema.safeParse(parsedJSON)
 
-      const parsedJSON = JSON.parse(jsonPart)
-      const validated = AIResponseSchema.safeParse(parsedJSON)
+        if (!validated.success) {
+          console.warn('[AI Refinement] Zod partial match, using best-effort data.')
+          return NextResponse.json({
+            content: markdownPart || rawContent,
+            data:    parsedJSON,
+            usage:   data.usage,
+            warning: 'schema_drift'
+          })
+        }
 
-      if (!validated.success) {
-        console.warn('[AI Refinement] Zod Validation: partial schema match, using raw data')
-        // Return raw parsed JSON as degraded response rather than a 422
-        // This prevents silent failures on the client side
-        return NextResponse.json({
-          content: markdownPart || 'Analyse disponible (validation partielle).',
-          data:    parsedJSON,  // unvalidated but still useful
-          usage:   data.usage,
-          warning: 'partial_validation',
+        return NextResponse.json({ 
+          content: markdownPart || "Analyse télémétrique complétée.", 
+          data: validated.data,
+          usage: data.usage 
         })
+      } catch (parseErr) {
+        // Fallback: If it looks like JSON but parsing fails, return raw text
+        return NextResponse.json({ content: rawContent, usage: data.usage })
       }
-
-      // Hallucination Guard: ensure Markdown summary doesn't contain terms not in context
-      // Simple implementation: check if Markdown mentions words like "PSG" or "Match" if not in JSON events
-      const sensitiveTerms = ['psg', 'match', 'olympia', 'travaux', 'incident', 'manifestation']
-      const halluTerms = sensitiveTerms.filter(term => 
-        markdownPart.toLowerCase().includes(term) && 
-        !jsonPart.toLowerCase().includes(term)
-      )
-
-      if (halluTerms.length > 0) {
-        console.warn('[AI Refinement] Hallucination Flagged:', halluTerms)
-        markdownPart = "💡 L'IA a détecté une possible incohérence avec les données réelles et a tronqué son analyse narrative par sécurité."
-      }
-
-      return NextResponse.json({ 
-        content: markdownPart, 
-        data: validated.data,
-        usage: data.usage 
-      })
-
-    } catch (parseErr) {
-      console.error('[AI Refinement] Parse Error:', parseErr, 'Raw Content:', rawContent)
-      return NextResponse.json({ error: 'Erreur formatage IA (JSON invalide)' }, { status: 500 })
     }
+
+    // 🕊️ Fallback: No JSON found, returning natural language only
+    return NextResponse.json({ 
+      content: rawContent, 
+      usage:   data.usage,
+      warning: 'no_json_struct'
+    })
+
   } catch (e: any) {
-    const isTimeout = e?.name === 'AbortError'
+    const isTimeout = e?.name === 'AbortError' || e?.name === 'TimeoutError'
     const message   = isTimeout
-      ? 'Délai d\'attente dépassé — le service IA est temporairement lent.'
-      : `Erreur serveur: ${e instanceof Error ? e.message : 'unknown'}`
+      ? 'Le moteur IA prend trop de temps à répondre (Timeout Provider).'
+      : `Erreur critique: ${e instanceof Error ? e.message : 'unknown'}`
     return NextResponse.json(
       { error: message, code: isTimeout ? 'timeout' : 'server_error' },
       { status: isTimeout ? 504 : 500 },

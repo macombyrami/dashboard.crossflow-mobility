@@ -33,6 +33,8 @@ export interface Bounds {
 export interface City {
   id:         string
   name:       string
+  fullName?:  string // e.g. "Paris, France"
+  state?:     string // e.g. "Île-de-France"
   country:    string
   countryCode:string
   center:     LatLng

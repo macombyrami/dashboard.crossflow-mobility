@@ -20,29 +20,69 @@ export function DecisionHub() {
   
   const [activeTab, setActiveTab] = React.useState<'explain' | 'recommend'>('explain')
 
-  const recommendations: Recommendation[] = [
-    {
-      id:      'rec-1',
-      title:   'Optimisation des feux — Bvd périphérique',
-      impact:  'HAUTE',
-      type:    'traffic',
-      action:  'Synchroniser les cycles de feux sur l\'entrée A1.',
-      benefit: [
-        { label: 'Congestion', val: '-12%', icon: Target },
-        { label: 'Émissions',  val: '-5%',  icon: Leaf }
-      ]
-    },
-    {
-      id:      'rec-2',
-      title:   'Renforcement Ligne 13',
-      impact:  'MODÉRÉE',
-      type:    'transport',
-      action:  'Augmenter la fréquence des rames (+2/h) suite à l\'incident A86.',
-      benefit: [
-        { label: 'Report modal', val: '+8%', icon: Zap }
-      ]
+  // 🛰️ Staff Engineer: Dynamic Recommendation Engine (Heuristic)
+  const getDynamicRecommendations = (): Recommendation[] => {
+    const list: Recommendation[] = []
+    const highCongestion = (kpis?.congestionRate || 0) > 0.40
+
+    // Rule 1: High Congestion across city
+    if (highCongestion) {
+      list.push({
+        id: 'rec-dyn-1',
+        title: 'Report multimodal immédiat',
+        impact: 'HAUTE',
+        type: 'transport',
+        action: 'Augmenter la fréquence des transports en commun sur les axes saturés et informer via SMS/App.',
+        benefit: [
+          { label: 'Congestion', val: '-15%', icon: Target },
+          { label: 'CO2', val: '-8%', icon: Leaf }
+        ]
+      })
     }
-  ]
+
+    // Rule 2: Based on specific incidents
+    incidents.filter(i => i.severity === 'critical' || i.severity === 'high').forEach((inc, idx) => {
+      list.push({
+        id: `rec-ext-${inc.id}`,
+        title: `Intervention: ${inc.title}`,
+        impact: 'CRITIQUE',
+        type: 'emergency',
+        action: `Dépêcher une équipe d'intervention à ${inc.address} et dévoyer le flux via les axes secondaires.`,
+        benefit: [
+          { label: 'Sécurité', val: 'MAX', icon: ShieldAlert },
+          { label: 'Temps', val: '-10m', icon: Zap }
+        ]
+      })
+    })
+
+    // Fallback if no issues
+    if (list.length === 0) {
+      list.push({
+        id: 'rec-idle',
+        title: 'Maintenance préventive',
+        impact: 'Basse',
+        type: 'traffic',
+        action: 'Aucune anomalie critique. Vérification des capteurs IoT en cours.',
+        benefit: [{ label: 'Stabilité', val: '100%', icon: Target }]
+      })
+    }
+
+    return list.slice(0, 3)
+  }
+
+  const recommendations = getDynamicRecommendations()
+
+  // 🧠 Root Cause Analysis logic
+  const getRootCause = () => {
+    const critical = incidents.filter(i => i.severity === 'critical')
+    if (critical.length > 0) {
+      return `La saturation actuelle est directement corrélée à **${critical[0].title}** à ${critical[0].address}.`
+    }
+    if ((kpis?.congestionRate || 0) > 0.35) {
+      return "Hausse structurelle du trafic liée à l'heure de pointe ou à la convergence des flux sur les axes principaux."
+    }
+    return "Trafic fluide. Les légères variations sont liées aux cycles de feux standards."
+  }
 
   return (
     <div className="flex flex-col h-full bg-bg-base/30">
@@ -80,32 +120,31 @@ export function DecisionHub() {
               icon={Zap}
               value={`${Math.round((kpis?.congestionRate ?? 0) * 100)}%`}
               metric="ANALYSE CONGESTION"
-              context="Source TomTom"
-              badge="⚠️ MODÉRÉ"
-              variant="warning"
+              context="Source TomTom + IoT"
+              badge={ (kpis?.congestionRate || 0) > 0.4 ? "⚠️ CRITIQUE" : "✅ STABLE"}
+              variant={(kpis?.congestionRate || 0) > 0.4 ? "danger" : "success"}
               className="w-full"
             />
 
             {/* Root Cause Analysis */}
             <div className="bg-bg-surface border border-bg-border rounded-2xl p-4 shadow-sm relative overflow-hidden">
+               <div className="absolute top-0 left-0 w-1 h-full bg-brand" />
                <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider mb-2 flex items-center gap-2">
                  <ShieldAlert className="w-3.5 h-3.5 text-brand" />
-                 Cause Racine
+                 Intelligence Cause Racine
                </h3>
-               <p className="text-xs text-text-secondary leading-relaxed">
-                 La hausse est principalement due à la corrélation entre les <span className="font-bold underline decoration-brand/30">travaux sur l'A1</span> et un incident signalé à <span className="italic">Saint-Denis</span>.
-               </p>
+               <p className="text-xs text-text-secondary leading-relaxed" dangerouslySetInnerHTML={{ __html: getRootCause().replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') }} />
             </div>
 
             {/* Insight Alerts mapping to DataCards */}
-            {incidents.filter(i => i.severity === 'critical' || (i as any).severity === 'major' || (i as any).severity === 'high').slice(0, 2).map(inc => (
+            {incidents.filter(i => i.severity === 'critical' || i.severity === 'high').slice(0, 2).map(inc => (
               <DataCard
                 key={inc.id}
                 icon={AlertTriangle}
                 value="🚨"
                 metric={inc.title}
                 context={`${inc.severity} Severity`}
-                badge="CRITIQUE"
+                badge="ACTIF"
                 variant="danger"
                 className="w-full shadow-glow-red/5"
               />
@@ -119,12 +158,12 @@ export function DecisionHub() {
                     <h4 className="text-xs font-bold text-text-primary group-hover:text-brand-green transition-colors">{rec.title}</h4>
                     <span className={cn(
                       "text-[8px] font-black px-1.5 py-0.5 rounded border",
-                      rec.impact === 'HAUTE' ? "text-brand-green border-brand-green/30 bg-brand-green/5" : "text-orange-400 border-orange-400/30 bg-orange-400/5"
+                      rec.impact === 'HAUTE' || rec.impact === 'CRITIQUE' ? "text-brand-green border-brand-green/30 bg-brand-green/5" : "text-orange-400 border-orange-400/30 bg-orange-400/5"
                     )}>
                       {rec.impact}
                     </span>
                   </div>
-                  <p className="text-[11px] text-text-secondary mb-4 leading-relaxed line-clamp-2">
+                  <p className="text-[11px] text-text-secondary mb-4 leading-relaxed line-clamp-3">
                     {rec.action}
                   </p>
                   <div className="flex items-center gap-4 border-t border-bg-border pt-3">

@@ -28,19 +28,19 @@ export function SimulationPanel() {
   const scenarioTypes = platformConfig.simulation.scenarioTypes
   const cfg           = platformConfig.simulation.scenarioConfig
 
-  // Auto-init connection to predictive backend
+  // Auto-init connection to predictive backend for ANY city
   useEffect(() => {
-    if (city.name === 'Gennevilliers') {
+    if (city.id) {
       simulationService.initEngine(city)
     }
-  }, [city.name])
+  }, [city.id, city.name])
 
   const [backendActive, setBackendActive] = useState(false)
 
   const handleRun = async () => {
     if (store.isRunning) return
     store.setRunning(true)
-    store.setProgress(0)
+    store.setProgress(10)
     store.setCurrentResult(null)
     setBackendActive(false)
 
@@ -48,11 +48,12 @@ export function SimulationPanel() {
       const scenario = store.buildScenario()
       const eventCenter = store.eventLocation ?? city.center
 
-      // 1. Run Predictive simulation on backend
+      // 1. Attempt Predictive simulation on backend
       let predictive: SimulationResult['predictive'] | undefined
       
+      // Only attempt if engine is ready, otherwise skip to local fallback
       if (store.status === 'ready') {
-        store.setProgress(20)
+        store.setProgress(25)
         try {
           const res = await simulationService.runPredictiveSimulation(
             city,
@@ -62,7 +63,7 @@ export function SimulationPanel() {
             store.magnitude
           )
           
-          if (res.comparison.delta) {
+          if (res.comparison && res.comparison.delta) {
             predictive = {
               normal:    { total_distance_m: res.comparison.normal.total_distance_m, total_time_s: res.comparison.normal.total_time_s },
               simulated: { total_distance_m: res.comparison.simulated.total_distance_m, total_time_s: res.comparison.simulated.total_time_s },
@@ -70,18 +71,19 @@ export function SimulationPanel() {
             }
             setBackendActive(true)
           }
-          store.setProgress(60)
+          store.setProgress(65)
         } catch (err: any) {
-          console.warn('[SimulationPanel] Backend simulation failed, checking fallback...', err)
-          store.setLastError(`Simulation failed: ${err.message}`)
+          console.warn('[SimulationPanel] Predictive backend failed or timed out. Falling back to local engine.', err)
+          // We don't block the user, we just don't set 'predictive' data
         }
       }
 
-      // 2. Run local engine logic for baseline comparison/visuals
+      // 2. Run local engine logic (Essential for visualization/baseline)
+      // If predictive failed, this serves as the primary result.
       const result = await runSimulation(city, scenario, (pct) => {
-        // Offset progress if backend already did some work
-        const offset = predictive ? 60 : 0
-        store.setProgress(offset + (pct * (1 - offset / 100)))
+        const offset = predictive ? 65 : 10
+        const scale = predictive ? 0.35 : 0.90
+        store.setProgress(Math.round(offset + (pct * scale)))
       })
 
       const finalResult: SimulationResult = predictive ? { ...result, predictive } : result
@@ -89,8 +91,14 @@ export function SimulationPanel() {
       store.addResult(finalResult)
       store.setCurrentResult(finalResult)
       store.setProgress(100)
+    } catch (criticalErr: any) {
+      console.error('[SimulationPanel] Critical execution failure:', criticalErr)
+      store.setLastError(`Execution Error: ${criticalErr.message}`)
     } finally {
-      store.setRunning(false)
+      // Small delay to let the user see the 100% progress
+      setTimeout(() => {
+        store.setRunning(false)
+      }, 500)
     }
   }
 

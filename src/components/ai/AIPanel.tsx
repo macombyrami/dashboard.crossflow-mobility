@@ -9,6 +9,8 @@ import { isPointInPolygon, isSegmentInPolygon } from '@/lib/utils/spatial'
 import { useTranslation } from '@/lib/hooks/useTranslation'
 import { DecisionHub } from './DecisionHub'
 import appData from '@/lib/data/app.json'
+import { useKPIHistoryStore } from '@/store/kpiHistoryStore'
+import { useSimulationStore } from '@/store/simulationStore'
 
 interface Message {
   id:      string
@@ -32,6 +34,9 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
   const openMeteoWeather   = useTrafficStore(s => s.openMeteoWeather)
   const dataSource         = useTrafficStore(s => s.dataSource)
   const setAIPanelOpen     = useMapStore(s => s.setAIPanelOpen)
+  
+  const getHistory      = useKPIHistoryStore(s => s.getForCity)
+  const currentSimResult = useSimulationStore(s => s.currentResult)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLTextAreaElement>(null)
@@ -65,6 +70,12 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
       }
     }
 
+    // Capture recent history trends (last 10 indices)
+    const recentHistory = getHistory(city.id, 10).map(h => ({
+      time: h.time,
+      congestion: h.congestion
+    }))
+
     return {
       cityName:        city.name,
       country:         city.country,
@@ -74,6 +85,11 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
       activeIncidents: kpis?.activeIncidents,
       dataSource:      dataSource === 'live' ? 'TomTom Live' : `${appData.name} Engine`,
       zone:            zoneContext,
+      history:         recentHistory,
+      prediction:      currentSimResult?.predictive ? {
+        scenario: currentSimResult.scenarioName,
+        impact:   currentSimResult.predictive.delta,
+      } : undefined,
       weather: openMeteoWeather ? {
         emoji:         openMeteoWeather.weatherEmoji,
         description:   openMeteoWeather.weatherLabel,

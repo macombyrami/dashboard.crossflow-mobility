@@ -11,6 +11,12 @@ async function proxy(req: NextRequest, context: { params: Promise<{ path: string
   const search = req.nextUrl.search
   const url = `${BACKEND_URL}/${path}${search}`
 
+  // 🛰️ Staff Engineer: High-Tolerance Proxy
+  // OSMnx graph loading and complex simulations (route compare) can take 30-90s.
+  // We use 120s for graph ops, 30s for general telemetry.
+  const isGraphOp = path.includes('graph/')
+  const timeout   = isGraphOp ? 120_000 : 30_000
+
   try {
     const body = req.method !== 'GET' && req.method !== 'HEAD'
       ? await req.text()
@@ -23,17 +29,42 @@ async function proxy(req: NextRequest, context: { params: Promise<{ path: string
         'Accept': 'application/json',
       },
       body,
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(timeout),
     })
 
     const data = await res.text()
-    return new NextResponse(data, {
+    
+    // Explicitly handle 404/500 from backend as JSON if possible
+    let responseData = data
+    if (!res.ok) {
+       try {
+         const parsed = JSON.parse(data)
+         responseData = JSON.stringify({ 
+           success: false, 
+           error: parsed.detail || parsed.message || 'Backend logic error',
+           backend_url: url
+         })
+       } catch {
+         // Not JSON, use raw text
+       }
+    }
+
+    return new NextResponse(responseData, {
       status: res.status,
       headers: { 'Content-Type': 'application/json' },
     })
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Backend unavailable'
-    return NextResponse.json({ error: msg, backend: BACKEND_URL }, { status: 503 })
+  } catch (err: any) {
+    const isTimeout = err.name === 'TimeoutError' || err.message?.includes('timeout')
+    const msg = isTimeout 
+      ? `Backend timeout (${timeout/1000}s) - OSMnx took too long.` 
+      : (err instanceof Error ? err.message : 'Backend unavailable')
+      
+    return NextResponse.json({ 
+      success: false, 
+      error: msg, 
+      backend: BACKEND_URL,
+      timeout_ms: timeout
+    }, { status: 504 })
   }
 }
 
