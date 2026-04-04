@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useTransition } from 'react'
+import { toast } from 'sonner'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -63,16 +64,21 @@ export function Sidebar() {
   const handleSignOut = async () => {
     if (!confirmSignOut) {
       setConfirmSignOut(true)
+      toast.warning('Êtes-vous sûr de vouloir vous déconnecter ?', {
+        description: 'Cliquez à nouveau pour confirmer.',
+        duration: 3000,
+      })
       setTimeout(() => setConfirmSignOut(false), 3000)
       return
     }
     
-    // 🛰️ STAFF ENGINEER: Concurrent SignOut Cleanup
-    await supabase.auth.signOut()
-    signOutStore()
-    
-    router.push('/login')
-    router.refresh()
+    toast.info('Déconnexion en cours...', {
+      icon: <Loader2 className="w-4 h-4 animate-spin" />,
+      duration: 2000
+    })
+
+    // Redirect to the dedicated logout page which handles cleanup
+    router.push('/logout')
   }
 
   return (

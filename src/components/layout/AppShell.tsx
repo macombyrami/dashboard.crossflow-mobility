@@ -6,6 +6,8 @@ import { SwipeNavigation }   from './SwipeNavigation'
 import { WeatherProvider }   from '@/components/providers/WeatherProvider'
 import { TrafficSyncManager } from '@/components/dashboard/TrafficSyncManager'
 import { ConfigGuard }      from '@/components/auth/ConfigGuard'
+import { Toaster } from 'sonner'
+import { Breadcrumb } from '../navigation/Breadcrumb'
 
 // 🚀 STAFF ENGINEER PERFORMANCE: Lazy-load heavy chrome components
 const Sidebar   = lazy(() => import('./Sidebar').then(m => ({ default: m.Sidebar })))
@@ -111,6 +113,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Header />
             </Suspense>
 
+            <Breadcrumb />
+
             <div className="flex-1 overflow-hidden relative flex flex-col min-h-0 z-0 pb-safe">
               <SwipeNavigation>
                 {children}
@@ -128,6 +132,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Suspense fallback={<div className="h-20 w-full fixed bottom-0 bg-white/5 animate-pulse" />}>
             <BottomNav />
           </Suspense>
+
+          <Toaster 
+            theme="dark" 
+            position="top-right" 
+            toastOptions={{
+              style: {
+                background: 'rgba(20, 21, 25, 0.9)',
+                backdropFilter: 'blur(16px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#fff',
+                borderRadius: '16px',
+              }
+            }}
+          />
         </UserCityProvider>
       </ConfigGuard>
     </div>
