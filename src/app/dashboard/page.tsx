@@ -175,7 +175,7 @@ export default function DashboardPage() {
         <div>
           <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2 animate-slide-up">
             <div className="w-1.5 h-6 sm:w-2 sm:h-7 bg-brand rounded-full shadow-glow" />
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tighter uppercase font-heading">
               {city.flag} {city.name}
             </h1>
           </div>
@@ -239,7 +239,7 @@ export default function DashboardPage() {
 
           <div className="flex-1">
             <div className="flex items-center gap-3">
-              <span className="text-[14px] font-bold text-white tracking-tight uppercase">
+              <span className="text-[14px] font-black text-white tracking-widest uppercase font-heading">
                 {t('dashboard.performance')}
               </span>
               <span className={cn(
@@ -255,8 +255,8 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-4 sm:gap-8 pr-1 sm:pr-2">
             <div className="flex flex-col items-end">
-              <p className="text-[8px] sm:text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Efficacité</p>
-              <p className="text-[13px] sm:text-[15px] font-bold text-white tabular-nums">{Math.round(kpis.networkEfficiency * 100)}%</p>
+              <p className="text-[8px] sm:text-[9px] font-black text-text-muted uppercase tracking-[0.25em] mb-1">Efficacité</p>
+              <p className="text-[13px] sm:text-[15px] font-black text-white tabular-nums font-heading">{Math.round(kpis.networkEfficiency * 100)}%</p>
             </div>
             <div className="w-[1px] h-6 sm:h-8 bg-white/5 hidden xs:block" />
             <div className="flex-col items-end hidden xs:flex">

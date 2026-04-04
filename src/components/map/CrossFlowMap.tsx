@@ -1632,13 +1632,16 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
 
       // ─── A/B Split View Filtering ───
       if (mode === 'predict') {
-        map.setFilter(TRAFFIC_SOURCE + '-lines', ['<', ['get', 'midpoint_lng'], splitLng])
-        map.setFilter(TRAFFIC_SOURCE + '-glow',  ['<', ['get', 'midpoint_lng'], splitLng])
-        map.setFilter(TRAFFIC_PREDICTION_SOURCE + '-lines', ['>', ['get', 'midpoint_lng'], splitLng])
+        const filters: any = ['<', ['get', 'midpoint_lng'], splitLng]
+        map.setFilter(TRAFFIC_SOURCE + '-lines', filters)
+        map.setFilter(TRAFFIC_SOURCE + '-glow',  filters)
+        map.setFilter(TRAFFIC_SOURCE + '-halo',  filters)
+        map.setFilter(TRAFFIC_PREDICTION_SOURCE + '-lines', ['>', ['get', 'midpoint_lng'], splitLng] as any)
       } else {
         // Reset filters in other modes
         map.setFilter(TRAFFIC_SOURCE + '-lines', null)
         map.setFilter(TRAFFIC_SOURCE + '-glow',  null)
+        map.setFilter(TRAFFIC_SOURCE + '-halo',  null)
         map.setFilter(TRAFFIC_PREDICTION_SOURCE + '-lines', null)
       }
     }
@@ -2325,6 +2328,25 @@ function initStaticSources(map: maplibregl.Map) {
     })
   }
 
+  // 0. Traffic Halo (Maximum Contrast)
+  if (!map.getLayer(TRAFFIC_SOURCE + '-halo')) {
+    map.addLayer({
+      id:     TRAFFIC_SOURCE + '-halo',
+      type:   'line',
+      source: TRAFFIC_SOURCE,
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#000000',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 
+          8, ['*', 1.2, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]],
+          13, ['*', 1.3, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]],
+          17, ['*', 1.6, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]]
+        ],
+        'line-opacity': 0.6,
+      }
+    })
+  }
+
   // 1. Primary Traffic Lines
   if (!map.getLayer(TRAFFIC_SOURCE + '-lines')) {
     map.addLayer({
@@ -2337,22 +2359,22 @@ function initStaticSources(map: maplibregl.Map) {
           'case',
           ['boolean', ['feature-state', 'hasData'], false],
           ['match', ['feature-state', 'levelCode'],
-            0, '#22C55E', 1, '#EAB308', 2, '#F97316', 3, '#EF4444',
-            '#22C55E'
+            0, '#00FF9D', 1, '#FACD15', 2, '#FF9F0A', 3, '#EF4444',
+            '#00FF9D'
           ],
           '#2A2D35' 
         ],
         'line-width': ['interpolate', ['linear'], ['zoom'], 
-          8, ['*', 0.6, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]],
-          13, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5],
-          17, ['*', 1.4, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]]
+          8, ['*', 0.6, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.4]],
+          13, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.4],
+          17, ['*', 1.4, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.4]]
         ],
         'line-opacity': [
           'interpolate', ['linear'], ['zoom'],
-          10, ['case', ['boolean', ['feature-state', 'hasData'], false], 0.88, 0.4],
+          10, ['case', ['boolean', ['feature-state', 'hasData'], false], 0.95, 0.4],
           14, ['case', ['boolean', ['feature-state', 'hasData'], false], 1.0, 0.6]
         ],
-        'line-dasharray': [8, 0.1]
+        'line-dasharray': [4, 0.1]
       },
     })
   }
@@ -2368,7 +2390,7 @@ function initStaticSources(map: maplibregl.Map) {
       paint: {
         'line-color': [
           'match', ['feature-state', 'levelCode'],
-          0, '#22C55E', 1, '#FAFA33', 2, '#FF9100', 3, '#FF0000',
+          0, '#00FF9D', 1, '#FACD15', 2, '#FF9F0A', 3, '#EF4444',
           '#666666'
         ],
         'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1, 16, 3],
@@ -2391,8 +2413,8 @@ function initStaticSources(map: maplibregl.Map) {
           'case',
           ['boolean', ['feature-state', 'hasData'], false],
           ['match', ['feature-state', 'levelCode'],
-            0, '#22C55E', 1, '#EAB308', 2, '#F97316', 3, '#EF4444',
-            '#22C55E'
+            0, '#00FF9D', 1, '#FACD15', 2, '#FF9F0A', 3, '#EF4444',
+            '#00FF9D'
           ],
           'transparent' 
         ],
@@ -2958,7 +2980,7 @@ function initBoundaryLayers(map: maplibregl.Map) {
     type:   'line',
     source: BOUNDARY_SOURCE,
     paint:  {
-      'line-color':   '#22C55E',
+      'line-color':   '#00FF9D',
       'line-width':   40,
       'line-opacity': 0.05,
       'line-blur':    25,
@@ -2971,7 +2993,7 @@ function initBoundaryLayers(map: maplibregl.Map) {
     type:   'line',
     source: BOUNDARY_SOURCE,
     paint:  {
-      'line-color':   '#22C55E',
+      'line-color':   '#00FF9D',
       'line-width':   12,
       'line-opacity': 0.2,
       'line-blur':    8,

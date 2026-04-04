@@ -4,21 +4,21 @@
 
 /* ─── Prestige Design System (SaaS v4.0) ────────────────────────────── */
 :root {
-  --bg-base:     #030303; /* Obsidian Black */
-  --bg-surface:  #080808;
-  --bg-elevated: #111111;
-  --bg-border:   rgba(255,255,255,0.08); /* Elite fine border */
-  --bg-subtle:   rgba(255,255,255,0.03);
-  --bg-hover:    rgba(255,255,255,0.1);
+  --bg-base:     #08090B; /* Deep Obsidian */
+  --bg-surface:  #0D0E11;
+  --bg-elevated: #15171C;
+  --bg-border:   rgba(255,255,255,0.06); /* Elite fine border */
+  --bg-subtle:   rgba(255,255,255,0.02);
+  --bg-hover:    rgba(255,255,255,0.08);
 
-  --text-primary:   #FFFFFF;
-  --text-secondary: #A1A1AA;
-  --text-muted:     #52525B;
+  --text-primary:   #FDFCFE;
+  --text-secondary: #ABABAD;
+  --text-muted:     #636366;
 
-  --brand:        #10a854; /* Verified CrossFlow Green */
-  --brand-dim:    rgba(16, 168, 84, 0.12);
-  --brand-glow:   rgba(16, 168, 84, 0.3);
-  --brand-glow-lg:rgba(16, 168, 84, 0.5);
+  --brand:        #00FF9D; /* Signal Green */
+  --brand-dim:    rgba(0, 255, 157, 0.12);
+  --brand-glow:   rgba(0, 255, 157, 0.3);
+  --brand-glow-lg:rgba(0, 255, 157, 0.5);
   --prestige-silver: linear-gradient(135deg, #FFF 0%, rgba(255,255,255,0.4) 100%);
   --prestige-glow: 0 0 40px -10px rgba(16, 168, 84, 0.3);
 
@@ -69,7 +69,7 @@ body {
   margin: 0;
   padding: 0;
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", system-ui, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg-base);
   /* Fluid Body Typography */
   font-size: clamp(14px, 1.2vw, 16px);
@@ -98,24 +98,23 @@ body {
 }
 
 .glass-card {
-  background: rgba(10, 10, 10, 0.45);
+  background: rgba(13, 14, 17, 0.45);
   backdrop-filter: blur(40px) saturate(210%);
   -webkit-backdrop-filter: blur(40px) saturate(210%);
-  border: 1px solid rgba(255,255,255,0.08); /* Ultra fine line */
-  border-radius: var(--radius-2xl);
+  border: 1px solid rgba(255,255,255,0.05); /* Ultra fine line */
+  border-radius: var(--radius-xl);
   box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
     0 10px 40px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
   transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-card:hover {
-  background: rgba(15, 15, 15, 0.6);
-  border-color: rgba(255,255,255,0.15);
-  transform: translateY(-4px);
+  background: rgba(21, 23, 28, 0.65);
+  border-color: var(--brand-glow);
+  transform: translateY(-4px) scale(1.01);
   box-shadow:
-    0 20px 60px -10px rgba(0,0,0,0.6),
+    0 30px 60px -12px rgba(0,0,0,0.7),
     0 0 40px -10px var(--brand-glow);
 }
 
@@ -145,6 +144,7 @@ body {
 
 /* ─── Typography (Fluid & Responsive Scale) ────────────────────────────── */
 .display {
+  font-family: 'Space Grotesk', sans-serif;
   font-size: clamp(32px, 5vw, 42px);
   font-weight: 700;
   letter-spacing: -0.035em;
@@ -152,18 +152,21 @@ body {
 }
 
 .heading-1 { 
+  font-family: 'Space Grotesk', sans-serif;
   font-size: clamp(24px, 4vw, 32px); 
   font-weight: 700; 
   letter-spacing: -0.024em; 
   line-height: 1.2; 
 }
 .heading-2 { 
+  font-family: 'Space Grotesk', sans-serif;
   font-size: clamp(20px, 3vw, 26px); 
   font-weight: 600; 
   letter-spacing: -0.018em; 
   line-height: 1.25; 
 }
 .heading-3 { 
+  font-family: 'Space Grotesk', sans-serif;
   font-size: clamp(17px, 2.5vw, 21px); 
   font-weight: 600; 
   letter-spacing: -0.012em; 

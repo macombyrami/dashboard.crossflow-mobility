@@ -49,14 +49,14 @@ function KPICardInner({
       <div className="relative z-10">
         <div className="flex items-baseline gap-2">
           <span className={cn(
-            "text-3xl sm:text-4xl font-bold tracking-tight text-white",
-            critical ? "text-[#FF3B30]" : warning ? "text-[#FF9F0A]" : ""
+            "text-3xl sm:text-4xl font-black tracking-tighter text-white font-heading",
+            critical ? "text-red-500" : warning ? "text-orange-500" : ""
           )}>
             {value}
           </span>
-          {unit && <span className="text-sm font-semibold text-text-secondary">{unit}</span>}
+          {unit && <span className="text-xs font-bold text-text-muted uppercase tracking-widest">{unit}</span>}
         </div>
-        {sub && <p className="text-[11px] font-medium text-text-muted mt-2 leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity duration-500">{sub}</p>}
+        {sub && <p className="text-[11px] font-semibold text-text-muted mt-2 leading-relaxed opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-1 group-hover:translate-y-0">{sub}</p>}
       </div>
 
       {delta !== undefined && (

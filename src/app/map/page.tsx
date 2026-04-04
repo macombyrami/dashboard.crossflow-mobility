@@ -124,28 +124,47 @@ export default function MapPage() {
 
         {/* --- DYNAMIC HUD LAYER --- */}
 
-        {/* TOP HUD: Status & Health (Centralized for scannability) */}
-        {!isAIPanelOpen && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center gap-2 w-full px-4 text-center sm:w-auto">
-             {mounted && (
-               <div className="flex flex-col items-center gap-1.5 opacity-90 backdrop-blur-sm px-4 py-2 rounded-2xl bg-[#030303]/40">
-                 <div className="flex items-center gap-2 pointer-events-auto">
-                   <LiveSyncBadge refreshing={isFetching} lastSync={lastUpdated?.toLocaleTimeString()} />
-                   <button 
-                     onClick={manualRefresh}
-                     className="p-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
-                   >
-                     <span className={cn("text-[10px] block", isFetching && "animate-spin")}>🔄</span>
-                   </button>
-                 </div>
-                 <CityPulseHUD className="hidden sm:flex" />
-                 {timeSinceUpdate > 1 && (
-                   <span className="text-[9px] font-black text-white/30 uppercase tracking-widest animate-pulse">
-                     Délai: {timeSinceUpdate} min
-                   </span>
-                 )}
-               </div>
-             )}
+        {/* TOP HUD: Unified Status & KPIs */}
+        {!isAIPanelOpen && mounted && (
+          <div className="absolute top-0 inset-x-0 z-30 pointer-events-none flex flex-col items-center">
+            <div className="w-full max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row items-start justify-between gap-4">
+              
+              {/* Left: System Status */}
+              <div className="pointer-events-auto flex items-center gap-2">
+                <LiveSyncBadge refreshing={isFetching} lastSync={lastUpdated?.toLocaleTimeString()} />
+                <button 
+                  onClick={manualRefresh}
+                  className="w-10 h-10 rounded-2xl bg-bg-surface/60 backdrop-blur-3xl border border-white/10 hover:bg-white/20 flex items-center justify-center transition-all shadow-prestige group"
+                  title="Rafraîchir les données"
+                >
+                  <span className={cn("text-xs block group-hover:scale-110", isFetching && "animate-spin")}>🔄</span>
+                </button>
+              </div>
+
+              {/* Center: Hero KPIs */}
+              <CityPulseHUD className="pointer-events-auto" />
+
+              {/* Right: Mode/Time Indicator (Desktop) */}
+              <div className="hidden lg:flex pointer-events-auto items-center gap-3 bg-bg-surface/60 backdrop-blur-3xl border border-white/10 px-4 py-2 rounded-2xl shadow-prestige">
+                <div className="flex flex-col text-right">
+                  <span className="text-[9px] font-black text-brand uppercase tracking-widest leading-none mb-1">Mode Opérationnel</span>
+                  <span className="text-[11px] font-bold text-white uppercase tracking-tighter leading-none">Intelligence Temps-Réel</span>
+                </div>
+                <div className="w-px h-6 bg-white/10" />
+                <div className="flex flex-col text-right">
+                  <span className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none mb-1">Version</span>
+                  <span className="text-[11px] font-bold text-white/60 uppercase tracking-tighter leading-none">v4.0.2</span>
+                </div>
+              </div>
+            </div>
+
+            {timeSinceUpdate > 2 && (
+              <div className="mt-2 bg-status-critical/10 border border-status-critical/30 px-3 py-1 rounded-full backdrop-blur-md animate-pulse">
+                <span className="text-[9px] font-black text-status-critical uppercase tracking-widest">
+                  Délai Telemetrie: {timeSinceUpdate} min
+                </span>
+              </div>
+            )}
           </div>
         )}
 

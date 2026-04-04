@@ -12,35 +12,23 @@ export function CityPulseHUD({ className }: { className?: string }) {
   if (mode === 'simulate') return null
 
   return (
-    <div className={cn("w-full max-w-full md:w-fit pointer-events-auto", className)}>
-      <div className={cn(
-        "flex flex-row md:flex-row items-center justify-center gap-2 p-2 p-1 md:p-1.5 transition-all w-full md:w-auto",
-        "bg-transparent md:bg-black/40 md:backdrop-blur-3xl md:border md:border-white/10 md:rounded-2xl md:shadow-apple md:ring-1 md:ring-white/5",
-        "overflow-x-auto no-scrollbar pb-2 md:pb-0"
-      )}>
-        
-        <DataCard
-          icon={CheckCircle2}
-          value={58}
-          scale="/100"
-          metric="SANTÉ URBAINE"
-          context={city.name}
-          badge="✅ BON"
-          variant="success"
-          mini={true}
-          className="md:hidden"
-        />
-        <DataCard
-          icon={CheckCircle2}
-          value={58}
-          scale="/100"
-          metric="SANTÉ URBAINE"
-          context={city.name}
-          badge="✅ BON"
-          variant="success"
-          className="hidden md:flex"
-        />
+    <div className={cn("w-full max-w-full lg:w-fit pointer-events-auto flex flex-col lg:flex-row items-center gap-3", className)}>
+      
+      {/* Primary HUD Card */}
+      <DataCard
+        icon={CheckCircle2}
+        value={58}
+        scale="/100"
+        metric="SANTÉ URBAINE"
+        context={city.name}
+        badge="✅ BON"
+        variant="success"
+        primary={true}
+        className="w-full lg:w-[240px] lg:h-[240px]"
+      />
 
+      {/* Secondary Metrics Grid */}
+      <div className="grid grid-cols-2 gap-2 w-full lg:w-auto">
         <DataCard
           icon={AlertTriangle}
           value="32%"
@@ -48,28 +36,7 @@ export function CityPulseHUD({ className }: { className?: string }) {
           context="Mode FLUX"
           badge="⚠️ MODÉRÉ"
           variant="warning"
-          mini={true}
-          className="md:hidden"
-        />
-        <DataCard
-          icon={AlertTriangle}
-          value="32%"
-          metric="CONGESTION"
-          context="Mode FLUX"
-          badge="⚠️ MODÉRÉ"
-          variant="warning"
-          className="hidden md:flex"
-        />
-
-        <DataCard
-          icon={ShieldAlert}
-          value={8}
-          metric="PERTURBATIONS"
-          context="Événements"
-          badge="🔴 CRITIQUE"
-          variant="danger"
-          mini={true}
-          className="md:hidden"
+          className="min-w-0"
         />
         <DataCard
           icon={ShieldAlert}
@@ -78,8 +45,15 @@ export function CityPulseHUD({ className }: { className?: string }) {
           context="Événements"
           badge="🔴 CRITIQUE"
           variant="danger"
-          className="hidden md:flex"
+          className="min-w-0"
         />
+        {/* Placeholder for scaling to 6 KPIs */}
+        <div className="hidden lg:flex items-center justify-center p-4 rounded-3xl border border-dashed border-white/5 bg-white/2">
+           <span className="text-[8px] font-black text-text-muted uppercase tracking-widest">Capteur AI</span>
+        </div>
+        <div className="hidden lg:flex items-center justify-center p-4 rounded-3xl border border-dashed border-white/5 bg-white/2">
+           <span className="text-[8px] font-black text-text-muted uppercase tracking-widest">Flux V2X</span>
+        </div>
       </div>
     </div>
   )

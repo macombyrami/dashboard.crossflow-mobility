@@ -21,15 +21,27 @@ const config: Config = {
           accent:    '#FFFFFF',
         },
         brand: {
-          DEFAULT: '#10a854',
-          dim:     'rgba(16, 168, 84, 0.15)',
-          glow:    'rgba(16, 168, 84, 0.25)',
+          DEFAULT: '#00FF9D',
+          dim:     'rgba(0, 255, 157, 0.15)',
+          glow:    'rgba(0, 255, 157, 0.25)',
+        },
+        antigravity: {
+          primary: '#00FF9D',
+          deep:    '#08090B',
+          void:    '#030303',
+          accent:  '#64f9c3',
         },
         traffic: {
-          free:      '#10a854',
+          free:      '#00FF9D',
           slow:      '#FFD600',
           congested: '#FF9F0A',
           critical:  '#FF3B30',
+        },
+        status: {
+          ok:       '#00FF9D',
+          warn:     '#FACD15',
+          critical: '#EF4444',
+          info:     '#0A84FF',
         },
         // Apple system colors
         apple: {
@@ -40,14 +52,15 @@ const config: Config = {
           red:    '#FF3B30',
           orange: '#FF9F0A',
           yellow: '#FFD60A',
-          green:  '#32D74B',
+          green:  '#00FF9D',
           teal:   '#5AC8F5',
           cyan:   '#5AC8FA',
         },
       },
       fontFamily: {
-        sans:  ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
-        mono:  ['JetBrains Mono', 'SF Mono', 'Fira Code', 'monospace'],
+        sans:    ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        heading: ['var(--font-space-grotesk)', 'Space Grotesk', 'sans-serif'],
+        mono:    ['JetBrains Mono', 'SF Mono', 'Fira Code', 'monospace'],
       },
       fontSize: {
         '2xs': ['10px', { lineHeight: '14px', letterSpacing: '0.01em' }],
