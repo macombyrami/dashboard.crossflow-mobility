@@ -77,7 +77,8 @@ export async function fetchRoads(
     const data = await res.json()
 
     return parseWays(data)
-  } catch {
+  } catch (err) {
+    console.error(`[Overpass API] Failed to fetch roads for ${bbox.join(',')}:`, err)
     return []
   }
 }

@@ -156,6 +156,25 @@ const OSM_DARK_STYLE: maplibregl.StyleSpecification = {
   glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
 }
 
+// ─── Map Helpers (Race Condition Protection) ───────────────────────
+
+/** Wrap map properties to avoid 'undefined' crashes if layer/source not ready */
+const safeSetPaintProperty = (map: maplibregl.Map | null, id: string, prop: string, val: any) => {
+  if (map && map.getLayer(id)) map.setPaintProperty(id, prop, val)
+}
+const safeSetLayoutProperty = (map: maplibregl.Map | null, id: string, prop: string, val: any) => {
+  if (map && map.getLayer(id)) map.setLayoutProperty(id, prop, val)
+}
+const safeGetSource = (map: maplibregl.Map | null, id: string) => {
+  return (map && map.getSource(id)) ? map.getSource(id) : null
+}
+const safeSetFilter = (map: maplibregl.Map | null, id: string, filter: any) => {
+  if (map && map.getLayer(id)) map.setFilter(id, filter)
+}
+const safeSetFeatureState = (map: maplibregl.Map | null, feat: { source: string, id: string | number }, state: any) => {
+  if (map && map.getSource(feat.source)) map.setFeatureState(feat, state)
+}
+
 function computeRoadWidth(roadType: string | undefined, level: CongestionLevel, zoom: number): number {
   const base: Record<string, number> = {
     motorway: 4.5, motorway_link: 3.5, 
@@ -312,7 +331,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     })
 
     // 3. Update Map Source
-    const src = map.getSource(VEHICLES_SOURCE) as maplibregl.GeoJSONSource | undefined
+    const src = safeGetSource(map, VEHICLES_SOURCE) as maplibregl.GeoJSONSource | null
     if (src) {
       src.setData({
         type: 'FeatureCollection',
@@ -338,7 +357,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       const active = allVehicles.find(v => v.id === selId)
       if (active) {
         // Update selection highlight source
-        const hSrc = map.getSource(VEHICLES_SOURCE + '-selected') as maplibregl.GeoJSONSource | undefined
+        const hSrc = safeGetSource(map, VEHICLES_SOURCE + '-selected') as maplibregl.GeoJSONSource | null
         if (hSrc) {
           hSrc.setData({
             type: 'Feature' as const,
@@ -373,12 +392,11 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     const p = pulseRef.current
     const pulseOpacity = 0.7 * (1 - p)
 
-    if (map.getLayer(METRO_STATIONS_SOURCE + '-alert')) {
-      map.setPaintProperty(METRO_STATIONS_SOURCE + '-alert', 'circle-opacity', pulseOpacity)
-    }
-    if (map.getLayer(VEHICLES_SOURCE + '-selected-ring')) {
-      map.setPaintProperty(VEHICLES_SOURCE + '-selected-ring', 'circle-opacity', pulseOpacity * 0.6)
-      map.setPaintProperty(VEHICLES_SOURCE + '-selected-ring', 'circle-radius', [
+    safeSetPaintProperty(map, METRO_STATIONS_SOURCE + '-alert', 'circle-opacity', pulseOpacity)
+    
+    if (map && map.getLayer(VEHICLES_SOURCE + '-selected-ring')) {
+      safeSetPaintProperty(map, VEHICLES_SOURCE + '-selected-ring', 'circle-opacity', pulseOpacity * 0.6)
+      safeSetPaintProperty(map, VEHICLES_SOURCE + '-selected-ring', 'circle-radius', [
         'interpolate', ['linear'], ['zoom'],
         10, 12 + (p * 8),
         15, 24 + (p * 12)
@@ -403,22 +421,18 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       
       // 1. Traffic Dash Animation
       offset = (offset + 0.15) % 100
-      if (map.getLayer(TRAFFIC_SOURCE + '-lines')) {
-        map.setPaintProperty(TRAFFIC_SOURCE + '-lines', 'line-dash-offset', offset)
-      }
+      safeSetPaintProperty(map, TRAFFIC_SOURCE + '-lines', 'line-dash-offset', offset)
 
       // 1b. Phase 5: Radial Scan & Critical Pulse
       // Scan starts at 0 and grows to 1 then stays there
       if (scanRef.current < 1) {
         scanRef.current += 0.005
-        if (map.getLayer('cf-traffic-glow')) {
-           map.setPaintProperty('cf-traffic-glow', 'line-opacity', [
-             'interpolate', ['linear'], ['line-progress'],
-             scanRef.current - 0.1, 0,
-             scanRef.current, 0.8,
-             scanRef.current + 0.1, 0
-           ])
-        }
+        safeSetPaintProperty(map, 'cf-traffic-glow', 'line-opacity', [
+          'interpolate', ['linear'], ['line-progress'],
+          scanRef.current - 0.1, 0,
+          scanRef.current, 0.8,
+          scanRef.current + 0.1, 0
+        ])
       }
 
       // 2. Pulse Animation (Vehicles + Station Alerts)
@@ -1426,7 +1440,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       const { NetworkAggregator } = await import('@/lib/engine/NetworkAggregator')
       const fc = await NetworkAggregator.getCityNetwork(city)
       
-      const tSrc = map.getSource(TRAFFIC_SOURCE) as maplibregl.GeoJSONSource
+      const tSrc = safeGetSource(map, TRAFFIC_SOURCE) as maplibregl.GeoJSONSource | null
       if (tSrc) {
         tSrc.setData(fc)
         cityNetworkRef.current = city.id
@@ -1580,12 +1594,12 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     setIncidents(incidents)
 
     // --- High Performance: UCTN Property Updates ---
-    if (map.getSource(TRAFFIC_SOURCE)) {
+    if (safeGetSource(map, TRAFFIC_SOURCE)) {
       const activeIds = new Set(snappedSnapshot.segments.map(s => s.id))
       
       // Update state for current live data
       snappedSnapshot.segments.forEach(seg => {
-        map.setFeatureState(
+        safeSetFeatureState(map,
           { source: TRAFFIC_SOURCE, id: seg.id },
           { 
             hasData: true, 
@@ -1603,7 +1617,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
         // Simulated +30m delta
         const currentScore = seg.congestionScore
         const predictedScore = Math.min(1, currentScore + 0.15)
-        map.setFeatureState(
+        safeSetFeatureState(map,
           { source: TRAFFIC_PREDICTION_SOURCE, id: seg.id },
           { levelCode: scoreToCongestionLevel(predictedScore) === 'free' ? 0 : 
                        scoreToCongestionLevel(predictedScore) === 'slow' ? 1 :
@@ -1625,24 +1639,26 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
             }
           }))
         }
-        ;(map.getSource(TRAFFIC_SOURCE) as maplibregl.GeoJSONSource).setData(geo)
-        ;(map.getSource(TRAFFIC_PREDICTION_SOURCE) as maplibregl.GeoJSONSource).setData(geo)
+        const s1 = safeGetSource(map, TRAFFIC_SOURCE) as maplibregl.GeoJSONSource | null
+        const s2 = safeGetSource(map, TRAFFIC_PREDICTION_SOURCE) as maplibregl.GeoJSONSource | null
+        if (s1) s1.setData(geo)
+        if (s2) s2.setData(geo)
         cityNetworkRef.current = city.id
       }
 
       // ─── A/B Split View Filtering ───
       if (mode === 'predict') {
         const filters: any = ['<', ['get', 'midpoint_lng'], splitLng]
-        map.setFilter(TRAFFIC_SOURCE + '-lines', filters)
-        map.setFilter(TRAFFIC_SOURCE + '-glow',  filters)
-        map.setFilter(TRAFFIC_SOURCE + '-halo',  filters)
-        map.setFilter(TRAFFIC_PREDICTION_SOURCE + '-lines', ['>', ['get', 'midpoint_lng'], splitLng] as any)
+        safeSetFilter(map, TRAFFIC_SOURCE + '-lines', filters)
+        safeSetFilter(map, TRAFFIC_SOURCE + '-glow',  filters)
+        safeSetFilter(map, TRAFFIC_SOURCE + '-halo',  filters)
+        safeSetFilter(map, TRAFFIC_PREDICTION_SOURCE + '-lines', ['>', ['get', 'midpoint_lng'], splitLng] as any)
       } else {
         // Reset filters in other modes
-        map.setFilter(TRAFFIC_SOURCE + '-lines', null)
-        map.setFilter(TRAFFIC_SOURCE + '-glow',  null)
-        map.setFilter(TRAFFIC_SOURCE + '-halo',  null)
-        map.setFilter(TRAFFIC_PREDICTION_SOURCE + '-lines', null)
+        safeSetFilter(map, TRAFFIC_SOURCE + '-lines', null)
+        safeSetFilter(map, TRAFFIC_SOURCE + '-glow',  null)
+        safeSetFilter(map, TRAFFIC_SOURCE + '-halo',  null)
+        safeSetFilter(map, TRAFFIC_PREDICTION_SOURCE + '-lines', null)
       }
     }
 
@@ -1656,7 +1672,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
           properties: { intensity: pt.intensity },
         })),
       }
-      const hSrc = map.getSource(HEATMAP_SOURCE) as maplibregl.GeoJSONSource | undefined
+      const hSrc = safeGetSource(map, HEATMAP_SOURCE) as maplibregl.GeoJSONSource | null
       if (hSrc) hSrc.setData(heatGeo)
     }
 
@@ -1668,11 +1684,11 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
         properties: { id: inc.id, title: inc.title, severity: inc.severity, color: inc.iconColor },
       })),
     }
-    const iSrc = map.getSource(INCIDENT_SOURCE) as maplibregl.GeoJSONSource | undefined
+    const iSrc = safeGetSource(map, INCIDENT_SOURCE) as maplibregl.GeoJSONSource | null
     if (iSrc) iSrc.setData(incGeo)
 
     // Boundary
-    const bSrc = map.getSource(BOUNDARY_SOURCE) as maplibregl.GeoJSONSource | undefined
+    const bSrc = safeGetSource(map, BOUNDARY_SOURCE) as maplibregl.GeoJSONSource | null
     if (bSrc && cityBoundary) bSrc.setData(cityBoundary)
 
     previousSnapshotRef.current = snapshot
@@ -1910,8 +1926,8 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
 
     if (!currentResult || !currentResult.predictive) {
       const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
-      const affSrc = map.getSource(PREDICTIVE_AFFECTED_SOURCE) as maplibregl.GeoJSONSource
-      const evtSrc = map.getSource(PREDICTIVE_EVENTS_SOURCE) as maplibregl.GeoJSONSource
+      const affSrc = safeGetSource(map, PREDICTIVE_AFFECTED_SOURCE) as maplibregl.GeoJSONSource | null
+      const evtSrc = safeGetSource(map, PREDICTIVE_EVENTS_SOURCE) as maplibregl.GeoJSONSource | null
       if (affSrc) affSrc.setData(empty)
       if (evtSrc) evtSrc.setData(empty)
       return
@@ -1919,13 +1935,13 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
 
     // Fetch and sync affected edges (real OSM segments from backend)
     simulationService.getAffectedEdges().then(geojson => {
-      const src = map.getSource(PREDICTIVE_AFFECTED_SOURCE) as maplibregl.GeoJSONSource
+      const src = safeGetSource(map, PREDICTIVE_AFFECTED_SOURCE) as maplibregl.GeoJSONSource | null
       if (src && geojson) src.setData(geojson)
     })
 
     // Fetch and sync active events (labels + icons)
     simulationService.getEvents().then(geojson => {
-      const src = map.getSource(PREDICTIVE_EVENTS_SOURCE) as maplibregl.GeoJSONSource
+      const src = safeGetSource(map, PREDICTIVE_EVENTS_SOURCE) as maplibregl.GeoJSONSource | null
       if (src && geojson) src.setData(geojson)
     })
   }, [currentResult, mapLoaded])
@@ -1937,7 +1953,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     const map = mapRef.current
     const loc = useSimulationStore.getState().eventLocation
 
-    const src = map.getSource(SIM_LOCATION_SOURCE) as maplibregl.GeoJSONSource
+    const src = safeGetSource(map, SIM_LOCATION_SOURCE) as maplibregl.GeoJSONSource | null
     if (!src) return
 
     if (!loc) {
@@ -1957,57 +1973,53 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return
     const map = mapRef.current
-    const trySet = (id: string, vis: 'visible' | 'none') => {
-      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', vis)
-    }
-
-    trySet(TRAFFIC_SOURCE  + '-lines',    activeLayers.has('traffic')   ? 'visible' : 'none')
-    trySet(TRAFFIC_SOURCE  + '-glow',     activeLayers.has('traffic')   ? 'visible' : 'none')
+    safeSetLayoutProperty(map, TRAFFIC_SOURCE  + '-lines',    'visibility', activeLayers.has('traffic')   ? 'visible' : 'none')
+    safeSetLayoutProperty(map, TRAFFIC_SOURCE  + '-glow',     'visibility', activeLayers.has('traffic')   ? 'visible' : 'none')
     // Heatmap layers are managed by the heatmap mode effect below
-    trySet(INCIDENT_SOURCE + '-circles',  activeLayers.has('incidents') ? 'visible' : 'none')
-    trySet(INCIDENT_SOURCE + '-glow',     activeLayers.has('incidents') ? 'visible' : 'none')
-    trySet(INCIDENT_SOURCE + '-labels',   activeLayers.has('incidents') ? 'visible' : 'none')
+    safeSetLayoutProperty(map, INCIDENT_SOURCE + '-circles',  'visibility', activeLayers.has('incidents') ? 'visible' : 'none')
+    safeSetLayoutProperty(map, INCIDENT_SOURCE + '-glow',     'visibility', activeLayers.has('incidents') ? 'visible' : 'none')
+    safeSetLayoutProperty(map, INCIDENT_SOURCE + '-labels',   'visibility', activeLayers.has('incidents') ? 'visible' : 'none')
 
     // Boundary layers
     const boundaryVis = activeLayers.has('boundary') ? 'visible' : 'none'
-    trySet(BOUNDARY_SOURCE + '-glow-outer', boundaryVis)
-    trySet(BOUNDARY_SOURCE + '-glow',       boundaryVis)
-    trySet(BOUNDARY_SOURCE + '-fill',       boundaryVis)
-    trySet(BOUNDARY_SOURCE + '-line',       boundaryVis)
-    trySet(BOUNDARY_SOURCE + '-label',      boundaryVis)
+    safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-glow-outer', 'visibility', boundaryVis)
+    safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-glow',       'visibility', boundaryVis)
+    safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-fill',       'visibility', boundaryVis)
+    safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-line',       'visibility', boundaryVis)
+    safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-label',      'visibility', boundaryVis)
 
     // District choropleth
-    trySet(DISTRICTS_SOURCE + '-fill',  boundaryVis)
-    trySet(DISTRICTS_SOURCE + '-line',  boundaryVis)
-    trySet(DISTRICTS_SOURCE + '-label', boundaryVis)
+    safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-fill',  'visibility', boundaryVis)
+    safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-line',  'visibility', boundaryVis)
+    safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-label', 'visibility', boundaryVis)
 
     // TomTom live tiles
     if (useLiveData) {
-      trySet(TOMTOM_FLOW + '-layer', activeLayers.has('traffic') ? 'visible' : 'none')
-      trySet(TOMTOM_INC  + '-layer', activeLayers.has('incidents') ? 'visible' : 'none')
+      safeSetLayoutProperty(map, TOMTOM_FLOW + '-layer', 'visibility', activeLayers.has('traffic') ? 'visible' : 'none')
+      safeSetLayoutProperty(map, TOMTOM_INC  + '-layer', 'visibility', activeLayers.has('incidents') ? 'visible' : 'none')
     }
 
     const transportVis = activeLayers.has('transport') ? 'visible' : 'none'
-    trySet(VEHICLES_SOURCE + '-glow',  transportVis)
-    trySet(VEHICLES_SOURCE + '-layer', transportVis)
-    trySet(VEHICLES_SOURCE + '-label', transportVis)
+    safeSetLayoutProperty(map, VEHICLES_SOURCE + '-glow',  'visibility', transportVis)
+    safeSetLayoutProperty(map, VEHICLES_SOURCE + '-layer', 'visibility', transportVis)
+    safeSetLayoutProperty(map, VEHICLES_SOURCE + '-label', 'visibility', transportVis)
     
     // Vehicle selection highlight visibility
     const selectedVehVis = (transportVis === 'visible' && selectedVehicleId !== null) ? 'visible' : 'none'
-    trySet(VEHICLES_SOURCE + '-selected-ring', selectedVehVis)
-    trySet(VEHICLES_SOURCE + '-selected-dot',  selectedVehVis)
+    safeSetLayoutProperty(map, VEHICLES_SOURCE + '-selected-ring', 'visibility', selectedVehVis)
+    safeSetLayoutProperty(map, VEHICLES_SOURCE + '-selected-dot',  'visibility', selectedVehVis)
     
     // Transit route polylines
 
-    trySet(TRANSIT_ROUTES_SOURCE + '-bus',    transportVis)
-    trySet(TRANSIT_ROUTES_SOURCE + '-metro',  transportVis)
+    safeSetLayoutProperty(map, TRANSIT_ROUTES_SOURCE + '-bus',    'visibility', transportVis)
+    safeSetLayoutProperty(map, TRANSIT_ROUTES_SOURCE + '-metro',  'visibility', transportVis)
     // Metro station markers
-    trySet(METRO_STATIONS_SOURCE + '-glow',   transportVis)
-    trySet(METRO_STATIONS_SOURCE + '-ring',   transportVis)
-    trySet(METRO_STATIONS_SOURCE + '-dot',    transportVis)
-    trySet(METRO_STATIONS_SOURCE + '-lineref',transportVis)
-    trySet(METRO_STATIONS_SOURCE + '-name',   transportVis)
-    trySet(METRO_STATIONS_SOURCE + '-alert',  transportVis)
+    safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-glow',   'visibility', transportVis)
+    safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-ring',   'visibility', transportVis)
+    safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-dot',    'visibility', transportVis)
+    safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-lineref','visibility', transportVis)
+    safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-name',   'visibility', transportVis)
+    safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-alert',  'visibility', transportVis)
   }, [activeLayers, mapLoaded, useLiveData])
 
   // ─── Heatmap mode (shows/hides correct heatmap layer) ────────────────
@@ -2015,18 +2027,15 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return
     const map = mapRef.current
-    const trySet = (id: string, vis: 'visible' | 'none') => {
-      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', vis)
-    }
     const isHeatmapActive = activeLayers.has('heatmap')
-    trySet(HEATMAP_SOURCE          + '-layer',   isHeatmapActive && heatmapMode === 'congestion' ? 'visible' : 'none')
-    trySet(HEATMAP_SOURCE          + '-circles', isHeatmapActive && heatmapMode === 'congestion' ? 'visible' : 'none')
+    safeSetLayoutProperty(map, HEATMAP_SOURCE          + '-layer',   'visibility', isHeatmapActive && heatmapMode === 'congestion' ? 'visible' : 'none')
+    safeSetLayoutProperty(map, HEATMAP_SOURCE          + '-circles', 'visibility', isHeatmapActive && heatmapMode === 'congestion' ? 'visible' : 'none')
     
-    trySet(HEATMAP_PASSAGES_SOURCE + '-layer',   isHeatmapActive && heatmapMode === 'passages'   ? 'visible' : 'none')
-    trySet(HEATMAP_PASSAGES_SOURCE + '-circles', isHeatmapActive && heatmapMode === 'passages'   ? 'visible' : 'none')
+    safeSetLayoutProperty(map, HEATMAP_PASSAGES_SOURCE + '-layer',   'visibility', isHeatmapActive && heatmapMode === 'passages'   ? 'visible' : 'none')
+    safeSetLayoutProperty(map, HEATMAP_PASSAGES_SOURCE + '-circles', 'visibility', isHeatmapActive && heatmapMode === 'passages'   ? 'visible' : 'none')
     
-    trySet(HEATMAP_CO2_SOURCE      + '-layer',   isHeatmapActive && heatmapMode === 'co2'        ? 'visible' : 'none')
-    trySet(HEATMAP_CO2_SOURCE      + '-circles', isHeatmapActive && heatmapMode === 'co2'        ? 'visible' : 'none')
+    safeSetLayoutProperty(map, HEATMAP_CO2_SOURCE      + '-layer',   'visibility', isHeatmapActive && heatmapMode === 'co2'        ? 'visible' : 'none')
+    safeSetLayoutProperty(map, HEATMAP_CO2_SOURCE      + '-circles', 'visibility', isHeatmapActive && heatmapMode === 'co2'        ? 'visible' : 'none')
   }, [heatmapMode, activeLayers, mapLoaded])
 
   // ─── Zone drawing (draft line + finalized polygon) ─────────────────

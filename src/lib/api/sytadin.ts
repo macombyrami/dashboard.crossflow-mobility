@@ -190,6 +190,21 @@ function parseAlertText(text: string, id: string): SytadinAlert | null {
 // ─── API client (Core Fetcher — No circular calls) ───────────────────────
 
 export async function fetchSytadinRaw(endpoint: 'alerts' | 'congestion'): Promise<{ html: string; degraded: boolean }> {
+  // ─── Browser Side: Route through our local proxy to avoid CSP/CORS ───
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/sytadin?type=${endpoint}`)
+      if (!res.ok) throw new Error(`Proxy error: ${res.status}`)
+      const html = await res.text()
+      const degraded = res.headers.get('X-Sytadin-Fallback') === 'true'
+      return { html, degraded }
+    } catch (err) {
+      console.warn(`[Sytadin Client] Proxy fetch failed for ${endpoint}, returning degraded state.`, err)
+      return { html: '', degraded: true }
+    }
+  }
+
+  // ─── Server Side: Direct fetch from Sytadin.fr ───────────────────────
   const url = endpoint === 'alerts' 
     ? 'https://www.sytadin.fr/refreshed/alert_block.jsp.html' 
     : 'https://www.sytadin.fr/refreshed/cumul_bouchon.jsp.html'
@@ -201,7 +216,7 @@ export async function fetchSytadinRaw(endpoint: 'alerts' | 'congestion'): Promis
         'Accept-Language': 'fr-FR,fr;q=0.9',
         'Accept':          'text/html,application/xhtml+xml',
       },
-      next: { revalidate: 180 },
+      next: { revalidate: 600 }, // Sync with proxy cache
       signal: AbortSignal.timeout(8000), 
     })
 

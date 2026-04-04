@@ -7,7 +7,9 @@ import { fetchSytadinRaw } from '@/lib/api/sytadin'
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const ep = (searchParams.get('endpoint') ?? 'alerts') as 'alerts' | 'congestion'
+  // Support both 'endpoint' and 'type' (alias)
+  const endpointParam = searchParams.get('endpoint') || searchParams.get('type')
+  const ep = (endpointParam ?? 'alerts') as 'alerts' | 'congestion'
 
   try {
     const { html, degraded } = await fetchSytadinRaw(ep)
@@ -22,7 +24,7 @@ export async function GET(request: Request) {
     return new NextResponse(html, {
       headers: {
         'Content-Type':  'text/html; charset=utf-8',
-        'Cache-Control': 'public, s-maxage=180, stale-while-revalidate=60',
+        'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=120',
         'X-Sytadin-Fallback': degraded ? 'true' : 'false'
       },
     })
