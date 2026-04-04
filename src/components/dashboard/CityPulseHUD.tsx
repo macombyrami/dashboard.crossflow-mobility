@@ -5,16 +5,16 @@ import { useMapStore } from '@/store/mapStore'
 import { cn } from '@/lib/utils/cn'
 import { DataCard } from '@/components/ui/DataCard'
 
-export function CityPulseHUD() {
+export function CityPulseHUD({ className }: { className?: string }) {
   const city = useMapStore(s => s.city)
   const mode = useMapStore(s => s.mode)
 
   if (mode === 'simulate') return null
 
   return (
-    <div className="w-full max-w-full md:w-fit pointer-events-auto">
+    <div className={cn("w-full max-w-full md:w-fit pointer-events-auto", className)}>
       <div className={cn(
-        "flex flex-row md:flex-row items-center justify-center gap-2 p-1 md:p-1.5 transition-all w-full md:w-auto",
+        "flex flex-row md:flex-row items-center justify-center gap-2 p-2 p-1 md:p-1.5 transition-all w-full md:w-auto",
         "bg-transparent md:bg-black/40 md:backdrop-blur-3xl md:border md:border-white/10 md:rounded-2xl md:shadow-apple md:ring-1 md:ring-white/5",
         "overflow-x-auto no-scrollbar pb-2 md:pb-0"
       )}>

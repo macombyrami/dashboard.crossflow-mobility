@@ -91,10 +91,10 @@ export function Sidebar() {
         />
       )}
 
-      <aside
+      <aside 
         aria-label="Menu opérationnel"
         className={cn(
-          "print-hidden fixed inset-y-0 left-0 z-50 flex flex-col w-[var(--sidebar-w)] shrink-0 h-full border-r border-white/5 bg-bg-base/95 glass shadow-apple transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          "fixed inset-y-0 left-0 z-[150] flex flex-col h-[100dvh] w-[var(--sidebar-w)] bg-bg-surface border-r border-white/5 transition-transform duration-300 lg:translate-x-0",
           "lg:relative lg:translate-x-0 lg:z-0 lg:flex",
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}

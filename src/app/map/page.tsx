@@ -1,6 +1,7 @@
 'use client'
 import React from 'react'
 import dynamic from 'next/dynamic'
+import { X } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useTranslation } from '@/lib/hooks/useTranslation'
@@ -124,27 +125,29 @@ export default function MapPage() {
         {/* --- DYNAMIC HUD LAYER --- */}
 
         {/* TOP HUD: Status & Health (Centralized for scannability) */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center gap-2 w-full px-4 text-center">
-           {mounted && (
-             <div className="flex flex-col items-center gap-1.5 opacity-90 backdrop-blur-sm px-4 py-2 rounded-2xl">
-               <div className="flex items-center gap-2 pointer-events-auto">
-                 <LiveSyncBadge refreshing={isFetching} lastSync={lastUpdated?.toLocaleTimeString()} />
-                 <button 
-                   onClick={manualRefresh}
-                   className="p-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
-                 >
-                   <span className={cn("text-[10px] block", isFetching && "animate-spin")}>🔄</span>
-                 </button>
+        {!isAIPanelOpen && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center gap-2 w-full px-4 text-center sm:w-auto">
+             {mounted && (
+               <div className="flex flex-col items-center gap-1.5 opacity-90 backdrop-blur-sm px-4 py-2 rounded-2xl bg-[#030303]/40">
+                 <div className="flex items-center gap-2 pointer-events-auto">
+                   <LiveSyncBadge refreshing={isFetching} lastSync={lastUpdated?.toLocaleTimeString()} />
+                   <button 
+                     onClick={manualRefresh}
+                     className="p-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                   >
+                     <span className={cn("text-[10px] block", isFetching && "animate-spin")}>🔄</span>
+                   </button>
+                 </div>
+                 <CityPulseHUD className="hidden sm:flex" />
+                 {timeSinceUpdate > 1 && (
+                   <span className="text-[9px] font-black text-white/30 uppercase tracking-widest animate-pulse">
+                     Délai: {timeSinceUpdate} min
+                   </span>
+                 )}
                </div>
-               <CityPulseHUD />
-               {timeSinceUpdate > 1 && (
-                 <span className="text-[9px] font-black text-white/30 uppercase tracking-widest animate-pulse">
-                   Mise à jour il y a {timeSinceUpdate} min
-                 </span>
-               )}
-             </div>
-           )}
-        </div>
+             )}
+          </div>
+        )}
 
         {/* 📱 MOBILE NAVIGATION & SHEETS */}
         {mounted && (
@@ -239,17 +242,29 @@ export default function MapPage() {
 
         {/* SIMULATION CONTROLS */}
         {mounted && mode === 'simulate' && (
-          <div className="absolute top-16 right-4 w-[calc(100%-32px)] sm:w-80 max-h-[calc(100vh-130px)] overflow-y-auto z-20 space-y-4">
+          <div className={cn(
+            "absolute z-20 space-y-3 transition-all duration-500",
+            "bottom-20 left-4 right-4 sm:bottom-auto sm:top-16 sm:right-4 sm:left-auto sm:w-80",
+            isAIPanelOpen && "opacity-20 pointer-events-none sm:opacity-100 sm:pointer-events-auto"
+          )}>
             <SimulationPanel />
             <SimulationResults />
           </div>
         )}
       </div>
 
-      {/* AI SIDEBAR: Fixed on mobile, pushes on desktop */}
+      {/* AI SIDEBAR: Full-screen on small mobile, fixed sidebar on desktop */}
       {mounted && isAIPanelOpen && (
-        <div className="fixed inset-y-14 right-0 w-full sm:w-80 bg-[#030303] border-l border-white/5 z-[80] sm:relative sm:inset-auto sm:z-auto shadow-2xl">
-          <AIPanel onClose={() => setAIPanelOpen(false)} />
+        <div className="fixed inset-0 sm:inset-y-14 sm:right-0 w-full sm:w-80 bg-[#030303] sm:bg-[#030303] border-l border-white/5 z-[200] sm:relative sm:inset-auto sm:z-auto shadow-2xl animate-in fade-in slide-in-from-right duration-300">
+          <div className="flex flex-col h-full">
+            <div className="sm:hidden flex items-center justify-between p-4 border-b border-white/5">
+               <h2 className="text-xs font-black uppercase tracking-widest text-brand">Analyse Intelligence</h2>
+               <button onClick={() => setAIPanelOpen(false)} className="p-2 rounded-xl bg-white/5 text-white/60 hover:text-white">
+                  <X className="w-5 h-5" />
+               </button>
+            </div>
+            <AIPanel onClose={() => setAIPanelOpen(false)} />
+          </div>
         </div>
       )}
     </main>

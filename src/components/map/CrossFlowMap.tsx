@@ -84,6 +84,7 @@ const PREDICTIVE_AFFECTED_SOURCE = 'cf-pred-affected'
 const PREDICTIVE_EVENTS_SOURCE   = 'cf-pred-events'
 const SIM_LOCATION_SOURCE        = 'cf-sim-location'
 const SOCIAL_SOURCE              = 'cf-social'
+const WORLD_MASK_SOURCE           = 'cf-world-mask'
 
 
 // ─── Popup helpers ────────────────────────────────────────────────────────
@@ -1329,12 +1330,37 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     if (!src) return
 
     if (!cityBoundary) {
-      // Clear boundary
+      // Clear boundary and mask
       src.setData({ type: 'FeatureCollection', features: [] })
+      const maskSrc = map.getSource(WORLD_MASK_SOURCE) as maplibregl.GeoJSONSource | undefined
+      if (maskSrc) maskSrc.setData({ type: 'FeatureCollection', features: [] })
       return
     }
 
     src.setData({ type: 'FeatureCollection', features: [cityBoundary] })
+
+    // ─── World Mask Update ───────────────────
+    const maskSrc = map.getSource(WORLD_MASK_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (maskSrc) {
+      const world = [[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]]
+      let coordinates: number[][][] = [world]
+
+      if (cityBoundary.geometry.type === 'Polygon') {
+        // Add current polygon as hole
+        coordinates.push(...(cityBoundary.geometry.coordinates as number[][][]))
+      } else if (cityBoundary.geometry.type === 'MultiPolygon') {
+        // Add all polygons of MultiPolygon as holes
+        (cityBoundary.geometry.coordinates as number[][][][]).forEach(poly => {
+          coordinates.push(...poly)
+        })
+      }
+
+      maskSrc.setData({
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates },
+        properties: {}
+      })
+    }
 
     // Compute bounds from polygon and fitBounds
     const coords = extractCoords(cityBoundary.geometry as any)
@@ -2997,6 +3023,18 @@ function initBoundaryLayers(map: maplibregl.Map) {
     minzoom: 8,
     maxzoom: 13,
   })
+
+  // 6. WORLD MASK — Masks out other cities
+  map.addSource(WORLD_MASK_SOURCE, { type: 'geojson', data: emptyFC })
+  map.addLayer({
+    id:     WORLD_MASK_SOURCE + '-fill',
+    type:   'fill',
+    source: WORLD_MASK_SOURCE,
+    paint:  {
+      'fill-color':   '#08090B',
+      'fill-opacity': 0.95,
+    },
+  }, BOUNDARY_SOURCE + '-glow-outer') // Insert below boundary glows but above background
 }
 
 function initHeatmapPassagesLayers(map: maplibregl.Map) {

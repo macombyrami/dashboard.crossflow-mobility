@@ -44,9 +44,10 @@ function LockedCityBadge() {
   return (
     <div className="flex items-center gap-3 h-10 px-4 rounded-xl bg-white/5 border border-white/5 shadow-inner transition-all hover:bg-white/10 group cursor-default">
       <MapPin className="w-4 h-4 text-brand-green shrink-0" strokeWidth={2.5} />
-      <span className="truncate text-xs font-black text-white leading-none uppercase tracking-[0.05em]">
+      <span className="truncate text-xs font-black text-white leading-none uppercase tracking-[0.05em] hidden sm:inline">
         {city.flag} {city.name}
       </span>
+      <span className="sm:hidden text-[10px] font-black text-white uppercase tracking-tight">{city.flag} {city.name.slice(0, 3)}</span>
       <div className="w-px h-4 bg-white/10 mx-1" />
       <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">{city.countryCode}</span>
     </div>

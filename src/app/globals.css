@@ -64,9 +64,8 @@ html {
 }
 
 body {
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
+  height: 100dvh;
+  overflow: hidden;
   margin: 0;
   padding: 0;
   color: var(--text-primary);
@@ -455,7 +454,7 @@ body {
 
 /* ─── Mobile safe area ─────────────────────────────────────────────────── */
 .pb-safe {
-  padding-bottom: calc(max(env(safe-area-inset-bottom), 8px) + var(--nav-h));
+  padding-bottom: calc(max(env(safe-area-inset-bottom), 12px) + var(--nav-h));
 }
 
 /* Desktop: no bottom nav, only minimal safe area */

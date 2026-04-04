@@ -91,9 +91,49 @@ export function ConsultantChat({ initialContext }: Props) {
 
   return (
     <div className={cn(
-      "flex flex-col h-[calc(100vh-240px)] min-h-[550px] max-w-5xl mx-auto w-full relative transition-all duration-500",
-      isPredictiveMode && "ring-2 ring-brand/20 rounded-3xl p-2 bg-brand/5"
+      "flex flex-col h-[calc(100dvh-120px)] max-w-5xl mx-auto w-full relative transition-all duration-500",
+      isPredictiveMode && "ring-2 ring-brand/20 rounded-3xl p-1 bg-brand/5"
     )}>
+      
+      {/* Integrated Action Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/[0.02]">
+        <div className="flex items-center gap-2">
+           <button 
+             onClick={() => setIsPredictiveMode(!isPredictiveMode)}
+             className={cn(
+               "px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all",
+               isPredictiveMode 
+                ? "bg-brand text-black border-brand shadow-glow" 
+                : "bg-white/5 border-white/10 text-text-muted hover:text-brand hover:border-brand/40"
+             )}
+           >
+             <Sparkles className="w-3 h-3" />
+             {isPredictiveMode ? 'Prédictions ON' : 'Prédictions OFF'}
+           </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+           <div className="relative group/export items-center flex">
+             <button className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-text-muted hover:text-white transition-all">
+                <Download className="w-3.5 h-3.5" />
+             </button>
+             <div className="absolute right-0 top-full mt-2 w-36 p-2 bg-[#0B0C10] glass rounded-xl border border-white/10 opacity-0 group-hover/export:opacity-100 transition-all pointer-events-none group-hover/export:pointer-events-auto z-50">
+                <button onClick={handleExportPDF} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 text-[9px] font-black uppercase tracking-widest text-text-secondary hover:text-white">
+                  <FileText className="w-3.5 h-3.5 text-brand" /> PDF
+                </button>
+                <button onClick={handleExportJSON} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 text-[9px] font-black uppercase tracking-widest text-text-secondary hover:text-white">
+                  <FileJson className="w-3.5 h-3.5 text-brand" /> JSON
+                </button>
+             </div>
+           </div>
+           <button 
+             onClick={() => setMessages([messages[0]])}
+             className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-rose-500/10 hover:border-rose-500/20 text-text-muted hover:text-rose-400 transition-all"
+           >
+             <Trash2 className="w-3.5 h-3.5" />
+           </button>
+        </div>
+      </div>
       
       {/* Top Banner for Predictive Mode */}
       {isPredictiveMode && (
@@ -135,56 +175,8 @@ export function ConsultantChat({ initialContext }: Props) {
         <div ref={scrollRef} />
       </div>
 
-      {/* Action Bar */}
-      <div className="absolute -top-14 right-4 flex items-center gap-2">
-         <button 
-           onClick={() => setIsPredictiveMode(!isPredictiveMode)}
-           className={cn(
-             "px-3 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all",
-             isPredictiveMode 
-              ? "bg-brand text-black border-brand shadow-glow" 
-              : "bg-white/5 border-white/10 text-text-muted hover:text-brand hover:border-brand/40"
-           )}
-         >
-           <Sparkles className="w-3.5 h-3.5" />
-           {isPredictiveMode ? 'Désactiver Prédictions' : 'Activer Prédictions'}
-         </button>
-
-         <div className="w-px h-4 bg-white/10 mx-1" />
-
-         <div className="relative group/export">
-           <button className="p-2 rounded-xl bg-white/5 border border-white/10 text-text-muted hover:text-white transition-all">
-              <Download className="w-4 h-4" />
-           </button>
-           <div className="absolute right-0 top-full mt-2 w-40 p-2 glass rounded-xl border border-white/10 opacity-0 group-hover/export:opacity-100 transition-opacity pointer-events-none group-hover/export:pointer-events-auto z-50">
-              <button 
-                onClick={handleExportPDF}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-[10px] font-black uppercase tracking-widest text-text-secondary hover:text-white"
-              >
-                <FileText className="w-4 h-4 text-brand" />
-                Rapport PDF
-              </button>
-              <button 
-                onClick={handleExportJSON}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-[10px] font-black uppercase tracking-widest text-text-secondary hover:text-white"
-              >
-                <FileJson className="w-4 h-4 text-brand" />
-                Données JSON
-              </button>
-           </div>
-         </div>
-
-         <button 
-           onClick={() => setMessages([messages[0]])}
-           className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-rose-500/10 hover:border-rose-500/20 text-text-muted hover:text-rose-400 transition-all group"
-           title="Effacer la conversation"
-         >
-           <Trash2 className="w-4 h-4 group-hover:scale-110" />
-         </button>
-      </div>
-
       {/* Input Section */}
-      <div className="mt-4 pt-4 border-t border-white/10">
+      <div className="p-4 bg-[#08090B] border-t border-white/5 rounded-b-3xl">
         <form 
           onSubmit={(e) => { e.preventDefault(); handleSend(input) }}
           className="relative group lg:px-4"
