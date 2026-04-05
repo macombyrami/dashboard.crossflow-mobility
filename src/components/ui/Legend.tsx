@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils/cn'
 interface LegendItem {
   label: string
   color: string
-  description?: string
 }
 
 interface LegendProps {
@@ -16,38 +15,36 @@ interface LegendProps {
   className?: string
 }
 
-export function Legend({ title, items, description, className }: LegendProps) {
+export function Legend({ title, items, className, description }: LegendProps) {
   return (
     <div className={cn(
-      "flex flex-col gap-3 p-4 rounded-2xl bg-black/80 backdrop-blur-3xl border border-white/10 shadow-apple ring-1 ring-white/5 w-64 transition-all hover:bg-black/90",
+      "flex flex-col gap-2.5 p-3 rounded-xl bg-bg-surface/80 backdrop-blur-3xl border border-white/5 shadow-2xl",
       className
     )}>
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{title}</span>
-        <div className="group relative">
-          <Info className="w-3.5 h-3.5 text-white/20 hover:text-white transition-colors cursor-help" />
-          {description && (
-            <div className="absolute bottom-full right-0 mb-3 w-48 p-2.5 bg-black/95 border border-white/10 rounded-xl text-[10px] text-white/60 leading-relaxed shadow-2xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all pointer-events-none z-30">
+      <div className="flex items-center justify-between px-1">
+        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">{title}</span>
+        {description && (
+          <div className="group relative">
+            <Info className="w-3 h-3 text-text-muted hover:text-white transition-colors cursor-help" />
+            <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-bg-elevated border border-white/10 rounded-lg text-[9px] text-text-secondary leading-tight shadow-2xl opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-30">
               {description}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      <div className="space-y-2">
+      <div className="flex flex-col gap-1.5 px-1 pb-1">
         {items.map((item, i) => (
-          <div key={i} className="flex items-center gap-3">
-             <div className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.1)]" style={{ background: item.color }} />
-             <span className="text-[9px] font-black text-white/60 uppercase tracking-widest leading-none">{item.label}</span>
+          <div key={i} className="flex items-center justify-between gap-4">
+             <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full" style={{ background: item.color }} />
+                <span className="text-[9px] font-bold text-text-secondary uppercase tracking-[0.1em]">{item.label}</span>
+             </div>
+             <div className="h-[1px] flex-1 bg-white/[0.03]" />
+             <div className="w-1.5 h-1.5 border-r border-b border-white/10" />
           </div>
         ))}
       </div>
-
-      {description && (
-        <p className="text-[9px] font-bold text-white/20 uppercase tracking-tighter italic border-t border-white/5 pt-2 mt-1">
-          {description}
-        </p>
-      )}
     </div>
   )
 }

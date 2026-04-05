@@ -3,6 +3,7 @@ import { useEffect, useRef, useCallback, useState, useMemo, memo } from 'react'
 
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useSimulationStore } from '@/store/simulationStore'
@@ -175,20 +176,26 @@ const safeSetFeatureState = (map: maplibregl.Map | null, feat: { source: string,
   if (map && map.getSource(feat.source)) map.setFeatureState(feat, state)
 }
 
-function computeRoadWidth(roadType: string | undefined, level: CongestionLevel, zoom: number): number {
+function computeRoadWidth(roadType: string | undefined, level: CongestionLevel, zoom: number, isMobile: boolean = false): number {
   const base: Record<string, number> = {
-    motorway: 4.5, motorway_link: 3.5, 
-    trunk: 4, trunk_link: 3,
-    primary: 3.5, primary_link: 2.8, 
-    secondary: 2.8, secondary_link: 2.2,
-    tertiary: 2.2, tertiary_link: 1.8,
-    residential: 1.5, service: 1.2,
-    unclassified: 1.2
+    motorway: 3.5, motorway_link: 2.8, 
+    trunk: 3.2, trunk_link: 2.4,
+    primary: 2.8, primary_link: 2.0, 
+    secondary: 2.2, secondary_link: 1.8,
+    tertiary: 1.8, tertiary_link: 1.4,
+    residential: 1.2, service: 1.0,
+    unclassified: 1.0
   }
   const mult: Record<CongestionLevel, number> = {
     free: 1.0, slow: 1.15, congested: 1.3, critical: 1.5,
   }
-  const baseWidth = base[roadType ?? ''] ?? 1.8
+  let baseWidth = base[roadType ?? ''] ?? 1.8
+  
+  // Mobile Optimization: Force thinner lines for spatial density
+  if (isMobile) {
+    baseWidth *= 0.7 
+  }
+
   const multiplier = mult[level] ?? 1.1
   
   // Exponential scaling with zoom
@@ -247,6 +254,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   const addZonePoint    = useMapStore(s => s.addZonePoint)
   // Vehicle selection / tracking
   const selectedVehicleId  = useMapStore(s => s.selectedVehicleId)
+  const isMobile = useMediaQuery('(max-width: 768px)')
   const setSelectedVehicle = useMapStore(s => s.setSelectedVehicle)
   const isTrackingVehicle  = useMapStore(s => s.isTrackingVehicle)
   const setTrackingVehicle = useMapStore(s => s.setTrackingVehicle)
@@ -429,9 +437,9 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
         scanRef.current += 0.005
         safeSetPaintProperty(map, 'cf-traffic-glow', 'line-opacity', [
           'interpolate', ['linear'], ['line-progress'],
-          scanRef.current - 0.1, 0,
-          scanRef.current, 0.8,
-          scanRef.current + 0.1, 0
+          scanRef.current - 0.15, 0,
+          scanRef.current, 0.4,
+          scanRef.current + 0.15, 0
         ])
       }
 
@@ -1788,7 +1796,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
               speed:      seg.speedKmh,
               level,
               color:      congestionColor(simCongestion),
-              width:      computeRoadWidth(seg.roadType, level, map.getZoom()),
+              width:      computeRoadWidth(seg.roadType, level, map.getZoom(), isMobile),
               roadType:   seg.roadType,
               streetName: seg.streetName,
               axisName:   seg.axisName,
@@ -1816,7 +1824,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
               speed:      seg.speedKmh,
               level:      seg.level,
               color:      congestionColor(seg.congestionScore),
-              width:      computeRoadWidth(seg.roadType, seg.level, mapRef.current!.getZoom()),
+              width:      computeRoadWidth(seg.roadType, seg.level, mapRef.current!.getZoom(), isMobile),
               roadType:   seg.roadType,
               streetName: seg.streetName,
               axisName:   seg.axisName,

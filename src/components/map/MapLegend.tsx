@@ -17,33 +17,38 @@ export default function MapLegend({ showTraffic = true, showIncidents = true, cl
 
   return (
     <div className={cn("z-20 pointer-events-auto transition-all duration-500", className)}>
-      {/* Mobile Toggle Button (48px touch target) */}
+      {/* 🔘 HUD Toggle Button */}
       <button 
-        className="md:hidden flex items-center justify-between w-[calc(100vw-2rem)] h-12 px-4 rounded-xl bg-black/80 backdrop-blur-xl border border-white/10 shadow-apple text-white/80 transition-all hover:bg-black"
+        className={cn(
+          "flex items-center justify-between gap-3 h-10 px-4 rounded-xl transition-all duration-300",
+          "bg-bg-surface/60 backdrop-blur-3xl border border-white/10 shadow-prestige",
+          "hover:bg-white/10 text-white/80 hover:text-white",
+          isOpen ? "mb-2" : ""
+        )}
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
       >
         <div className="flex items-center gap-2">
-          <Layers className="w-5 h-5" />
-          <span className="text-sm font-black uppercase tracking-widest">Légende</span>
+          <Layers className="w-4 h-4 text-brand" />
+          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Légende Flux</span>
         </div>
-        {isOpen ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+        {isOpen ? <ChevronDown className="w-4 h-4 opacity-40" /> : <ChevronUp className="w-4 h-4 opacity-40" />}
       </button>
 
       <div className={cn(
         "transition-all duration-500",
-        isOpen ? "flex animate-in fade-in slide-in-from-bottom-4" : "hidden md:flex"
+        isOpen ? "flex animate-in fade-in slide-in-from-bottom-2" : "hidden md:flex"
       )}>
         {showTraffic && (
           <Legend
-            title="Niveau de Congestion"
+            title="Index de Congestion"
             items={[
-              { label: "Fluide", color: "#00D966" },
-              { label: "Modéré", color: "#FF9500" },
+              { label: "Nominal", color: "#00FF9D" },
+              { label: "Saturé", color: "#FFD60A" },
               { label: "Critique", color: "#FF3B30" }
             ]}
-            description="Analyse en temps réel des flux via TomTom Traffic Index."
-            className="w-[calc(100vw-2rem)] md:w-64"
+            description="Télémétrie multisources (TomTom + HERE + Flux V2X)."
+            className="w-56"
           />
         )}
       </div>

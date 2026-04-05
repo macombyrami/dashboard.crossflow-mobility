@@ -2,50 +2,51 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 /* ─── Prestige Design System (SaaS v4.0) ────────────────────────────── */
 :root {
-  --bg-base:     #08090B; /* Deep Obsidian */
-  --bg-surface:  #0D0E11;
-  --bg-elevated: #15171C;
-  --bg-border:   rgba(255,255,255,0.06); /* Elite fine border */
+  --bg-base:     #050505; /* Deepest Obsidian */
+  --bg-surface:  #0A0B0E;
+  --bg-elevated: #0F1116;
+  --bg-border:   rgba(255,255,255,0.08); /* Precision 1px border */
   --bg-subtle:   rgba(255,255,255,0.02);
   --bg-hover:    rgba(255,255,255,0.08);
 
-  --text-primary:   #FDFCFE;
-  --text-secondary: #ABABAD;
-  --text-muted:     #636366;
+  --text-primary:   #FFFFFF;
+  --text-secondary: #8E8E93;
+  --text-muted:     #48484A;
 
   --brand:        #00FF9D; /* Signal Green */
-  --brand-dim:    rgba(0, 255, 157, 0.12);
-  --brand-glow:   rgba(0, 255, 157, 0.3);
-  --brand-glow-lg:rgba(0, 255, 157, 0.5);
+  --brand-dim:    rgba(0, 255, 157, 0.1);
+  --brand-glow:   rgba(0, 255, 157, 0.15);
+  --brand-glow-lg:rgba(0, 255, 157, 0.25);
   --prestige-silver: linear-gradient(135deg, #FFF 0%, rgba(255,255,255,0.4) 100%);
-  --prestige-glow: 0 0 40px -10px rgba(16, 168, 84, 0.3);
+  --prestige-glow: 0 0 40px -20px rgba(0, 255, 157, 0.2);
 
-  --traffic-free:      #10a854;
-  --traffic-slow:      #FACD15;
-  --traffic-congested: #F97316;
-  --traffic-critical:  #EF4444;
+  --traffic-free:      #00FF9D;
+  --traffic-slow:      #FFD60A;
+  --traffic-congested: #FF9F0A;
+  --traffic-critical:  #FF3B30;
 
-  --radius-sm:  8px;
-  --radius:     12px;
-  --radius-md:  16px;
-  --radius-lg:  20px;
-  --radius-xl:  24px;
-  --radius-2xl: 40px; /* Expansive for bento cards */
+  --radius-sm:  4px;
+  --radius:     8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  20px;
+  --radius-2xl: 24px; /* Tactical roundness */
 
-  /* ─── Standard Breakpoints ─── */
-  --screen-xs: 320px;
-  --screen-sm: 480px;
-  --screen-md: 768px;
-  --screen-lg: 1024px;
-  --screen-xl: 1440px;
-
-  /* ─── Responsive Layout ─── */
-  --header-h:  64px;
+  /* ─── Precision Grid ─── */
+  --header-h:  56px;
   --sidebar-w: 240px;
-  --mini-sidebar-w: 80px;
-  --nav-h:     64px;
+  --mini-sidebar-w: 64px;
+  --nav-h:     64px; /* Increased for mobile touch targets */
+
+  /* ─── Safe Area Tokens ─── */
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
 }
 
 /* ─── Reset & Base ─────────────────────────────────────────────────────── */
@@ -482,13 +483,22 @@ body {
 
 /* ─── Mobile safe area ─────────────────────────────────────────────────── */
 .pb-safe {
-  padding-bottom: calc(max(env(safe-area-inset-bottom), 12px) + var(--nav-h));
+  padding-bottom: calc(var(--safe-bottom) + var(--nav-h));
+}
+
+.pt-safe {
+  padding-top: var(--safe-top);
+}
+
+.px-safe {
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
 }
 
 /* Desktop: no bottom nav, only minimal safe area */
 @media (min-width: 1024px) {
   .pb-safe {
-    padding-bottom: 16px;
+    padding-bottom: 24px;
   }
 }
 

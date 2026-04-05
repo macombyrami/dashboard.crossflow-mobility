@@ -67,15 +67,20 @@ function MapSkeleton() {
   )
 }
 
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
+import { PilotIsland } from '@/components/mobile/PilotIsland'
+import { MobileInsightDrawer } from '@/components/mobile/MobileInsightDrawer'
+
 export default function MapPage() {
   const [mounted, setMounted] = React.useState(false)
   const [isFilterSheetOpen, setIsFilterSheetOpen] = React.useState(false)
-  const [isTransportSheetOpen, setIsTransportSheetOpen] = React.useState(false) // STAFF OPTIMIZATION: Track open state
+  const [isTransportSheetOpen, setIsTransportSheetOpen] = React.useState(false)
   
   const { t } = useTranslation()
   const city  = useMapStore(s => s.city)
+  const isMobile = useMediaQuery('(max-width: 768px)')
 
-  // 🔄 HIGH-PERFORMANCE DATA FETCHING (STAFF ENGINEER LAYER)
+  // 🔄 HIGH-PERFORMANCE DATA FETCHING
   const { lastUpdated, manualRefresh, isFetching, timeSinceUpdate } = useTrafficData()
 
   React.useEffect(() => {
@@ -89,10 +94,9 @@ export default function MapPage() {
   const activeLayers    = useMapStore(s => s.activeLayers)
   const toggleLayer     = useMapStore(s => s.toggleLayer)
   const setKPIs         = useTrafficStore(s => s.setKPIs)
-  // Track the selected vehicle to conditionally mount VehicleInfoCard
   const selectedVehicleId = useMapStore(s => s.selectedVehicleId)
 
-  // Optimized KPI generation - only re-gen when traffic data actually updates
+  // Optimized KPI generation
   React.useEffect(() => {
     if (mounted) {
       setKPIs(generateCityKPIs(city))
@@ -109,8 +113,8 @@ export default function MapPage() {
 
   // 🧪 LAZY LOADING: Re-open transport sheet if layer toggled on mobile
   React.useEffect(() => {
-    if (layerProps.transport) setIsTransportSheetOpen(true)
-  }, [layerProps.transport])
+    if (layerProps.transport && isMobile) setIsTransportSheetOpen(true)
+  }, [layerProps.transport, isMobile])
 
   return (
     <main id="main-content" aria-label="Carte de mobilité urbaine" className="flex flex-1 h-full overflow-hidden relative bg-[#030303]">
@@ -124,52 +128,67 @@ export default function MapPage() {
 
         {/* --- DYNAMIC HUD LAYER --- */}
 
-        {/* TOP HUD: Unified Status & KPIs */}
-        {!isAIPanelOpen && mounted && (
-          <div className="absolute top-0 inset-x-0 z-30 pointer-events-none flex flex-col items-center">
-            <div className="w-full max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row items-start justify-between gap-4">
-              
-              {/* Left: System Status */}
-              <div className="pointer-events-auto flex items-center gap-2">
-                <LiveSyncBadge refreshing={isFetching} lastSync={lastUpdated?.toLocaleTimeString()} />
-                <button 
-                  onClick={manualRefresh}
-                  className="w-10 h-10 rounded-2xl bg-bg-surface/60 backdrop-blur-3xl border border-white/10 hover:bg-white/20 flex items-center justify-center transition-all shadow-prestige group"
-                  title="Rafraîchir les données"
-                >
-                  <span className={cn("text-xs block group-hover:scale-110", isFetching && "animate-spin")}>🔄</span>
-                </button>
+        {/* 📱 MOBILE OVERLAY SET */}
+        {mounted && isMobile && !isAIPanelOpen && (
+          <>
+            <PilotIsland />
+            <MobileInsightDrawer />
+          </>
+        )}
+
+        {/* 💻 DESKTOP HUD: Unified Status & Tactical Dock */}
+        {!isMobile && !isAIPanelOpen && mounted && (
+          <div className="absolute top-4 left-4 z-30 pointer-events-none flex flex-col gap-4">
+            
+            {/* Mission Context & System Status */}
+            <div className="flex items-center gap-2 pointer-events-auto">
+              <div className="bg-bg-surface/60 backdrop-blur-3xl border border-white/10 px-3 py-1.5 rounded-xl shadow-prestige flex items-center gap-3">
+                 <div className="flex flex-col">
+                   <span className="text-[8px] font-black text-brand uppercase tracking-[0.2em] leading-none mb-1">Système</span>
+                   <span className="text-[10px] font-bold text-white uppercase tracking-tighter leading-none">Opérationnel</span>
+                 </div>
+                 <div className="w-[1px] h-4 bg-white/10" />
+                 <LiveSyncBadge refreshing={isFetching} lastSync={lastUpdated?.toLocaleTimeString()} className="!bg-transparent !border-none !p-0" />
               </div>
 
-              {/* Center: Hero KPIs */}
-              <CityPulseHUD className="pointer-events-auto" />
-
-              {/* Right: Mode/Time Indicator (Desktop) */}
-              <div className="hidden lg:flex pointer-events-auto items-center gap-3 bg-bg-surface/60 backdrop-blur-3xl border border-white/10 px-4 py-2 rounded-2xl shadow-prestige">
-                <div className="flex flex-col text-right">
-                  <span className="text-[9px] font-black text-brand uppercase tracking-widest leading-none mb-1">Mode Opérationnel</span>
-                  <span className="text-[11px] font-bold text-white uppercase tracking-tighter leading-none">Intelligence Temps-Réel</span>
-                </div>
-                <div className="w-px h-6 bg-white/10" />
-                <div className="flex flex-col text-right">
-                  <span className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none mb-1">Version</span>
-                  <span className="text-[11px] font-bold text-white/60 uppercase tracking-tighter leading-none">v4.0.2</span>
-                </div>
-              </div>
+              <button 
+                onClick={manualRefresh}
+                className="w-9 h-9 rounded-xl bg-bg-surface/60 backdrop-blur-3xl border border-white/10 hover:bg-white/20 flex items-center justify-center transition-all shadow-prestige group pointer-events-auto"
+                title="Rafraîchir les données"
+              >
+                <div className={cn("text-[10px] group-hover:scale-110", isFetching && "animate-spin")}>🔄</div>
+              </button>
             </div>
 
+            {/* Tactical KPI Dock */}
+            <CityPulseHUD className="pointer-events-auto" />
+
             {timeSinceUpdate > 2 && (
-              <div className="mt-2 bg-status-critical/10 border border-status-critical/30 px-3 py-1 rounded-full backdrop-blur-md animate-pulse">
-                <span className="text-[9px] font-black text-status-critical uppercase tracking-widest">
-                  Délai Telemetrie: {timeSinceUpdate} min
+              <div className="bg-status-critical/10 border border-status-critical/30 px-3 py-1.5 rounded-xl backdrop-blur-md animate-pulse w-fit">
+                <span className="text-[8px] font-black text-status-critical uppercase tracking-[0.2em]">
+                  LATENCE TÉLÉMÉTRIE: {timeSinceUpdate} MIN
                 </span>
               </div>
             )}
           </div>
         )}
 
-        {/* 📱 MOBILE NAVIGATION & SHEETS */}
-        {mounted && (
+        {/* TOP RIGHT: System Meta (Desktop) */}
+        {!isMobile && !isAIPanelOpen && mounted && (
+          <div className="hidden lg:flex absolute top-4 right-4 z-30 pointer-events-auto items-center gap-3 bg-bg-surface/60 backdrop-blur-3xl border border-white/10 px-4 py-2 rounded-2xl shadow-prestige">
+            <div className="flex flex-col text-right">
+              <span className="text-[8px] font-black text-brand uppercase tracking-[0.2em] leading-none mb-1">Réseau Neuronal</span>
+              <span className="text-[10px] font-bold text-white uppercase tracking-tighter leading-none">v4.0.2 Stable</span>
+            </div>
+            <div className="w-px h-6 bg-white/10" />
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-brand/10 border border-brand/20">
+               <span className="text-xs">⚡</span>
+            </div>
+          </div>
+        )}
+
+        {/* 📱 MOBILE NAVIGATION & SHEETS (Legacy Compatibility) */}
+        {mounted && isMobile && (
           <>
             <FilterFAB 
               isOpen={isFilterSheetOpen} 
@@ -198,14 +217,13 @@ export default function MapPage() {
                 snapPoints={[0.2, 0.5, 0.9]}
                 initialSnap={0.2}
               >
-                {/* 🚀 LAZY MOUNT: Panel only active when sheet is visible */}
                 {isTransportSheetOpen && <VehicleFilterPanel vehicleCount={0} />}
               </BottomSheet>
             )}
           </>
         )}
 
-        {/* RIGHT HUD: Desktop Only (Hidden on mobile) */}
+        {/* RIGHT HUD: Desktop Only */}
         <div className={cn(
           "hidden md:flex absolute right-4 z-40 transition-all duration-500 flex flex-col items-end gap-3 top-4",
         )}>
@@ -226,13 +244,12 @@ export default function MapPage() {
         {/* CENTER COMPONENTS — only in predict mode */}
         {mounted && mode === 'predict' && <MapSplitSlider />}
 
-        {/* BOTTOM HUD: Contextual Legends (Desktop only or pushed up by sheet) */}
+        {/* BOTTOM HUD: Contextual Legends (Repositioned for Mobile) */}
         {mounted && (
           <div className={cn(
             "absolute z-20 pointer-events-none transition-all duration-500",
             "bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6",
-            "md:bottom-6 bottom-24", // Pushed up above Nav on mobile
-            mode === 'predict' && "bottom-32 md:bottom-20"
+            isMobile ? "bottom-32 left-auto translate-x-0 right-4" : "bottom-6"
           )}>
             {mode === 'predict' && (
               <div className="bg-bg-surface/90 border border-brand-green/30 rounded-full px-4 py-2 backdrop-blur-md pointer-events-auto mb-4 w-fit flex mx-auto shadow-glow-green/10">
@@ -247,11 +264,11 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* FLOATING PANELS: Details (Desktop-oriented or hidden on small mobile) */}
-        {mounted && mode !== 'simulate' && <EdgeDetailPanel />}
-        {mounted && <ZoneStatsPanel />}
+        {/* FLOATING PANELS: Details (Hidden on small mobile if obstructing) */}
+        {mounted && !isMobile && mode !== 'simulate' && <EdgeDetailPanel />}
+        {mounted && !isMobile && <ZoneStatsPanel />}
         
-        {/* Current Vehicle Detail — only mount when a vehicle is selected */}
+        {/* Current Vehicle Detail */}
         {mounted && selectedVehicleId && (
            <VehicleInfoCard 
              vehicle={null}
@@ -272,7 +289,7 @@ export default function MapPage() {
         )}
       </div>
 
-      {/* AI SIDEBAR: Full-screen on small mobile, fixed sidebar on desktop */}
+      {/* AI SIDEBAR */}
       {mounted && isAIPanelOpen && (
         <div className="fixed inset-0 sm:inset-y-14 sm:right-0 w-full sm:w-80 bg-[#030303] sm:bg-[#030303] border-l border-white/5 z-[200] sm:relative sm:inset-auto sm:z-auto shadow-2xl animate-in fade-in slide-in-from-right duration-300">
           <div className="flex flex-col h-full">
