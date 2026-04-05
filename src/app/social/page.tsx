@@ -354,8 +354,15 @@ function IntelligenceDashboard() {
 
 export default function SocialPage() {
   const [activeTab, setActiveTab] = React.useState<SocialTab>('sytadin')
+  const [isPending, startTransition] = React.useTransition()
   const [counts, setCounts] = React.useState({ ratp: 0, sytadin: 0, community: 0, x: 0 })
   const city = useMapStore(s => s.city)
+
+  const handleTabChange = (tab: SocialTab) => {
+    startTransition(() => {
+      setActiveTab(tab)
+    })
+  }
 
   const updateCount = (key: keyof typeof counts, val: number) => {
     setCounts(prev => ({ ...prev, [key]: val }))
@@ -386,7 +393,7 @@ export default function SocialPage() {
             ].map(tab => (
               <button 
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as SocialTab)}
+                onClick={() => handleTabChange(tab.id as SocialTab)}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-xs font-semibold w-full text-left border border-transparent",
                   activeTab === tab.id ? "bg-white/[0.03] border-white/5 shadow-sm" : "text-text-secondary hover:bg-white/[0.02]"
@@ -414,7 +421,10 @@ export default function SocialPage() {
           xCount={counts.x} 
         />
 
-        <div className="relative z-10 flex-1 flex flex-col overflow-hidden h-full p-6">
+        <div className={cn(
+          "relative z-10 flex-1 flex flex-col overflow-hidden h-full p-6 transition-opacity duration-300",
+          isPending ? "opacity-50 pointer-events-none" : "opacity-100"
+        )}>
           {activeTab === 'intelligence' && <IntelligenceDashboard />}
           {activeTab === 'ratp' && <RatpFeed onUpdate={(n) => updateCount('ratp', n)} />}
           {activeTab === 'sytadin' && <SytadinFeed onUpdate={(n) => updateCount('sytadin', n)} />}

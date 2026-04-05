@@ -1,9 +1,8 @@
-'use client'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Map, TrendingUp, Cpu, AlertTriangle, Rss } from 'lucide-react'
+import { Map, TrendingUp, Cpu, AlertTriangle, Rss, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
+import React, { useTransition } from 'react'
 
 const TABS = [
   { href: '/map',        icon: Map,             label: 'Carte' },
@@ -15,6 +14,14 @@ const TABS = [
 
 export function BottomNav() {
   const pathname = usePathname()
+  const router   = useRouter()
+  const [isPending, startTransition] = useTransition()
+
+  const handleNav = (href: string) => {
+    startTransition(() => {
+      router.push(href)
+    })
+  }
 
   return (
     <nav
@@ -29,23 +36,29 @@ export function BottomNav() {
         {TABS.map(({ href, icon: Icon, label }) => {
           const active = pathname === href || (href !== '/' && pathname.startsWith(href))
           return (
-            <Link
+            <button
               key={href}
-              href={href}
+              onClick={() => handleNav(href)}
+              disabled={isPending}
               role="listitem"
               className={cn(
                 'relative flex flex-col items-center justify-center gap-1.5 flex-1 min-w-0 transition-all duration-200 active:scale-90',
-                active ? 'text-brand-green' : 'text-zinc-500'
+                active ? 'text-brand-green' : 'text-zinc-500',
+                isPending && !active && 'opacity-50'
               )}
             >
               <div className="relative">
-                <Icon
-                  className={cn(
-                    'w-6 h-6 transition-all duration-300',
-                    active ? 'scale-110' : 'opacity-70'
-                  )}
-                  strokeWidth={active ? 2.5 : 2}
-                />
+                {isPending && active ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-brand-green" />
+                ) : (
+                  <Icon
+                    className={cn(
+                      'w-6 h-6 transition-all duration-300',
+                      active ? 'scale-110' : 'opacity-70'
+                    )}
+                    strokeWidth={active ? 2.5 : 2}
+                  />
+                )}
                 {active && (
                   <motion.div
                     layoutId="glow"
@@ -65,7 +78,7 @@ export function BottomNav() {
               {active && (
                 <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-8 h-px bg-brand-green shadow-glow-green" />
               )}
-            </Link>
+            </button>
           )
         })}
       </div>

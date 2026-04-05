@@ -1,6 +1,6 @@
 'use client'
 import React, { memo, useState, useEffect, useRef } from 'react'
-import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap, Lock, AlertTriangle, Clock, ShieldCheck, Info, Menu } from 'lucide-react'
+import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap, Lock, AlertTriangle, Clock, ShieldCheck, Info, Menu, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useMapStore, geocodingToCity } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
@@ -82,6 +82,7 @@ function CitySearchBar() {
 // ─── Main Header Component ──────────────────────────────────────────────────
 
 export function Header() {
+  const [isPending, startTransition] = React.useTransition()
   const setAIPanelOpen  = useMapStore(s => s.setAIPanelOpen)
   const isAIPanelOpen   = useMapStore(s => s.isAIPanelOpen)
   const weather         = useTrafficStore(s => s.weather)
@@ -91,6 +92,24 @@ export function Header() {
   const toggleSidebar   = useUIStore(s => s.toggleSidebar)
   const isNotificationOpen = useUIStore(s => s.isNotificationOpen)
   const setNotificationOpen  = useUIStore(s => s.setNotificationOpen)
+
+  const handleToggleSidebar = () => {
+    startTransition(() => {
+      toggleSidebar()
+    })
+  }
+
+  const handleToggleNotifications = () => {
+    startTransition(() => {
+      setNotificationOpen(!isNotificationOpen)
+    })
+  }
+
+  const handleToggleAI = () => {
+    startTransition(() => {
+      setAIPanelOpen(!isAIPanelOpen)
+    })
+  }
 
   const allIncidents  = [...socialIncidents, ...incidents]
   const incidentCount = allIncidents.length
@@ -107,7 +126,7 @@ export function Header() {
       {/* 🧩 GROUP 1: CONTEXTE GÉOGRAPHIQUE & SYSTÈME */}
       <div className="flex items-center gap-2 md:gap-4 shrink-0">
         <button
-          onClick={toggleSidebar}
+          onClick={handleToggleSidebar}
           aria-label="Ouvrir le menu"
           className="lg:hidden flex items-center justify-center w-10 h-10 -ml-2 rounded-xl text-white/70 hover:text-white hover:bg-white/5 transition-colors"
         >
@@ -139,13 +158,14 @@ export function Header() {
         {/* 🔔 Notifications */}
         <div className="relative ml-1">
           <button
-            onClick={() => setNotificationOpen(!isNotificationOpen)}
+            onClick={handleToggleNotifications}
             aria-label={`${incidentCount} notifications de trafic`}
             aria-haspopup="true"
             aria-expanded={isNotificationOpen}
             className={cn(
               'w-10 h-10 flex items-center justify-center rounded-xl border transition-all relative', 
-              isNotificationOpen ? 'bg-white/15 border-white/20' : 'bg-white/5 border-white/5 hover:bg-white/10'
+              isNotificationOpen ? 'bg-white/15 border-white/20' : 'bg-white/5 border-white/5 hover:bg-white/10',
+              isPending && 'opacity-50'
             )}
           >
             <Bell className="w-4.5 h-4.5 text-white/60" strokeWidth={2} aria-hidden="true" />
@@ -159,16 +179,21 @@ export function Header() {
 
         {/* 🧩 GROUP 3: INFO & AI ANALYST */}
         <button
-          onClick={() => setAIPanelOpen(!isAIPanelOpen)}
+          onClick={handleToggleAI}
           aria-label={isAIPanelOpen ? "Masquer l'analyse IA" : "Afficher l'analyse IA prédictive"}
           aria-pressed={isAIPanelOpen}
           className={cn(
             'w-10 h-10 flex items-center justify-center rounded-xl border transition-all relative group',
-            isAIPanelOpen ? 'bg-brand-green border-brand-green shadow-glow' : 'bg-white/5 border-white/5 hover:bg-white/10'
+            isAIPanelOpen ? 'bg-brand-green border-brand-green shadow-glow' : 'bg-white/5 border-white/5 hover:bg-white/10',
+            isPending && 'opacity-50 cursor-wait'
           )}
           title="Analyse Intelligence"
         >
-          <Sparkles className={cn('w-4.5 h-4.5', isAIPanelOpen ? 'text-black' : 'text-brand-green')} aria-hidden="true" />
+          {isPending && !isAIPanelOpen ? (
+            <Loader2 className="w-4.5 h-4.5 text-brand-green animate-spin" />
+          ) : (
+            <Sparkles className={cn('w-4.5 h-4.5', isAIPanelOpen ? 'text-black' : 'text-brand-green')} aria-hidden="true" />
+          )}
           <div className="absolute top-full right-0 mt-3 px-3 py-2 bg-black/95 border border-white/10 rounded-xl text-[10px] text-white/60 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all pointer-events-none translate-y-2 group-hover:translate-y-0 shadow-2xl z-50">
              Activer l'Analyse Prédictive IA
           </div>
