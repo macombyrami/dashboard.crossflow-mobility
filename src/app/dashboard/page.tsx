@@ -13,6 +13,12 @@ import { TimelineScrubber } from '@/components/dashboard/TimelineScrubber'
 import { ZoneExportTool } from '@/components/dashboard/ZoneExportTool'
 import { LiveSyncBadge } from '@/components/dashboard/LiveSyncBadge'
 
+// Mobile Components
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
+import { MobileDashboardView } from '@/components/mobile/dashboard/MobileDashboardView'
+import { PilotStatus } from '@/components/mobile/dashboard/PilotStatus'
+import { AIAssistantCard } from '@/components/mobile/dashboard/AIAssistantCard'
+
 // Dynamic Imports for heavy widgets
 const TrafficChart = dynamic(() => import('@/components/dashboard/TrafficChart').then(m => m.TrafficChart), { 
   ssr: false, 
@@ -137,36 +143,39 @@ export default function DashboardPage() {
     if (kpis) addSnapshot(kpis)
   }, [kpis, addSnapshot])
 
-  if (!kpis) return null
+  const isMobile = useMediaQuery('(max-width: 1023px)')
 
-  const congPct    = Math.round(kpis.congestionRate * 100)
-  const targets    = platformConfig.kpi.targets
-  const congWarn   = kpis.congestionRate >= targets.congestion_rate.warning
-  const congCrit   = kpis.congestionRate >= targets.congestion_rate.critical
-  const travelWarn = kpis.avgTravelMin   >= targets.avg_travel_time_min.warning
-  const pollWarn   = kpis.pollutionIndex >= targets.pollution_index.warning
-  const pollColor  = pollutionLabel(kpis.pollutionIndex).color
+  const { congPct, congWarn, congCrit, travelWarn, pollWarn, pollColor, congDelta, travelDelta } = useMemo(() => {
+    if (!kpis) return {} as any
+    const congPct    = Math.round(kpis.congestionRate * 100)
+    const targets    = platformConfig.kpi.targets
+    const congWarn   = kpis.congestionRate >= targets.congestion_rate.warning
+    const congCrit   = kpis.congestionRate >= targets.congestion_rate.critical
+    const travelWarn = kpis.avgTravelMin   >= targets.avg_travel_time_min.warning
+    const pollWarn   = kpis.pollutionIndex >= targets.pollution_index.warning
+    const pollColor  = pollutionLabel(kpis.pollutionIndex).color
 
-  // Deltas réels calculés depuis l'historique persisté (24h en arrière)
-  // Si pas encore assez d'historique, on ne montre rien (pas de fausse valeur)
-  const { congDelta, travelDelta } = useMemo(() => {
-    const history = useKPIHistoryStore.getState().getForCity(city.id, 96)  // 48 buckets/jour × 2 jours
-    if (history.length < 2) return { congDelta: undefined, travelDelta: undefined }
-
-    const BUCKET_24H = 48  // 48 × 30 min = 24h
-    const latest   = history[history.length - 1]
-    // Trouver le bucket le plus proche de 24h plus tôt
-    const yesterday = history.find(s =>
-      s.cityId === city.id && Math.abs(s.bucketKey - (latest.bucketKey - BUCKET_24H)) <= 2
-    )
-    if (!yesterday) return { congDelta: undefined, travelDelta: undefined }
-
-    return {
-      congDelta:   Math.round((latest.congestion - yesterday.congestion) * 10) / 10,
-      travelDelta: Math.round((latest.avgTravelMin - yesterday.avgTravelMin) * 10) / 10,
+    const history = useKPIHistoryStore.getState().getForCity(city.id, 96)
+    let cDelta, tDelta
+    if (history.length >= 2) {
+      const BUCKET_24H = 48
+      const latest   = history[history.length - 1]
+      const yesterday = history.find(s =>
+        s.cityId === city.id && Math.abs(s.bucketKey - (latest.bucketKey - BUCKET_24H)) <= 2
+      )
+      if (yesterday) {
+        cDelta = Math.round((latest.congestion - yesterday.congestion) * 10) / 10
+        tDelta = Math.round((latest.avgTravelMin - yesterday.avgTravelMin) * 10) / 10
+      }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [city.id, kpis?.capturedAt])
+
+    return { congPct, congWarn, congCrit, travelWarn, pollWarn, pollColor, congDelta: cDelta, travelDelta: tDelta }
+  }, [kpis, city.id])
+
+  if (!kpis) return null
+  if (isMobile) {
+    return <MobileDashboardView kpis={kpis} city={city} incidents={incidents} />
+  }
 
   return (
     <main className="min-h-full p-4 sm:p-8 space-y-6 sm:space-y-8 pb-safe">

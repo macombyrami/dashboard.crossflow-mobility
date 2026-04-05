@@ -18,16 +18,21 @@ interface Props {
   critical?:  boolean
   sub?:       string
   className?: string
+  variant?:   'default' | 'mini'
 }
 
 function KPICardInner({
   label, value, unit, delta, deltaUnit = '%', inverse = false,
   icon: Icon, color = '#22C55E', warning, critical, sub, className,
+  variant = 'default',
 }: Props) {
   const { t } = useTranslation()
+  const isMini = variant === 'mini'
+
   return (
     <div className={cn(
-      'glass-card p-5 sm:p-6 space-y-5 hover:shadow-apple relative group overflow-hidden animate-scale-in',
+      'glass-card space-y-5 hover:shadow-apple relative group overflow-hidden animate-scale-in',
+      isMini ? 'p-4 space-y-3 rounded-2xl' : 'p-5 sm:p-6 rounded-3xl',
       className,
     )}>
       {/* Background Glow Overlay (Apple-style subtle vibrancy) */}
@@ -37,26 +42,35 @@ function KPICardInner({
       />
 
       <div className="flex items-center justify-between relative z-10">
-        <span className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.12em] block">{label}</span>
+        <span className={cn(
+          "font-bold text-text-secondary uppercase tracking-[0.12em] block",
+          isMini ? "text-[9px]" : "text-[11px]"
+        )}>
+          {label}
+        </span>
         <div
-          className="w-11 h-11 rounded-[14px] flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-110 group-hover:rotate-3 duration-500 shadow-sm"
+          className={cn(
+            "rounded-[14px] flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-110 group-hover:rotate-3 duration-500 shadow-sm",
+            isMini ? "w-8 h-8 rounded-[10px]" : "w-11 h-11"
+          )}
           style={{ backgroundColor: `${color}14`, border: `1px solid ${color}25` }}
         >
-          <Icon className="w-5 h-5" style={{ color }} />
+          <Icon className={isMini ? "w-4 h-4" : "w-5 h-5"} style={{ color }} />
         </div>
       </div>
 
       <div className="relative z-10">
         <div className="flex items-baseline gap-2">
           <span className={cn(
-            "text-3xl sm:text-4xl font-black tracking-tighter text-white font-heading",
+            "font-black tracking-tighter text-white font-heading",
+            isMini ? "text-2xl" : "text-3xl sm:text-4xl",
             critical ? "text-red-500" : warning ? "text-orange-500" : ""
           )}>
             {value}
           </span>
-          {unit && <span className="text-xs font-bold text-text-muted uppercase tracking-widest">{unit}</span>}
+          {unit && <span className={cn("font-bold text-text-muted uppercase tracking-widest", isMini ? "text-[8px]" : "text-xs")}>{unit}</span>}
         </div>
-        {sub && <p className="text-[11px] font-semibold text-text-muted mt-2 leading-relaxed opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-1 group-hover:translate-y-0">{sub}</p>}
+        {sub && !isMini && <p className="text-[11px] font-semibold text-text-muted mt-2 leading-relaxed opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-1 group-hover:translate-y-0">{sub}</p>}
       </div>
 
       {delta !== undefined && (
