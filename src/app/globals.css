@@ -376,7 +376,7 @@ body {
 .animate-splash-bg   { animation: splash-bg 2.6s ease-in-out both; }
 .animate-slide-up   { animation: slide-up-fade 0.25s ease-out both; }
 .animate-scale-in { animation: scale-bounce 0.3s cubic-bezier(0.34,1.56,0.64,1) both; }
-.traffic-flow {
+traffic-flow {
   stroke-dasharray: 10 10;
   animation: flow-line 1s linear infinite;
   will-change: stroke-dashoffset;
