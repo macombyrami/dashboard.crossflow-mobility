@@ -26,14 +26,25 @@ export async function exportToPdf(pageTitle?: string): Promise<void> {
   const prev = document.title
   if (pageTitle) document.title = pageTitle
   
-  // 🚀 STAFF ENGINEER: Rendering Stabilization Delay
+  // ─── SAFE EXPORT MODE (Staff Engineer Implementation) ─────────────
+  // 1. Force the layout into a static/standard flow for print
+  document.body.setAttribute('data-export-mode', 'true')
+  
+  // 2. 🚀 Rendering Stabilization Delay
   // High-density dashboards with dynamic Recharts / MapLibre need a micro-task
   // cycle to settle layout after title changes or print-media query triggers.
-  await new Promise(resolve => setTimeout(resolve, 500))
+  // Especially critical when disabling transitions/absolute positioning.
+  await new Promise(resolve => setTimeout(resolve, 800))
   
-  window.print()
-  
-  if (pageTitle) document.title = prev
+  try {
+    window.print()
+  } catch (err) {
+    console.error('[CrossFlow Export] Print failed:', err)
+  } finally {
+    // 3. ─── CLEANUP ──────────────────────────────────────────────────
+    document.body.removeAttribute('data-export-mode')
+    if (pageTitle) document.title = prev
+  }
 }
 
 function triggerDownload(blob: Blob, filename: string): void {

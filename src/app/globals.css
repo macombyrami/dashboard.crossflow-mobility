@@ -550,6 +550,37 @@ body {
   @page { margin: 1.5cm; }
 }
 
+/* ─── Safe Export Mode (Staff Engineer Fix) ────────────────────────────── */
+[data-export-mode="true"] {
+  height: auto !important;
+  overflow: visible !important;
+}
+
+[data-export-mode="true"] .app-shell,
+[data-export-mode="true"] .main-content {
+  display: block !important;
+  position: static !important;
+  height: auto !important;
+  overflow: visible !important;
+  animation: none !important;
+}
+
+/* Bypass SwipeNavigation absolute positioning to prevent 0px height collapse */
+[data-export-mode="true"] .main-content > div,
+[data-export-mode="true"] [class*="motion-div"] {
+  display: block !important;
+  position: relative !important;
+  height: auto !important;
+  width: 100% !important;
+  inset: auto !important;
+  transform: none !important;
+  overflow: visible !important;
+}
+
+[data-export-mode="true"] .print-hidden {
+  display: none !important;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    ♿ ACCESSIBILITY — WCAG 2.1 AA Compliance Layer
    ═══════════════════════════════════════════════════════════════════════════ */
