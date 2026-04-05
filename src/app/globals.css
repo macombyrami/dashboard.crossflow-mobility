@@ -225,9 +225,23 @@ body {
 .btn-icon:active { transform: scale(0.93); }
 
 .btn-prestige {
-  @apply relative px-8 py-4 rounded-2xl bg-white text-black font-black uppercase tracking-[0.2em] text-[10px] 
-         hover:bg-brand hover:text-black transition-all duration-500 flex items-center justify-center gap-3
-         shadow-[0_0_30px_-10px_rgba(255,255,255,0.3)] border-none outline-none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 1rem 2rem;
+  border-radius: var(--radius-2xl);
+  background-color: #ffffff;
+  color: #000000;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 10px;
+  transition: all 500ms;
+  box-shadow: 0 0 30px -10px rgba(255,255,255,0.3);
+  border: none;
+  outline: none;
 }
 
 .btn-prestige:hover {
@@ -374,12 +388,23 @@ body {
 }
 
 .text-prestige-gradient {
-  @apply bg-clip-text text-transparent bg-gradient-to-br from-white via-white/80 to-white/40;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(to bottom right, #ffffff, rgba(255,255,255,0.8), rgba(255,255,255,0.4));
 }
 
 .noise-overlay {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  @apply pointer-events-none fixed inset-0 z-[1000] opacity-[0.04] mix-blend-overlay;
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
 }
 
 /* ─── Layout Shell ─────────────────────────────────────────────────────── */
