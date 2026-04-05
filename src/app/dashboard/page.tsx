@@ -191,13 +191,8 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-3 sm:gap-4">
           <ZoneExportTool />
-          <button
-            onClick={() => exportToPdf(`${appData.name} — ${city.name} Dashboard`)}
-            className="print-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-xs text-text-secondary hover:text-text-primary"
-          >
-            <Download className="w-3.5 h-3.5" />
-            PDF
-          </button>
+          
+          <PDFButton city={city} />
           
           <button
             onClick={() => alert("Permalink généré : " + window.location.href)}
@@ -343,6 +338,45 @@ export default function DashboardPage() {
         <IncidentFeed maxItems={5} />
       </div>
     </main>
+  )
+}
+
+function PDFButton({ city }: { city: { name: string } }) {
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  const handleExport = async () => {
+    setIsGenerating(true)
+    try {
+      await exportToPdf(`${appData.name} — ${city.name} Dashboard`)
+    } finally {
+      // Re-enable button after print dialog closes (or cancels)
+      setIsGenerating(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleExport}
+      disabled={isGenerating}
+      className={cn(
+        "print-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all text-xs",
+        isGenerating 
+          ? "bg-bg-border border-transparent text-text-muted cursor-not-allowed opacity-70"
+          : "bg-bg-elevated border-bg-border hover:border-text-muted text-text-secondary hover:text-text-primary"
+      )}
+    >
+      {isGenerating ? (
+        <>
+          <div className="w-3 h-3 border-2 border-brand/30 border-t-brand rounded-full animate-spin" />
+          GÉNÉRATION...
+        </>
+      ) : (
+        <>
+          <Download className="w-3.5 h-3.5" />
+          PDF
+        </>
+      )}
+    </button>
   )
 }
 

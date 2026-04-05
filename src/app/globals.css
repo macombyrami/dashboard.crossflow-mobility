@@ -496,12 +496,32 @@ body {
 
   .app-shell {
     display: block !important;
+    position: static !important;
     height: auto !important;
+    width: 100% !important;
+    overflow: visible !important;
+    animation: none !important;
   }
 
   .main-content {
+    display: block !important;
+    position: static !important;
     overflow: visible !important;
-    padding-bottom: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Specifically Target the Framer Motion / Swipe wrapper */
+  .main-content > div {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+    inset: auto !important;
+    transform: none !important;
   }
 
   main {

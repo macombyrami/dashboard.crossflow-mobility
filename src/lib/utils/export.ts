@@ -22,10 +22,17 @@ export function exportToCsv(
 }
 
 /** Open browser print dialog (relies on @media print CSS hiding chrome) */
-export function exportToPdf(pageTitle?: string): void {
+export async function exportToPdf(pageTitle?: string): Promise<void> {
   const prev = document.title
   if (pageTitle) document.title = pageTitle
+  
+  // 🚀 STAFF ENGINEER: Rendering Stabilization Delay
+  // High-density dashboards with dynamic Recharts / MapLibre need a micro-task
+  // cycle to settle layout after title changes or print-media query triggers.
+  await new Promise(resolve => setTimeout(resolve, 500))
+  
   window.print()
+  
   if (pageTitle) document.title = prev
 }
 
