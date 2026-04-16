@@ -4,7 +4,7 @@ import { SimulationResults } from '@/components/simulation/SimulationResults'
 import { SytadinFeed } from '@/components/simulation/SytadinFeed'
 import { PredictiveStatus } from '@/components/simulation/PredictiveStatus'
 import { IdfNetworkStats } from '@/components/simulation/IdfNetworkStats'
-import { MiroFishPanel } from '@/components/simulation/MiroFishPanel'
+import { StatsPanel } from '@/components/simulation/StatsPanel'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useSimulationStore } from '@/store/simulationStore'
@@ -12,7 +12,7 @@ import { generateCityKPIs, generateIncidents } from '@/lib/engine/traffic.engine
 
 
 import { useEffect, useState } from 'react'
-import { Brain, GitBranch, Info, Rss } from 'lucide-react'
+import { ChartColumnBig, GitBranch, Info, Rss } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useTranslation } from '@/lib/hooks/useTranslation'
 import type { Metadata } from 'next'
@@ -22,7 +22,7 @@ const CrossFlowMap = dynamic(
   { ssr: false, loading: () => <div className="w-full h-full bg-bg-surface" /> },
 )
 
-type RightTab = 'results' | 'social' | 'mirofish'
+type RightTab = 'results' | 'analytics' | 'social'
 
 export default function SimulationPage() {
   const { t } = useTranslation()
@@ -105,15 +105,15 @@ export default function SimulationPage() {
             {t('simulation.results')}
           </button>
           <button
-            onClick={() => setRightTab('mirofish')}
+            onClick={() => setRightTab('analytics')}
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-semibold transition-colors border-b-2 ${
-              rightTab === 'mirofish'
-                ? 'border-purple-400 text-purple-400 bg-purple-400/5'
+              rightTab === 'analytics'
+                ? 'border-brand text-brand bg-brand/5'
                 : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
             }`}
           >
-            <Brain className="w-3.5 h-3.5" />
-            IA Agents
+            <ChartColumnBig className="w-3.5 h-3.5" />
+            Analytique
           </button>
           <button
             onClick={() => setRightTab('social')}
@@ -134,9 +134,9 @@ export default function SimulationPage() {
             <div className="h-full overflow-y-auto p-4">
               <SimulationResults />
             </div>
-          ) : rightTab === 'mirofish' ? (
+          ) : rightTab === 'analytics' ? (
             <div className="h-full overflow-y-auto p-4">
-              <MiroFishPanel />
+              <StatsPanel />
             </div>
           ) : (
             <SytadinFeed />
