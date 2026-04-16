@@ -1,9 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Activity, MapPin, Route, Layers, RefreshCw, Server, CheckCircle2, XCircle } from 'lucide-react'
+import { Activity, MapPin, Layers, RefreshCw, Server, XCircle } from 'lucide-react'
+
 import { predictiveApi, type PredAnalytics } from '@/lib/api/predictive'
+import { useMapStore } from '@/store/mapStore'
 import { useSimulationStore } from '@/store/simulationStore'
+import { generateCityKPIs } from '@/lib/engine/traffic.engine'
 import { cn } from '@/lib/utils/cn'
 
 interface HealthState {
@@ -14,9 +17,11 @@ interface HealthState {
 }
 
 export function StatsPanel() {
+  const city = useMapStore(s => s.city)
   const graphLoaded = useSimulationStore(s => s.graphLoaded)
   const backendOnline = useSimulationStore(s => s.backendOnline)
   const revision = useSimulationStore(s => s.revision)
+
   const [health, setHealth] = useState<HealthState | null>(null)
   const [analytics, setAnalytics] = useState<PredAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
@@ -26,10 +31,12 @@ export function StatsPanel() {
   const refresh = async () => {
     setRefreshing(true)
     setError(null)
+
     try {
       const h = await predictiveApi.health()
       setHealth(h)
       useSimulationStore.getState().setBackendOnline(h.online)
+
       if (h.graph_loaded) {
         useSimulationStore.getState().setGraphLoaded(true)
         const a = await predictiveApi.getAnalytics()
@@ -40,6 +47,8 @@ export function StatsPanel() {
     } catch (err: any) {
       setError(err?.message ?? 'Impossible de charger les métriques prédictives.')
       setAnalytics(null)
+      setHealth({ online: false })
+      useSimulationStore.getState().setBackendOnline(false)
     } finally {
       setRefreshing(false)
       setLoading(false)
@@ -62,18 +71,31 @@ export function StatsPanel() {
   }
 
   if (!backendOnline || !health?.online) {
+    const kpis = generateCityKPIs(city)
+
     return (
       <div className="rounded-2xl border border-bg-border bg-bg-surface p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <XCircle className="w-4 h-4 text-[#FF1744]" />
-          <span className="text-xs font-semibold text-[#FF1744]">Backend prédictif hors ligne</span>
+          <XCircle className="w-4 h-4 text-[#2979FF]" />
+          <span className="text-xs font-semibold text-[#2979FF]">Mode analytique local</span>
         </div>
         <p className="text-[11px] text-text-muted leading-relaxed">
-          Le moteur FastAPI du projet prédictif n’est pas joignable depuis cette instance.
+          Le moteur FastAPI n&apos;est pas joignable depuis cette instance. L&apos;aperçu local reste disponible pour {city.name}.
         </p>
-        <div className="bg-bg-elevated rounded-lg p-2 font-mono text-[10px] text-text-muted">
-          <div>cd crossflow-mobility-predictive-main</div>
-          <div>uvicorn backend.main:app --port 8000</div>
+        <div className="grid grid-cols-2 gap-2">
+          <MiniStat label="Congestion" value={`${Math.round(kpis.congestionRate * 100)}%`} accent="text-brand" />
+          <MiniStat label="Efficacité" value={`${Math.round(kpis.networkEfficiency * 100)}%`} accent="text-brand-green" />
+        </div>
+        <div className="rounded-lg bg-white/[0.03] border border-white/5 px-3 py-2">
+          <div className="flex items-center gap-2 mb-1">
+            <MapPin className="w-3 h-3 text-text-muted" />
+            <span className="text-[10px] font-medium text-text-muted uppercase tracking-widest">
+              Fallback local
+            </span>
+          </div>
+          <p className="text-[10px] text-text-muted leading-relaxed">
+            Les métriques prédictives complètes se réactivent automatiquement dès que FastAPI est disponible.
+          </p>
         </div>
         <button
           onClick={refresh}
@@ -82,7 +104,7 @@ export function StatsPanel() {
           <RefreshCw className={cn('w-3 h-3', refreshing && 'animate-spin')} />
           Réessayer
         </button>
-        {error && <p className="text-[10px] text-[#FF1744]">{error}</p>}
+        {error && <p className="text-[10px] text-[#2979FF]">{error}</p>}
       </div>
     )
   }
@@ -164,7 +186,7 @@ export function StatsPanel() {
         )}
 
         {error && (
-          <div className="rounded-lg bg-[rgba(255,23,68,0.08)] border border-[rgba(255,23,68,0.2)] px-3 py-2 text-[10px] text-[#FF1744] leading-relaxed">
+          <div className="rounded-lg bg-[rgba(41,121,255,0.08)] border border-[rgba(41,121,255,0.2)] px-3 py-2 text-[10px] text-[#2979FF] leading-relaxed">
             {error}
           </div>
         )}
@@ -177,7 +199,7 @@ export function StatsPanel() {
             </span>
           </div>
           <p className="text-[10px] text-text-muted leading-relaxed">
-            Les feux et les segments dépendent de la qualité OSM. La couverture de Gennevilliers peut être partielle sur certains équipements.
+            Les feux et les segments dépendent de la qualité OSM. La couverture peut être partielle sur certains équipements.
           </p>
         </div>
       </div>

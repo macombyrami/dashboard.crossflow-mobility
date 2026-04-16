@@ -66,6 +66,7 @@ export function SimulationMap() {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
+  const [backendReady, setBackendReady] = useState<boolean | null>(null)
 
   const center = useMemo(() => city.center, [city.center])
 
@@ -92,7 +93,29 @@ export function SimulationMap() {
   }
 
   useEffect(() => {
-    void simulationService.initEngine(city)
+    let mounted = true
+
+    const bootstrap = async () => {
+      const online = await simulationService.checkHealth()
+      if (!mounted) return
+      setBackendReady(online)
+
+      if (online) {
+        await simulationService.initEngine(city)
+      } else {
+        const store = useSimulationStore.getState()
+        store.setBackendOnline(false)
+        store.setGraphLoaded(false)
+        store.setEngineStatus('idle')
+        store.setLastError(null)
+      }
+    }
+
+    void bootstrap()
+
+    return () => {
+      mounted = false
+    }
   }, [city.id, city.name])
 
   useEffect(() => {
@@ -263,8 +286,9 @@ export function SimulationMap() {
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
+    if (backendReady === false) return
     void refreshData()
-  }, [mapLoaded, revision, city.id])
+  }, [mapLoaded, revision, city.id, backendReady])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
@@ -333,7 +357,9 @@ export function SimulationMap() {
               ? 'Ajouter du trafic'
               : locationPickerActive
                 ? 'Placer un événement'
-                : 'Navigation libre'}
+                : backendReady === false
+                  ? 'Mode local'
+                  : 'Navigation libre'}
         </p>
       </div>
     </div>

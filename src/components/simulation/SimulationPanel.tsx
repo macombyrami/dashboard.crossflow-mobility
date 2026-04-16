@@ -67,8 +67,28 @@ export function SimulationPanel() {
   const [activeEvents, setActiveEvents] = useState<Array<{ id: string; label: string; count: number }>>([])
 
   useEffect(() => {
-    void simulationService.initEngine(city)
-    void simulationService.checkHealth()
+    let mounted = true
+
+    const bootstrap = async () => {
+      const online = await simulationService.checkHealth()
+      if (!mounted) return
+
+      if (online) {
+        await simulationService.initEngine(city)
+      } else {
+        const store = useSimulationStore.getState()
+        store.setBackendOnline(false)
+        store.setGraphLoaded(false)
+        store.setEngineStatus('idle')
+        store.setLastError(null)
+      }
+    }
+
+    void bootstrap()
+
+    return () => {
+      mounted = false
+    }
   }, [city.id, city.name])
 
   useEffect(() => {
