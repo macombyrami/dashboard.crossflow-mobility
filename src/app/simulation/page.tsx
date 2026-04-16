@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { ChartColumnBig, GitBranch, Info, Rss } from 'lucide-react'
+import { ChartColumnBig, GitBranch, Info } from 'lucide-react'
 
 import { SimulationPanel } from '@/components/simulation/SimulationPanel'
 import { SimulationResults } from '@/components/simulation/SimulationResults'
-import { SytadinFeed } from '@/components/simulation/SytadinFeed'
 import { StatsPanel } from '@/components/simulation/StatsPanel'
 
 import { useMapStore } from '@/store/mapStore'
@@ -19,7 +18,7 @@ const CrossFlowMap = dynamic(
   { ssr: false, loading: () => <div className="w-full h-full bg-bg-surface" /> },
 )
 
-type RightTab = 'results' | 'analytics' | 'social'
+type RightTab = 'results' | 'analytics'
 
 export default function SimulationPage() {
   const { t } = useTranslation()
@@ -84,20 +83,9 @@ export default function SimulationPage() {
                 ? 'border-brand text-brand bg-brand/5'
                 : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
             }`}
-          >
-            <ChartColumnBig className="w-3.5 h-3.5" />
-            Analytique
-          </button>
-          <button
-            onClick={() => setRightTab('social')}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-semibold transition-colors border-b-2 ${
-              rightTab === 'social'
-                ? 'border-[#1DA1F2] text-[#1DA1F2] bg-[#1DA1F2]/5'
-                : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
-            }`}
-          >
-            <Rss className="w-3.5 h-3.5" />
-            Social
+            >
+              <ChartColumnBig className="w-3.5 h-3.5" />
+              Analytique
           </button>
         </div>
 
@@ -110,9 +98,7 @@ export default function SimulationPage() {
             <div className="h-full overflow-y-auto p-4">
               <StatsPanel />
             </div>
-          ) : (
-            <SytadinFeed />
-          )}
+          ) : null}
         </div>
       </div>
     </div>

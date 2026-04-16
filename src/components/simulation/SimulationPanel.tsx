@@ -119,9 +119,6 @@ export function SimulationPanel() {
   }
 
   const impact = cfg[store.scenarioType]?.impact
-  const isBlockMode = store.status === 'ready' && store.locationPickerActive === false && store.scenarioType === 'road_closure'
-  const isTrafficMode = store.scenarioType === 'traffic_light' || store.scenarioType === 'speed_limit'
-  const isEventMode = store.scenarioType === 'event'
 
   return (
     <div className="space-y-4">
