@@ -16,6 +16,7 @@ interface HealthState {
 export function StatsPanel() {
   const graphLoaded = useSimulationStore(s => s.graphLoaded)
   const backendOnline = useSimulationStore(s => s.backendOnline)
+  const revision = useSimulationStore(s => s.revision)
   const [health, setHealth] = useState<HealthState | null>(null)
   const [analytics, setAnalytics] = useState<PredAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
@@ -48,7 +49,7 @@ export function StatsPanel() {
   useEffect(() => {
     refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphLoaded])
+  }, [graphLoaded, revision])
 
   if (loading) {
     return (

@@ -49,7 +49,7 @@ export function Sidebar() {
     if (href === '/simulation') setMode('simulate')
 
     startTransition(() => {
-      if (['/prediction', '/simulation'].includes(href)) {
+      if (href === '/prediction') {
         router.push('/map')
       } else {
         router.push(href)

@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Simulation de Mobilité — CrossFlow',
-  description: 'Simuler des scénarios urbains et analyser l\'impact sur le trafic.',
+  title: "Simulation — Tester l'impact — CrossFlow",
+  description: "Tester l'impact de scénarios urbains sur le trafic avec le moteur prédictif.",
 }
 
 export default function SimulationLayout({ children }: { children: React.ReactNode }) {

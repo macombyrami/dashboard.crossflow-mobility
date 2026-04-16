@@ -3,6 +3,15 @@ import { persist } from 'zustand/middleware'
 import type { SimulationScenario, SimulationResult, ScenarioType } from '@/types'
 import { platformConfig } from '@/config/platform.config'
 
+export const SIMULATION_INTERACTION_MODE = {
+  NONE: 'none',
+  BLOCK_ROAD: 'block_road',
+  ADD_TRAFFIC: 'add_traffic',
+  ADD_EVENT: 'add_event',
+} as const
+
+export type SimulationInteractionMode = typeof SIMULATION_INTERACTION_MODE[keyof typeof SIMULATION_INTERACTION_MODE]
+
 interface SimulationStore {
   // Current scenario builder
   scenarioType:    ScenarioType
@@ -21,6 +30,10 @@ interface SimulationStore {
   setDurationHours:   (h: number) => void
   setMagnitude:       (m: number) => void
   setTimeWindow:      (start: number, end: number) => void
+  revision:           number
+  bumpRevision:       () => void
+  interactionMode:    SimulationInteractionMode
+  setInteractionMode:  (mode: SimulationInteractionMode) => void
 
   // Build scenario object
   buildScenario:    () => SimulationScenario
@@ -63,6 +76,8 @@ export const useSimulationStore = create<SimulationStore>()(
       magnitude:       1.0,
       timeWindowStart: 8,
       timeWindowEnd:   10,
+      revision:        0,
+      interactionMode: SIMULATION_INTERACTION_MODE.NONE,
       status:          'idle',
       lastError:       null,
 
@@ -74,6 +89,8 @@ export const useSimulationStore = create<SimulationStore>()(
       setDurationHours:   (h: number) => set({ durationHours: h }),
       setMagnitude:       (m: number) => set({ magnitude: m }),
       setTimeWindow:      (start: number, end: number) => set({ timeWindowStart: start, timeWindowEnd: end }),
+      bumpRevision:       () => set(s => ({ revision: s.revision + 1 })),
+      setInteractionMode: (mode) => set({ interactionMode: mode }),
 
       buildScenario: (): SimulationScenario => {
         const s = get() as SimulationStore

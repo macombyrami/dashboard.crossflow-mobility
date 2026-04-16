@@ -7,7 +7,9 @@ import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useSimulationStore } from '@/store/simulationStore'
+import { SIMULATION_INTERACTION_MODE } from '@/store/simulationStore'
 import { simulationService } from '@/lib/services/SimulationService'
+import { predictiveApi } from '@/lib/api/predictive'
 import { platformConfig } from '@/config/platform.config'
 import { congestionColor, scoreToCongestionLevel } from '@/lib/utils/congestion'
 import { cn } from '@/lib/utils/cn'
@@ -278,6 +280,9 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   const dataSource            = useTrafficStore(s => s.dataSource)
 
   const currentResult           = useSimulationStore(s => s.currentResult)
+  const simulationRevision      = useSimulationStore(s => s.revision)
+  const simulationInteractionMode = useSimulationStore(s => s.interactionMode)
+  const setInteractionMode      = useSimulationStore(s => s.setInteractionMode)
   const locationPickerActive    = useSimulationStore(s => s.locationPickerActive)
   const eventLocation           = useSimulationStore(s => s.eventLocation)
   const setEventLocation        = useSimulationStore(s => s.setEventLocation)
@@ -535,7 +540,38 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       if (zoneActiveRef.current) return
       const feat = e.features?.[0]
       if (!feat) return
-      selectSegment(feat.properties?.id as string)
+      const segmentId = feat.properties?.id as string
+      selectSegment(segmentId)
+
+      if (simulationInteractionMode === SIMULATION_INTERACTION_MODE.BLOCK_ROAD) {
+        try {
+          await predictiveApi.blockRoad(segmentId)
+          simulationService.getAffectedEdges().then(geojson => {
+            const src = safeGetSource(map, PREDICTIVE_AFFECTED_SOURCE) as maplibregl.GeoJSONSource | null
+            if (src && geojson) src.setData(geojson)
+          })
+          useSimulationStore.getState().bumpRevision()
+          setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
+        } catch (err) {
+          console.error('[CrossFlow] blockRoad failed:', err)
+        }
+        return
+      }
+
+      if (simulationInteractionMode === SIMULATION_INTERACTION_MODE.ADD_TRAFFIC) {
+        try {
+          await predictiveApi.addTraffic(segmentId, 'medium')
+          simulationService.getAffectedEdges().then(geojson => {
+            const src = safeGetSource(map, PREDICTIVE_AFFECTED_SOURCE) as maplibregl.GeoJSONSource | null
+            if (src && geojson) src.setData(geojson)
+          })
+          useSimulationStore.getState().bumpRevision()
+          setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
+        } catch (err) {
+          console.error('[CrossFlow] addTraffic failed:', err)
+        }
+        return
+      }
 
       // Fetch real TomTom data for this point if key available
       if (useLiveData) {
@@ -1294,8 +1330,8 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       const affectedSrc = map.getSource(PREDICTIVE_AFFECTED_SOURCE) as maplibregl.GeoJSONSource | undefined
       const eventsSrc   = map.getSource(PREDICTIVE_EVENTS_SOURCE) as maplibregl.GeoJSONSource | undefined
 
-      if (!simulationResult || !simulationResult.predictive) {
-        // Clear if no active simulation result
+      if (!simulationResult && simulationRevision === 0) {
+        // Clear when no simulation workflow is active yet
         affectedSrc?.setData({ type: 'FeatureCollection', features: [] })
         eventsSrc?.setData({ type: 'FeatureCollection', features: [] })
         return
@@ -1319,7 +1355,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
 
     updatePredictiveLayers()
 
-  }, [simulationResult, mapLoaded])
+  }, [simulationResult, simulationRevision, mapLoaded, simulationInteractionMode])
 
 
   // ─── Sim Event Location Marker ───────────────────────────────────────

@@ -1,99 +1,208 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { AlertCircle, Ban, Bike, Calendar, CheckCircle2, Cpu, Download, Loader2, MapPin, Play, Search, Train, TrafficCone, Gauge, Trash2, X, Zap } from 'lucide-react'
-import { useMapStore } from '@/store/mapStore'
-import { useSimulationStore } from '@/store/simulationStore'
-import { simulationService } from '@/lib/services/SimulationService'
-import { runSimulation } from '@/lib/engine/simulation.engine'
-import { platformConfig } from '@/config/platform.config'
-import { cn } from '@/lib/utils/cn'
-import type { ScenarioType, SimulationResult } from '@/types'
-import { useTranslation } from '@/lib/hooks/useTranslation'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  AlertCircle,
+  Ban,
+  CheckCircle2,
+  Cpu,
+  Download,
+  Loader2,
+  MapPin,
+  Search,
+  TrafficCone,
+  Trash2,
+  Zap,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import type { ReactNode } from 'react'
 
-const ICONS: Record<ScenarioType, typeof Play> = {
-  road_closure: Ban,
-  traffic_light: TrafficCone,
-  bike_lane: Bike,
-  speed_limit: Gauge,
-  public_transport: Train,
-  event: Calendar,
-}
+import { predictiveApi, type PredEventType, type PredTrafficLevel } from '@/lib/api/predictive'
+import { simulationService } from '@/lib/services/SimulationService'
+import { useMapStore } from '@/store/mapStore'
+import { SIMULATION_INTERACTION_MODE, useSimulationStore } from '@/store/simulationStore'
+import { cn } from '@/lib/utils/cn'
+
+const TRAFFIC_LEVELS: Array<{ value: PredTrafficLevel; label: string; color: string }> = [
+  { value: 'light', label: 'Léger ×1.2', color: '#00E676' },
+  { value: 'medium', label: 'Moyen ×1.5', color: '#FF6D00' },
+  { value: 'heavy', label: 'Fort ×2.0', color: '#FF1744' },
+]
+
+const EVENT_TYPES: Array<{ value: PredEventType; label: string; icon: ReactNode }> = [
+  { value: 'accident', label: 'Accident', icon: '💥' },
+  { value: 'works', label: 'Travaux', icon: '🚧' },
+  { value: 'demonstration', label: 'Manifestation', icon: '📢' },
+  { value: 'administrative', label: 'Fermeture', icon: '🚫' },
+]
 
 export function SimulationPanel() {
-  const { t } = useTranslation()
   const city = useMapStore(s => s.city)
-  const store = useSimulationStore()
-  const scenarioTypes = platformConfig.simulation.scenarioTypes
-  const cfg = platformConfig.simulation.scenarioConfig
-  const [backendActive, setBackendActive] = useState(false)
+  const selectedSegmentId = useMapStore(s => s.selectedSegmentId)
+  const revision = useSimulationStore(s => s.revision)
+  const interactionMode = useSimulationStore(s => s.interactionMode)
+  const eventLocation = useSimulationStore(s => s.eventLocation)
+  const locationPickerActive = useSimulationStore(s => s.locationPickerActive)
+  const setEventLocation = useSimulationStore(s => s.setEventLocation)
+  const setLocationPickerActive = useSimulationStore(s => s.setLocationPickerActive)
+  const setInteractionMode = useSimulationStore(s => s.setInteractionMode)
+  const status = useSimulationStore(s => s.status)
+  const lastError = useSimulationStore(s => s.lastError)
+  const bumpRevision = useSimulationStore(s => s.bumpRevision)
+  const setLastError = useSimulationStore(s => s.setLastError)
+
+  const [trafficLevel, setTrafficLevel] = useState<PredTrafficLevel>('medium')
+  const [eventType, setEventType] = useState<PredEventType>('works')
+  const [eventRadius, setEventRadius] = useState(300)
+  const [isBusy, setIsBusy] = useState(false)
+  const [analytics, setAnalytics] = useState<{
+    blocked: number
+    slow: number
+    events: number
+    edges: number
+    online: boolean
+  } | null>(null)
+  const [blockedSegments, setBlockedSegments] = useState<Array<{ id: string; label: string }>>([])
+  const [activeEvents, setActiveEvents] = useState<Array<{ id: string; label: string; count: number }>>([])
 
   useEffect(() => {
     void simulationService.initEngine(city)
+    void simulationService.checkHealth()
   }, [city.id, city.name])
 
-  const handleRun = async () => {
-    if (store.isRunning) return
+  useEffect(() => {
+    let active = true
 
-    store.setRunning(true)
-    store.setProgress(10)
-    store.setCurrentResult(null)
-    setBackendActive(false)
+    const refresh = async () => {
+      try {
+        const [health, blocked, slow, events, graph] = await Promise.all([
+          predictiveApi.health(),
+          predictiveApi.getEdges('blocked'),
+          predictiveApi.getEdges('slow'),
+          predictiveApi.getEvents(),
+          predictiveApi.getAnalytics().catch(() => null),
+        ])
 
-    try {
-      const scenario = store.buildScenario()
-      const eventCenter = store.eventLocation ?? city.center
+        if (!active) return
 
-      let predictive: SimulationResult['predictive'] | undefined
-
-      if (store.status === 'ready') {
-        store.setProgress(25)
-        try {
-          const res = await simulationService.runPredictiveSimulation(
-            city,
-            eventCenter,
-            store.scenarioType,
-            scenario.name,
-            store.magnitude,
-          )
-
-          if (res.comparison?.delta) {
-            predictive = {
-              normal: {
-                total_distance_m: res.comparison.normal.total_distance_m,
-                total_time_s: res.comparison.normal.total_time_s,
-              },
-              simulated: {
-                total_distance_m: res.comparison.simulated.total_distance_m,
-                total_time_s: res.comparison.simulated.total_time_s,
-              },
-              delta: res.comparison.delta,
+        setBlockedSegments(
+          blocked.features.slice(0, 5).map((feature, index) => {
+            const props = (feature.properties ?? {}) as Record<string, unknown>
+            const rawId = String(props.edge_id ?? props.id ?? props.name ?? `segment-${index + 1}`)
+            return {
+              id: rawId,
+              label: formatShortLabel(rawId, props.name),
             }
-            setBackendActive(true)
-          }
-          store.setProgress(65)
-        } catch (err) {
-          console.warn('[SimulationPanel] Predictive backend failed. Falling back to local engine.', err)
+          }),
+        )
+        setActiveEvents(
+          events.features.slice(0, 5).map((feature, index) => {
+            const props = (feature.properties ?? {}) as Record<string, unknown>
+            const rawId = String(props.id ?? props.label ?? props.name ?? `event-${index + 1}`)
+            const affected = Array.isArray(props.affected_edges) ? props.affected_edges.length : 0
+            return {
+              id: rawId,
+              label: String(props.label ?? props.name ?? rawId),
+              count: affected,
+            }
+          }),
+        )
+        setAnalytics({
+          online: Boolean(health.online),
+          blocked: blocked.features.length,
+          slow: slow.features.length,
+          events: events.features.length,
+          edges: graph?.total_roads ?? 0,
+        })
+      } catch {
+        if (active) {
+          setAnalytics(null)
+          setBlockedSegments([])
+          setActiveEvents([])
         }
       }
+    }
 
-      const result = await runSimulation(city, scenario, (pct) => {
-        const offset = predictive ? 65 : 10
-        const scale = predictive ? 0.35 : 0.9
-        store.setProgress(Math.round(offset + (pct * scale)))
-      })
+    void refresh()
 
-      const finalResult: SimulationResult = predictive ? { ...result, predictive } : result
-      store.addResult(finalResult)
-      store.setCurrentResult(finalResult)
-      store.setProgress(100)
-    } catch (criticalErr: any) {
-      console.error('[SimulationPanel] Critical execution failure:', criticalErr)
-      store.setLastError(`Execution Error: ${criticalErr.message}`)
+    return () => {
+      active = false
+    }
+  }, [city.id, revision, status])
+
+  const selectedSegmentLabel = useMemo(() => {
+    if (!selectedSegmentId) return null
+    return selectedSegmentId.length > 28
+      ? `…${selectedSegmentId.slice(-12)}`
+      : selectedSegmentId
+  }, [selectedSegmentId])
+
+  const handleBlockRoad = async () => {
+    if (!selectedSegmentId) {
+      toast.warning('Sélectionnez un segment sur la carte.')
+      return
+    }
+
+    setIsBusy(true)
+    setLastError(null)
+
+    try {
+      await predictiveApi.blockRoad(selectedSegmentId)
+      bumpRevision()
+      setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
+      toast.success('Route bloquée sur la carte')
+    } catch (err: any) {
+      setLastError(err?.message ?? 'Impossible de bloquer la route.')
+      toast.error('Blocage impossible')
     } finally {
-      setTimeout(() => {
-        store.setRunning(false)
-      }, 500)
+      setIsBusy(false)
+    }
+  }
+
+  const handleAddTraffic = async () => {
+    if (!selectedSegmentId) {
+      toast.warning('Sélectionnez un segment sur la carte.')
+      return
+    }
+
+    setIsBusy(true)
+    setLastError(null)
+
+    try {
+      await predictiveApi.addTraffic(selectedSegmentId, trafficLevel)
+      bumpRevision()
+      setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
+      toast.success('Trafic appliqué au segment')
+    } catch (err: any) {
+      setLastError(err?.message ?? 'Impossible d’appliquer le trafic.')
+      toast.error('Trafic impossible')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  const handleCreateEvent = async () => {
+    const center = eventLocation ?? city.center
+
+    setIsBusy(true)
+    setLastError(null)
+
+    try {
+      await predictiveApi.addEvent(
+        center,
+        eventType,
+        eventRadius,
+        `Événement ${city.name}`,
+      )
+      setLocationPickerActive(false)
+      setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
+      bumpRevision()
+      toast.success('Événement ajouté à la simulation')
+    } catch (err: any) {
+      setLastError(err?.message ?? 'Impossible de créer l’événement.')
+      toast.error('Événement impossible')
+    } finally {
+      setIsBusy(false)
     }
   }
 
@@ -107,330 +216,467 @@ export function SimulationPanel() {
       a.download = 'crossflow_affected_edges.geojson'
       a.click()
       URL.revokeObjectURL(url)
+      toast.success('GeoJSON exporté')
     } catch (err) {
       console.error('Export error:', err)
+      toast.error('Export GeoJSON impossible')
     }
   }
 
   const handleReset = async () => {
-    await simulationService.resetEngine()
-    store.clearResults()
-    store.setCurrentResult(null)
+    setIsBusy(true)
+    try {
+      await predictiveApi.resetSimulation()
+      setEventLocation(null)
+      setLocationPickerActive(false)
+      setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
+      setBlockedSegments([])
+      setActiveEvents([])
+      bumpRevision()
+      toast.success('Simulation réinitialisée')
+    } catch (err) {
+      console.error('Reset error:', err)
+      toast.error('Réinitialisation impossible')
+    } finally {
+      setIsBusy(false)
+    }
   }
 
-  const impact = cfg[store.scenarioType]?.impact
+  const isReady = status === 'ready'
+  const statusLabel =
+    status === 'initializing'
+      ? 'Initialisation du moteur…'
+      : status === 'ready'
+        ? 'Moteur prédictif prêt'
+        : status === 'error'
+          ? 'Erreur moteur'
+          : 'Moteur en attente'
+
+  const statusCopy =
+    status === 'initializing'
+      ? 'Chargement du graphe OSMnx.'
+      : status === 'ready'
+        ? 'Simulation temps réel activée.'
+        : status === 'error'
+          ? (lastError || 'Backend inaccessible')
+          : 'Sélectionnez une ville pour démarrer.'
 
   return (
     <div className="space-y-4">
       <div className={cn(
-        'px-4 py-3 rounded-2xl border flex items-center justify-between transition-all',
-        store.status === 'ready'
+        'px-4 py-3 rounded-2xl border flex items-center justify-between gap-4',
+        status === 'ready'
           ? 'bg-brand/5 border-brand/20'
-          : store.status === 'error'
+          : status === 'error'
             ? 'bg-[#FF1744]/5 border-[#FF1744]/20'
             : 'bg-bg-elevated border-bg-border',
       )}>
         <div className="flex items-center gap-3 min-w-0">
-          {store.status === 'initializing' ? (
+          {status === 'initializing' ? (
             <Loader2 className="w-4 h-4 animate-spin text-brand" />
-          ) : store.status === 'ready' ? (
+          ) : status === 'ready' ? (
             <CheckCircle2 className="w-4 h-4 text-brand" />
-          ) : store.status === 'error' ? (
+          ) : status === 'error' ? (
             <AlertCircle className="w-4 h-4 text-[#FF1744]" />
           ) : (
             <Cpu className="w-4 h-4 text-text-muted" />
           )}
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-wider text-text-primary">
-              {store.status === 'initializing'
-                ? 'Initialisation...'
-                : store.status === 'ready'
-                  ? 'Moteur prédictif prêt'
-                  : store.status === 'error'
-                    ? 'Erreur moteur'
-                    : 'Moteur en attente'}
+              {statusLabel}
             </p>
             <p className="text-[10px] text-text-secondary leading-tight">
-              {store.status === 'initializing'
-                ? 'Chargement du graphe OSMnx.'
-                : store.status === 'ready'
-                  ? 'Simulation temps réel activée.'
-                  : store.status === 'error'
-                    ? (store.lastError || 'Backend inaccessible')
-                    : 'Sélectionnez une ville pour démarrer.'}
+              {statusCopy}
             </p>
           </div>
         </div>
-        {store.status === 'error' && (
-          <button
-            onClick={() => simulationService.initEngine(city)}
-            className="text-[10px] font-bold text-brand hover:underline cursor-pointer"
-          >
-            Réessayer
-          </button>
-        )}
+
+        <div className="hidden xl:flex items-center gap-2">
+          <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-white/5 border border-white/10 text-text-muted uppercase tracking-widest">
+            {analytics?.online ? 'Backend online' : 'Backend offline'}
+          </span>
+        </div>
       </div>
 
       <section className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
         <div className="px-5 py-4 border-b border-bg-border">
           <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">
-            {t('simulation.scenario_type')}
+            Mode interaction
           </p>
         </div>
-        <div className="p-3 grid grid-cols-2 gap-2">
-          {scenarioTypes.map(type => {
-            const Icon = ICONS[type]
-            const active = store.scenarioType === type
-            const scenCfg = cfg[type]
-            return (
-              <button
-                key={type}
-                onClick={() => store.setScenarioType(type)}
-                className={cn(
-                  'flex flex-col items-start gap-1.5 p-3 rounded-xl border text-left transition-all',
-                  active
-                    ? 'bg-brand/10 border-brand/30 text-brand'
-                    : 'border-bg-border text-text-secondary hover:bg-bg-elevated hover:text-text-primary',
-                )}
-              >
-                <Icon className={cn('w-4 h-4', active ? 'text-brand' : 'text-text-muted')} />
-                <span className="text-xs font-semibold leading-tight">{scenCfg?.label}</span>
-              </button>
-            )
-          })}
+        <div className="p-4 space-y-3">
+          <p className="text-[11px] text-text-muted leading-relaxed">
+            Activez un mode puis cliquez sur un segment de la carte. Le clic suivant applique l&apos;action.
+          </p>
+
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => setInteractionMode(
+                interactionMode === SIMULATION_INTERACTION_MODE.BLOCK_ROAD
+                  ? SIMULATION_INTERACTION_MODE.NONE
+                  : SIMULATION_INTERACTION_MODE.BLOCK_ROAD
+              )}
+              className={cn(
+                'rounded-xl border px-3 py-2 text-left transition-all',
+                interactionMode === SIMULATION_INTERACTION_MODE.BLOCK_ROAD
+                  ? 'border-[#FF1744]/30 bg-[#FF1744]/10 text-[#FF1744]'
+                  : 'border-bg-border bg-bg-elevated text-text-secondary hover:bg-white/5 hover:text-text-primary',
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <Ban className="w-4 h-4" />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Blocage</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setInteractionMode(
+                interactionMode === SIMULATION_INTERACTION_MODE.ADD_TRAFFIC
+                  ? SIMULATION_INTERACTION_MODE.NONE
+                  : SIMULATION_INTERACTION_MODE.ADD_TRAFFIC
+              )}
+              className={cn(
+                'rounded-xl border px-3 py-2 text-left transition-all',
+                interactionMode === SIMULATION_INTERACTION_MODE.ADD_TRAFFIC
+                  ? 'border-[#FF6D00]/30 bg-[#FF6D00]/10 text-[#FF6D00]'
+                  : 'border-bg-border bg-bg-elevated text-text-secondary hover:bg-white/5 hover:text-text-primary',
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <TrafficCone className="w-4 h-4" />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Trafic</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setLocationPickerActive(!locationPickerActive)}
+              className={cn(
+                'rounded-xl border px-3 py-2 text-left transition-all',
+                locationPickerActive
+                  ? 'border-[#2979FF]/30 bg-[#2979FF]/10 text-[#2979FF]'
+                  : 'border-bg-border bg-bg-elevated text-text-secondary hover:bg-white/5 hover:text-text-primary',
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Événement</span>
+              </div>
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-bg-border bg-bg-elevated px-3 py-2">
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-widest text-text-muted">Segment sélectionné</p>
+              <p className="text-xs font-semibold text-text-primary truncate">
+                {selectedSegmentLabel ?? 'Aucun segment sélectionné'}
+              </p>
+            </div>
+            <button
+              onClick={handleBlockRoad}
+              disabled={isBusy || !isReady || !selectedSegmentId}
+              className={cn(
+                'shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all',
+                isBusy || !isReady || !selectedSegmentId
+                  ? 'bg-bg-elevated text-text-muted border border-bg-border cursor-not-allowed'
+                  : 'bg-[#FF1744]/10 text-[#FF1744] border border-[#FF1744]/20 hover:bg-[#FF1744]/15',
+              )}
+            >
+              <Ban className="w-3.5 h-3.5" />
+              Bloquer
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <MiniStat label="Bloquées" value={analytics?.blocked ?? 0} accent="text-[#FF1744]" />
+            <MiniStat label="Ralenties" value={analytics?.slow ?? 0} accent="text-[#FF6D00]" />
+            <MiniStat label="Événements" value={analytics?.events ?? 0} accent="text-brand" />
+          </div>
+
+          {blockedSegments.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+                Routes bloquées
+              </p>
+              <div className="space-y-2">
+                {blockedSegments.map(segment => (
+                  <div key={segment.id} className="flex items-center justify-between gap-3 rounded-xl border border-bg-border bg-bg-elevated px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-text-primary truncate">{segment.label}</p>
+                      <p className="text-[10px] text-text-muted uppercase tracking-widest">Impact direct sur le maillage</p>
+                    </div>
+                    <span className="text-[10px] font-bold text-[#FF1744] uppercase tracking-widest">Critique</span>
+                  </div>
+                ))}
+              </div>
+              {analytics && analytics.blocked > blockedSegments.length && (
+                <p className="text-[10px] text-text-muted">
+                  +{analytics.blocked - blockedSegments.length} autres segments
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
-      <section className="bg-bg-surface border border-bg-border rounded-2xl p-5 space-y-4">
-        <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">
-          {t('simulation.parameters')}
-        </p>
-
-        <div className="space-y-1.5">
-          <label className="text-xs text-text-secondary">{t('common.name')}</label>
-          <input
-            value={store.scenarioName}
-            onChange={e => store.setScenarioName(e.target.value)}
-            className="w-full bg-bg-elevated border border-bg-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand/50 transition-colors"
-            placeholder={t('simulation.name_placeholder')}
-          />
+      <section className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-bg-border">
+          <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">
+            Simuler du trafic
+          </p>
         </div>
-
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <label className="text-xs text-text-secondary">{t('simulation.duration')}</label>
-            <span className="text-xs font-semibold text-brand">{store.durationHours}h</span>
+        <div className="p-4 space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            {TRAFFIC_LEVELS.map(level => {
+              const active = trafficLevel === level.value
+              return (
+                <button
+                  key={level.value}
+                  onClick={() => setTrafficLevel(level.value)}
+                  className={cn(
+                    'rounded-xl border px-3 py-2 text-left transition-all',
+                    active
+                      ? 'border-brand/30 bg-brand/10 text-brand'
+                      : 'border-bg-border bg-bg-elevated text-text-secondary hover:bg-white/5 hover:text-text-primary',
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: level.color }} />
+                    <span className="text-[11px] font-bold uppercase tracking-wider">{level.label}</span>
+                  </div>
+                </button>
+              )
+            })}
           </div>
-          <input
-            type="range"
-            min={1}
-            max={platformConfig.simulation.maxDurationHours}
-            step={1}
-            value={store.durationHours}
-            onChange={e => store.setDurationHours(+e.target.value)}
-            className="w-full accent-[#00E676] cursor-pointer"
-          />
-          <div className="flex justify-between text-[10px] text-text-muted">
-            <span>1h</span>
-            <span>{platformConfig.simulation.maxDurationHours}h</span>
-          </div>
-        </div>
 
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <label className="text-xs text-text-secondary">{t('simulation.intensity')}</label>
-            <span className="text-xs font-semibold text-brand">
-              {store.magnitude < 0.7
-                ? t('simulation.intensity_low')
-                : store.magnitude < 1.3
-                  ? t('simulation.intensity_normal')
-                  : t('simulation.intensity_high')}
-            </span>
-          </div>
-          <input
-            type="range"
-            min={0.3}
-            max={2.0}
-            step={0.1}
-            value={store.magnitude}
-            onChange={e => store.setMagnitude(+e.target.value)}
-            className="w-full accent-[#00E676] cursor-pointer"
-          />
-        </div>
+            <button
+              onClick={handleAddTraffic}
+              disabled={isBusy || !isReady || !selectedSegmentId}
+              className={cn(
+                'w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all border',
+                isBusy || !isReady || !selectedSegmentId
+                  ? 'bg-bg-elevated text-text-muted border-bg-border cursor-not-allowed'
+                  : 'bg-[#FF6D00]/10 text-[#FF6D00] border-[#FF6D00]/20 hover:bg-[#FF6D00]/15',
+            )}
+          >
+            <TrafficCone className="w-4 h-4" />
+            Appliquer le trafic sur un segment
+          </button>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <label className="text-xs text-text-secondary">{t('simulation.start')}</label>
-            <select
-              value={store.timeWindowStart}
-              onChange={e => store.setTimeWindow(+e.target.value, store.timeWindowEnd)}
-              className="w-full bg-bg-elevated border border-bg-border rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-brand/50"
-            >
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
+          <div className="space-y-2 pt-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+              Intensité du trafic
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {TRAFFIC_LEVELS.map(level => (
+                <div key={level.value} className="rounded-xl border border-bg-border bg-bg-elevated px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: level.color }} />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">{level.label}</span>
+                  </div>
+                </div>
               ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs text-text-secondary">{t('simulation.end')}</label>
-            <select
-              value={store.timeWindowEnd}
-              onChange={e => store.setTimeWindow(store.timeWindowStart, +e.target.value)}
-              className="w-full bg-bg-elevated border border-bg-border rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-brand/50"
-            >
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
-              ))}
-            </select>
+            </div>
           </div>
         </div>
       </section>
 
       <section className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-bg-border flex items-center justify-between">
-          <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">Localisation</p>
-          {store.eventLocation && (
-            <button
-              onClick={() => store.setEventLocation(null)}
-              className="text-[10px] text-[#FF4757] hover:opacity-80 flex items-center gap-1"
-            >
-              <X className="w-3 h-3" /> Réinitialiser
-            </button>
-          )}
+        <div className="px-5 py-4 border-b border-bg-border">
+          <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">
+            Créer un événement
+          </p>
         </div>
-        <div className="p-3 space-y-2.5">
-          {store.eventLocation ? (
-            <div className="flex items-center gap-2 bg-[rgba(255,71,87,0.08)] border border-[rgba(255,71,87,0.2)] rounded-lg px-3 py-2">
-              <MapPin className="w-3.5 h-3.5 text-[#FF4757] shrink-0" />
-              <span className="text-xs text-[#FF4757] font-mono">
-                {store.eventLocation.lat.toFixed(4)}, {store.eventLocation.lng.toFixed(4)}
-              </span>
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            {EVENT_TYPES.map(evt => {
+              const active = eventType === evt.value
+              return (
+                <button
+                  key={evt.value}
+                  onClick={() => setEventType(evt.value)}
+                  className={cn(
+                    'rounded-xl border px-3 py-2 text-left transition-all',
+                    active
+                      ? 'border-brand/30 bg-brand/10 text-brand'
+                      : 'border-bg-border bg-bg-elevated text-text-secondary hover:bg-white/5 hover:text-text-primary',
+                  )}
+                >
+                  <span className="text-sm mr-2">{evt.icon}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider">{evt.label}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <label className="text-xs text-text-secondary">Rayon d’impact</label>
+              <span className="text-xs font-semibold text-brand">{eventRadius} m</span>
             </div>
-          ) : (
-            <p className="text-[11px] text-text-muted leading-relaxed">
-              Zone entière de <strong>{city.name}</strong> — ou placez un point précis sur la carte.
-            </p>
+            <input
+              type="range"
+              min={50}
+              max={1000}
+              step={50}
+              value={eventRadius}
+              onChange={e => setEventRadius(Number(e.target.value))}
+              className="w-full accent-[#00E676] cursor-pointer"
+            />
+          </div>
+
+          <div className="space-y-2 rounded-xl border border-bg-border bg-bg-elevated px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-widest text-text-muted">Point d’impact</p>
+                <p className="text-xs font-semibold text-text-primary truncate">
+                  {eventLocation
+                    ? `${eventLocation.lat.toFixed(4)}, ${eventLocation.lng.toFixed(4)}`
+                    : `Centre de ${city.name}`}
+                </p>
+              </div>
+              {eventLocation && (
+                <button
+                  onClick={() => setEventLocation(null)}
+                  className="text-[10px] font-bold uppercase tracking-widest text-[#FF4757] hover:underline"
+                >
+                  Réinitialiser
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => setLocationPickerActive(!locationPickerActive)}
+              className={cn(
+                'w-full inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold uppercase tracking-widest border transition-all',
+                locationPickerActive
+                  ? 'bg-[#FF4757]/10 text-[#FF4757] border-[#FF4757]/20 animate-pulse'
+                  : 'bg-bg-surface text-text-secondary border-bg-border hover:bg-white/5 hover:text-text-primary',
+              )}
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              {locationPickerActive ? 'Cliquez sur la carte…' : 'Placer sur la carte'}
+            </button>
+
+            <button
+              onClick={handleCreateEvent}
+              disabled={isBusy || !isReady}
+              className={cn(
+                'w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all border',
+                isBusy || !isReady
+                  ? 'bg-bg-elevated text-text-muted border-bg-border cursor-not-allowed'
+                  : 'bg-[#2979FF]/10 text-[#2979FF] border-[#2979FF]/20 hover:bg-[#2979FF]/15',
+              )}
+            >
+              <Zap className="w-4 h-4" />
+              Placer l’événement sur la carte
+            </button>
+          </div>
+
+          {activeEvents.length > 0 && (
+            <div className="space-y-2 pt-1">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+                Événements actifs
+              </p>
+              <div className="space-y-2">
+                {activeEvents.map(evt => (
+                  <div key={evt.id} className="flex items-center justify-between gap-3 rounded-xl border border-bg-border bg-bg-elevated px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-text-primary truncate">{evt.label}</p>
+                      <p className="text-[10px] text-text-muted uppercase tracking-widest">
+                        {evt.count > 0 ? `${evt.count} routes impactées` : 'Impact local'}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold text-[#2979FF] uppercase tracking-widest">Actif</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
-          <button
-            onClick={() => store.setLocationPickerActive(!store.locationPickerActive)}
-            className={cn(
-              'w-full text-xs rounded-lg py-2 font-semibold flex items-center justify-center gap-1.5 transition-all border',
-              store.locationPickerActive
-                ? 'bg-[rgba(255,71,87,0.15)] text-[#FF4757] border-[rgba(255,71,87,0.4)] animate-pulse'
-                : 'bg-bg-elevated text-text-secondary border-bg-border hover:text-text-primary',
-            )}
-          >
-            <MapPin className="w-3.5 h-3.5" />
-            {store.locationPickerActive ? 'Cliquez sur la carte…' : 'Placer sur la carte'}
-          </button>
         </div>
       </section>
 
-      {impact && !store.isRunning && store.currentResult === null && (
-        <section className="bg-bg-surface border border-bg-border rounded-2xl p-5 space-y-3 opacity-70">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">
-              {t('simulation.estimated_impact')}
-            </p>
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-muted uppercase tracking-wider">Indicatif</span>
-          </div>
-          <ImpactRow label={t('dashboard.congestion')} value={impact.congestion * store.magnitude} unit="pts" />
-          <ImpactRow label={t('dashboard.travel_time')} value={impact.travelTime * store.magnitude} unit="%" />
-          <ImpactRow label={t('dashboard.pollution')} value={impact.pollution * store.magnitude} unit="pts" />
-          <p className="text-[10px] text-text-muted">Lancez la simulation pour obtenir des résultats précis.</p>
-        </section>
-      )}
-
-      {impact && store.currentResult !== null && (
-        <section className="bg-bg-surface border border-bg-border rounded-2xl p-5 space-y-3">
+      <section className="bg-bg-surface border border-bg-border rounded-2xl p-4 space-y-3">
+        <div className="flex items-center justify-between">
           <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">
-            {t('simulation.estimated_impact')}
+            Actions globales
           </p>
-          <ImpactRow label={t('dashboard.congestion')} value={impact.congestion * store.magnitude} unit="pts" />
-          <ImpactRow label={t('dashboard.travel_time')} value={impact.travelTime * store.magnitude} unit="%" />
-          <ImpactRow label={t('dashboard.pollution')} value={impact.pollution * store.magnitude} unit="pts" />
-        </section>
-      )}
-
-      <button
-        onClick={handleRun}
-        disabled={store.isRunning}
-        className={cn(
-          'w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-semibold text-sm transition-all',
-          store.isRunning
-            ? 'bg-bg-elevated text-text-muted cursor-not-allowed'
-            : 'bg-brand text-bg-base hover:bg-brand/90 shadow-glow',
-        )}
-      >
-        {store.isRunning ? (
-          <>
-            <span className="inline-block w-4 h-4 border-2 border-text-muted border-t-transparent rounded-full animate-spin" />
-            {t('simulation.running')}... {store.progress}%
-          </>
-        ) : (
-          <>
-            <Play className="w-4 h-4" />
-            {t('simulation.run')}
-          </>
-        )}
-      </button>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {backendActive && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand/10 border border-brand/20 text-brand text-[10px] font-semibold">
-            <Cpu className="w-3 h-3" />
-            Moteur prédictif OSM activé
-          </div>
-        )}
-        {store.status === 'ready' && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 text-text-muted text-[10px] font-semibold">
-            <Search className="w-3 h-3" />
-            Graphe chargé
-          </div>
-        )}
-      </div>
-
-      {store.isRunning && (
-        <div className="h-1.5 rounded-full bg-bg-subtle overflow-hidden">
-          <div
-            className="h-full rounded-full bg-brand transition-all duration-300"
-            style={{ width: `${store.progress}%` }}
-          />
+          <span className="text-[10px] font-semibold text-text-muted uppercase tracking-widest">
+            Mise à jour auto
+          </span>
         </div>
-      )}
 
-      <section className="grid grid-cols-2 gap-2 pt-2">
-        <button
-          className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/5 border border-white/5 hover:bg-brand/10 hover:border-brand/20 text-[10px] font-bold text-text-primary uppercase tracking-widest transition-all"
-          onClick={handleExportGeoJSON}
-        >
-          <Download className="w-3.5 h-3.5 text-brand" />
-          GeoJSON
-        </button>
-        <button
-          className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 text-[10px] font-bold text-text-primary uppercase tracking-widest transition-all"
-          onClick={handleReset}
-        >
-          <Trash2 className="w-3.5 h-3.5 text-text-muted" />
-          Réinitialiser
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/5 border border-white/5 hover:bg-brand/10 hover:border-brand/20 text-[10px] font-bold text-text-primary uppercase tracking-widest transition-all"
+            onClick={handleExportGeoJSON}
+            disabled={isBusy}
+          >
+            <Download className="w-3.5 h-3.5 text-brand" />
+            GeoJSON
+          </button>
+          <button
+            className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 text-[10px] font-bold text-text-primary uppercase tracking-widest transition-all"
+            onClick={handleReset}
+            disabled={isBusy}
+          >
+            <Trash2 className="w-3.5 h-3.5 text-text-muted" />
+            Réinitialiser
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {analytics?.online ? (
+            <Pill icon={<Cpu className="w-3 h-3" />} tone="brand">
+              Moteur prédictif actif
+            </Pill>
+          ) : (
+            <Pill icon={<Search className="w-3 h-3" />} tone="muted">
+              Chargement du graphe
+            </Pill>
+          )}
+          {isBusy && (
+            <Pill icon={<Loader2 className="w-3 h-3 animate-spin" />} tone="muted">
+              Exécution…
+            </Pill>
+          )}
+        </div>
       </section>
     </div>
   )
 }
 
-function ImpactRow({ label, value, unit }: { label: string; value: number; unit: string }) {
-  const isPositive = value > 0
-  const isNeg = label === 'Congestion' || label === 'Travel Time' || label === 'Pollution' || label === 'Temps de trajet'
-  const color = isPositive ? (isNeg ? '#FF1744' : '#00E676') : (isNeg ? '#00E676' : '#FF1744')
-  const sign = isPositive ? '+' : ''
-
+function MiniStat({ label, value, accent = 'text-white' }: { label: string; value: number | string; accent?: string }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-xs text-text-secondary">{label}</span>
-      <span className="text-xs font-semibold" style={{ color }}>
-        {sign}{Math.round(Math.abs(value) * 100)} {unit}
-      </span>
+    <div className="rounded-xl bg-bg-elevated border border-bg-border px-3 py-2">
+      <p className="text-[9px] uppercase tracking-widest text-text-muted">{label}</p>
+      <p className={cn('text-sm font-bold mt-1', accent)}>{value}</p>
     </div>
+  )
+}
+
+function formatShortLabel(id: string, explicitName?: unknown) {
+  if (typeof explicitName === 'string' && explicitName.trim()) return explicitName
+  if (!id) return 'Segment'
+  const compact = id.length > 28 ? `…${id.slice(-12)}` : id
+  return compact.replace(/[_-]+/g, ' ')
+}
+
+function Pill({
+  icon,
+  children,
+  tone = 'muted',
+}: {
+  icon: ReactNode
+  children: ReactNode
+  tone?: 'muted' | 'brand'
+}) {
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold border uppercase tracking-widest',
+      tone === 'brand'
+        ? 'bg-brand/10 border-brand/20 text-brand'
+        : 'bg-white/5 border-white/5 text-text-muted',
+    )}>
+      {icon}
+      {children}
+    </span>
   )
 }
