@@ -2,8 +2,6 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap');
-
 /* ─── Prestige Design System (SaaS v4.0) ────────────────────────────── */
 :root {
   --bg-base:     #050505; /* Deepest Obsidian */
