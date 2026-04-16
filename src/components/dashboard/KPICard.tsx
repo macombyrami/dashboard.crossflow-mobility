@@ -11,6 +11,7 @@ interface Props {
   unit?:      string
   delta?:     number
   deltaUnit?: string
+  deltaLabel?: string
   inverse?:   boolean  // lower = better
   icon:       LucideIcon
   color?:     string
@@ -23,6 +24,7 @@ interface Props {
 
 function KPICardInner({
   label, value, unit, delta, deltaUnit = '%', inverse = false,
+  deltaLabel,
   icon: Icon, color = '#22C55E', warning, critical, sub, className,
   variant = 'default',
 }: Props) {
@@ -70,13 +72,13 @@ function KPICardInner({
           </span>
           {unit && <span className={cn("font-bold text-text-muted uppercase tracking-widest", isMini ? "text-[8px]" : "text-xs")}>{unit}</span>}
         </div>
-        {sub && !isMini && <p className="text-[11px] font-semibold text-text-muted mt-2 leading-relaxed opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-1 group-hover:translate-y-0">{sub}</p>}
+        {sub && !isMini && <p className="text-[12px] font-medium text-text-secondary mt-2 leading-relaxed">{sub}</p>}
       </div>
 
       {delta !== undefined && (
         <div className="flex items-center gap-2 pt-5 border-t border-white/5 relative z-10">
           <MetricDelta value={Number(delta)} unit={deltaUnit} inverse={inverse} />
-          <span className="text-[11px] font-semibold text-text-muted">vs {t('common.yesterday') || 'hier'}</span>
+          <span className="text-[11px] font-semibold text-text-muted">{deltaLabel ?? `vs ${t('common.yesterday') || 'hier'}`}</span>
         </div>
       )}
     </div>

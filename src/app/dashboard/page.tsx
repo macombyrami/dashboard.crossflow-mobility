@@ -1,41 +1,24 @@
 'use client'
-import { useEffect, useState, useMemo, memo } from 'react'
+
+import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { Activity, Clock, Wind, AlertTriangle, Zap, Download } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Activity, ArrowRight, Clock, Download, Wind, AlertTriangle, Zap } from 'lucide-react'
+import { formatDistanceToNow } from 'date-fns'
+import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils/cn'
 import appData from '@/lib/data/app.json'
 
-// Components
 import { KPICard } from '@/components/dashboard/KPICard'
 import { IncidentFeed } from '@/components/dashboard/IncidentFeed'
 import { EventsWidget } from '@/components/dashboard/EventsWidget'
 import { TimelineScrubber } from '@/components/dashboard/TimelineScrubber'
 import { ZoneExportTool } from '@/components/dashboard/ZoneExportTool'
 import { LiveSyncBadge } from '@/components/dashboard/LiveSyncBadge'
+import { StatusBar } from '@/components/dashboard/StatusBar'
 
-// Mobile Components
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
 import { MobileDashboardView } from '@/components/mobile/dashboard/MobileDashboardView'
-import { PilotStatus } from '@/components/mobile/dashboard/PilotStatus'
-import { AIAssistantCard } from '@/components/mobile/dashboard/AIAssistantCard'
-
-// Dynamic Imports for heavy widgets
-const TrafficChart = dynamic(() => import('@/components/dashboard/TrafficChart').then(m => m.TrafficChart), { 
-  ssr: false, 
-  loading: () => <ChartSkeleton /> 
-})
-const ModalSplitChart = dynamic(() => import('@/components/dashboard/ModalSplitChart').then(m => m.ModalSplitChart), { 
-  ssr: false, 
-  loading: () => <CardSkeleton height="200px" /> 
-})
-const TrafficStabilityWidget = dynamic(() => import('@/components/dashboard/TrafficStabilityWidget').then(m => m.TrafficStabilityWidget), { 
-  ssr: false, 
-  loading: () => <CardSkeleton height="150px" /> 
-})
-const WeatherCard = dynamic(() => import('@/components/dashboard/WeatherCard').then(m => m.WeatherCard), { ssr: false })
-const AirQualityCard = dynamic(() => import('@/components/dashboard/AirQualityCard').then(m => m.AirQualityCard), { ssr: false })
-
-// Hooks & Store
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useKPIHistoryStore } from '@/store/kpiHistoryStore'
@@ -47,7 +30,21 @@ import { pollutionLabel } from '@/lib/utils/congestion'
 import { getSnapshots } from '@/lib/api/snapshots'
 import type { CityKPIs, TrafficSnapshot } from '@/types'
 
-// Helpers
+const TrafficChart = dynamic(() => import('@/components/dashboard/TrafficChart').then(m => m.TrafficChart), {
+  ssr: false,
+  loading: () => <ChartSkeleton />,
+})
+const ModalSplitChart = dynamic(() => import('@/components/dashboard/ModalSplitChart').then(m => m.ModalSplitChart), {
+  ssr: false,
+  loading: () => <CardSkeleton height="200px" />,
+})
+const TrafficStabilityWidget = dynamic(() => import('@/components/dashboard/TrafficStabilityWidget').then(m => m.TrafficStabilityWidget), {
+  ssr: false,
+  loading: () => <CardSkeleton height="150px" />,
+})
+const WeatherCard = dynamic(() => import('@/components/dashboard/WeatherCard').then(m => m.WeatherCard), { ssr: false })
+const AirQualityCard = dynamic(() => import('@/components/dashboard/AirQualityCard').then(m => m.AirQualityCard), { ssr: false })
+
 function ChartSkeleton() {
   return (
     <div className="w-full h-[320px] bg-bg-elevated/40 border border-bg-border rounded-3xl animate-pulse flex items-center justify-center">
@@ -57,61 +54,77 @@ function ChartSkeleton() {
 }
 
 function CardSkeleton({ height }: { height: string }) {
-  return (
-    <div className="w-full bg-bg-elevated/40 border border-bg-border rounded-3xl animate-pulse" style={{ height }} />
-  )
+  return <div className="w-full bg-bg-elevated/40 border border-bg-border rounded-3xl animate-pulse" style={{ height }} />
 }
 
 function kpisFromSnapshot(cityId: string, snapshot: TrafficSnapshot, incidentCount: number, base: CityKPIs): CityKPIs {
   const segs = snapshot.segments
   if (!segs.length) return base
-  const congestionRate     = segs.reduce((a, s) => a + s.congestionScore, 0) / segs.length
-  const avgTravelMin       = Math.max(5, 10 + congestionRate * 40)
-  const pollutionIndex     = Math.min(10, Math.max(0.5, congestionRate * 8 + 0.5))
-  const networkEfficiency  = Math.max(0.1, 1 - congestionRate * 0.85)
+  const congestionRate = segs.reduce((a, s) => a + s.congestionScore, 0) / segs.length
+  const avgTravelMin = Math.max(5, 10 + congestionRate * 40)
+  const pollutionIndex = Math.min(10, Math.max(0.5, congestionRate * 8 + 0.5))
+  const networkEfficiency = Math.max(0.1, 1 - congestionRate * 0.85)
   return {
     ...base,
     cityId,
     congestionRate,
     avgTravelMin,
     pollutionIndex,
-    activeIncidents:  incidentCount,
+    activeIncidents: incidentCount,
     networkEfficiency,
     capturedAt: snapshot.fetchedAt,
   }
 }
 
+function SectionCard({
+  title,
+  subtitle,
+  children,
+  className,
+}: {
+  title: string
+  subtitle?: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <section className={cn('card-premium overflow-hidden border border-white/5', className)}>
+      <div className="px-5 sm:px-6 py-4 border-b border-white/5 bg-white/[0.02]">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-[13px] font-black uppercase tracking-[0.18em] text-white">{title}</h2>
+          {subtitle && <p className="text-[11px] text-text-muted">{subtitle}</p>}
+        </div>
+      </div>
+      <div className="p-4 sm:p-5">{children}</div>
+    </section>
+  )
+}
+
 export default function DashboardPage() {
   const { t } = useTranslation()
-  const city                = useMapStore(s => s.city)
-  const kpis                = useTrafficStore(s => s.kpis)
-  const setKPIs             = useTrafficStore(s => s.setKPIs)
-  const setIncidents        = useTrafficStore(s => s.setIncidents)
-  const snapshot            = useTrafficStore(s => s.snapshot)
-  const incidents           = useTrafficStore(s => s.incidents)
-  const dataSource          = useTrafficStore(s => s.dataSource)
-  const openMeteoWeather    = useTrafficStore(s => s.openMeteoWeather)
-  const setOpenMeteoWeather = useTrafficStore(s => s.setOpenMeteoWeather)
-  const setWeather          = useTrafficStore(s => s.setWeather)  // legacy shape lu par le Header
-  const airQuality          = useTrafficStore(s => s.airQuality)
-  const setAirQuality       = useTrafficStore(s => s.setAirQuality)
-  const addSnapshot         = useKPIHistoryStore(s => s.addSnapshot)
-  const syncSnapshots       = useKPIHistoryStore(s => s.syncHistoricalSnapshots)
+  const city = useMapStore(s => s.city)
+  const kpis = useTrafficStore(s => s.kpis)
+  const setKPIs = useTrafficStore(s => s.setKPIs)
+  const setIncidents = useTrafficStore(s => s.setIncidents)
+  const snapshot = useTrafficStore(s => s.snapshot)
+  const incidents = useTrafficStore(s => s.incidents)
+  const dataSource = useTrafficStore(s => s.dataSource)
+  const openMeteoWeather = useTrafficStore(s => s.openMeteoWeather)
+  const airQuality = useTrafficStore(s => s.airQuality)
+  const lastUpdate = useTrafficStore(s => s.lastUpdate)
+  const addSnapshot = useKPIHistoryStore(s => s.addSnapshot)
+  const syncSnapshots = useKPIHistoryStore(s => s.syncHistoricalSnapshots)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
   useEffect(() => { document.title = `Tableau de bord — ${city.name} | CrossFlow` }, [city.name])
 
-  // 🛰️ Staff Engineer: Historical Hydration Pipeline
-  // Fetches last 24h of real snapshots to populate charts immediately
   useEffect(() => {
     if (!mounted) return
     async function hydrate() {
       try {
-        const history = await getSnapshots(city.id, 1440) // 24h
-        if (history && history.length > 0) {
-          syncSnapshots(city.id, history)
-        }
+        const history = await getSnapshots(city.id, 1440)
+        if (history && history.length > 0) syncSnapshots(city.id, history)
       } catch (err) {
         console.warn('[Dashboard Hydration] Failed to fetch history, falling back to synthetic.', err)
       }
@@ -119,7 +132,6 @@ export default function DashboardPage() {
     hydrate()
   }, [mounted, city.id, syncSnapshots])
 
-  // Synthetic KPIs + incidents baseline (only when no live data)
   useEffect(() => {
     if (dataSource === 'live') return
     setKPIs(generateCityKPIs(city))
@@ -131,37 +143,36 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [city, dataSource, setKPIs, setIncidents])
 
-  // Real KPIs derived from HERE live snapshot
   useEffect(() => {
     if (!snapshot) return
     const base = generateCityKPIs(city)
     setKPIs(kpisFromSnapshot(city.id, snapshot, incidents.length, base))
   }, [snapshot, dataSource, city, incidents.length, setKPIs])
 
-  // Record KPI snapshot to history store (30-min buckets)
   useEffect(() => {
     if (kpis) addSnapshot(kpis)
   }, [kpis, addSnapshot])
 
   const isMobile = useMediaQuery('(max-width: 1023px)')
 
-  const { congPct, congWarn, congCrit, travelWarn, pollWarn, pollColor, congDelta, travelDelta } = useMemo(() => {
-    if (!kpis) return {} as any
-    const congPct    = Math.round(kpis.congestionRate * 100)
-    const targets    = platformConfig.kpi.targets
-    const congWarn   = kpis.congestionRate >= targets.congestion_rate.warning
-    const congCrit   = kpis.congestionRate >= targets.congestion_rate.critical
-    const travelWarn = kpis.avgTravelMin   >= targets.avg_travel_time_min.warning
-    const pollWarn   = kpis.pollutionIndex >= targets.pollution_index.warning
-    const pollColor  = pollutionLabel(kpis.pollutionIndex).color
+  const derived = useMemo(() => {
+    if (!kpis) return null
+    const targets = platformConfig.kpi.targets
+    const congPct = Math.round(kpis.congestionRate * 100)
+    const congWarn = kpis.congestionRate >= targets.congestion_rate.warning
+    const congCrit = kpis.congestionRate >= targets.congestion_rate.critical
+    const travelWarn = kpis.avgTravelMin >= targets.avg_travel_time_min.warning
+    const pollWarn = kpis.pollutionIndex >= targets.pollution_index.warning
+    const pollColor = pollutionLabel(kpis.pollutionIndex).color
 
     const history = useKPIHistoryStore.getState().getForCity(city.id, 96)
-    let cDelta, tDelta
+    let cDelta: number | undefined
+    let tDelta: number | undefined
     if (history.length >= 2) {
       const BUCKET_24H = 48
-      const latest   = history[history.length - 1]
+      const latest = history[history.length - 1]
       const yesterday = history.find(s =>
-        s.cityId === city.id && Math.abs(s.bucketKey - (latest.bucketKey - BUCKET_24H)) <= 2
+        s.cityId === city.id && Math.abs(s.bucketKey - (latest.bucketKey - BUCKET_24H)) <= 2,
       )
       if (yesterday) {
         cDelta = Math.round((latest.congestion - yesterday.congestion) * 10) / 10
@@ -169,182 +180,205 @@ export default function DashboardPage() {
       }
     }
 
-    return { congPct, congWarn, congCrit, travelWarn, pollWarn, pollColor, congDelta: cDelta, travelDelta: tDelta }
-  }, [kpis, city.id])
+    const weatherImpact: 'none' | 'low' | 'high' = !openMeteoWeather || openMeteoWeather.trafficImpact === 'none'
+      ? 'none'
+      : openMeteoWeather.trafficImpact === 'minor'
+        ? 'low'
+        : 'high'
+    const status: 'optimal' | 'warning' | 'critical' = congCrit
+      ? 'critical'
+      : (congWarn && travelWarn) || pollWarn
+        ? 'warning'
+        : 'optimal'
 
-  if (!kpis) return null
+    return {
+      congPct,
+      congWarn,
+      congCrit,
+      travelWarn,
+      pollWarn,
+      pollColor,
+      cDelta,
+      tDelta,
+      status,
+      weatherImpact,
+    }
+  }, [kpis, city.id, openMeteoWeather])
+
+  if (!kpis || !derived) return null
+
   if (isMobile) {
-    return <MobileDashboardView kpis={kpis} city={city} incidents={incidents} />
+    return (
+      <MobileDashboardView
+        kpis={kpis}
+        city={city}
+        incidents={incidents}
+        status={derived.status}
+        weatherImpact={derived.weatherImpact}
+        refreshedAt={snapshot ? new Date(snapshot.fetchedAt) : lastUpdate}
+      />
+    )
   }
 
+  const updatedAt = lastUpdate ?? (snapshot ? new Date(snapshot.fetchedAt) : null)
+  const relativeUpdated = updatedAt
+    ? `Mis à jour il y a ${formatDistanceToNow(updatedAt, { locale: fr, addSuffix: false })}`
+    : t('dashboard.updated')
+
   return (
-    <main className="min-h-full p-4 sm:p-8 space-y-6 sm:space-y-8 pb-safe">
-      {/* Title & Stats Summary */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6">
-        <div>
-          <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2 animate-slide-up">
-            <div className="w-1.5 h-6 sm:w-2 sm:h-7 bg-brand rounded-full shadow-glow" />
+    <main className="min-h-full p-4 sm:p-6 lg:p-8 pb-safe space-y-6 lg:space-y-8">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-8 bg-brand rounded-full shadow-glow" />
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tighter uppercase font-heading">
               {city.flag} {city.name}
             </h1>
           </div>
-          <p className="text-[12px] sm:text-[14px] font-medium text-text-secondary flex flex-wrap items-center gap-2 animate-slide-up [animation-delay:100ms]">
-            {t('dashboard.title')} · <span className="text-text-muted">{t('dashboard.updated')}</span>
+          <div className="flex flex-wrap items-center gap-2 text-[12px] sm:text-[13px] font-medium text-text-secondary">
+            <span>{t('dashboard.title')}</span>
+            <span className="text-text-muted">•</span>
+            <span>{relativeUpdated}</span>
             {dataSource === 'live' && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-brand/10 border border-brand/30 text-brand text-[9px] font-bold uppercase tracking-wider">
-                <Zap className="w-2 h-2" />Live
+              <span className="inline-flex items-center gap-1 rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-brand">
+                <Zap className="w-2 h-2" />
+                Live
               </span>
             )}
             <LiveSyncBadge className="scale-90 origin-left" />
-          </p>
+          </div>
         </div>
-        <div className="flex items-center gap-3 sm:gap-4">
+
+        <div className="flex flex-wrap items-center gap-3">
           <ZoneExportTool />
-          
           <PDFButton city={city} />
-          
           <button
-            onClick={() => alert("Permalink généré : " + window.location.href)}
-            className="print-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand/5 border border-brand/20 hover:bg-brand/10 transition-all text-xs text-brand font-bold"
+            onClick={() => { window.location.href = '/map' }}
+            className="print-hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-brand/10 border border-brand/20 hover:bg-brand/15 transition-all text-xs text-brand font-bold"
           >
-            <Activity className="w-3.5 h-3.5" />
-            PARTAGER
+            <ArrowRight className="w-3.5 h-3.5" />
+            Voir la carte
           </button>
-          {openMeteoWeather && (
-            <div className="glass-light px-4 py-2 rounded-xl border border-white/5 flex items-center gap-2.5">
-              <span className="text-xl">{openMeteoWeather.weatherEmoji}</span>
-              <div className="flex flex-col">
-                <span className="text-[13px] font-bold text-white leading-none">{openMeteoWeather.temp}°C</span>
-                <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider mt-1">{openMeteoWeather.weatherLabel}</span>
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.42fr)_minmax(0,0.58fr)]">
+        <div className="space-y-5">
+          <StatusBar
+            status={derived.status}
+            efficiency={Math.round(kpis.networkEfficiency * 100)}
+            weatherImpact={derived.weatherImpact}
+            refreshedAt={updatedAt}
+            live={dataSource === 'live'}
+          />
+
+          <SectionCard
+            title="État du réseau"
+            subtitle="Vue prioritaire : congestion, retard, impacts et coûts"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <KPICard
+                label="Congestion"
+                value={derived.congPct}
+                unit="%"
+                delta={derived.cDelta}
+                deltaLabel="vs 24h"
+                deltaUnit="%"
+                inverse
+                icon={Activity}
+                color={derived.congCrit ? '#FF1744' : derived.congWarn ? '#FF6D00' : '#00E676'}
+                warning={derived.congWarn}
+                critical={derived.congCrit}
+                sub={derived.congCrit ? 'Réseau sous tension immédiate' : derived.congWarn ? 'Trafic à surveiller' : 'Réseau nominal'}
+              />
+              <KPICard
+                label="Retard moyen"
+                value={kpis.avgTravelMin.toFixed(0)}
+                unit="min"
+                delta={derived.tDelta}
+                deltaLabel="vs 24h"
+                deltaUnit=" min"
+                inverse
+                icon={Clock}
+                color={derived.travelWarn ? '#FF6D00' : '#2979FF'}
+                warning={derived.travelWarn}
+                sub="Impact direct sur la productivité urbaine"
+              />
+              <KPICard
+                label="Impact sanitaire"
+                value={kpis.pollutionIndex.toFixed(1)}
+                unit="/ 10"
+                inverse
+                icon={Wind}
+                color={derived.pollColor}
+                warning={derived.pollWarn}
+                sub={`Exposition NO2 · ${pollutionLabel(kpis.pollutionIndex).label}`}
+              />
+              <KPICard
+                label="Coût des incidents"
+                value={incidents.length}
+                icon={AlertTriangle}
+                color={incidents.length > 5 ? '#FF6D00' : '#FFD600'}
+                sub={`Est. ${incidents.length * 450} € de perte sèche / heure`}
+              />
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Trafic : tendance 24h"
+            subtitle={derived.congWarn ? 'Pic et ralentissements à surveiller' : 'Tendance stable avec marges de fluidité'}
+          >
+            <div className="space-y-4">
+              <TrafficChart />
+            </div>
+          </SectionCard>
+
+          <details className="card-premium overflow-hidden border border-white/5 rounded-3xl">
+            <summary className="list-none cursor-pointer px-5 sm:px-6 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+              <div>
+                <h2 className="text-[13px] font-black uppercase tracking-[0.18em] text-white">Historique 24h</h2>
+                <p className="text-[11px] text-text-muted">Analyse détaillée disponible à la demande</p>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-brand">Ouvrir</span>
+            </summary>
+            <div className="p-4 sm:p-5">
+              <TimelineScrubber />
+            </div>
+          </details>
+        </div>
+
+        <div className="space-y-5">
+          <SectionCard
+            title="Décision court terme"
+            subtitle="Lecture rapide des prochains leviers d'action"
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <TrafficStabilityWidget />
+              <ModalSplitChart />
+            </div>
+          </SectionCard>
+
+          <IncidentFeed
+            maxItems={5}
+            title="Alertes actives"
+            subtitle="Incidents et anomalies à prioriser sur la carte"
+            ctaLabel="Voir sur la carte"
+            onCtaClick={() => { window.location.href = '/map' }}
+          />
+
+          <SectionCard
+            title="Contexte opérationnel"
+            subtitle="Événements, météo et qualité de l'air"
+          >
+            <div className="space-y-4">
+              <EventsWidget lat={city.center.lat} lng={city.center.lng} radiusKm={15} maxItems={5} />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {openMeteoWeather && <WeatherCard weather={openMeteoWeather} />}
+                {airQuality && <AirQualityCard aq={airQuality} />}
               </div>
             </div>
-          )}
+          </SectionCard>
         </div>
-      </div>
-
-      {/* Network status banner */}
-      <div className={cn(
-        "relative overflow-hidden p-[1px] rounded-[22px] group animate-slide-up [animation-delay:200ms]",
-        congCrit ? "bg-gradient-to-r from-red-500/30 to-transparent" :
-        congWarn ? "bg-gradient-to-r from-orange-500/30 to-transparent" :
-                  "bg-gradient-to-r from-brand/30 to-transparent"
-      )}>
-        <div className="glass px-5 sm:px-7 py-4 sm:py-5 rounded-[21px] flex items-center gap-4 border border-white/5">
-          <div className="relative">
-            <div className={cn(
-              "w-3 h-3 rounded-full shadow-glow animate-pulse",
-              congCrit ? "bg-red-500" : congWarn ? "bg-orange-500" : "bg-brand"
-            )} />
-            <div className={cn(
-              "absolute inset-0 w-3 h-3 rounded-full blur-sm",
-              congCrit ? "bg-red-500" : congWarn ? "bg-orange-500" : "bg-brand"
-            )} />
-          </div>
-
-          <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <span className="text-[14px] font-black text-white tracking-widest uppercase font-heading">
-                {t('dashboard.performance')}
-              </span>
-              <span className={cn(
-                "text-[10px] font-bold px-2 py-0.5 rounded-full border tracking-widest uppercase",
-                congCrit ? "text-red-500 border-red-500/20 bg-red-500/10" :
-                congWarn ? "text-orange-500 border-orange-500/20 bg-orange-500/10" :
-                          "text-brand border-brand/20 bg-brand/10"
-              )}>
-                {congCrit ? t('common.incidents') : congWarn ? 'Warning' : 'Optimal'}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 sm:gap-8 pr-1 sm:pr-2">
-            <div className="flex flex-col items-end">
-              <p className="text-[8px] sm:text-[9px] font-black text-text-muted uppercase tracking-[0.25em] mb-1">Efficacité</p>
-              <p className="text-[13px] sm:text-[15px] font-black text-white tabular-nums font-heading">{Math.round(kpis.networkEfficiency * 100)}%</p>
-            </div>
-            <div className="w-[1px] h-6 sm:h-8 bg-white/5 hidden xs:block" />
-            <div className="flex-col items-end hidden xs:flex">
-              <p className="text-[8px] sm:text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Météo → Trafic</p>
-              <p className={cn("text-[11px] sm:text-[13px] font-bold tabular-nums", openMeteoWeather?.trafficImpact === 'none' ? 'text-brand' : 'text-orange-500')}>
-                {openMeteoWeather?.trafficImpact === 'none' ? 'Aucun' : openMeteoWeather?.trafficImpact.toUpperCase() || 'N/A'}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI grid */}
-      <div className="kpi-grid my-4">
-        <KPICard
-          label="Temps perdu cumulé"
-          value={congPct}
-          unit="%"
-          delta={congDelta}           // undefined = pas d'affichage si pas encore d'historique 24h
-          deltaUnit="%"
-          inverse
-          icon={Activity}
-          color={congCrit ? '#FF1744' : congWarn ? '#FF6D00' : '#00E676'}
-          warning={congWarn}
-          critical={congCrit}
-          sub={`${Math.round(kpis.congestionRate * 4200)} heures perdues par jour / 100k hab.`}
-        />
-        <KPICard
-          label="Retard par trajet"
-          value={kpis.avgTravelMin.toFixed(0)}
-          unit="min"
-          delta={travelDelta}         // undefined = pas d'affichage si pas encore d'historique 24h
-          deltaUnit=" min"
-          inverse
-          icon={Clock}
-          color={travelWarn ? '#FF6D00' : '#2979FF'}
-          warning={travelWarn}
-          sub="Impact direct sur la productivité urbaine"
-        />
-        <KPICard
-          label="Impact Sanitaire"
-          value={kpis.pollutionIndex.toFixed(1)}
-          unit="/ 10"
-          inverse
-          icon={Wind}
-          color={pollColor}
-          warning={pollWarn}
-          sub={`Exposition NO2 · ${pollutionLabel(kpis.pollutionIndex).label}`}
-        />
-        <KPICard
-          label="Coût des Incidents"
-          value={incidents.length}
-          icon={AlertTriangle}
-          color={incidents.length > 5 ? '#FF6D00' : '#FFD600'}
-          sub={`Est. ${incidents.length * 450}€ de perte sèche / heure`}
-        />
-      </div>
-
-      {/* Staff Playback Timeline */}
-      <TimelineScrubber />
-
-      {/* Charts + real data row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <TrafficChart />
-        </div>
-        <div className="space-y-4">
-          <TrafficStabilityWidget />
-          <ModalSplitChart />
-        </div>
-      </div>
-
-      {/* Real weather + air quality (OpenMeteo, no key) */}
-      {(openMeteoWeather || airQuality) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {openMeteoWeather && <WeatherCard weather={openMeteoWeather} />}
-          {airQuality       && <AirQualityCard aq={airQuality} />}
-        </div>
-      )}
-
-      {/* Événements & incidents */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <EventsWidget lat={city.center.lat} lng={city.center.lng} radiusKm={15} maxItems={5} />
-        <IncidentFeed maxItems={5} />
       </div>
     </main>
   )
@@ -358,7 +392,6 @@ function PDFButton({ city }: { city: { name: string } }) {
     try {
       await exportToPdf(`${appData.name} — ${city.name} Dashboard`)
     } finally {
-      // Re-enable button after print dialog closes (or cancels)
       setIsGenerating(false)
     }
   }
@@ -368,16 +401,16 @@ function PDFButton({ city }: { city: { name: string } }) {
       onClick={handleExport}
       disabled={isGenerating}
       className={cn(
-        "print-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all text-xs",
-        isGenerating 
-          ? "bg-bg-border border-transparent text-text-muted cursor-not-allowed opacity-70"
-          : "bg-bg-elevated border-bg-border hover:border-text-muted text-text-secondary hover:text-text-primary"
+        'print-hidden flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all text-xs font-bold',
+        isGenerating
+          ? 'bg-bg-border border-transparent text-text-muted cursor-not-allowed opacity-70'
+          : 'bg-bg-elevated border-bg-border hover:border-text-muted text-text-secondary hover:text-text-primary',
       )}
     >
       {isGenerating ? (
         <>
           <div className="w-3 h-3 border-2 border-brand/30 border-t-brand rounded-full animate-spin" />
-          GÉNÉRATION...
+          Génération...
         </>
       ) : (
         <>
@@ -388,22 +421,3 @@ function PDFButton({ city }: { city: { name: string } }) {
     </button>
   )
 }
-
-const EfficiencyBar = memo(function EfficiencyBar({
-  label, value, color = '#22C55E',
-}: { label: string; value: number; color?: string }) {
-  return (
-    <div className="space-y-2 mb-4 group">
-      <div className="flex justify-between items-end">
-        <span className="text-[10px] sm:text-[11px] font-bold text-text-muted uppercase tracking-[0.1em]">{label}</span>
-        <span className="text-[12px] sm:text-[13px] font-bold tabular-nums" style={{ color }}>{Math.round(value * 100)}%</span>
-      </div>
-      <div className="h-2 rounded-full bg-white/5 overflow-hidden shadow-inner">
-        <div
-          className="h-full rounded-full transition-[width] duration-700 ease-out"
-          style={{ width: `${value * 100}%`, backgroundColor: color, boxShadow: `0 0 12px ${color}40` }}
-        />
-      </div>
-    </div>
-  )
-})
