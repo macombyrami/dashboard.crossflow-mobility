@@ -4,9 +4,7 @@ import { memo } from 'react'
 import { Activity, Clock, Wind, AlertTriangle } from 'lucide-react'
 import { KPICard } from '@/components/dashboard/KPICard'
 import { StatusBar } from '@/components/dashboard/StatusBar'
-import { IncidentFeed } from '@/components/dashboard/IncidentFeed'
-import { EventsWidget } from '@/components/dashboard/EventsWidget'
-import { AIAssistantCard } from './AIAssistantCard'
+import { PredictionTabs } from '@/components/dashboard/PredictionTabs'
 import { pollutionLabel } from '@/lib/utils/congestion'
 
 interface Props {
@@ -18,12 +16,15 @@ interface Props {
   refreshedAt?: Date | null
 }
 
-function MobileDashboardViewInner({ kpis, city, incidents, status, weatherImpact, refreshedAt }: Props) {
+function MobileDashboardViewInner({ kpis, incidents, status, weatherImpact, refreshedAt }: Props) {
   const healthScore = Math.round(kpis.networkEfficiency * 100)
   const pollColor = pollutionLabel(kpis.pollutionIndex).color
   const pollWarn = kpis.pollutionIndex >= 7
   const congWarn = kpis.congestionRate >= 0.6
   const congCrit = kpis.congestionRate >= 0.85
+  const delayStatus: 'optimal' | 'warning' | 'critical' =
+    kpis.avgTravelMin >= 30 ? 'critical' : kpis.avgTravelMin >= 20 ? 'warning' : 'optimal'
+  const incidentStatus: 'optimal' | 'warning' | 'critical' = incidents.length >= 8 ? 'critical' : incidents.length >= 4 ? 'warning' : 'optimal'
 
   return (
     <main className="min-h-full p-4 space-y-4 pb-24 animate-slide-up">
@@ -46,6 +47,7 @@ function MobileDashboardViewInner({ kpis, city, incidents, status, weatherImpact
           color={congCrit ? '#FF1744' : congWarn ? '#FF6D00' : '#00E676'}
           warning={congWarn}
           critical={congCrit}
+          status={congCrit ? 'critical' : congWarn ? 'warning' : 'optimal'}
           sub="État du réseau"
           variant="mini"
         />
@@ -56,6 +58,7 @@ function MobileDashboardViewInner({ kpis, city, incidents, status, weatherImpact
           inverse
           icon={Clock}
           color="#2979FF"
+          status={delayStatus}
           sub="Productivité"
           variant="mini"
         />
@@ -66,6 +69,7 @@ function MobileDashboardViewInner({ kpis, city, incidents, status, weatherImpact
           icon={Wind}
           color={pollColor}
           warning={pollWarn}
+          status={pollWarn ? 'warning' : 'optimal'}
           sub={`NO2 · ${pollutionLabel(kpis.pollutionIndex).label}`}
           variant="mini"
         />
@@ -74,29 +78,13 @@ function MobileDashboardViewInner({ kpis, city, incidents, status, weatherImpact
           value={incidents.length}
           icon={AlertTriangle}
           color={incidents.length > 5 ? '#FF6D00' : '#FFD600'}
+          status={incidentStatus}
           sub="Signalements actifs"
           variant="mini"
         />
       </div>
 
-      <div className="space-y-3">
-        <h2 className="px-1 text-[10px] font-black uppercase tracking-[0.25em] text-text-muted">Décision rapide</h2>
-        <div className="grid grid-cols-1 gap-3">
-          <IncidentFeed
-            maxItems={3}
-            title="Alertes actives"
-            subtitle="À traiter en priorité sur la carte"
-            ctaLabel="Voir la carte"
-            onCtaClick={() => { window.location.href = '/map' }}
-          />
-          <AIAssistantCard />
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <h2 className="px-1 text-[10px] font-black uppercase tracking-[0.25em] text-text-muted">Contexte</h2>
-        <EventsWidget lat={city.center.lat} lng={city.center.lng} radiusKm={10} maxItems={3} />
-      </div>
+      <PredictionTabs />
     </main>
   )
 }

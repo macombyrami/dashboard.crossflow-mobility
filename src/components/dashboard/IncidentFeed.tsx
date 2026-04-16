@@ -29,9 +29,9 @@ interface IncidentFeedProps {
 }
 
 export function IncidentFeed({
-  maxItems = 5,
+  maxItems = 3,
   title = 'Alertes actives',
-  subtitle = 'Signaux critiques à traiter en priorité',
+  subtitle = 'Triées par sévérité, 3 visibles maximum',
   ctaLabel,
   onCtaClick,
 }: IncidentFeedProps) {
@@ -127,6 +127,14 @@ export function IncidentFeed({
           </div>
         ))}
       </div>
+
+      {incidents.length > sorted.length && (
+        <div className="px-6 py-3 border-t border-white/5 bg-white/[0.02] flex items-center justify-between gap-3">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
+            + {incidents.length - sorted.length} autres alertes
+          </span>
+        </div>
+      )}
     </div>
   )
 }

@@ -5,6 +5,8 @@ import { MetricDelta } from '@/components/ui/MetricDelta'
 import { useTranslation } from '@/lib/hooks/useTranslation'
 import type { LucideIcon } from 'lucide-react'
 
+type KPIStatus = 'optimal' | 'warning' | 'critical'
+
 interface Props {
   label:      string
   value:      string | number
@@ -17,6 +19,7 @@ interface Props {
   color?:     string
   warning?:   boolean
   critical?:  boolean
+  status?:    KPIStatus
   sub?:       string
   className?: string
   variant?:   'default' | 'mini'
@@ -25,16 +28,40 @@ interface Props {
 function KPICardInner({
   label, value, unit, delta, deltaUnit = '%', inverse = false,
   deltaLabel,
-  icon: Icon, color = '#22C55E', warning, critical, sub, className,
+  icon: Icon, color = '#22C55E', warning, critical, status, sub, className,
   variant = 'default',
 }: Props) {
   const { t } = useTranslation()
   const isMini = variant === 'mini'
+  const resolvedStatus: KPIStatus = status ?? (critical ? 'critical' : warning ? 'warning' : 'optimal')
+
+  const STATUS_CONFIG: Record<KPIStatus, { label: string; dot: string; badge: string; ring: string }> = {
+    optimal: {
+      label: 'OPTIMAL',
+      dot: 'bg-[#00E676]',
+      badge: 'text-[#00E676] border-[#00E676]/20 bg-[#00E676]/10',
+      ring: 'ring-[#00E676]/20',
+    },
+    warning: {
+      label: 'WARNING',
+      dot: 'bg-[#FF6D00]',
+      badge: 'text-[#FF6D00] border-[#FF6D00]/20 bg-[#FF6D00]/10',
+      ring: 'ring-[#FF6D00]/20',
+    },
+    critical: {
+      label: 'CRITICAL',
+      dot: 'bg-[#FF1744]',
+      badge: 'text-[#FF1744] border-[#FF1744]/20 bg-[#FF1744]/10',
+      ring: 'ring-[#FF1744]/20',
+    },
+  }
+
+  const statusConfig = STATUS_CONFIG[resolvedStatus]
 
   return (
     <div className={cn(
-      'glass-card space-y-5 hover:shadow-apple relative group overflow-hidden animate-scale-in',
-      isMini ? 'p-4 space-y-3 rounded-2xl' : 'p-5 sm:p-6 rounded-3xl',
+      'glass-card hover:shadow-apple relative group overflow-hidden animate-scale-in',
+      isMini ? 'p-4 space-y-3 rounded-2xl' : 'p-5 sm:p-6 space-y-4 rounded-3xl',
       className,
     )}>
       {/* Background Glow Overlay (Apple-style subtle vibrancy) */}
@@ -43,40 +70,53 @@ function KPICardInner({
         style={{ backgroundColor: color, willChange: 'opacity' }}
       />
 
-      <div className="flex items-center justify-between relative z-10">
+      <div className="flex items-start justify-between gap-3 relative z-10">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={cn('w-2.5 h-2.5 rounded-full shadow-glow flex-shrink-0', statusConfig.dot)} />
+          <span className={cn(
+            'font-bold text-text-secondary uppercase tracking-[0.12em] block truncate',
+            isMini ? 'text-[9px]' : 'text-[11px]',
+          )}>
+            {label}
+          </span>
+        </div>
         <span className={cn(
-          "font-bold text-text-secondary uppercase tracking-[0.12em] block",
-          isMini ? "text-[9px]" : "text-[11px]"
+          'inline-flex items-center rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wider flex-shrink-0',
+          statusConfig.badge,
+          isMini ? 'leading-none' : '',
         )}>
-          {label}
+          {statusConfig.label}
         </span>
+      </div>
+
+      <div className="flex items-start justify-between gap-3 relative z-10">
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className={cn(
+              'font-black tracking-tighter text-white font-heading',
+              isMini ? 'text-2xl' : 'text-3xl sm:text-4xl',
+              critical ? 'text-red-500' : warning ? 'text-orange-500' : '',
+            )}>
+              {value}
+            </span>
+            {unit && <span className={cn('font-bold text-text-muted uppercase tracking-widest', isMini ? 'text-[8px]' : 'text-xs')}>{unit}</span>}
+          </div>
+          {sub && !isMini && <p className="text-[12px] font-medium text-text-secondary mt-2 leading-relaxed">{sub}</p>}
+        </div>
+
         <div
           className={cn(
-            "rounded-[14px] flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-110 group-hover:rotate-3 duration-500 shadow-sm",
-            isMini ? "w-8 h-8 rounded-[10px]" : "w-11 h-11"
+            'rounded-[14px] flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-110 group-hover:rotate-3 duration-500 shadow-sm ring-1',
+            isMini ? 'w-8 h-8 rounded-[10px]' : 'w-11 h-11',
           )}
           style={{ backgroundColor: `${color}14`, border: `1px solid ${color}25` }}
         >
-          <Icon className={isMini ? "w-4 h-4" : "w-5 h-5"} style={{ color }} />
+          <Icon className={isMini ? 'w-4 h-4' : 'w-5 h-5'} style={{ color }} />
         </div>
-      </div>
-
-      <div className="relative z-10">
-        <div className="flex items-baseline gap-2">
-          <span className={cn(
-            "font-black tracking-tighter text-white font-heading",
-            isMini ? "text-2xl" : "text-3xl sm:text-4xl",
-            critical ? "text-red-500" : warning ? "text-orange-500" : ""
-          )}>
-            {value}
-          </span>
-          {unit && <span className={cn("font-bold text-text-muted uppercase tracking-widest", isMini ? "text-[8px]" : "text-xs")}>{unit}</span>}
-        </div>
-        {sub && !isMini && <p className="text-[12px] font-medium text-text-secondary mt-2 leading-relaxed">{sub}</p>}
       </div>
 
       {delta !== undefined && (
-        <div className="flex items-center gap-2 pt-5 border-t border-white/5 relative z-10">
+        <div className="flex items-center gap-2 pt-4 border-t border-white/5 relative z-10">
           <MetricDelta value={Number(delta)} unit={deltaUnit} inverse={inverse} />
           <span className="text-[11px] font-semibold text-text-muted">{deltaLabel ?? `vs ${t('common.yesterday') || 'hier'}`}</span>
         </div>

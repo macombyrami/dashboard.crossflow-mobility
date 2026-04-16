@@ -10,12 +10,10 @@ import { cn } from '@/lib/utils/cn'
 import appData from '@/lib/data/app.json'
 
 import { KPICard } from '@/components/dashboard/KPICard'
-import { IncidentFeed } from '@/components/dashboard/IncidentFeed'
-import { EventsWidget } from '@/components/dashboard/EventsWidget'
-import { TimelineScrubber } from '@/components/dashboard/TimelineScrubber'
 import { ZoneExportTool } from '@/components/dashboard/ZoneExportTool'
 import { LiveSyncBadge } from '@/components/dashboard/LiveSyncBadge'
 import { StatusBar } from '@/components/dashboard/StatusBar'
+import { PredictionTabs } from '@/components/dashboard/PredictionTabs'
 
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
 import { MobileDashboardView } from '@/components/mobile/dashboard/MobileDashboardView'
@@ -34,16 +32,6 @@ const TrafficChart = dynamic(() => import('@/components/dashboard/TrafficChart')
   ssr: false,
   loading: () => <ChartSkeleton />,
 })
-const ModalSplitChart = dynamic(() => import('@/components/dashboard/ModalSplitChart').then(m => m.ModalSplitChart), {
-  ssr: false,
-  loading: () => <CardSkeleton height="200px" />,
-})
-const TrafficStabilityWidget = dynamic(() => import('@/components/dashboard/TrafficStabilityWidget').then(m => m.TrafficStabilityWidget), {
-  ssr: false,
-  loading: () => <CardSkeleton height="150px" />,
-})
-const WeatherCard = dynamic(() => import('@/components/dashboard/WeatherCard').then(m => m.WeatherCard), { ssr: false })
-const AirQualityCard = dynamic(() => import('@/components/dashboard/AirQualityCard').then(m => m.AirQualityCard), { ssr: false })
 
 function ChartSkeleton() {
   return (
@@ -51,10 +39,6 @@ function ChartSkeleton() {
       <Activity className="w-8 h-8 text-white/10" />
     </div>
   )
-}
-
-function CardSkeleton({ height }: { height: string }) {
-  return <div className="w-full bg-bg-elevated/40 border border-bg-border rounded-3xl animate-pulse" style={{ height }} />
 }
 
 function kpisFromSnapshot(cityId: string, snapshot: TrafficSnapshot, incidentCount: number, base: CityKPIs): CityKPIs {
@@ -110,7 +94,6 @@ export default function DashboardPage() {
   const incidents = useTrafficStore(s => s.incidents)
   const dataSource = useTrafficStore(s => s.dataSource)
   const openMeteoWeather = useTrafficStore(s => s.openMeteoWeather)
-  const airQuality = useTrafficStore(s => s.airQuality)
   const lastUpdate = useTrafficStore(s => s.lastUpdate)
   const addSnapshot = useKPIHistoryStore(s => s.addSnapshot)
   const syncSnapshots = useKPIHistoryStore(s => s.syncHistoricalSnapshots)
@@ -191,6 +174,8 @@ export default function DashboardPage() {
         ? 'warning'
         : 'optimal'
 
+    const incidentsStatus: 'optimal' | 'warning' | 'critical' = incidents.length >= 8 ? 'critical' : incidents.length >= 4 ? 'warning' : 'optimal'
+
     return {
       congPct,
       congWarn,
@@ -202,8 +187,9 @@ export default function DashboardPage() {
       tDelta,
       status,
       weatherImpact,
+      incidentsStatus,
     }
-  }, [kpis, city.id, openMeteoWeather])
+  }, [kpis, city.id, incidents.length, openMeteoWeather])
 
   if (!kpis || !derived) return null
 
@@ -289,6 +275,7 @@ export default function DashboardPage() {
                 color={derived.congCrit ? '#FF1744' : derived.congWarn ? '#FF6D00' : '#00E676'}
                 warning={derived.congWarn}
                 critical={derived.congCrit}
+                status={derived.congCrit ? 'critical' : derived.congWarn ? 'warning' : 'optimal'}
                 sub={derived.congCrit ? 'Réseau sous tension immédiate' : derived.congWarn ? 'Trafic à surveiller' : 'Réseau nominal'}
               />
               <KPICard
@@ -302,6 +289,7 @@ export default function DashboardPage() {
                 icon={Clock}
                 color={derived.travelWarn ? '#FF6D00' : '#2979FF'}
                 warning={derived.travelWarn}
+                status={derived.travelWarn ? 'warning' : 'optimal'}
                 sub="Impact direct sur la productivité urbaine"
               />
               <KPICard
@@ -312,6 +300,7 @@ export default function DashboardPage() {
                 icon={Wind}
                 color={derived.pollColor}
                 warning={derived.pollWarn}
+                status={derived.pollWarn ? 'warning' : 'optimal'}
                 sub={`Exposition NO2 · ${pollutionLabel(kpis.pollutionIndex).label}`}
               />
               <KPICard
@@ -319,6 +308,7 @@ export default function DashboardPage() {
                 value={incidents.length}
                 icon={AlertTriangle}
                 color={incidents.length > 5 ? '#FF6D00' : '#FFD600'}
+                status={derived.incidentsStatus}
                 sub={`Est. ${incidents.length * 450} € de perte sèche / heure`}
               />
             </div>
@@ -332,51 +322,14 @@ export default function DashboardPage() {
               <TrafficChart />
             </div>
           </SectionCard>
-
-          <details className="card-premium overflow-hidden border border-white/5 rounded-3xl">
-            <summary className="list-none cursor-pointer px-5 sm:px-6 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
-              <div>
-                <h2 className="text-[13px] font-black uppercase tracking-[0.18em] text-white">Historique 24h</h2>
-                <p className="text-[11px] text-text-muted">Analyse détaillée disponible à la demande</p>
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-brand">Ouvrir</span>
-            </summary>
-            <div className="p-4 sm:p-5">
-              <TimelineScrubber />
-            </div>
-          </details>
         </div>
 
         <div className="space-y-5">
           <SectionCard
-            title="Décision court terme"
-            subtitle="Lecture rapide des prochains leviers d'action"
+            title="Prochaines 2 heures"
+            subtitle="Alertes, contexte et données pour décider vite"
           >
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <TrafficStabilityWidget />
-              <ModalSplitChart />
-            </div>
-          </SectionCard>
-
-          <IncidentFeed
-            maxItems={5}
-            title="Alertes actives"
-            subtitle="Incidents et anomalies à prioriser sur la carte"
-            ctaLabel="Voir sur la carte"
-            onCtaClick={() => { window.location.href = '/map' }}
-          />
-
-          <SectionCard
-            title="Contexte opérationnel"
-            subtitle="Événements, météo et qualité de l'air"
-          >
-            <div className="space-y-4">
-              <EventsWidget lat={city.center.lat} lng={city.center.lng} radiusKm={15} maxItems={5} />
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {openMeteoWeather && <WeatherCard weather={openMeteoWeather} />}
-                {airQuality && <AirQualityCard aq={airQuality} />}
-              </div>
-            </div>
+            <PredictionTabs />
           </SectionCard>
         </div>
       </div>
