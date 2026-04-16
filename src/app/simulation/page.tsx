@@ -1,17 +1,12 @@
 'use client'
 
 import { useEffect } from 'react'
-import dynamic from 'next/dynamic'
 import { GitBranch, Info } from 'lucide-react'
 
 import { SimulationPanel } from '@/components/simulation/SimulationPanel'
 import { StatsPanel } from '@/components/simulation/StatsPanel'
+import { SimulationMap } from '@/components/simulation/SimulationMap'
 import { useMapStore } from '@/store/mapStore'
-
-const CrossFlowMap = dynamic(
-  () => import('@/components/map/CrossFlowMap').then(m => ({ default: m.CrossFlowMap })),
-  { ssr: false, loading: () => <div className="w-full h-full bg-bg-surface" /> },
-)
 
 export default function SimulationPage() {
   const city = useMapStore(s => s.city)
@@ -56,7 +51,7 @@ export default function SimulationPage() {
         </div>
 
         <div className="flex-1 relative min-h-[300px]">
-          <CrossFlowMap />
+          <SimulationMap />
           <div className="absolute top-4 left-4 bg-bg-surface/90 border border-bg-border rounded-xl px-3 py-2 backdrop-blur-sm z-10">
             <p className="text-xs text-text-muted">
               Mode <span className="text-brand font-semibold">SIMULATION</span>

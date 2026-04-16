@@ -23,7 +23,7 @@ import { useMapStore } from '@/store/mapStore'
 import { SIMULATION_INTERACTION_MODE, useSimulationStore } from '@/store/simulationStore'
 import { cn } from '@/lib/utils/cn'
 
-const TRAFFIC_LEVELS: Array<{ value: PredTrafficLevel; label: string; color: string }> = [
+const TRAFFIC_LEVELS: Array<{ value: 'light' | 'medium' | 'heavy'; label: string; color: string }> = [
   { value: 'light', label: 'Léger ×1.2', color: '#00E676' },
   { value: 'medium', label: 'Moyen ×1.5', color: '#FF6D00' },
   { value: 'heavy', label: 'Fort ×2.0', color: '#FF1744' },
@@ -41,6 +41,7 @@ export function SimulationPanel() {
   const selectedSegmentId = useMapStore(s => s.selectedSegmentId)
   const revision = useSimulationStore(s => s.revision)
   const interactionMode = useSimulationStore(s => s.interactionMode)
+  const trafficLevel = useSimulationStore(s => s.trafficLevel)
   const eventLocation = useSimulationStore(s => s.eventLocation)
   const locationPickerActive = useSimulationStore(s => s.locationPickerActive)
   const setEventLocation = useSimulationStore(s => s.setEventLocation)
@@ -50,8 +51,8 @@ export function SimulationPanel() {
   const lastError = useSimulationStore(s => s.lastError)
   const bumpRevision = useSimulationStore(s => s.bumpRevision)
   const setLastError = useSimulationStore(s => s.setLastError)
+  const setTrafficLevel = useSimulationStore(s => s.setTrafficLevel)
 
-  const [trafficLevel, setTrafficLevel] = useState<PredTrafficLevel>('medium')
   const [eventType, setEventType] = useState<PredEventType>('works')
   const [eventRadius, setEventRadius] = useState(300)
   const [isBusy, setIsBusy] = useState(false)
@@ -169,7 +170,7 @@ export function SimulationPanel() {
     setLastError(null)
 
     try {
-      await predictiveApi.addTraffic(selectedSegmentId, trafficLevel)
+      await predictiveApi.addTraffic(selectedSegmentId, trafficLevel as PredTrafficLevel)
       bumpRevision()
       setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
       toast.success('Trafic appliqué au segment')
@@ -464,9 +465,9 @@ export function SimulationPanel() {
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
               Intensité du trafic
             </p>
-            <div className="grid grid-cols-3 gap-2">
-              {TRAFFIC_LEVELS.map(level => (
-                <div key={level.value} className="rounded-xl border border-bg-border bg-bg-elevated px-3 py-2">
+          <div className="grid grid-cols-3 gap-2">
+            {TRAFFIC_LEVELS.map(level => (
+              <div key={level.value} className="rounded-xl border border-bg-border bg-bg-elevated px-3 py-2">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: level.color }} />
                     <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">{level.label}</span>

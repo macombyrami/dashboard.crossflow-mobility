@@ -34,6 +34,8 @@ interface SimulationStore {
   bumpRevision:       () => void
   interactionMode:    SimulationInteractionMode
   setInteractionMode:  (mode: SimulationInteractionMode) => void
+  trafficLevel:       'light' | 'medium' | 'heavy'
+  setTrafficLevel:    (level: 'light' | 'medium' | 'heavy') => void
 
   // Build scenario object
   buildScenario:    () => SimulationScenario
@@ -78,6 +80,7 @@ export const useSimulationStore = create<SimulationStore>()(
       timeWindowEnd:   10,
       revision:        0,
       interactionMode: SIMULATION_INTERACTION_MODE.NONE,
+      trafficLevel:    'medium',
       status:          'idle',
       lastError:       null,
 
@@ -91,6 +94,7 @@ export const useSimulationStore = create<SimulationStore>()(
       setTimeWindow:      (start: number, end: number) => set({ timeWindowStart: start, timeWindowEnd: end }),
       bumpRevision:       () => set(s => ({ revision: s.revision + 1 })),
       setInteractionMode: (mode) => set({ interactionMode: mode }),
+      setTrafficLevel:    (level) => set({ trafficLevel: level }),
 
       buildScenario: (): SimulationScenario => {
         const s = get() as SimulationStore
