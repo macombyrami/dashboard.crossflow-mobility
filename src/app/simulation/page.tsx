@@ -1,12 +1,17 @@
 'use client'
 
 import { useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { GitBranch, Info } from 'lucide-react'
 
 import { SimulationPanel } from '@/components/simulation/SimulationPanel'
 import { StatsPanel } from '@/components/simulation/StatsPanel'
-import { SimulationMap } from '@/components/simulation/SimulationMap'
 import { useMapStore } from '@/store/mapStore'
+
+const SimulationMap = dynamic(
+  () => import('@/components/simulation/SimulationMap').then(m => m.SimulationMap),
+  { ssr: false },
+)
 
 export default function SimulationPage() {
   const city = useMapStore(s => s.city)

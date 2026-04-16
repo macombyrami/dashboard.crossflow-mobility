@@ -37,6 +37,21 @@ interface SimulationStore {
   trafficLevel:       'light' | 'medium' | 'heavy'
   setTrafficLevel:    (level: 'light' | 'medium' | 'heavy') => void
 
+  // Local simulation state used by /simulation without remote backend
+  roadNetwork: GeoJSON.FeatureCollection | null
+  setRoadNetwork: (network: GeoJSON.FeatureCollection | null) => void
+  blockedEdgeIds: string[]
+  trafficEdges: Record<string, 'light' | 'medium' | 'heavy'>
+  localEvents: LocalSimulationEvent[]
+  blockRoad: (edgeId: string) => void
+  unblockRoad: (edgeId: string) => void
+  setTrafficEdge: (edgeId: string, level: 'light' | 'medium' | 'heavy') => void
+  clearTrafficEdge: (edgeId: string) => void
+  addLocalEvent: (event: Omit<LocalSimulationEvent, 'id' | 'createdAt'>) => void
+  removeLocalEvent: (eventId: string) => void
+  clearLocalEvents: () => void
+  resetLocalSimulation: () => void
+
   // Build scenario object
   buildScenario:    () => SimulationScenario
 
@@ -83,6 +98,10 @@ export const useSimulationStore = create<SimulationStore>()(
       trafficLevel:    'medium',
       status:          'idle',
       lastError:       null,
+      roadNetwork:     null,
+      blockedEdgeIds:  [],
+      trafficEdges:    {},
+      localEvents:     [],
 
       setScenarioType:  (t: ScenarioType) => {
         const cfg = platformConfig.simulation.scenarioConfig[t]
@@ -95,6 +114,60 @@ export const useSimulationStore = create<SimulationStore>()(
       bumpRevision:       () => set(s => ({ revision: s.revision + 1 })),
       setInteractionMode: (mode) => set({ interactionMode: mode }),
       setTrafficLevel:    (level) => set({ trafficLevel: level }),
+      setRoadNetwork:     (network) => set({ roadNetwork: network }),
+      blockRoad:          (edgeId) => set(state => ({
+        blockedEdgeIds: state.blockedEdgeIds.includes(edgeId)
+          ? state.blockedEdgeIds
+          : [...state.blockedEdgeIds, edgeId],
+        trafficEdges: {
+          ...state.trafficEdges,
+          [edgeId]: state.trafficEdges[edgeId] ?? 'heavy',
+        },
+      })),
+      unblockRoad:        (edgeId) => set(state => {
+        const { [edgeId]: _removed, ...rest } = state.trafficEdges
+        return {
+          blockedEdgeIds: state.blockedEdgeIds.filter(id => id !== edgeId),
+          trafficEdges: rest,
+        }
+      }),
+      setTrafficEdge:     (edgeId, level) => set(state => ({
+        trafficEdges: {
+          ...state.trafficEdges,
+          [edgeId]: level,
+        },
+      })),
+      clearTrafficEdge:   (edgeId) => set(state => {
+        const { [edgeId]: _removed, ...rest } = state.trafficEdges
+        return { trafficEdges: rest }
+      }),
+      addLocalEvent:      (event) => set(state => ({
+        localEvents: [
+          {
+            id: `evt_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+            createdAt: Date.now(),
+            ...event,
+          },
+          ...state.localEvents,
+        ].slice(0, 20),
+      })),
+      removeLocalEvent:   (eventId) => set(state => ({
+        localEvents: state.localEvents.filter(evt => evt.id !== eventId),
+      })),
+      clearLocalEvents:   () => set({ localEvents: [] }),
+      resetLocalSimulation: () => set({
+        blockedEdgeIds: [],
+        trafficEdges: {},
+        localEvents: [],
+        roadNetwork: null,
+        eventLocation: null,
+        locationPickerActive: false,
+        interactionMode: SIMULATION_INTERACTION_MODE.NONE,
+        lastError: null,
+        status: 'ready',
+        backendOnline: true,
+        graphLoaded: true,
+      }),
 
       buildScenario: (): SimulationScenario => {
         const s = get() as SimulationStore
@@ -146,3 +219,14 @@ export const useSimulationStore = create<SimulationStore>()(
     }
   )
 )
+
+interface LocalSimulationEvent {
+  id: string
+  createdAt: number
+  type: string
+  label: string
+  lat: number
+  lng: number
+  radius: number
+  affectedEdges: string[]
+}

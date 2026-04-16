@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
-  AlertCircle,
   Ban,
   CheckCircle2,
   Cpu,
@@ -17,29 +16,33 @@ import {
 import { toast } from 'sonner'
 import type { ReactNode } from 'react'
 
-import { predictiveApi, type PredEventType, type PredTrafficLevel } from '@/lib/api/predictive'
-import { simulationService } from '@/lib/services/SimulationService'
 import { useMapStore } from '@/store/mapStore'
-import { SIMULATION_INTERACTION_MODE, useSimulationStore } from '@/store/simulationStore'
+import {
+  SIMULATION_INTERACTION_MODE,
+  useSimulationStore,
+  type SimulationInteractionMode,
+} from '@/store/simulationStore'
 import { cn } from '@/lib/utils/cn'
 
 const TRAFFIC_LEVELS: Array<{ value: 'light' | 'medium' | 'heavy'; label: string; color: string }> = [
-  { value: 'light', label: 'Léger ×1.2', color: '#00E676' },
-  { value: 'medium', label: 'Moyen ×1.5', color: '#FF6D00' },
-  { value: 'heavy', label: 'Fort ×2.0', color: '#FF1744' },
+  { value: 'light', label: 'Leger x1.2', color: '#00E676' },
+  { value: 'medium', label: 'Moyen x1.5', color: '#FF6D00' },
+  { value: 'heavy', label: 'Fort x2.0', color: '#FF1744' },
 ]
 
-const EVENT_TYPES: Array<{ value: PredEventType; label: string; icon: ReactNode }> = [
+const EVENT_TYPES: Array<{ value: 'accident' | 'works' | 'demonstration' | 'administrative'; label: string; icon: ReactNode }> = [
   { value: 'accident', label: 'Accident', icon: '💥' },
   { value: 'works', label: 'Travaux', icon: '🚧' },
   { value: 'demonstration', label: 'Manifestation', icon: '📢' },
   { value: 'administrative', label: 'Fermeture', icon: '🚫' },
 ]
 
+type LocalEventType = 'accident' | 'works' | 'demonstration' | 'administrative'
+
 export function SimulationPanel() {
   const city = useMapStore(s => s.city)
   const selectedSegmentId = useMapStore(s => s.selectedSegmentId)
-  const revision = useSimulationStore(s => s.revision)
+
   const interactionMode = useSimulationStore(s => s.interactionMode)
   const trafficLevel = useSimulationStore(s => s.trafficLevel)
   const eventLocation = useSimulationStore(s => s.eventLocation)
@@ -49,256 +52,140 @@ export function SimulationPanel() {
   const setInteractionMode = useSimulationStore(s => s.setInteractionMode)
   const status = useSimulationStore(s => s.status)
   const lastError = useSimulationStore(s => s.lastError)
-  const bumpRevision = useSimulationStore(s => s.bumpRevision)
   const setLastError = useSimulationStore(s => s.setLastError)
   const setTrafficLevel = useSimulationStore(s => s.setTrafficLevel)
+  const roadNetwork = useSimulationStore(s => s.roadNetwork)
+  const blockedEdgeIds = useSimulationStore(s => s.blockedEdgeIds)
+  const trafficEdges = useSimulationStore(s => s.trafficEdges)
+  const localEvents = useSimulationStore(s => s.localEvents)
+  const blockRoad = useSimulationStore(s => s.blockRoad)
+  const unblockRoad = useSimulationStore(s => s.unblockRoad)
+  const setTrafficEdge = useSimulationStore(s => s.setTrafficEdge)
+  const addLocalEvent = useSimulationStore(s => s.addLocalEvent)
+  const removeLocalEvent = useSimulationStore(s => s.removeLocalEvent)
+  const resetLocalSimulation = useSimulationStore(s => s.resetLocalSimulation)
 
-  const [eventType, setEventType] = useState<PredEventType>('works')
+  const [eventType, setEventType] = useState<LocalEventType>('works')
   const [eventRadius, setEventRadius] = useState(300)
   const [isBusy, setIsBusy] = useState(false)
-  const [analytics, setAnalytics] = useState<{
-    blocked: number
-    slow: number
-    events: number
-    edges: number
-    online: boolean
-  } | null>(null)
-  const [blockedSegments, setBlockedSegments] = useState<Array<{ id: string; label: string }>>([])
-  const [activeEvents, setActiveEvents] = useState<Array<{ id: string; label: string; count: number }>>([])
-
-  useEffect(() => {
-    let mounted = true
-
-    const bootstrap = async () => {
-      const online = await simulationService.checkHealth()
-      if (!mounted) return
-
-      if (online) {
-        await simulationService.initEngine(city)
-      } else {
-        const store = useSimulationStore.getState()
-        store.setBackendOnline(false)
-        store.setGraphLoaded(false)
-        store.setEngineStatus('idle')
-        store.setLastError(null)
-      }
-    }
-
-    void bootstrap()
-
-    return () => {
-      mounted = false
-    }
-  }, [city.id, city.name])
-
-  useEffect(() => {
-    let active = true
-
-    const refresh = async () => {
-      try {
-        const [health, blocked, slow, events, graph] = await Promise.all([
-          predictiveApi.health(),
-          predictiveApi.getEdges('blocked'),
-          predictiveApi.getEdges('slow'),
-          predictiveApi.getEvents(),
-          predictiveApi.getAnalytics().catch(() => null),
-        ])
-
-        if (!active) return
-
-        setBlockedSegments(
-          blocked.features.slice(0, 5).map((feature, index) => {
-            const props = (feature.properties ?? {}) as Record<string, unknown>
-            const rawId = String(props.edge_id ?? props.id ?? props.name ?? `segment-${index + 1}`)
-            return {
-              id: rawId,
-              label: formatShortLabel(rawId, props.name),
-            }
-          }),
-        )
-        setActiveEvents(
-          events.features.slice(0, 5).map((feature, index) => {
-            const props = (feature.properties ?? {}) as Record<string, unknown>
-            const rawId = String(props.id ?? props.label ?? props.name ?? `event-${index + 1}`)
-            const affected = Array.isArray(props.affected_edges) ? props.affected_edges.length : 0
-            return {
-              id: rawId,
-              label: String(props.label ?? props.name ?? rawId),
-              count: affected,
-            }
-          }),
-        )
-        setAnalytics({
-          online: Boolean(health.online),
-          blocked: blocked.features.length,
-          slow: slow.features.length,
-          events: events.features.length,
-          edges: graph?.total_roads ?? 0,
-        })
-      } catch {
-        if (active) {
-          setAnalytics(null)
-          setBlockedSegments([])
-          setActiveEvents([])
-        }
-      }
-    }
-
-    void refresh()
-
-    return () => {
-      active = false
-    }
-  }, [city.id, revision, status])
 
   const selectedSegmentLabel = useMemo(() => {
     if (!selectedSegmentId) return null
-    return selectedSegmentId.length > 28
-      ? `…${selectedSegmentId.slice(-12)}`
-      : selectedSegmentId
+    return selectedSegmentId.length > 28 ? `...${selectedSegmentId.slice(-12)}` : selectedSegmentId
   }, [selectedSegmentId])
 
-  const handleBlockRoad = async () => {
-    if (!selectedSegmentId) {
-      toast.warning('Sélectionnez un segment sur la carte.')
-      return
+  const analytics = useMemo(() => {
+    const totalEdges = roadNetwork?.features.length ?? 0
+    const activeTraffic = Object.values(trafficEdges).length
+    return {
+      blocked: blockedEdgeIds.length,
+      slow: activeTraffic,
+      events: localEvents.length,
+      edges: totalEdges,
+      localReady: Boolean(roadNetwork),
     }
+  }, [blockedEdgeIds.length, localEvents.length, roadNetwork, trafficEdges])
 
-    setIsBusy(true)
-    setLastError(null)
-
-    try {
-      await predictiveApi.blockRoad(selectedSegmentId)
-      bumpRevision()
-      setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
-      toast.success('Route bloquée sur la carte')
-    } catch (err: any) {
-      setLastError(err?.message ?? 'Impossible de bloquer la route.')
-      toast.error('Blocage impossible')
-    } finally {
-      setIsBusy(false)
-    }
-  }
-
-  const handleAddTraffic = async () => {
-    if (!selectedSegmentId) {
-      toast.warning('Sélectionnez un segment sur la carte.')
-      return
-    }
-
-    setIsBusy(true)
-    setLastError(null)
-
-    try {
-      await predictiveApi.addTraffic(selectedSegmentId, trafficLevel as PredTrafficLevel)
-      bumpRevision()
-      setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
-      toast.success('Trafic appliqué au segment')
-    } catch (err: any) {
-      setLastError(err?.message ?? 'Impossible d’appliquer le trafic.')
-      toast.error('Trafic impossible')
-    } finally {
-      setIsBusy(false)
-    }
-  }
-
-  const handleCreateEvent = async () => {
-    const center = eventLocation ?? city.center
-
-    setIsBusy(true)
-    setLastError(null)
-
-    try {
-      await predictiveApi.addEvent(
-        center,
-        eventType,
-        eventRadius,
-        `Événement ${city.name}`,
-      )
-      setLocationPickerActive(false)
-      setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
-      bumpRevision()
-      toast.success('Événement ajouté à la simulation')
-    } catch (err: any) {
-      setLastError(err?.message ?? 'Impossible de créer l’événement.')
-      toast.error('Événement impossible')
-    } finally {
-      setIsBusy(false)
-    }
-  }
-
-  const handleExportGeoJSON = async () => {
-    try {
-      const data = await simulationService.getAffectedEdges()
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/geo+json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'crossflow_affected_edges.geojson'
-      a.click()
-      URL.revokeObjectURL(url)
-      toast.success('GeoJSON exporté')
-    } catch (err) {
-      console.error('Export error:', err)
-      toast.error('Export GeoJSON impossible')
-    }
-  }
-
-  const handleReset = async () => {
-    setIsBusy(true)
-    try {
-      await predictiveApi.resetSimulation()
-      setEventLocation(null)
-      setLocationPickerActive(false)
-      setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
-      setBlockedSegments([])
-      setActiveEvents([])
-      bumpRevision()
-      toast.success('Simulation réinitialisée')
-    } catch (err) {
-      console.error('Reset error:', err)
-      toast.error('Réinitialisation impossible')
-    } finally {
-      setIsBusy(false)
-    }
-  }
-
-  const isReady = status === 'ready'
   const statusLabel =
-    status === 'initializing'
-      ? 'Initialisation du moteur…'
-      : status === 'ready'
-        ? 'Moteur prédictif prêt'
+    status === 'ready'
+      ? 'Moteur local pret'
+      : status === 'initializing'
+        ? 'Initialisation de la carte'
         : status === 'error'
-          ? 'Erreur moteur'
-          : 'Moteur en attente'
+          ? 'Erreur locale'
+          : 'Mode local'
 
   const statusCopy =
-    status === 'initializing'
-      ? 'Chargement du graphe OSMnx.'
-      : status === 'ready'
-        ? 'Simulation temps réel activée.'
+    status === 'ready'
+      ? 'Simulation temps reel activee sans backend distant.'
+      : status === 'initializing'
+        ? 'Chargement du graphe IDF local...'
         : status === 'error'
-          ? (lastError || 'Backend inaccessible')
-          : 'Sélectionnez une ville pour démarrer.'
+          ? (lastError || 'Donnees locales indisponibles')
+          : 'La simulation utilise les donnees locales du projet predictive-main.'
+
+  const handleBlockRoad = () => {
+    if (!selectedSegmentId) {
+      toast.warning('Selectionnez un segment sur la carte.')
+      return
+    }
+
+    setLastError(null)
+    blockRoad(selectedSegmentId)
+    setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
+    toast.success('Route bloquee sur la carte')
+  }
+
+  const handleAddTraffic = () => {
+    if (!selectedSegmentId) {
+      toast.warning('Selectionnez un segment sur la carte.')
+      return
+    }
+
+    setLastError(null)
+    setTrafficEdge(selectedSegmentId, trafficLevel)
+    setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
+    toast.success('Trafic applique au segment')
+  }
+
+  const handleCreateEvent = () => {
+    const center = eventLocation ?? city.center
+    const affectedEdges = approximateAffectedEdges(roadNetwork, center.lat, center.lng, eventRadius)
+
+    setLastError(null)
+    addLocalEvent({
+      type: eventType,
+      label: `${city.name} ${EVENT_TYPES.find(evt => evt.value === eventType)?.label ?? 'Evenement'}`,
+      lat: center.lat,
+      lng: center.lng,
+      radius: eventRadius,
+      affectedEdges,
+    })
+
+    setLocationPickerActive(false)
+    setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
+    toast.success('Evenement ajoute a la simulation')
+  }
+
+  const handleExportGeoJSON = () => {
+    const data = buildAffectedEdgesGeoJSON(roadNetwork, blockedEdgeIds, trafficEdges)
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/geo+json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'crossflow_affected_edges.geojson'
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('GeoJSON exporte')
+  }
+
+  const handleReset = () => {
+    resetLocalSimulation()
+    setEventLocation(null)
+    setLocationPickerActive(false)
+    setInteractionMode(SIMULATION_INTERACTION_MODE.NONE)
+    toast.success('Simulation reinitialisee')
+  }
 
   return (
     <div className="space-y-4">
-      <div className={cn(
-        'px-4 py-3 rounded-2xl border flex items-center justify-between gap-4',
-        status === 'ready'
-          ? 'bg-brand/5 border-brand/20'
-          : status === 'error'
-            ? 'bg-[#FF1744]/5 border-[#FF1744]/20'
-            : 'bg-bg-elevated border-bg-border',
-      )}>
+      <div
+        className={cn(
+          'px-4 py-3 rounded-2xl border flex items-center justify-between gap-4',
+          status === 'ready'
+            ? 'bg-brand/5 border-brand/20'
+            : status === 'error'
+              ? 'bg-[#FF1744]/5 border-[#FF1744]/20'
+              : 'bg-bg-elevated border-bg-border',
+        )}
+      >
         <div className="flex items-center gap-3 min-w-0">
           {status === 'initializing' ? (
             <Loader2 className="w-4 h-4 animate-spin text-brand" />
           ) : status === 'ready' ? (
             <CheckCircle2 className="w-4 h-4 text-brand" />
           ) : status === 'error' ? (
-            <AlertCircle className="w-4 h-4 text-[#FF1744]" />
+            <Ban className="w-4 h-4 text-[#FF1744]" />
           ) : (
             <Cpu className="w-4 h-4 text-text-muted" />
           )}
@@ -314,7 +201,7 @@ export function SimulationPanel() {
 
         <div className="hidden xl:flex items-center gap-2">
           <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-white/5 border border-white/10 text-text-muted uppercase tracking-widest">
-            {analytics?.online ? 'Backend online' : 'Backend offline'}
+            Mode local
           </span>
         </div>
       </div>
@@ -327,7 +214,7 @@ export function SimulationPanel() {
         </div>
         <div className="p-4 space-y-3">
           <p className="text-[11px] text-text-muted leading-relaxed">
-            Activez un mode puis cliquez sur un segment de la carte. Le clic suivant applique l&apos;action.
+            Activez un mode puis cliquez sur un segment de la carte. Le clic suivant applique l'action.
           </p>
 
           <div className="grid grid-cols-3 gap-2">
@@ -378,24 +265,23 @@ export function SimulationPanel() {
             >
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4" />
-                <span className="text-[10px] font-bold uppercase tracking-widest">Événement</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest">Evenement</span>
               </div>
             </button>
           </div>
 
           <div className="flex items-center justify-between gap-3 rounded-xl border border-bg-border bg-bg-elevated px-3 py-2">
             <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-widest text-text-muted">Segment sélectionné</p>
+              <p className="text-[10px] uppercase tracking-widest text-text-muted">Segment selectionne</p>
               <p className="text-xs font-semibold text-text-primary truncate">
-                {selectedSegmentLabel ?? 'Aucun segment sélectionné'}
+                {selectedSegmentLabel ?? 'Aucun segment selectionne'}
               </p>
             </div>
             <button
               onClick={handleBlockRoad}
-              disabled={isBusy || !isReady || !selectedSegmentId}
               className={cn(
                 'shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all',
-                isBusy || !isReady || !selectedSegmentId
+                !selectedSegmentId
                   ? 'bg-bg-elevated text-text-muted border border-bg-border cursor-not-allowed'
                   : 'bg-[#FF1744]/10 text-[#FF1744] border border-[#FF1744]/20 hover:bg-[#FF1744]/15',
               )}
@@ -406,30 +292,38 @@ export function SimulationPanel() {
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            <MiniStat label="Bloquées" value={analytics?.blocked ?? 0} accent="text-[#FF1744]" />
-            <MiniStat label="Ralenties" value={analytics?.slow ?? 0} accent="text-[#FF6D00]" />
-            <MiniStat label="Événements" value={analytics?.events ?? 0} accent="text-brand" />
+            <MiniStat label="Bloquees" value={analytics.blocked} accent="text-[#FF1744]" />
+            <MiniStat label="Ralenties" value={analytics.slow} accent="text-[#FF6D00]" />
+            <MiniStat label="Evenements" value={analytics.events} accent="text-brand" />
           </div>
 
-          {blockedSegments.length > 0 && (
+          {blockedEdgeIds.length > 0 && (
             <div className="space-y-2 pt-2">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
-                Routes bloquées
+                Routes bloquees
               </p>
               <div className="space-y-2">
-                {blockedSegments.map(segment => (
-                  <div key={segment.id} className="flex items-center justify-between gap-3 rounded-xl border border-bg-border bg-bg-elevated px-3 py-2">
+                {blockedEdgeIds.slice(0, 5).map(edgeId => (
+                  <div
+                    key={edgeId}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-bg-border bg-bg-elevated px-3 py-2"
+                  >
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-text-primary truncate">{segment.label}</p>
+                      <p className="text-xs font-semibold text-text-primary truncate">{formatSegmentLabel(edgeId)}</p>
                       <p className="text-[10px] text-text-muted uppercase tracking-widest">Impact direct sur le maillage</p>
                     </div>
-                    <span className="text-[10px] font-bold text-[#FF1744] uppercase tracking-widest">Critique</span>
+                    <button
+                      onClick={() => unblockRoad(edgeId)}
+                      className="text-[10px] font-bold text-[#FF1744] uppercase tracking-widest hover:underline"
+                    >
+                      Retirer
+                    </button>
                   </div>
                 ))}
               </div>
-              {analytics && analytics.blocked > blockedSegments.length && (
+              {blockedEdgeIds.length > 5 && (
                 <p className="text-[10px] text-text-muted">
-                  +{analytics.blocked - blockedSegments.length} autres segments
+                  +{blockedEdgeIds.length - 5} autres segments
                 </p>
               )}
             </div>
@@ -467,14 +361,14 @@ export function SimulationPanel() {
             })}
           </div>
 
-            <button
-              onClick={handleAddTraffic}
-              disabled={isBusy || !isReady || !selectedSegmentId}
-              className={cn(
-                'w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all border',
-                isBusy || !isReady || !selectedSegmentId
-                  ? 'bg-bg-elevated text-text-muted border-bg-border cursor-not-allowed'
-                  : 'bg-[#FF6D00]/10 text-[#FF6D00] border-[#FF6D00]/20 hover:bg-[#FF6D00]/15',
+          <button
+            onClick={handleAddTraffic}
+            disabled={!selectedSegmentId}
+            className={cn(
+              'w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all border',
+              !selectedSegmentId
+                ? 'bg-bg-elevated text-text-muted border-bg-border cursor-not-allowed'
+                : 'bg-[#FF6D00]/10 text-[#FF6D00] border-[#FF6D00]/20 hover:bg-[#FF6D00]/15',
             )}
           >
             <TrafficCone className="w-4 h-4" />
@@ -483,11 +377,11 @@ export function SimulationPanel() {
 
           <div className="space-y-2 pt-2">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
-              Intensité du trafic
+              Intensite du trafic
             </p>
-          <div className="grid grid-cols-3 gap-2">
-            {TRAFFIC_LEVELS.map(level => (
-              <div key={level.value} className="rounded-xl border border-bg-border bg-bg-elevated px-3 py-2">
+            <div className="grid grid-cols-3 gap-2">
+              {TRAFFIC_LEVELS.map(level => (
+                <div key={level.value} className="rounded-xl border border-bg-border bg-bg-elevated px-3 py-2">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: level.color }} />
                     <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">{level.label}</span>
@@ -502,7 +396,7 @@ export function SimulationPanel() {
       <section className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
         <div className="px-5 py-4 border-b border-bg-border">
           <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">
-            Créer un événement
+            Creer un evenement
           </p>
         </div>
         <div className="p-4 space-y-4">
@@ -529,7 +423,7 @@ export function SimulationPanel() {
 
           <div className="space-y-2">
             <div className="flex justify-between">
-              <label className="text-xs text-text-secondary">Rayon d’impact</label>
+              <label className="text-xs text-text-secondary">Rayon d'impact</label>
               <span className="text-xs font-semibold text-brand">{eventRadius} m</span>
             </div>
             <input
@@ -546,7 +440,7 @@ export function SimulationPanel() {
           <div className="space-y-2 rounded-xl border border-bg-border bg-bg-elevated px-3 py-3">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-widest text-text-muted">Point d’impact</p>
+                <p className="text-[10px] uppercase tracking-widest text-text-muted">Point d'impact</p>
                 <p className="text-xs font-semibold text-text-primary truncate">
                   {eventLocation
                     ? `${eventLocation.lat.toFixed(4)}, ${eventLocation.lng.toFixed(4)}`
@@ -558,7 +452,7 @@ export function SimulationPanel() {
                   onClick={() => setEventLocation(null)}
                   className="text-[10px] font-bold uppercase tracking-widest text-[#FF4757] hover:underline"
                 >
-                  Réinitialiser
+                  Reinitialiser
                 </button>
               )}
             </div>
@@ -573,39 +467,41 @@ export function SimulationPanel() {
               )}
             >
               <MapPin className="w-3.5 h-3.5" />
-              {locationPickerActive ? 'Cliquez sur la carte…' : 'Placer sur la carte'}
+              {locationPickerActive ? 'Cliquez sur la carte...' : 'Placer sur la carte'}
             </button>
 
             <button
               onClick={handleCreateEvent}
-              disabled={isBusy || !isReady}
-              className={cn(
-                'w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all border',
-                isBusy || !isReady
-                  ? 'bg-bg-elevated text-text-muted border-bg-border cursor-not-allowed'
-                  : 'bg-[#2979FF]/10 text-[#2979FF] border-[#2979FF]/20 hover:bg-[#2979FF]/15',
-              )}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all border bg-[#2979FF]/10 text-[#2979FF] border-[#2979FF]/20 hover:bg-[#2979FF]/15"
             >
               <Zap className="w-4 h-4" />
-              Placer l’événement sur la carte
+              Placer l'evenement sur la carte
             </button>
           </div>
 
-          {activeEvents.length > 0 && (
+          {localEvents.length > 0 && (
             <div className="space-y-2 pt-1">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
-                Événements actifs
+                Evenements actifs
               </p>
               <div className="space-y-2">
-                {activeEvents.map(evt => (
-                  <div key={evt.id} className="flex items-center justify-between gap-3 rounded-xl border border-bg-border bg-bg-elevated px-3 py-2">
+                {localEvents.slice(0, 5).map(evt => (
+                  <div
+                    key={evt.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-bg-border bg-bg-elevated px-3 py-2"
+                  >
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-text-primary truncate">{evt.label}</p>
                       <p className="text-[10px] text-text-muted uppercase tracking-widest">
-                        {evt.count > 0 ? `${evt.count} routes impactées` : 'Impact local'}
+                        {evt.affectedEdges.length > 0 ? `${evt.affectedEdges.length} routes impactees` : 'Impact local'}
                       </p>
                     </div>
-                    <span className="text-[10px] font-bold text-[#2979FF] uppercase tracking-widest">Actif</span>
+                    <button
+                      onClick={() => removeLocalEvent(evt.id)}
+                      className="text-[10px] font-bold text-[#2979FF] uppercase tracking-widest hover:underline"
+                    >
+                      Retirer
+                    </button>
                   </div>
                 ))}
               </div>
@@ -620,7 +516,7 @@ export function SimulationPanel() {
             Actions globales
           </p>
           <span className="text-[10px] font-semibold text-text-muted uppercase tracking-widest">
-            Mise à jour auto
+            Mise a jour locale
           </span>
         </div>
 
@@ -639,23 +535,20 @@ export function SimulationPanel() {
             disabled={isBusy}
           >
             <Trash2 className="w-3.5 h-3.5 text-text-muted" />
-            Réinitialiser
+            Reinitialiser
           </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {analytics?.online ? (
-            <Pill icon={<Cpu className="w-3 h-3" />} tone="brand">
-              Moteur prédictif actif
-            </Pill>
-          ) : (
-            <Pill icon={<Search className="w-3 h-3" />} tone="muted">
-              Chargement du graphe
-            </Pill>
-          )}
+          <Pill icon={<Cpu className="w-3 h-3" />} tone="brand">
+            Moteur local actif
+          </Pill>
+          <Pill icon={<Search className="w-3 h-3" />} tone="muted">
+            Graphe IDF charge
+          </Pill>
           {isBusy && (
             <Pill icon={<Loader2 className="w-3 h-3 animate-spin" />} tone="muted">
-              Exécution…
+              Execution...
             </Pill>
           )}
         </div>
@@ -673,11 +566,70 @@ function MiniStat({ label, value, accent = 'text-white' }: { label: string; valu
   )
 }
 
-function formatShortLabel(id: string, explicitName?: unknown) {
-  if (typeof explicitName === 'string' && explicitName.trim()) return explicitName
+function formatSegmentLabel(id: string) {
   if (!id) return 'Segment'
-  const compact = id.length > 28 ? `…${id.slice(-12)}` : id
+  const compact = id.length > 28 ? `...${id.slice(-12)}` : id
   return compact.replace(/[_-]+/g, ' ')
+}
+
+function approxCoordKey(lng: number, lat: number) {
+  return `${lng.toFixed(4)}:${lat.toFixed(4)}`
+}
+
+function approximateAffectedEdges(
+  network: GeoJSON.FeatureCollection | null,
+  lat: number,
+  lng: number,
+  radiusMeters: number,
+) {
+  if (!network?.features?.length) return []
+  const threshold = Math.max(0.002, radiusMeters / 100000)
+  const affected: string[] = []
+
+  for (const feature of network.features.slice(0, 300)) {
+    if (feature.geometry?.type !== 'LineString') continue
+    const coords = feature.geometry.coordinates as [number, number][]
+    const close = coords.some(([x, y]) => Math.abs(x - lng) <= threshold && Math.abs(y - lat) <= threshold)
+    if (close) {
+      const id = String((feature.properties as Record<string, unknown> | undefined)?.id ?? '')
+      if (id) affected.push(id)
+    }
+  }
+
+  return affected.slice(0, 25)
+}
+
+function buildAffectedEdgesGeoJSON(
+  network: GeoJSON.FeatureCollection | null,
+  blockedEdgeIds: string[],
+  trafficEdges: Record<string, 'light' | 'medium' | 'heavy'>,
+) {
+  if (!network?.features?.length) {
+    return { type: 'FeatureCollection', features: [] }
+  }
+
+  const features = network.features
+    .filter(feature => {
+      const id = String((feature.properties as Record<string, unknown> | undefined)?.id ?? '')
+      return blockedEdgeIds.includes(id) || Boolean(trafficEdges[id])
+    })
+    .map(feature => {
+      const id = String((feature.properties as Record<string, unknown> | undefined)?.id ?? '')
+      const level = trafficEdges[id]
+      return {
+        ...feature,
+        properties: {
+          ...(feature.properties ?? {}),
+          status: blockedEdgeIds.includes(id) ? 'blocked' : 'slow',
+          traffic_level: level ?? 'heavy',
+        },
+      }
+    })
+
+  return {
+    type: 'FeatureCollection',
+    features,
+  }
 }
 
 function Pill({
@@ -690,12 +642,14 @@ function Pill({
   tone?: 'muted' | 'brand'
 }) {
   return (
-    <span className={cn(
-      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold border uppercase tracking-widest',
-      tone === 'brand'
-        ? 'bg-brand/10 border-brand/20 text-brand'
-        : 'bg-white/5 border-white/5 text-text-muted',
-    )}>
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold border uppercase tracking-widest',
+        tone === 'brand'
+          ? 'bg-brand/10 border-brand/20 text-brand'
+          : 'bg-white/5 border-white/5 text-text-muted',
+      )}
+    >
       {icon}
       {children}
     </span>
