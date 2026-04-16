@@ -151,6 +151,11 @@ export async function runSimulation(
   await new Promise(r => setTimeout(r, 150))
 
   const roadSummary = buildRoadSummary(affected)
+  const affectedIds = affected.slice(0, 8).map(seg => seg.properties.id)
+  const normalDistance = Math.max(1800, Math.round(affectedKm * 800 + 3500))
+  const normalTime = Math.max(240, Math.round(normalDistance / 11.5))
+  const simulatedDistance = Math.round(normalDistance * (1 + Math.min(0.35, magnitude * 0.04)))
+  const simulatedTime = Math.round(normalTime * (1 + Math.min(0.65, Math.abs(effectiveTravel) * 1.6)))
 
   return {
     id,
@@ -176,6 +181,22 @@ export async function runSimulation(
     },
     alternativePaths: altPaths,
     completedAt:      new Date().toISOString(),
+    predictive: {
+      normal: {
+        total_distance_m: normalDistance,
+        total_time_s: normalTime,
+      },
+      simulated: {
+        total_distance_m: simulatedDistance,
+        total_time_s: simulatedTime,
+      },
+      delta: {
+        distance_m: simulatedDistance - normalDistance,
+        time_s: simulatedTime - normalTime,
+        avoided_edges: affectedIds.slice(0, 4),
+        added_edges: affectedIds.slice(4, 8),
+      },
+    },
     // Extra IDF-specific metadata (stored in result for display)
     meta: {
       affectedKm:   Math.round(affectedKm * 10) / 10,

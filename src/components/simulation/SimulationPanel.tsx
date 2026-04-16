@@ -22,6 +22,7 @@ import {
   useSimulationStore,
   type SimulationInteractionMode,
 } from '@/store/simulationStore'
+import { runSimulation } from '@/lib/engine/simulation.engine'
 import { cn } from '@/lib/utils/cn'
 
 const TRAFFIC_LEVELS: Array<{ value: 'light' | 'medium' | 'heavy'; label: string; color: string }> = [
@@ -55,6 +56,8 @@ export function SimulationPanel() {
   const setLastError = useSimulationStore(s => s.setLastError)
   const setTrafficLevel = useSimulationStore(s => s.setTrafficLevel)
   const roadNetwork = useSimulationStore(s => s.roadNetwork)
+  const scenarioType = useSimulationStore(s => s.scenarioType)
+  const buildScenario = useSimulationStore(s => s.buildScenario)
   const blockedEdgeIds = useSimulationStore(s => s.blockedEdgeIds)
   const trafficEdges = useSimulationStore(s => s.trafficEdges)
   const localEvents = useSimulationStore(s => s.localEvents)
@@ -64,6 +67,11 @@ export function SimulationPanel() {
   const addLocalEvent = useSimulationStore(s => s.addLocalEvent)
   const removeLocalEvent = useSimulationStore(s => s.removeLocalEvent)
   const resetLocalSimulation = useSimulationStore(s => s.resetLocalSimulation)
+  const addResult = useSimulationStore(s => s.addResult)
+  const setCurrentResult = useSimulationStore(s => s.setCurrentResult)
+  const setRunning = useSimulationStore(s => s.setRunning)
+  const setProgress = useSimulationStore(s => s.setProgress)
+  const isRunning = useSimulationStore(s => s.isRunning)
 
   const [eventType, setEventType] = useState<LocalEventType>('works')
   const [eventRadius, setEventRadius] = useState(300)
@@ -157,6 +165,27 @@ export function SimulationPanel() {
     a.click()
     URL.revokeObjectURL(url)
     toast.success('GeoJSON exporte')
+  }
+
+  const handleRunComparison = async () => {
+    setRunning(true)
+    setProgress(8)
+    setLastError(null)
+
+    try {
+      const scenario = buildScenario()
+      scenario.name = scenario.name || `${city.name} - ${scenarioType}`
+      const result = await runSimulation(city, scenario, pct => setProgress(pct))
+      addResult(result)
+      setCurrentResult(result)
+      toast.success('Simulation comparee avec succes')
+    } catch (err: any) {
+      setLastError(err?.message ?? 'Impossible de lancer la comparaison locale.')
+      toast.error('Comparaison impossible')
+    } finally {
+      setRunning(false)
+      setProgress(0)
+    }
   }
 
   const handleReset = () => {
@@ -538,6 +567,20 @@ export function SimulationPanel() {
             Reinitialiser
           </button>
         </div>
+
+        <button
+          onClick={handleRunComparison}
+          disabled={isBusy || isRunning}
+          className={cn(
+            'w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all border',
+            isBusy || isRunning
+              ? 'bg-bg-elevated text-text-muted border-bg-border cursor-not-allowed'
+              : 'bg-brand/10 text-brand border-brand/20 hover:bg-brand/15',
+          )}
+        >
+          <Cpu className={cn('w-4 h-4', isRunning && 'animate-pulse')} />
+          {isRunning ? 'Comparaison en cours...' : 'Tester l\'impact'}
+        </button>
 
         <div className="flex flex-wrap items-center gap-2">
           <Pill icon={<Cpu className="w-3 h-3" />} tone="brand">
