@@ -28,6 +28,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname   = usePathname()
   const [mounted, setMounted] = React.useState(false)
   const isPublic   = NO_SHELL_ROUTES.some(p => pathname === p || (p !== '/' && pathname.startsWith(p)))
+  const isMapRoute = pathname.startsWith('/map')
 
   React.useEffect(() => {
     setMounted(true)
@@ -75,6 +76,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (isPublic) {
     // Auth / onboarding pages: full-screen, no chrome
     return <>{children}</>
+  }
+
+  if (isMapRoute) {
+    return (
+      <div className="app-shell bg-[#030303] min-h-screen overflow-hidden">
+        <ConfigGuard>
+          <UserCityProvider>
+            <WeatherProvider />
+            <TrafficSyncManager />
+            <div className="relative w-screen h-screen overflow-hidden">
+              {children}
+            </div>
+            <Suspense fallback={null}>
+              <Toaster
+                theme="dark"
+                position="top-right"
+                toastOptions={{
+                  style: {
+                    background: 'rgba(20, 21, 25, 0.9)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#fff',
+                    borderRadius: '16px',
+                  }
+                }}
+              />
+            </Suspense>
+          </UserCityProvider>
+        </ConfigGuard>
+      </div>
+    )
   }
 
   // Defer rendering of shell components that depend on persisted stores (city, user...)

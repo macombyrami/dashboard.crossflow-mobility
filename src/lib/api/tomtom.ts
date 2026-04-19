@@ -4,17 +4,17 @@
  */
 
 export function hasKey(): boolean {
-  return process.env.NEXT_PUBLIC_TOMTOM_ENABLED === 'true' ||
-    (!!process.env.NEXT_PUBLIC_TOMTOM_API_KEY && process.env.NEXT_PUBLIC_TOMTOM_API_KEY.length > 10)
+  // The client talks to our `/api/tomtom/*` proxy routes, so TomTom should stay
+  // enabled unless it is explicitly disabled. The server will still fall back
+  // cleanly if the private key is missing.
+  return process.env.NEXT_PUBLIC_TOMTOM_ENABLED !== 'false'
 }
 
 export function getTrafficFlowTileUrl(): string {
-  if (!hasKey()) return ''
   return `/api/tomtom/tile/flow/relative0-dark/{z}/{x}/{y}`
 }
 
 export function getTrafficIncidentTileUrl(): string {
-  if (!hasKey()) return ''
   return `/api/tomtom/tile/incidents/night/{z}/{x}/{y}`
 }
 
@@ -61,7 +61,6 @@ export interface TomTomIncident {
 export async function fetchIncidents(
   bbox: [number, number, number, number],
 ): Promise<TomTomIncident[]> {
-  if (!hasKey()) return []
   try {
     const [west, south, east, north] = bbox
     const res = await fetch(`/api/tomtom/incidents?bbox=${west},${south},${east},${north}`)

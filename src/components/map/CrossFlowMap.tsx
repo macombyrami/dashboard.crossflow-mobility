@@ -49,7 +49,6 @@ import type { OSMRoad, OSMPOIPoint, OSMRouteGeometry, MetroStation } from '@/lib
 import { fetchAllTrafficStatus, LINE_COLORS } from '@/lib/api/ratp'
 import { simulateTransitVehicles, type TransitVehicle } from '@/lib/engine/transit.engine'
 import {
-  hasKey,
   getTrafficFlowTileUrl,
   getTrafficIncidentTileUrl,
   fetchFlowSegment,
@@ -288,7 +287,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   const setEventLocation        = useSimulationStore(s => s.setEventLocation)
   const setLocationPickerActive = useSimulationStore(s => s.setLocationPickerActive)
 
-  const useLiveData = hasKey()
+  const useLiveData = process.env.NEXT_PUBLIC_TOMTOM_ENABLED !== 'false'
 
   // Refs to avoid stale closures in map click handler
   const zoneActiveRef              = useRef(zoneActive)
@@ -1311,10 +1310,25 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return
     popupRef.current?.remove()
-    mapRef.current.flyTo({
-      center:    [city.center.lng, city.center.lat],
-      zoom:      city.zoom,
-      duration:  1400,
+    const west = city.bbox?.[0] ?? city.center.lng - 0.05
+    const south = city.bbox?.[1] ?? city.center.lat - 0.05
+    const east = city.bbox?.[2] ?? city.center.lng + 0.05
+    const north = city.bbox?.[3] ?? city.center.lat + 0.05
+    const padLng = Math.max((east - west) * 0.12, 0.01)
+    const padLat = Math.max((north - south) * 0.12, 0.01)
+    const maxBounds = new maplibregl.LngLatBounds(
+      [west - padLng, south - padLat],
+      [east + padLng, north + padLat],
+    )
+    const cityBounds = new maplibregl.LngLatBounds(
+      [west, south],
+      [east, north],
+    )
+
+    mapRef.current.setMaxBounds(maxBounds)
+    mapRef.current.fitBounds(cityBounds, {
+      padding: 28,
+      duration: 1400,
       essential: true,
     })
   }, [city.id, mapLoaded]) // eslint-disable-line
@@ -1588,7 +1602,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     let incidents: Incident[] = synthetic
 
     // ── 4. Fetch TomTom incidents ONLY if not in resilience/synthetic mode ──
-    if (useTomTom && dataSource === 'live') {
+    if (useTomTom) {
       // Fetch real TomTom incidents for current viewport
       const tomtomIncs = await fetchTomTomIncidents(viewportBbox)
       if (tomtomIncs.length > 0) {
@@ -1606,6 +1620,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
           iconColor:   getSeverityColor(tomtomSeverityToLocal(inc.magnitudeOfDelay)),
         }))
       }
+      setDataSource('live')
     } else if (useHere) {
       // HERE incidents as fallback for current viewport
       const hereIncs = await fetchHereIncidents(viewportBbox)
@@ -1625,6 +1640,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
           iconColor:   getSeverityColor(inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium'),
         }))
       }
+      setDataSource('live')
     } else {
       setDataSource('synthetic')
     }
