@@ -89,6 +89,7 @@ const ZONE_SOURCE             = 'cf-zone'
 const ZONE_DRAFT_SOURCE       = 'cf-zone-draft'
 const POI_SOURCE              = 'cf-pois'
 const VEHICLES_SOURCE         = 'cf-vehicles'
+const VEHICLE_TRAILS_SOURCE   = 'cf-vehicle-trails'
 const METRO_STATIONS_SOURCE   = 'cf-metro-stations'
 const TRANSIT_ROUTES_SOURCE   = 'cf-transit-routes'
 const PREDICTIVE_AFFECTED_SOURCE = 'cf-pred-affected'
@@ -545,6 +546,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     // 3. Update Map Source
     const src = safeGetSource(map, VEHICLES_SOURCE) as maplibregl.GeoJSONSource | null
+    const trailsSrc = safeGetSource(map, VEHICLE_TRAILS_SOURCE) as maplibregl.GeoJSONSource | null
     if (src) {
       src.setData({
         type: 'FeatureCollection',
@@ -561,6 +563,25 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
             speedKmh:  v.speedKmh,
           },
         })),
+      })
+    }
+    if (trailsSrc) {
+      trailsSrc.setData({
+        type: 'FeatureCollection',
+        features: filtered
+          .filter(v => v.trailCoords.length >= 2)
+          .map(v => ({
+            type: 'Feature' as const,
+            id: `${v.id}-trail`,
+            geometry: { type: 'LineString' as const, coordinates: v.trailCoords },
+            properties: {
+              id: v.id,
+              routeType: v.routeType,
+              routeRef: v.routeRef,
+              color: v.color,
+              speedKmh: v.speedKmh,
+            },
+          })),
       })
     }
 
@@ -2571,6 +2592,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     const transportVis = activeLayers.has('transport') ? 'visible' : 'none'
     safeSetLayoutProperty(map, VEHICLES_SOURCE + '-glow',  'visibility', transportVis)
+    safeSetLayoutProperty(map, VEHICLE_TRAILS_SOURCE + '-glow', 'visibility', transportVis)
+    safeSetLayoutProperty(map, VEHICLE_TRAILS_SOURCE + '-line', 'visibility', transportVis)
     safeSetLayoutProperty(map, VEHICLES_SOURCE + '-layer', 'visibility', transportVis)
     safeSetLayoutProperty(map, VEHICLES_SOURCE + '-label', 'visibility', transportVis)
     
@@ -2600,6 +2623,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-line', 'visibility', 'none')
       safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-label', 'visibility', 'none')
       safeSetLayoutProperty(map, VEHICLES_SOURCE + '-glow', 'visibility', 'none')
+      safeSetLayoutProperty(map, VEHICLE_TRAILS_SOURCE + '-glow', 'visibility', 'none')
+      safeSetLayoutProperty(map, VEHICLE_TRAILS_SOURCE + '-line', 'visibility', 'none')
       safeSetLayoutProperty(map, VEHICLES_SOURCE + '-layer', 'visibility', 'none')
       safeSetLayoutProperty(map, VEHICLES_SOURCE + '-label', 'visibility', 'none')
       safeSetLayoutProperty(map, TRANSIT_ROUTES_SOURCE + '-bus', 'visibility', 'none')
@@ -3739,6 +3764,37 @@ function initStaticSources(map: maplibregl.Map) {
 
   // ── Transit Vehicles ──────────────────────────────────────────────────
   map.addSource(VEHICLES_SOURCE, { type: 'geojson', data: emptyFC })
+  map.addSource(VEHICLE_TRAILS_SOURCE, { type: 'geojson', data: emptyFC })
+
+  map.addLayer({
+    id:     VEHICLE_TRAILS_SOURCE + '-glow',
+    type:   'line',
+    source: VEHICLE_TRAILS_SOURCE,
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint:  {
+      'line-color': ['get', 'color'],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 15, 10],
+      'line-opacity': 0.12,
+      'line-blur': 4,
+    },
+  })
+
+  map.addLayer({
+    id:     VEHICLE_TRAILS_SOURCE + '-line',
+    type:   'line',
+    source: VEHICLE_TRAILS_SOURCE,
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint:  {
+      'line-color': ['get', 'color'],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.2, 15, 3.2],
+      'line-opacity': [
+        'interpolate', ['linear'], ['get', 'speedKmh'],
+        0, 0.34,
+        20, 0.48,
+        60, 0.62,
+      ],
+    },
+  })
 
   // Outer glow ring (type-colored)
   map.addLayer({
