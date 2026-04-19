@@ -55,10 +55,10 @@ export function EventsWidget({ lat, lng, radiusKm = 15, maxItems = 6 }: EventsWi
 
   if (loading) {
     return (
-      <div className="glass-card p-6 rounded-[24px] border border-white/5 animate-pulse">
-        <div className="h-6 w-48 bg-white/5 rounded-lg mb-6" />
+      <div className="glass-card p-6 rounded-[24px] border border-bg-border animate-pulse">
+        <div className="h-6 w-48 bg-bg-subtle rounded-lg mb-6" />
         <div className="space-y-4">
-          {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-white/5 rounded-2xl" />)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-bg-subtle rounded-2xl" />)}
         </div>
       </div>
     )
@@ -73,7 +73,7 @@ export function EventsWidget({ lat, lng, radiusKm = 15, maxItems = 6 }: EventsWi
   }, {} as Record<string, UrbanEvent[]>)
 
   return (
-    <div className="glass-card rounded-[24px] border border-white/5 overflow-hidden flex flex-col shadow-apple h-full">
+    <div className="glass-card rounded-[24px] border border-bg-border overflow-hidden flex flex-col shadow-apple h-full">
       {/* Header */}
       <div className="px-6 pt-6 pb-4">
         <div className="flex items-center justify-between mb-1">
@@ -81,7 +81,7 @@ export function EventsWidget({ lat, lng, radiusKm = 15, maxItems = 6 }: EventsWi
             <div className="w-1.5 h-4.5 bg-brand rounded-full shadow-glow" />
             <h2 className="text-[13px] font-bold text-text-muted uppercase tracking-[0.18em]">Événements à proximité</h2>
           </div>
-          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-secondary tabular-nums">
+          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-bg-subtle border border-bg-border text-text-secondary tabular-nums">
             {events.length}
           </span>
         </div>
@@ -101,7 +101,7 @@ export function EventsWidget({ lat, lng, radiusKm = 15, maxItems = 6 }: EventsWi
                 return (
                   <button 
                     key={evt.id} 
-                    className="w-full text-left px-5 py-3 group hover:bg-white/5 transition-all duration-200 relative"
+                    className="w-full text-left px-5 py-3 group hover:bg-bg-subtle transition-all duration-200 relative"
                   >
                     <div className="flex items-start gap-4">
                       {/* Icon */}
@@ -111,7 +111,7 @@ export function EventsWidget({ lat, lng, radiusKm = 15, maxItems = 6 }: EventsWi
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <h3 className="text-[14px] font-bold text-white truncate group-hover:text-brand transition-colors">{evt.title}</h3>
+                          <h3 className="text-[14px] font-bold text-text-primary truncate group-hover:text-brand transition-colors">{evt.title}</h3>
                         </div>
 
                         <div className="flex flex-col gap-1">
@@ -143,7 +143,7 @@ export function EventsWidget({ lat, lng, radiusKm = 15, maxItems = 6 }: EventsWi
                         )}>
                           {evt.impactLabel || 'Impact léger'}
                         </span>
-                        <div className="flex items-center gap-1.5 font-bold text-[12px] text-white tabular-nums">
+                        <div className="flex items-center gap-1.5 font-bold text-[12px] text-text-primary tabular-nums">
                           <TrendingUp className="w-3 h-3 text-brand" />
                           +{evt.trafficIncrease || Math.round(evt.trafficScore * 100)}%
                         </div>
@@ -160,7 +160,7 @@ export function EventsWidget({ lat, lng, radiusKm = 15, maxItems = 6 }: EventsWi
       </div>
 
       {/* Footer */}
-      <div className="mt-auto px-6 py-4 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
+      <div className="mt-auto px-6 py-4 border-t border-bg-border bg-bg-subtle/40 flex items-center justify-between">
         <span className="text-[10px] font-bold text-text-muted uppercase tracking-[0.1em]">Source: PredictHQ</span>
         <div className="flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />

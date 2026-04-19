@@ -99,7 +99,7 @@ export default function IncidentsPage() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-slide-up">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-text-primary flex items-center gap-3">
             <AlertTriangle className="w-6 h-6 text-brand" />
             Alertes & Incidents
             <span className="text-text-muted font-medium ml-1">— {city.flag} {city.name}</span>
@@ -115,7 +115,7 @@ export default function IncidentsPage() {
               ['ID', 'Type', 'Sévérité', 'Titre', 'Adresse', 'Source', 'Début'],
               incidents.map(i => [i.id, i.type, i.severity, i.title, i.address, i.source, i.startedAt]),
             )}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-brand/40 transition-all text-sm font-semibold text-text-secondary hover:text-white group"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-bg-subtle border border-bg-border hover:border-brand/40 transition-all text-sm font-semibold text-text-secondary hover:text-text-primary group"
           >
             <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
             Exporter CSV
@@ -144,7 +144,7 @@ export default function IncidentsPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-bold text-white tabular-nums">{sytadinData.totalCongestionKm}</span>
+                <span className="text-5xl font-bold text-text-primary tabular-nums">{sytadinData.totalCongestionKm}</span>
                 <span className="text-lg font-bold text-text-muted">km</span>
               </div>
               <p className="text-sm font-semibold text-text-secondary mt-1">Cumul de bouchons actuel</p>
@@ -160,7 +160,7 @@ export default function IncidentsPage() {
 
           {/* Travel Times Table */}
           <div className="lg:col-span-2 glass-card overflow-hidden flex flex-col">
-            <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-bg-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Route className="w-4 h-4 text-text-muted" />
                 <span className="text-[12px] font-bold text-text-secondary uppercase tracking-widest">Temps de parcours — Axes Majeurs</span>
@@ -169,7 +169,7 @@ export default function IncidentsPage() {
             <div className="flex-1 overflow-x-auto custom-scrollbar">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-white/5 bg-white/[0.02]">
+                  <tr className="border-b border-bg-border bg-bg-subtle/40">
                     <th className="px-6 py-3 text-[10px] font-bold text-text-muted uppercase tracking-wider">Axe</th>
                     <th className="px-6 py-3 text-[10px] font-bold text-text-muted uppercase tracking-wider">Parcours</th>
                     <th className="px-6 py-3 text-[10px] font-bold text-text-muted uppercase tracking-wider text-right">Temps</th>
@@ -178,9 +178,9 @@ export default function IncidentsPage() {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {travelTimes.map((tt, i) => (
-                    <tr key={i} className="hover:bg-white/[0.03] transition-colors group">
+                    <tr key={i} className="hover:bg-bg-subtle/60 transition-colors group">
                       <td className="px-6 py-3">
-                        <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[11px] font-bold text-white group-hover:border-brand/40 transition-colors">
+                        <span className="px-2 py-0.5 rounded-md bg-bg-subtle border border-bg-border text-[11px] font-bold text-text-primary group-hover:border-brand/40 transition-colors">
                           {tt.axis}
                         </span>
                       </td>
@@ -193,7 +193,7 @@ export default function IncidentsPage() {
                         <div className="flex flex-col items-end">
                           <span className={cn(
                             "text-[13px] font-bold tabular-nums",
-                            tt.timeMin > tt.normalTimeMin * 1.5 ? "text-red-500" : "text-white"
+                            tt.timeMin > tt.normalTimeMin * 1.5 ? "text-red-500" : "text-text-primary"
                           )}>{tt.timeMin} min</span>
                           <span className="text-[10px] text-text-muted font-medium">Hab: {tt.normalTimeMin} min</span>
                         </div>
@@ -227,7 +227,7 @@ export default function IncidentsPage() {
               'px-4 py-2 rounded-xl text-[12px] font-bold transition-all border shadow-sm',
               filter === f.id
                 ? 'bg-brand text-black border-brand scale-105'
-                : 'bg-white/5 text-text-secondary border-white/10 hover:border-white/20 hover:text-white',
+                : 'bg-bg-subtle text-text-secondary border-bg-border hover:border-bg-hover hover:text-text-primary',
             )}
           >
             {f.label}
@@ -242,7 +242,7 @@ export default function IncidentsPage() {
             <div className="w-16 h-16 rounded-3xl bg-brand/10 flex items-center justify-center mx-auto mb-4 border border-brand/20">
               <Zap className="w-8 h-8 text-brand" />
             </div>
-            <h3 className="text-white font-bold mb-1">Tout est fluide</h3>
+            <h3 className="text-text-primary font-bold mb-1">Tout est fluide</h3>
             <p className="text-text-muted text-sm">Aucun incident critique détecté pour le moment.</p>
           </div>
         ) : (
@@ -254,7 +254,7 @@ export default function IncidentsPage() {
                   'glass-card p-5 group transition-all duration-300 relative overflow-hidden',
                   inc.severity === 'critical' ? 'border-red-500/20' :
                   inc.severity === 'high'     ? 'border-orange-500/20' :
-                                                'border-white/5',
+                                                'border-bg-border',
                 )}
               >
                 {/* Visual accent for Sytadin sources */}
@@ -276,14 +276,14 @@ export default function IncidentsPage() {
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-[15px] font-bold text-white group-hover:text-brand transition-colors truncate">{inc.title}</h3>
+                        <h3 className="text-[15px] font-bold text-text-primary group-hover:text-brand transition-colors truncate">{inc.title}</h3>
                         <SeverityPill severity={inc.severity} size="sm" />
                       </div>
                       <p className="text-[13px] font-medium text-text-secondary line-clamp-2 lg:line-clamp-1">{inc.description}</p>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 lg:pl-4 lg:border-l lg:border-white/5">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 lg:pl-4 lg:border-l lg:border-bg-border">
                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-text-muted">
                       <MapPin className="w-3.5 h-3.5" />
                       {inc.address}
@@ -293,7 +293,7 @@ export default function IncidentsPage() {
                       {mounted ? formatDistanceToNow(new Date(inc.startedAt), { locale: fr, addSuffix: true }) : '...'}
                     </div>
                     <div className="ml-auto lg:ml-0 flex items-center gap-2">
-                       <span className="text-[10px] font-bold text-text-muted px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 uppercase tracking-widest">
+                       <span className="text-[10px] font-bold text-text-muted px-2 py-0.5 rounded-lg bg-bg-subtle border border-bg-border uppercase tracking-widest">
                          {inc.source}
                        </span>
                     </div>

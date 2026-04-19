@@ -1,20 +1,19 @@
 'use client'
 import dynamic from 'next/dynamic'
-import { ModeSelector } from '@/components/map/controls/ModeSelector'
-import { LayerControls } from '@/components/map/controls/LayerControls'
-import { MapLegend } from '@/components/map/MapLegend'
+import { ModeSelector }    from '@/components/map/controls/ModeSelector'
+import { LayerControls }   from '@/components/map/controls/LayerControls'
+import { MapLegend }       from '@/components/map/MapLegend'
 import { EdgeDetailPanel } from '@/components/map/panels/EdgeDetailPanel'
-import { ZoneStatsPanel } from '@/components/map/panels/ZoneStatsPanel'
-import { SimulationPanel } from '@/components/simulation/SimulationPanel'
+import { ZoneStatsPanel }  from '@/components/map/panels/ZoneStatsPanel'
+import { SimulationPanel }   from '@/components/simulation/SimulationPanel'
 import { SimulationResults } from '@/components/simulation/SimulationResults'
-import { AIPanel } from '@/components/ai/AIPanel'
-import { LiveIndicator } from '@/components/ui/LiveIndicator'
-import { useMapStore } from '@/store/mapStore'
-import { useTrafficStore } from '@/store/trafficStore'
-import { generateCityKPIs } from '@/lib/engine/traffic.engine'
-import { hasKey } from '@/lib/api/tomtom'
-import { useEffect } from 'react'
-import { useTranslation } from '@/lib/hooks/useTranslation'
+import { AIPanel }           from '@/components/ai/AIPanel'
+import { DataSourceBadge }   from '@/components/map/DataSourceBadge'
+import { useMapStore }       from '@/store/mapStore'
+import { useTrafficStore }   from '@/store/trafficStore'
+import { generateCityKPIs }  from '@/lib/engine/traffic.engine'
+import { useEffect }         from 'react'
+import { useTranslation }    from '@/lib/hooks/useTranslation'
 
 const CrossFlowMap = dynamic(
   () => import('@/components/map/CrossFlowMap').then(m => ({ default: m.CrossFlowMap })),
@@ -22,14 +21,11 @@ const CrossFlowMap = dynamic(
 )
 
 export default function MapPage() {
-  const { t } = useTranslation()
   const city           = useMapStore(s => s.city)
   const mode           = useMapStore(s => s.mode)
   const isAIPanelOpen  = useMapStore(s => s.isAIPanelOpen)
   const setAIPanelOpen = useMapStore(s => s.setAIPanelOpen)
   const setKPIs        = useTrafficStore(s => s.setKPIs)
-
-  const isLive = hasKey()
 
   useEffect(() => {
     setKPIs(generateCityKPIs(city))
@@ -39,41 +35,29 @@ export default function MapPage() {
 
   return (
     <div className="flex flex-1 h-full overflow-hidden">
-      {/* Map area */}
       <div className="flex-1 relative overflow-hidden">
         <CrossFlowMap />
 
         {/* Mode selector — top center */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
           <ModeSelector />
+        </div>
+
+        {/* Data source badge — top right */}
+        <div className="absolute top-3 right-3 z-10 pointer-events-auto">
+          <DataSourceBadge />
         </div>
 
         {/* Layer controls — top left */}
         {mode !== 'simulate' && (
-          <div className="absolute top-4 left-4 z-10 pointer-events-auto hidden sm:block">
+          <div className="absolute top-3 left-3 z-10 pointer-events-auto hidden sm:block">
             <LayerControls />
           </div>
         )}
 
-        {/* Status indicators */}
-        {mode === 'live' && (
-          <div className="absolute bottom-16 left-4 z-10 pointer-events-none">
-            <div className="bg-bg-surface/85 border border-bg-border rounded-lg px-3 py-2 backdrop-blur-sm">
-              <LiveIndicator label={isLive ? `${t('common.live')} · TomTom` : `${t('common.live')} · ${t('common.demo')}`} color={isLive ? '#00E676' : '#8080A0'} />
-            </div>
-          </div>
-        )}
-        {mode === 'predict' && (
-          <div className="absolute bottom-16 left-4 z-10">
-            <div className="bg-bg-surface/90 border border-[rgba(41,121,255,0.5)] rounded-lg px-3 py-2 backdrop-blur-sm">
-              <LiveIndicator label={`${t('nav.predictions').toUpperCase()} · +30 MIN`} color="#2979FF" />
-            </div>
-          </div>
-        )}
-
-        {/* Simulation panel */}
+        {/* Simulation panel — top right (below badge) */}
         {mode === 'simulate' && (
-          <div className="absolute top-16 right-4 w-[calc(100%-32px)] sm:w-80 max-h-[calc(100vh-130px)] overflow-y-auto z-20 space-y-4">
+          <div className="absolute top-16 right-3 w-[calc(100%-24px)] sm:w-80 max-h-[calc(100vh-130px)] overflow-y-auto z-20 space-y-3">
             <SimulationPanel />
             <SimulationResults />
           </div>
@@ -82,7 +66,7 @@ export default function MapPage() {
         {/* Map legend */}
         <MapLegend />
 
-        {/* Edge detail panel */}
+        {/* Edge detail panel (offset below the data source badge) */}
         {mode !== 'simulate' && <EdgeDetailPanel />}
 
         {/* Zone stats panel */}

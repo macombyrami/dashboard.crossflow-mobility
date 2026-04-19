@@ -40,9 +40,9 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="print-hidden hidden lg:flex flex-col w-[200px] shrink-0 h-full border-r border-white/5 glass shadow-apple">
+    <aside className="print-hidden hidden lg:flex flex-col w-[200px] shrink-0 h-full border-r border-bg-border glass shadow-apple">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-5 h-[58px] border-b border-white/5 shrink-0">
+      <div className="flex items-center gap-2.5 px-5 h-[58px] border-b border-bg-border shrink-0">
         <div className="relative">
           <div className="w-8 h-8 rounded-[10px] bg-brand flex items-center justify-center shadow-glow-sm">
             <Zap className="w-4.5 h-4.5 text-black" strokeWidth={2.5} />
@@ -66,8 +66,8 @@ export function Sidebar() {
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-[12px] text-sm transition-all duration-300 group relative',
                   active
-                    ? 'bg-white/10 text-brand font-semibold shadow-sm'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                    ? 'bg-bg-hover text-brand font-semibold shadow-sm'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-subtle'
                 )}
               >
                 {active && (
@@ -85,10 +85,10 @@ export function Sidebar() {
       </nav>
 
       {/* User & Settings */}
-      <div className="px-3 pb-5 border-t border-white/5 pt-4 space-y-1">
+      <div className="px-3 pb-5 border-t border-bg-border pt-4 space-y-1">
         {user && (
-          <div className="px-3 py-3 flex items-center gap-3 mb-2 rounded-[14px] bg-white/5 border border-white/5">
-            <div className="w-8 h-8 rounded-full bg-bg-elevated flex items-center justify-center border border-white/10 shrink-0">
+          <div className="px-3 py-3 flex items-center gap-3 mb-2 rounded-[14px] bg-bg-subtle border border-bg-border">
+            <div className="w-8 h-8 rounded-full bg-bg-elevated flex items-center justify-center border border-bg-border shrink-0">
               <UserCircle className="w-5 h-5 text-text-secondary" />
             </div>
             <div className="min-w-0">
@@ -107,8 +107,8 @@ export function Sidebar() {
           className={cn(
             'flex items-center gap-3 px-3 py-2.5 rounded-[12px] text-sm transition-all duration-300 group',
             pathname === '/settings'
-              ? 'bg-white/10 text-brand font-semibold shadow-sm'
-              : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+              ? 'bg-bg-hover text-brand font-semibold shadow-sm'
+              : 'text-text-secondary hover:text-text-primary hover:bg-bg-subtle'
           )}
         >
           <Settings className={cn('w-4.5 h-4.5 shrink-0 transition-all duration-300', pathname === '/settings' ? 'text-brand scale-110' : 'text-text-muted group-hover:text-text-secondary group-hover:rotate-12')} strokeWidth={1.75} />

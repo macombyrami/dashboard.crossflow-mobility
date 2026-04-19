@@ -65,11 +65,11 @@ export function SimulationPanel() {
                 className={cn(
                   'flex flex-col items-start gap-1.5 p-3 rounded-xl border text-left transition-all',
                   active
-                    ? 'bg-brand-green-dim border-brand-green/40 text-brand-green'
+                    ? 'bg-brand-dim border-brand/40 text-brand'
                     : 'border-bg-border text-text-secondary hover:bg-bg-elevated hover:text-text-primary',
                 )}
               >
-                <Icon className={cn('w-4 h-4', active ? 'text-brand-green' : 'text-text-muted')} />
+                <Icon className={cn('w-4 h-4', active ? 'text-brand' : 'text-text-muted')} />
                 <span className="text-xs font-semibold leading-tight">{scenCfg?.label}</span>
               </button>
             )
@@ -88,7 +88,7 @@ export function SimulationPanel() {
           <input
             value={store.scenarioName}
             onChange={e => store.setScenarioName(e.target.value)}
-            className="w-full bg-bg-elevated border border-bg-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-green/50 transition-colors"
+            className="w-full bg-bg-elevated border border-bg-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand/50 transition-colors"
             placeholder={t('simulation.name_placeholder')}
           />
         </div>
@@ -96,7 +96,7 @@ export function SimulationPanel() {
         <div className="space-y-2">
           <div className="flex justify-between">
             <label className="text-xs text-text-secondary">{t('simulation.duration')}</label>
-            <span className="text-xs font-semibold text-brand-green">{store.durationHours}h</span>
+            <span className="text-xs font-semibold text-brand">{store.durationHours}h</span>
           </div>
           <input
             type="range"
@@ -116,7 +116,7 @@ export function SimulationPanel() {
         <div className="space-y-2">
           <div className="flex justify-between">
             <label className="text-xs text-text-secondary">{t('simulation.intensity')}</label>
-            <span className="text-xs font-semibold text-brand-green">
+            <span className="text-xs font-semibold text-brand">
               {store.magnitude < 0.7 ? t('simulation.intensity_low') : store.magnitude < 1.3 ? t('simulation.intensity_normal') : t('simulation.intensity_high')}
             </span>
           </div>
@@ -138,7 +138,7 @@ export function SimulationPanel() {
             <select
               value={store.timeWindowStart}
               onChange={e => store.setTimeWindow(+e.target.value, store.timeWindowEnd)}
-              className="w-full bg-bg-elevated border border-bg-border rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-green/50"
+              className="w-full bg-bg-elevated border border-bg-border rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-brand/50"
             >
               {Array.from({ length: 24 }, (_, i) => (
                 <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
@@ -150,7 +150,7 @@ export function SimulationPanel() {
             <select
               value={store.timeWindowEnd}
               onChange={e => store.setTimeWindow(store.timeWindowStart, +e.target.value)}
-              className="w-full bg-bg-elevated border border-bg-border rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-green/50"
+              className="w-full bg-bg-elevated border border-bg-border rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-brand/50"
             >
               {Array.from({ length: 24 }, (_, i) => (
                 <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
@@ -178,7 +178,7 @@ export function SimulationPanel() {
           'w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-semibold text-sm transition-all',
           store.isRunning
             ? 'bg-bg-elevated text-text-muted cursor-not-allowed'
-            : 'bg-brand-green text-bg-base hover:bg-brand-green-hover shadow-glow',
+            : 'bg-brand text-bg-base hover:bg-brand-hover shadow-glow',
         )}
       >
         {store.isRunning ? (
@@ -197,7 +197,7 @@ export function SimulationPanel() {
       {store.isRunning && (
         <div className="h-1.5 rounded-full bg-bg-subtle overflow-hidden">
           <div
-            className="h-full rounded-full bg-brand-green transition-all duration-300"
+            className="h-full rounded-full bg-brand transition-all duration-300"
             style={{ width: `${store.progress}%` }}
           />
         </div>

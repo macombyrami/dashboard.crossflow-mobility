@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap, Lock, Settings } from 'lucide-react'
+import { Bell, Sparkles, Search, MapPin, X, ChevronDown, Zap, Lock, Settings, Sun, Moon } from 'lucide-react'
 import { useMapStore, geocodingToCity } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
+import { useThemeStore } from '@/store/themeStore'
 import { CITIES }       from '@/config/cities.config'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -31,7 +32,7 @@ export function Header() {
     <header
       className="print-hidden flex items-center h-[52px] px-3 sm:px-4 gap-2 shrink-0 border-b border-bg-border"
       style={{
-        background: 'rgba(10,11,14,0.92)',
+        background: 'var(--header-bg)',
         backdropFilter: 'blur(24px) saturate(180%)',
         WebkitBackdropFilter: 'blur(24px) saturate(180%)',
       }}
@@ -62,6 +63,9 @@ export function Header() {
         <div className="hidden md:flex items-center px-2.5 py-1.5 rounded-lg bg-bg-elevated/60 border border-bg-border/50">
           <span className="text-[13px] font-medium text-text-secondary mono tabular-nums">{time}</span>
         </div>
+
+        {/* Theme toggle */}
+        <ThemeToggle />
 
         {/* Alerts */}
         <button
@@ -96,6 +100,25 @@ export function Header() {
         </button>
       </div>
     </header>
+  )
+}
+
+// ─── Theme toggle ──────────────────────────────────────────────────────────
+function ThemeToggle() {
+  const theme       = useThemeStore(s => s.theme)
+  const toggleTheme = useThemeStore(s => s.toggleTheme)
+  const isLight     = theme === 'light'
+  return (
+    <button
+      onClick={toggleTheme}
+      className="btn-icon"
+      title={isLight ? 'Passer en mode sombre' : 'Passer en mode clair'}
+      aria-label="Basculer le thème"
+    >
+      {isLight
+        ? <Moon className="w-[18px] h-[18px]" strokeWidth={1.75} />
+        : <Sun  className="w-[18px] h-[18px]" strokeWidth={1.75} />}
+    </button>
   )
 }
 
@@ -266,10 +289,10 @@ function CitySearchBar() {
         <div
           className="absolute top-full left-0 right-0 mt-1.5 rounded-xl border border-bg-border overflow-hidden animate-scale-in z-50"
           style={{
-            background: 'rgba(18,20,26,0.96)',
+            background: 'var(--popover-bg)',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
-            boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
+            boxShadow: 'var(--shadow-popover)',
           }}
         >
           {/* Search input */}

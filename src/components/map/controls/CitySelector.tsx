@@ -43,7 +43,7 @@ export function CitySelector() {
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-sm"
       >
-        <MapPin className="w-3.5 h-3.5 text-brand-green" />
+        <MapPin className="w-3.5 h-3.5 text-brand" />
         <span className="text-text-primary font-medium">
           {city.flag} {city.name}
         </span>
@@ -78,21 +78,21 @@ export function CitySelector() {
                 onClick={() => select(c)}
                 className={cn(
                   'w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-bg-surface transition-colors',
-                  c.id === city.id && 'bg-brand-green-dim',
+                  c.id === city.id && 'bg-brand-dim',
                 )}
               >
                 <span className="text-lg leading-none">{c.flag}</span>
                 <div className="flex-1 min-w-0">
                   <p className={cn(
                     'text-sm font-medium truncate',
-                    c.id === city.id ? 'text-brand-green' : 'text-text-primary',
+                    c.id === city.id ? 'text-brand' : 'text-text-primary',
                   )}>
                     {c.name}
                   </p>
                   <p className="text-xs text-text-muted">{c.country} • {(c.population / 1000).toFixed(0)}k hab.</p>
                 </div>
                 {c.id === city.id && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-brand-green flex-shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand flex-shrink-0" />
                 )}
               </button>
             ))}

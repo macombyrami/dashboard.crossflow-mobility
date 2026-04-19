@@ -80,7 +80,7 @@ export default function OnboardingPage() {
   const step0 = (
     <div className="space-y-10 animate-slide-up">
       <div className="space-y-3">
-        <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Bienvenue sur CrossFlow</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold text-text-primary tracking-tight">Bienvenue sur CrossFlow</h1>
         <p className="text-[15px] font-medium text-text-secondary leading-relaxed">La plateforme de mobilité urbaine intelligente. Quelques secondes pour personnaliser votre expérience.</p>
       </div>
 
@@ -90,7 +90,7 @@ export default function OnboardingPage() {
           value={name}
           onChange={e => setName(e.target.value)}
           placeholder="Ex: Sophie"
-          className="w-full bg-white/5 border border-white/10 rounded-[14px] px-5 py-4 text-text-primary placeholder-text-muted outline-none focus:border-brand/40 focus:ring-1 focus:ring-brand/20 transition-all shadow-sm"
+          className="w-full bg-bg-subtle border border-bg-border rounded-[14px] px-5 py-4 text-text-primary placeholder-text-muted outline-none focus:border-brand/40 focus:ring-1 focus:ring-brand/20 transition-all shadow-sm"
         />
       </div>
 
@@ -105,7 +105,7 @@ export default function OnboardingPage() {
                 'flex items-start gap-4 p-5 rounded-[18px] border text-left transition-all duration-300 group',
                 role === r.id
                   ? 'border-brand/40 bg-brand/10 shadow-glow-sm'
-                  : 'border-white/5 bg-white/5 hover:border-white/20 hover:bg-white/10 shadow-sm',
+                  : 'border-bg-border bg-bg-subtle hover:border-bg-hover hover:bg-bg-hover shadow-sm',
               )}
             >
               <span className="text-3xl leading-none grayscale group-hover:grayscale-0 transition-all duration-500 scale-95 group-hover:scale-105">{r.emoji}</span>
@@ -125,7 +125,7 @@ export default function OnboardingPage() {
   const step1 = (
     <div className="space-y-8 animate-slide-up">
       <div className="space-y-3">
-        <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Votre ville principale</h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-text-primary tracking-tight">Votre ville principale</h2>
         <p className="text-[15px] font-medium text-text-secondary leading-relaxed">CrossFlow s'adapte à chaque ville. Choisissez celle que vous gérez ou analysez en priorité.</p>
       </div>
 
@@ -138,7 +138,7 @@ export default function OnboardingPage() {
               'flex items-center gap-5 p-5 rounded-[18px] border text-left transition-all duration-300 group shadow-sm',
               cityId === c.id
                 ? 'border-brand/40 bg-brand/10 shadow-glow-sm'
-                : 'border-white/5 bg-white/5 hover:border-white/20 hover:bg-white/10',
+                : 'border-bg-border bg-bg-subtle hover:border-bg-hover hover:bg-bg-hover',
             )}
           >
             <span className="text-3xl leading-none transition-transform group-hover:scale-110 duration-300">{c.flag}</span>
@@ -162,7 +162,7 @@ export default function OnboardingPage() {
   const step2 = (
     <div className="space-y-8 animate-slide-up">
       <div className="space-y-3">
-        <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Ce que vous pouvez faire</h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-text-primary tracking-tight">Ce que vous pouvez faire</h2>
         <p className="text-[15px] font-medium text-text-secondary leading-relaxed">CrossFlow réunit trafic temps réel, IA prédictive et simulation en une seule interface.</p>
       </div>
 
@@ -170,12 +170,12 @@ export default function OnboardingPage() {
         {FEATURES.map((f, i) => (
           <div
             key={i}
-            className="p-5 rounded-[20px] border border-white/5 bg-white/5 space-y-3 hover:bg-white/10 transition-colors duration-300 group shadow-sm hover:shadow-apple-sm"
+            className="p-5 rounded-[20px] border border-bg-border bg-bg-subtle space-y-3 hover:bg-bg-hover transition-colors duration-300 group shadow-sm hover:shadow-apple-sm"
           >
             <div className="w-10 h-10 rounded-[14px] flex items-center justify-center shadow-glow-sm" style={{ background: `${f.color}14`, border: `1px solid ${f.color}25` }}>
               <f.icon className="w-5 h-5 transition-transform group-hover:scale-110 duration-500" style={{ color: f.color }} />
             </div>
-            <p className="text-[14px] font-bold text-white tracking-tight leading-tight">{f.title}</p>
+            <p className="text-[14px] font-bold text-text-primary tracking-tight leading-tight">{f.title}</p>
             <p className="text-[11px] font-medium text-text-muted leading-relaxed">{f.desc}</p>
           </div>
         ))}
@@ -194,7 +194,7 @@ export default function OnboardingPage() {
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-3xl font-bold text-white tracking-tight">
+        <h2 className="text-3xl font-bold text-text-primary tracking-tight">
           Tout est prêt{name ? `, ${name}` : ''} !
         </h2>
         <p className="text-[15px] font-medium text-text-secondary leading-relaxed max-w-md mx-auto">
@@ -203,12 +203,12 @@ export default function OnboardingPage() {
         </p>
       </div>
 
-      <div className="bg-white/5 border border-white/5 rounded-[20px] p-6 text-left space-y-4 shadow-sm backdrop-blur-md">
+      <div className="bg-bg-subtle border border-bg-border rounded-[20px] p-6 text-left space-y-4 shadow-sm backdrop-blur-md">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-text-muted">Résumé de configuration</p>
         <div className="grid grid-cols-2 gap-5 text-[14px]">
-          {name  && <div className="space-y-1"><p className="text-[10px] uppercase tracking-wider text-text-muted font-bold">Prénom</p><p className="text-white font-bold">{name}</p></div>}
-          {role  && <div className="space-y-1"><p className="text-[10px] uppercase tracking-wider text-text-muted font-bold">Profil</p><p className="text-white font-bold">{ROLES.find(r => r.id === role)?.label}</p></div>}
-          <div className="space-y-1"><p className="text-[10px] uppercase tracking-wider text-text-muted font-bold">Ville active</p><p className="text-white font-bold">{selectedCity.flag} {selectedCity.name}</p></div>
+          {name  && <div className="space-y-1"><p className="text-[10px] uppercase tracking-wider text-text-muted font-bold">Prénom</p><p className="text-text-primary font-bold">{name}</p></div>}
+          {role  && <div className="space-y-1"><p className="text-[10px] uppercase tracking-wider text-text-muted font-bold">Profil</p><p className="text-text-primary font-bold">{ROLES.find(r => r.id === role)?.label}</p></div>}
+          <div className="space-y-1"><p className="text-[10px] uppercase tracking-wider text-text-muted font-bold">Ville active</p><p className="text-text-primary font-bold">{selectedCity.flag} {selectedCity.name}</p></div>
           <div className="space-y-1"><p className="text-[10px] uppercase tracking-wider text-text-muted font-bold">Intelligence</p><p className="text-brand font-bold">HERE + TomTom Live</p></div>
         </div>
       </div>
@@ -257,14 +257,14 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-bg-base flex flex-col items-center justify-start sm:justify-center p-4 py-10 sm:py-4 overflow-y-auto">
       {/* Background gradient */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-brand-green/5 rounded-full blur-[120px]" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-brand/5 rounded-full blur-[120px]" />
       </div>
 
       <div className="w-full max-w-2xl relative">
 
         {/* Header logo */}
         <div className="flex items-center gap-2.5 mb-8">
-          <div className="w-9 h-9 rounded-xl bg-brand-green flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-brand flex items-center justify-center">
             <Zap className="w-5 h-5 text-black" strokeWidth={2.5} />
           </div>
           <span className="text-lg font-bold text-text-primary">CrossFlow</span>
@@ -282,21 +282,21 @@ export default function OnboardingPage() {
                   'w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[11px] sm:text-[12px] font-bold transition-all duration-500 shadow-sm',
                   i < step  ? 'bg-brand text-black scale-90' :
                   i === step ? 'bg-brand/20 border border-brand/60 text-brand shadow-glow-sm' :
-                  'bg-white/5 border border-white/5 text-text-muted',
+                  'bg-bg-subtle border border-bg-border text-text-muted',
                 )}>
                   {i < step ? '✓' : i + 1}
                 </div>
-                <span className={cn('text-[12px] sm:text-[13px] font-bold tracking-tight whitespace-nowrap', i === step ? 'text-white' : 'text-text-muted')}>{label}</span>
+                <span className={cn('text-[12px] sm:text-[13px] font-bold tracking-tight whitespace-nowrap', i === step ? 'text-text-primary' : 'text-text-muted')}>{label}</span>
               </div>
               {i < steps.length - 1 && (
-                <div className="w-4 h-[1px] bg-white/10 hidden xs:block" />
+                <div className="w-4 h-[1px] bg-bg-hover hidden xs:block" />
               )}
             </div>
           ))}
         </div>
 
         {/* Step content */}
-        <div className="glass border border-white/10 rounded-[28px] p-8 sm:p-10 shadow-apple relative overflow-hidden">
+        <div className="glass border border-bg-border rounded-[28px] p-8 sm:p-10 shadow-apple relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-brand/5 blur-[100px] pointer-events-none" />
           
           {step === 0 && step0}
@@ -313,7 +313,7 @@ export default function OnboardingPage() {
                 'flex items-center gap-2.5 px-8 py-4 rounded-[16px] font-bold text-[15px] transition-all duration-300 shadow-apple-sm',
                 canNext() && !loading
                   ? 'bg-brand text-black hover:scale-[1.03] active:scale-[0.98] shadow-glow hover:shadow-glow-lg'
-                  : 'bg-white/5 text-text-muted border border-white/5 cursor-not-allowed',
+                  : 'bg-bg-subtle text-text-muted border border-bg-border cursor-not-allowed',
               )}
             >
               {loading ? (

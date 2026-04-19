@@ -41,13 +41,18 @@ export const viewport: Viewport = {
   width:        'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor:   '#08090B',
+  themeColor:   '#F5F5F7',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=localStorage.getItem('cf-theme');var t='light';if(s){var p=JSON.parse(s);if(p&&p.state&&p.state.theme){t=p.state.theme}}document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}})();`,
+          }}
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

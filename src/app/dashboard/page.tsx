@@ -118,13 +118,14 @@ export default function DashboardPage() {
   const pollDelta   = ((seed % 31) - 15) / 10
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 space-y-6 sm:space-y-8">
+    <main className="flex-1 min-h-0 overflow-y-auto page-scroll">
+      <div className="page-container space-y-6 sm:space-y-8 2xl:space-y-10">
       {/* Title & Stats Summary */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6">
         <div>
           <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2 animate-slide-up">
             <div className="w-1.5 h-6 sm:w-2 sm:h-7 bg-brand rounded-full shadow-glow" />
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+            <h1 className="heading-fluid-1 text-text-primary tracking-tight">
               {city.flag} {city.name}
             </h1>
           </div>
@@ -146,10 +147,10 @@ export default function DashboardPage() {
             PDF
           </button>
           {openMeteoWeather && (
-            <div className="glass-light px-4 py-2 rounded-xl border border-white/5 flex items-center gap-2.5">
+            <div className="glass-light px-4 py-2 rounded-xl flex items-center gap-2.5">
               <span className="text-xl">{openMeteoWeather.weatherEmoji}</span>
               <div className="flex flex-col">
-                <span className="text-[13px] font-bold text-white leading-none">{openMeteoWeather.temp}°C</span>
+                <span className="text-[13px] font-bold text-text-primary leading-none">{openMeteoWeather.temp}°C</span>
                 <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider mt-1">{openMeteoWeather.weatherLabel}</span>
               </div>
             </div>
@@ -164,7 +165,7 @@ export default function DashboardPage() {
         congWarn ? "bg-gradient-to-r from-orange-500/30 to-transparent" :
                   "bg-gradient-to-r from-brand/30 to-transparent"
       )}>
-        <div className="glass px-5 sm:px-7 py-4 sm:py-5 rounded-[21px] flex items-center gap-4 border border-white/5">
+        <div className="glass px-5 sm:px-7 py-4 sm:py-5 rounded-[21px] flex items-center gap-4">
           <div className="relative">
             <div className={cn(
               "w-3 h-3 rounded-full shadow-glow animate-pulse",
@@ -178,7 +179,7 @@ export default function DashboardPage() {
 
           <div className="flex-1">
             <div className="flex items-center gap-3">
-              <span className="text-[14px] font-bold text-white tracking-tight uppercase">
+              <span className="text-[14px] font-bold text-text-primary tracking-tight uppercase">
                 {t('dashboard.performance')}
               </span>
               <span className={cn(
@@ -195,9 +196,9 @@ export default function DashboardPage() {
           <div className="flex items-center gap-4 sm:gap-8 pr-1 sm:pr-2">
             <div className="flex flex-col items-end">
               <p className="text-[8px] sm:text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Efficacité</p>
-              <p className="text-[13px] sm:text-[15px] font-bold text-white tabular-nums">{Math.round(kpis.networkEfficiency * 100)}%</p>
+              <p className="text-[13px] sm:text-[15px] font-bold text-text-primary tabular-nums">{Math.round(kpis.networkEfficiency * 100)}%</p>
             </div>
-            <div className="w-[1px] h-6 sm:h-8 bg-white/5 hidden xs:block" />
+            <div className="w-[1px] h-6 sm:h-8 bg-bg-border hidden xs:block" />
             <div className="flex-col items-end hidden xs:flex">
               <p className="text-[8px] sm:text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Impact Météo</p>
               <p className={cn("text-[11px] sm:text-[13px] font-bold tabular-nums", openMeteoWeather?.trafficImpact === 'none' ? 'text-brand' : 'text-orange-500')}>
@@ -209,7 +210,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="kpi-grid">
         <KPICard
           label={t('dashboard.congestion')}
           value={congPct}
@@ -262,7 +263,7 @@ export default function DashboardPage() {
         </div>
         <div className="space-y-4">
           <ModalSplitChart />
-          <div className="glass-card border border-white/5 rounded-[22px] p-6 shadow-sm group animate-scale-in [animation-delay:600ms]">
+          <div className="glass-card rounded-[22px] p-6 shadow-sm group animate-scale-in [animation-delay:600ms]">
             <div className="flex items-center gap-2.5 mb-5">
               <div className="w-1.5 h-4.5 bg-brand rounded-full shadow-glow" />
               <p className="text-[11px] font-bold text-text-muted uppercase tracking-[0.18em]">{t('dashboard.performance')}</p>
@@ -288,6 +289,7 @@ export default function DashboardPage() {
         <EventsWidget lat={city.center.lat} lng={city.center.lng} radiusKm={15} maxItems={5} />
         <IncidentFeed maxItems={5} />
       </div>
+      </div>
     </main>
   )
 }
@@ -299,7 +301,7 @@ function EfficiencyBar({ label, value, color = '#22C55E' }: { label: string; val
         <span className="text-[10px] sm:text-[11px] font-bold text-text-muted uppercase tracking-[0.1em]">{label}</span>
         <span className="text-[12px] sm:text-[13px] font-bold tabular-nums" style={{ color }}>{Math.round(value * 100)}%</span>
       </div>
-      <div className="h-2 rounded-full bg-white/5 overflow-hidden shadow-inner">
+      <div className="h-2 rounded-full bg-bg-subtle overflow-hidden shadow-inner">
         <div
           className="h-full rounded-full transition-all duration-1000 ease-out"
           style={{ width: `${value * 100}%`, backgroundColor: color, boxShadow: `0 0 12px ${color}40` }}

@@ -159,8 +159,8 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
       {/* Header */}
       <div className="px-4 py-3 border-b border-bg-border flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-brand-green-dim border border-brand-green/30 flex items-center justify-center">
-            <BrainCircuit className="w-3.5 h-3.5 text-brand-green" />
+          <div className="w-7 h-7 rounded-lg bg-brand-dim border border-brand/30 flex items-center justify-center">
+            <BrainCircuit className="w-3.5 h-3.5 text-brand" />
           </div>
           <div>
             <p className="text-sm font-semibold text-text-primary">CrossFlow AI</p>
@@ -186,10 +186,10 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
                     onClick={() => { setModel(m.id); setShowModel(false) }}
                     className={cn(
                       'w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-bg-surface transition-colors',
-                      model === m.id && 'bg-brand-green-dim',
+                      model === m.id && 'bg-brand-dim',
                     )}
                   >
-                    <span className={cn('text-xs font-medium', model === m.id ? 'text-brand-green' : 'text-text-primary')}>
+                    <span className={cn('text-xs font-medium', model === m.id ? 'text-brand' : 'text-text-primary')}>
                       {m.label}
                     </span>
                     <span className="text-[10px] text-text-muted">{m.note}</span>
@@ -226,8 +226,8 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
         {messages.length === 0 && (
           <div className="space-y-4">
             <div className="text-center py-4">
-              <div className="w-10 h-10 rounded-xl bg-brand-green-dim border border-brand-green/20 flex items-center justify-center mx-auto mb-3">
-                <Zap className="w-5 h-5 text-brand-green" />
+              <div className="w-10 h-10 rounded-xl bg-brand-dim border border-brand/20 flex items-center justify-center mx-auto mb-3">
+                <Zap className="w-5 h-5 text-brand" />
               </div>
               <p className="text-sm text-text-secondary">{t('ai.ask_question')}</p>
               <p className="text-xs text-text-muted mt-1">{t('ai.quick_prompts')}</p>
@@ -252,7 +252,7 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
             <div className={cn(
               'w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold mt-0.5',
               msg.role === 'user'
-                ? 'bg-brand-green-dim border border-brand-green/30 text-brand-green'
+                ? 'bg-brand-dim border border-brand/30 text-brand'
                 : 'bg-bg-elevated border border-bg-border text-text-secondary',
             )}>
               {msg.role === 'user' ? (locale === 'fr' ? 'V' : 'M') : '⚡'}
@@ -260,7 +260,7 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
             <div className={cn(
               'max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed',
               msg.role === 'user'
-                ? 'bg-brand-green-dim border border-brand-green/20 text-text-primary rounded-tr-sm'
+                ? 'bg-brand-dim border border-brand/20 text-text-primary rounded-tr-sm'
                 : 'bg-bg-elevated border border-bg-border text-text-secondary rounded-tl-sm',
             )}>
               <FormattedMessage content={msg.content} />
@@ -271,13 +271,13 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
         {loading && (
           <div className="flex gap-2.5">
             <div className="w-6 h-6 rounded-full bg-bg-elevated border border-bg-border flex items-center justify-center flex-shrink-0">
-              <Loader2 className="w-3 h-3 text-brand-green animate-spin" />
+              <Loader2 className="w-3 h-3 text-brand animate-spin" />
             </div>
             <div className="bg-bg-elevated border border-bg-border rounded-2xl rounded-tl-sm px-3.5 py-2.5">
               <div className="flex gap-1 items-center">
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           </div>
@@ -308,7 +308,7 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
             onKeyDown={handleKey}
             placeholder={t('ai.input_placeholder')}
             rows={2}
-            className="flex-1 bg-bg-elevated border border-bg-border rounded-xl px-3 py-2.5 text-xs text-text-primary placeholder-text-muted outline-none focus:border-brand-green/50 transition-colors resize-none"
+            className="flex-1 bg-bg-elevated border border-bg-border rounded-xl px-3 py-2.5 text-xs text-text-primary placeholder-text-muted outline-none focus:border-brand/50 transition-colors resize-none"
           />
           <button
             onClick={() => sendMessage(input)}
@@ -316,7 +316,7 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
             className={cn(
               'w-9 h-9 self-end rounded-xl flex items-center justify-center transition-all flex-shrink-0',
               input.trim() && !loading
-                ? 'bg-brand-green text-bg-base hover:bg-brand-green-hover shadow-glow'
+                ? 'bg-brand text-bg-base hover:bg-brand-hover shadow-glow'
                 : 'bg-bg-elevated text-text-muted border border-bg-border cursor-not-allowed',
             )}
           >
@@ -338,8 +338,8 @@ function FormattedMessage({ content }: { content: string }) {
         if (line.startsWith('# '))   return <p key={i} className="font-bold text-text-primary mt-2 first:mt-0 text-sm">{line.slice(2)}</p>
         if (line.startsWith('**') && line.endsWith('**'))
           return <p key={i} className="font-semibold text-text-primary">{line.slice(2, -2)}</p>
-        if (line.startsWith('- '))   return <p key={i} className="flex gap-1.5 mt-0.5"><span className="text-brand-green flex-shrink-0">·</span><span>{formatInline(line.slice(2))}</span></p>
-        if (line.startsWith('• '))   return <p key={i} className="flex gap-1.5 mt-0.5"><span className="text-brand-green flex-shrink-0">·</span><span>{formatInline(line.slice(2))}</span></p>
+        if (line.startsWith('- '))   return <p key={i} className="flex gap-1.5 mt-0.5"><span className="text-brand flex-shrink-0">·</span><span>{formatInline(line.slice(2))}</span></p>
+        if (line.startsWith('• '))   return <p key={i} className="flex gap-1.5 mt-0.5"><span className="text-brand flex-shrink-0">·</span><span>{formatInline(line.slice(2))}</span></p>
         if (line === '')             return <br key={i} />
         return <p key={i} className="mt-0.5">{formatInline(line)}</p>
       })}

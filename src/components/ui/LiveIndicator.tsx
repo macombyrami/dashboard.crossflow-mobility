@@ -9,7 +9,7 @@ interface Props {
 
 export function LiveIndicator({ label = 'LIVE', color = '#22C55E', className }: Props) {
   return (
-    <span className={cn('inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full glass-light border border-white/5', className)}>
+    <span className={cn('inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full glass-light border border-bg-border', className)}>
       <span className="relative flex h-2 w-2">
         <span
           className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-40"

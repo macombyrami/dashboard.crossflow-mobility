@@ -5,9 +5,9 @@ import { cn } from '@/lib/utils/cn'
 import type { TrafficMode } from '@/types'
 
 const MODES: { id: TrafficMode; label: string; sublabel: string; icon: typeof Radio }[] = [
-  { id: 'live',     label: 'Temps réel', sublabel: 'En direct',   icon: Radio },
-  { id: 'predict',  label: 'Prévision',  sublabel: '+30 min',     icon: Brain },
-  { id: 'simulate', label: 'Simulation', sublabel: 'Scénarios',   icon: FlaskConical },
+  { id: 'live',     label: 'Temps réel', sublabel: 'En direct', icon: Radio        },
+  { id: 'predict',  label: 'Prévision',  sublabel: '+30 min',   icon: Brain        },
+  { id: 'simulate', label: 'Simulation', sublabel: 'Scénarios', icon: FlaskConical },
 ]
 
 export function ModeSelector() {
@@ -15,7 +15,7 @@ export function ModeSelector() {
   const setMode = useMapStore(s => s.setMode)
 
   return (
-    <div className="flex glass rounded-apple p-1.5 gap-1.5 shadow-apple border border-white/5">
+    <div className="glass-card flex rounded-xl p-1 gap-1">
       {MODES.map(({ id, label, sublabel, icon: Icon }) => {
         const active = mode === id
         return (
@@ -23,18 +23,21 @@ export function ModeSelector() {
             key={id}
             onClick={() => setMode(id)}
             className={cn(
-              'flex items-center gap-2.5 px-5 py-2 rounded-apple text-[13px] font-semibold transition-all duration-300 relative group overflow-hidden',
+              'flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-[13px] font-semibold transition-all duration-200 group',
               active
-                ? 'bg-brand-green text-bg-base shadow-glow'
-                : 'text-text-secondary hover:text-white hover:bg-white/5',
+                ? 'bg-brand text-black shadow-md'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-subtle',
             )}
           >
-            <Icon className={cn("w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110", active ? "text-bg-base" : "text-text-muted group-hover:text-text-secondary")} />
-            <div className="flex flex-col items-start translate-y-[-1px]">
-               <span className="tracking-tight leading-none">{label}</span>
-               <span className={cn('text-[9px] font-bold uppercase tracking-wider mt-1 opacity-60', active ? 'text-bg-base' : 'text-text-muted')}>
-                 {sublabel}
-               </span>
+            <Icon
+              className={cn('w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110', active ? 'text-black' : 'text-text-muted group-hover:text-text-secondary')}
+              strokeWidth={2}
+            />
+            <div className="flex flex-col items-start leading-none">
+              <span className="tracking-tight">{label}</span>
+              <span className={cn('text-[9px] font-bold uppercase tracking-wider mt-0.5 opacity-70', active ? 'text-black' : 'text-text-muted')}>
+                {sublabel}
+              </span>
             </div>
           </button>
         )

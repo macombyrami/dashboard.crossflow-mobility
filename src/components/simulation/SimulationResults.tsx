@@ -32,7 +32,7 @@ export function SimulationResults() {
               onClick={() => setCurrentResult(r)}
               className={cn(
                 'w-full flex items-center justify-between px-5 py-3.5 hover:bg-bg-elevated transition-colors text-left',
-                currentResult?.id === r.id && 'bg-brand-green-dim',
+                currentResult?.id === r.id && 'bg-brand-dim',
               )}
             >
               <div>
@@ -58,7 +58,7 @@ function ResultDetail({ result }: { result: SimulationResult }) {
   return (
     <div className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
       <div className="px-5 py-4 border-b border-bg-border flex items-center gap-2">
-        <CheckCircle2 className="w-4 h-4 text-brand-green" />
+        <CheckCircle2 className="w-4 h-4 text-brand" />
         <p className="text-sm font-semibold text-text-primary">{result.scenarioName}</p>
       </div>
 
@@ -67,7 +67,7 @@ function ResultDetail({ result }: { result: SimulationResult }) {
         <div className="grid grid-cols-3 gap-2 text-center">
           <div />
           <div className="text-xs font-semibold text-text-muted uppercase tracking-widest">{t('simulation.before')}</div>
-          <div className="text-xs font-semibold text-brand-green uppercase tracking-widest">{t('simulation.after')}</div>
+          <div className="text-xs font-semibold text-brand uppercase tracking-widest">{t('simulation.after')}</div>
 
           <MetricRow
             icon={Gauge} label={t('dashboard.congestion')}

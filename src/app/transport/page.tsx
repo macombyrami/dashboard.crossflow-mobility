@@ -161,7 +161,7 @@ function LineCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-[13px] font-black text-white shrink-0"
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-[13px] font-black text-text-primary shrink-0"
             style={{ backgroundColor: colour }}
           >
             {badge.slice(0, 2).toUpperCase()}
@@ -240,7 +240,7 @@ function FilterTabs({ options, value, onChange }: {
           className={cn(
             'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
             value === o.key
-              ? 'bg-brand-green/10 text-brand-green border-brand-green/40'
+              ? 'bg-brand/10 text-brand border-brand/40'
               : 'bg-bg-surface text-text-secondary border-bg-border hover:border-text-muted',
           )}
         >
@@ -307,11 +307,11 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
-            <Train className="w-5 h-5 text-brand-green" />
+            <Train className="w-5 h-5 text-brand" />
             Trafic RATP — Temps réel
           </h1>
           <p className="text-sm text-text-secondary mt-1 flex items-center gap-2">
-            <Wifi className="w-3 h-3 text-brand-green" />
+            <Wifi className="w-3 h-3 text-brand" />
             Île-de-France Mobilités
             {lastUpdate && mounted && (
               <span className="text-text-muted">· {formatDistanceToNow(lastUpdate, { locale: fr, addSuffix: true })}</span>
@@ -336,7 +336,7 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
 
       {loading && lines.length === 0 && (
         <div className="border border-bg-border rounded-3xl p-16 text-center">
-          <div className="w-10 h-10 border-[3px] border-brand-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-10 h-10 border-[3px] border-brand border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-[13px] font-bold text-text-secondary uppercase tracking-tight">Initialisation du flux RATP…</p>
         </div>
       )}
@@ -426,7 +426,7 @@ function OsmTransitView({ city, mounted }: { city: OsmCity; mounted: boolean }) 
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
-            <Bus className="w-5 h-5 text-brand-green" />
+            <Bus className="w-5 h-5 text-brand" />
             Réseau transport — {city.flag} {city.name}
           </h1>
           <p className="text-sm text-text-secondary mt-1 flex items-center gap-2">
@@ -458,7 +458,7 @@ function OsmTransitView({ city, mounted }: { city: OsmCity; mounted: boolean }) 
 
       {loading && (
         <div className="border border-bg-border rounded-3xl p-16 text-center">
-          <div className="w-10 h-10 border-[3px] border-brand-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-10 h-10 border-[3px] border-brand border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-[13px] font-bold text-text-secondary uppercase tracking-tight">Chargement réseau OSM…</p>
         </div>
       )}

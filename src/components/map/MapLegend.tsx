@@ -55,7 +55,7 @@ export function MapLegend() {
     <div className="absolute bottom-24 right-3 z-10 flex flex-col items-end gap-2">
       {/* City Context Label (shown when boundary is active) */}
       {isBoundary && (
-        <div className="glass px-3 py-1.5 rounded-full border border-brand-green/30 text-[10px] font-bold text-brand-green uppercase tracking-wider animate-in fade-in slide-in-from-right-4">
+        <div className="glass px-3 py-1.5 rounded-full border border-brand/30 text-[10px] font-bold text-brand uppercase tracking-wider animate-in fade-in slide-in-from-right-4">
           Cœur Urbain Actif
         </div>
       )}
@@ -73,12 +73,12 @@ export function MapLegend() {
         <div className="bg-bg-surface/95 backdrop-blur-md border border-bg-border rounded-2xl p-4 w-56 shadow-2xl space-y-4 animate-in zoom-in-95 fade-in duration-200 origin-bottom-right">
           {/* Heatmap Section */}
           {isHeatmap && (
-            <div className="pb-3 border-b border-white/5">
-              <p className="text-[10px] font-bold text-brand-green uppercase tracking-[0.12em] mb-3 flex items-center gap-2">
-                <span className="w-1 h-1 rounded-full bg-brand-green animate-pulse" />
+            <div className="pb-3 border-b border-bg-border">
+              <p className="text-[10px] font-bold text-brand uppercase tracking-[0.12em] mb-3 flex items-center gap-2">
+                <span className="w-1 h-1 rounded-full bg-brand animate-pulse" />
                 {HEATMAP_LEGENDS[heatmapMode].title}
               </p>
-              <div className="relative h-2 w-full rounded-full overflow-hidden mb-2 bg-white/5">
+              <div className="relative h-2 w-full rounded-full overflow-hidden mb-2 bg-bg-subtle">
                 <div 
                   className="absolute inset-0"
                   style={{ 
@@ -131,7 +131,7 @@ export function MapLegend() {
 
           {/* Transport / POIs */}
           {isTransport && (
-            <div className="pt-2 border-t border-white/5">
+            <div className="pt-2 border-t border-bg-border">
               <p className="text-[10px] font-bold text-text-muted uppercase tracking-[0.12em] mb-2">Infrastructures</p>
               <div className="grid grid-cols-2 gap-2">
                 {[

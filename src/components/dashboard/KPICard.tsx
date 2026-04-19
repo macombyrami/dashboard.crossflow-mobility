@@ -48,7 +48,7 @@ export function KPICard({
       <div className="relative z-10">
         <div className="flex items-baseline gap-2">
           <span className={cn(
-            "text-3xl sm:text-4xl font-bold tracking-tight text-white",
+            "text-3xl sm:text-4xl font-bold tracking-tight text-text-primary",
             critical ? "text-[#FF3B30]" : warning ? "text-[#FF9F0A]" : ""
           )}>
             {value}
@@ -59,7 +59,7 @@ export function KPICard({
       </div>
 
       {delta !== undefined && (
-        <div className="flex items-center gap-2 pt-5 border-t border-white/5 relative z-10">
+        <div className="flex items-center gap-2 pt-5 border-t border-bg-border relative z-10">
           <MetricDelta value={Number(delta)} unit={deltaUnit} inverse={inverse} />
           <span className="text-[11px] font-semibold text-text-muted">vs {t('common.yesterday') || 'hier'}</span>
         </div>

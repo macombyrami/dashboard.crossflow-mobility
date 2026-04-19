@@ -63,7 +63,7 @@ export function ModalSplitChart() {
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
              <div className="text-center">
                 <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest leading-none mb-1">Total</p>
-                <p className="text-lg font-bold text-white leading-none">100%</p>
+                <p className="text-lg font-bold text-text-primary leading-none">100%</p>
              </div>
           </div>
         </div>
@@ -73,9 +73,9 @@ export function ModalSplitChart() {
             <div key={d.name} className="flex items-center justify-between group/row">
               <div className="flex items-center gap-3">
                 <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-glow-sm transition-all group-hover/row:scale-125 duration-300" style={{ backgroundColor: d.color }} />
-                <span className="text-[13px] font-bold text-text-secondary group-hover/row:text-white transition-colors">{d.name}</span>
+                <span className="text-[13px] font-bold text-text-secondary group-hover/row:text-text-primary transition-colors">{d.name}</span>
               </div>
-              <span className="text-[14px] font-bold text-white tabular-nums tracking-tight">{d.value}%</span>
+              <span className="text-[14px] font-bold text-text-primary tabular-nums tracking-tight">{d.value}%</span>
             </div>
           ))}
         </div>
