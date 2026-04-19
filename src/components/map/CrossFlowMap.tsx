@@ -2384,6 +2384,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', isDecisionMap ? 'none' : trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-fill', 'visibility', 'none')
     safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-line', 'visibility', 'none')
+    safeSetLayoutProperty(map, 'cf-idf-roads-lines', 'visibility', trafficVis)
+    safeSetLayoutProperty(map, 'cf-idf-roads-labels', 'visibility', trafficVis)
     setCongestionHeatmapStackVisibility(map, activeHeatSourceRef.current, heatVis, heatVis)
     setCongestionHeatmapStackVisibility(map, inactiveHeatSource, heatVis, 'none')
     safeSetLayoutProperty(map, TRAFFIC_FLOW_SOURCE + '-layer', 'visibility', flowVis)
@@ -2403,6 +2405,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', 'none')
       safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-fill', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-line', 'visibility', trafficVis)
+      safeSetLayoutProperty(map, 'cf-idf-roads-lines', 'visibility', trafficVis)
+      safeSetLayoutProperty(map, 'cf-idf-roads-labels', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_FLOW_SOURCE + '-layer', 'visibility', flowVis)
       safeSetLayoutProperty(map, INCIDENT_SOURCE + '-cluster-glow', 'visibility', incidentsVis)
       safeSetLayoutProperty(map, INCIDENT_SOURCE + '-cluster', 'visibility', incidentsVis)
@@ -2491,6 +2495,18 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       safeSetLayoutProperty(map, SIM_LOCATION_SOURCE + '-dot', 'visibility', 'none')
       safeSetLayoutProperty(map, TOMTOM_FLOW + '-layer', 'visibility', 'none')
       safeSetLayoutProperty(map, TOMTOM_INC + '-layer', 'visibility', 'none')
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[MapFilters] apply', {
+        traffic: trafficVis,
+        incidents: incidentsVis,
+        flow: flowVis,
+        isDecisionMap,
+        trafficLayer: map.getLayoutProperty(TRAFFIC_SOURCE + '-lines', 'visibility'),
+        incidentsLayer: map.getLayoutProperty(INCIDENT_SOURCE + '-cluster', 'visibility'),
+        flowLayer: map.getLayoutProperty(TRAFFIC_FLOW_SOURCE + '-layer', 'visibility'),
+      })
     }
   }, [activeLayers, mapLoaded, useLiveData, isDecisionMap])
 

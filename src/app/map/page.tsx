@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import type { ComponentType } from 'react'
 import { AlertTriangle, Layers3, MapPinned, Navigation2, Radar } from 'lucide-react'
@@ -25,11 +25,27 @@ export default function MapPage() {
   const snapshot = useTrafficStore(s => s.snapshot)
   const trafficSummary = useTrafficStore(s => s.trafficSummary)
   const liveWeather = useTrafficStore(s => s.openMeteoWeather)
+  const didInitFlowLayer = useRef(false)
+  const trafficEnabled = activeLayers.has('traffic')
+  const incidentsEnabled = activeLayers.has('incidents')
+  const flowEnabled = activeLayers.has('flow')
 
   useEffect(() => {
     document.title = `${city.name} Live Traffic | CrossFlow`
-    if (!activeLayers.has('flow')) setLayer('flow', true)
-  }, [activeLayers, city.name, setLayer])
+  }, [city.name])
+
+  useEffect(() => {
+    if (didInitFlowLayer.current) return
+    didInitFlowLayer.current = true
+    if (!flowEnabled) setLayer('flow', true)
+  }, [flowEnabled, setLayer])
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return
+    console.log('Traffic:', trafficEnabled)
+    console.log('Incidents:', incidentsEnabled)
+    console.log('Flow:', flowEnabled)
+  }, [flowEnabled, incidentsEnabled, trafficEnabled])
 
   const segmentCount = trafficSummary?.segmentCount ?? snapshot?.segments.length ?? 0
   const avgCongestion = trafficSummary ? Math.round(trafficSummary.avgCongestion * 100) : 0
@@ -82,7 +98,10 @@ export default function MapPage() {
 
             <div className="mt-3 grid grid-cols-3 gap-2">
               {layerPills.map(layer => {
-                const active = activeLayers.has(layer.id)
+                const active =
+                  layer.id === 'traffic' ? trafficEnabled :
+                  layer.id === 'incidents' ? incidentsEnabled :
+                  flowEnabled
                 return (
                   <button
                     key={layer.id}
