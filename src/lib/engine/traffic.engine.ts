@@ -95,6 +95,65 @@ function co2GPerKm(congestion: number): number {
   return 120 + congestion * 180
 }
 
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value))
+}
+
+function interpolateCoord(a: [number, number], b: [number, number], t: number): [number, number] {
+  return [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+  ]
+}
+
+function bearingBetween(a: [number, number], b: [number, number]): number {
+  const [lng1, lat1] = a
+  const [lng2, lat2] = b
+  const y = Math.sin((lng2 - lng1) * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+  const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+    Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos((lng2 - lng1) * Math.PI / 180)
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360
+}
+
+function offsetPoint(point: [number, number], bearingDeg: number, distanceM: number): [number, number] {
+  const theta = bearingDeg * Math.PI / 180
+  const dx = Math.cos(theta) * distanceM
+  const dy = Math.sin(theta) * distanceM
+  const latOffset = dy / 110540
+  const lngOffset = dx / (111320 * Math.max(Math.cos(point[1] * Math.PI / 180), 0.2))
+  return [point[0] + lngOffset, point[1] + latOffset]
+}
+
+function pushSmoothHeatPoints(
+  heatmap: HeatmapPoint[],
+  coords: [number, number][],
+  intensity: number,
+  spreadMeters = 34,
+): void {
+  if (coords.length < 2) {
+    const [lng, lat] = coords[0] ?? [0, 0]
+    heatmap.push({ lng, lat, intensity })
+    return
+  }
+
+  for (let i = 0; i < coords.length - 1; i++) {
+    const start = coords[i]
+    const end = coords[i + 1]
+    const meters = turf.distance(turf.point(start), turf.point(end), { units: 'meters' })
+    const steps = Math.max(2, Math.min(10, Math.ceil(meters / 70)))
+    const segmentBearing = bearingBetween(start, end)
+
+    for (let step = 0; step <= steps; step++) {
+      const t = step / steps
+      const base = interpolateCoord(start, end, t)
+      const localIntensity = clamp01(intensity * (0.85 + (1 - Math.abs(0.5 - t) * 2) * 0.15))
+      heatmap.push({ lng: base[0], lat: base[1], intensity: localIntensity })
+      heatmap.push({ lng: offsetPoint(base, segmentBearing + 90, spreadMeters)[0], lat: offsetPoint(base, segmentBearing + 90, spreadMeters)[1], intensity: localIntensity * 0.45 })
+      heatmap.push({ lng: offsetPoint(base, segmentBearing - 90, spreadMeters)[0], lat: offsetPoint(base, segmentBearing - 90, spreadMeters)[1], intensity: localIntensity * 0.45 })
+    }
+  }
+}
+
 interface RawSegment {
   coords: [number, number][]
   type:   'main' | 'secondary' | 'highway'
@@ -187,7 +246,7 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
     }
 
     segments.push(enrichSegmentWithStreetMetadata(segment))
-    road.coords.forEach(pt => heatmap.push({ lng: pt[0], lat: pt[1], intensity: enriched.score }))
+    pushSmoothHeatPoints(heatmap, road.coords, clamp01(enriched.score * (0.85 + (road.type === 'highway' ? 0.15 : 0))))
   })
 
   return {
@@ -251,7 +310,7 @@ export function generateTrafficFromOSMRoads(city: City, osmRoads: OSMRoad[]): Tr
       lastUpdated: now.toISOString(),
       mode: 'car'
     })
-    coords.forEach(pt => heatmap.push({ lng: pt[0], lat: pt[1], intensity: enriched.score }))
+    pushSmoothHeatPoints(heatmap, coords, clamp01(enriched.score * (0.8 + (coords.length > 6 ? 0.1 : 0))))
   })
 
   return {

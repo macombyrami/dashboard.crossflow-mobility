@@ -1834,7 +1834,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     }
 
     // --- Heatmaps & Incidents ---
-    if (activeLayers.has('heatmap')) {
+    if (activeLayers.has('heatmap') || isDecisionMap) {
       const heatGeo: GeoJSON.FeatureCollection = {
         type: 'FeatureCollection',
         features: snapshot.heatmap.map(pt => ({
@@ -1891,10 +1891,6 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
         }),
       }
 
-      const zoneGeo = {
-        type: 'FeatureCollection' as const,
-        features: buildTrafficZones(snappedSnapshot.segments) as GeoJSON.Feature[],
-      }
       const flowGeo = {
         type: 'FeatureCollection' as const,
         features: buildFlowMarkers(snappedSnapshot.segments) as GeoJSON.Feature[],
@@ -1918,13 +1914,11 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
 
       const trafficSrc = safeGetSource(map, TRAFFIC_SOURCE) as maplibregl.GeoJSONSource | null
       const predSrc = safeGetSource(map, TRAFFIC_PREDICTION_SOURCE) as maplibregl.GeoJSONSource | null
-      const zoneSrc = safeGetSource(map, TRAFFIC_ZONE_SOURCE) as maplibregl.GeoJSONSource | null
       const flowSrc = safeGetSource(map, TRAFFIC_FLOW_SOURCE) as maplibregl.GeoJSONSource | null
       const clusterSrc = safeGetSource(map, INCIDENT_SOURCE) as maplibregl.GeoJSONSource | null
       const criticalSrc = safeGetSource(map, INCIDENT_CRITICAL_SOURCE) as maplibregl.GeoJSONSource | null
       if (trafficSrc) trafficSrc.setData(trafficGeo)
       if (predSrc) predSrc.setData(trafficGeo)
-      if (zoneSrc) zoneSrc.setData(zoneGeo)
       if (flowSrc) flowSrc.setData(flowGeo)
       if (clusterSrc) clusterSrc.setData(clusterGeo)
       if (criticalSrc) criticalSrc.setData(criticalGeo)
@@ -2216,12 +2210,15 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     const incidentsVis = activeLayers.has('incidents') ? 'visible' : 'none'
     const flowVis = activeLayers.has('flow') ? 'visible' : 'none'
     const boundaryVis = activeLayers.has('boundary') ? 'visible' : 'none'
+    const heatVis = isDecisionMap ? 'visible' : (activeLayers.has('heatmap') ? 'visible' : 'none')
 
     safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-lines', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', isDecisionMap ? 'none' : trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', isDecisionMap ? 'none' : trafficVis)
-    safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-fill', 'visibility', trafficVis)
-    safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-line', 'visibility', trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-fill', 'visibility', 'none')
+    safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-line', 'visibility', 'none')
+    safeSetLayoutProperty(map, HEATMAP_SOURCE + '-layer', 'visibility', heatVis)
+    safeSetLayoutProperty(map, HEATMAP_SOURCE + '-circles', 'visibility', heatVis)
     safeSetLayoutProperty(map, TRAFFIC_FLOW_SOURCE + '-layer', 'visibility', flowVis)
 
     safeSetLayoutProperty(map, INCIDENT_SOURCE + '-cluster-glow', 'visibility', incidentsVis)
@@ -2921,16 +2918,17 @@ function initStaticSources(map: maplibregl.Map) {
     maxzoom: 16,
     layout: { visibility: 'none' },
     paint:  {
-      'heatmap-weight':   ['interpolate', ['linear'], ['get', 'intensity'], 0, 0, 1, 1],
-      'heatmap-intensity':['interpolate', ['linear'], ['zoom'], 0, 1, 9, 3],
-      'heatmap-radius':   ['interpolate', ['linear'], ['zoom'], 0, 2, 9, 22],
-      'heatmap-opacity':  0.60,
+      'heatmap-weight':   ['interpolate', ['linear'], ['get', 'intensity'], 0, 0, 0.3, 0.18, 0.6, 0.62, 1, 1],
+      'heatmap-intensity':['interpolate', ['linear'], ['zoom'], 0, 0.8, 8, 1.8, 12, 2.8, 16, 3.6],
+      'heatmap-radius':   ['interpolate', ['linear'], ['zoom'], 0, 14, 8, 26, 12, 40, 16, 58],
+      'heatmap-opacity':  ['interpolate', ['linear'], ['zoom'], 0, 0.18, 8, 0.42, 12, 0.68, 16, 0.78],
       'heatmap-color': [
         'interpolate', ['linear'], ['heatmap-density'],
         0,    'rgba(34, 197, 94, 0)',
-        0.25, 'rgba(34, 197, 94, 0.3)',
-        0.5,  'rgba(255, 214, 0, 0.5)',
-        0.75, 'rgba(255, 159, 10, 0.7)',
+        0.18, 'rgba(34, 197, 94, 0.22)',
+        0.4,  'rgba(255, 214, 0, 0.35)',
+        0.65, 'rgba(255, 159, 10, 0.55)',
+        0.85, 'rgba(239, 68, 68, 0.8)',
       ],
     },
   })
