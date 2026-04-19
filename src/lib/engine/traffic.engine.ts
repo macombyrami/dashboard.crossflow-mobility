@@ -52,14 +52,6 @@ function stitchSegments(segments: [number, number][][], thresholdMeters = 30): [
   return result
 }
 
-// Import enriched data (optional/conditional)
-let parisNetwork: any[] = []
-try {
-  parisNetwork = require('@/lib/data/paris_network.json')
-} catch (e) {
-  parisNetwork = []
-}
-
 // ─── Modal split normalizer ───
 type ModalSplit = { car: number; metro: number; bus: number; bike: number; pedestrian: number }
 function normalizeModalSplit(raw: ModalSplit): ModalSplit {
@@ -99,6 +91,10 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value))
 }
 
+const MAX_SYNTHETIC_ROADS = 180
+const MAX_HEATMAP_POINTS = 1200
+const MAX_HEATMAP_STEPS_PER_SEGMENT = 5
+
 function interpolateCoord(a: [number, number], b: [number, number], t: number): [number, number] {
   return [
     a[0] + (b[0] - a[0]) * t,
@@ -130,6 +126,8 @@ function pushSmoothHeatPoints(
   intensity: number,
   spreadMeters = 34,
 ): void {
+  if (heatmap.length >= MAX_HEATMAP_POINTS) return
+
   if (coords.length < 2) {
     const [lng, lat] = coords[0] ?? [0, 0]
     heatmap.push({ lng, lat, intensity })
@@ -137,19 +135,27 @@ function pushSmoothHeatPoints(
   }
 
   for (let i = 0; i < coords.length - 1; i++) {
+    if (heatmap.length >= MAX_HEATMAP_POINTS) return
+
     const start = coords[i]
     const end = coords[i + 1]
     const meters = turf.distance(turf.point(start), turf.point(end), { units: 'meters' })
-    const steps = Math.max(2, Math.min(10, Math.ceil(meters / 70)))
+    const steps = Math.max(1, Math.min(MAX_HEATMAP_STEPS_PER_SEGMENT, Math.ceil(meters / 120)))
     const segmentBearing = bearingBetween(start, end)
 
     for (let step = 0; step <= steps; step++) {
+      if (heatmap.length >= MAX_HEATMAP_POINTS) return
+
       const t = step / steps
       const base = interpolateCoord(start, end, t)
       const localIntensity = clamp01(intensity * (0.85 + (1 - Math.abs(0.5 - t) * 2) * 0.15))
       heatmap.push({ lng: base[0], lat: base[1], intensity: localIntensity })
-      heatmap.push({ lng: offsetPoint(base, segmentBearing + 90, spreadMeters)[0], lat: offsetPoint(base, segmentBearing + 90, spreadMeters)[1], intensity: localIntensity * 0.45 })
-      heatmap.push({ lng: offsetPoint(base, segmentBearing - 90, spreadMeters)[0], lat: offsetPoint(base, segmentBearing - 90, spreadMeters)[1], intensity: localIntensity * 0.45 })
+      if (heatmap.length >= MAX_HEATMAP_POINTS) return
+      const left = offsetPoint(base, segmentBearing + 90, spreadMeters)
+      heatmap.push({ lng: left[0], lat: left[1], intensity: localIntensity * 0.4 })
+      if (heatmap.length >= MAX_HEATMAP_POINTS) return
+      const right = offsetPoint(base, segmentBearing - 90, spreadMeters)
+      heatmap.push({ lng: right[0], lat: right[1], intensity: localIntensity * 0.4 })
     }
   }
 }
@@ -162,15 +168,56 @@ interface RawSegment {
 }
 
 function generateCityRoads(city: City): RawSegment[] {
-  if (city.id === 'paris' && parisNetwork.length > 0) {
-    return parisNetwork.map(s => ({
-      id: s.id,
-      name: s.name,
-      coords: s.coords,
-      type: s.type === 'motorway' ? 'highway' : 'main'
-    }))
+  const [minLng, minLat, maxLng, maxLat] = city.bbox ?? [
+    city.center.lng - 0.08,
+    city.center.lat - 0.05,
+    city.center.lng + 0.08,
+    city.center.lat + 0.05,
+  ]
+
+  const lngSpan = Math.max(0.02, (maxLng - minLng) * 0.5)
+  const latSpan = Math.max(0.02, (maxLat - minLat) * 0.5)
+  const roads: RawSegment[] = []
+  const spokes = 10
+  const rings = 4
+
+  for (let i = 0; i < spokes; i++) {
+    const angle = (Math.PI * 2 * i) / spokes
+    const dx = Math.cos(angle) * lngSpan
+    const dy = Math.sin(angle) * latSpan
+    roads.push({
+      id: `${city.id}-radial-${i}`,
+      name: `Radial ${i + 1}`,
+      type: i % 3 === 0 ? 'highway' : 'main',
+      coords: [
+        [city.center.lng - dx, city.center.lat - dy],
+        [city.center.lng, city.center.lat],
+        [city.center.lng + dx, city.center.lat + dy],
+      ],
+    })
   }
-  return []
+
+  for (let ring = 1; ring <= rings; ring++) {
+    const ratio = ring / (rings + 1)
+    const ringLng = lngSpan * ratio
+    const ringLat = latSpan * ratio
+    const points = 12
+    for (let i = 0; i < points; i++) {
+      const a1 = (Math.PI * 2 * i) / points
+      const a2 = (Math.PI * 2 * (i + 1)) / points
+      roads.push({
+        id: `${city.id}-ring-${ring}-${i}`,
+        name: `Ring ${ring}-${i + 1}`,
+        type: ring % 2 === 0 ? 'secondary' : 'main',
+        coords: [
+          [city.center.lng + Math.cos(a1) * ringLng, city.center.lat + Math.sin(a1) * ringLat],
+          [city.center.lng + Math.cos(a2) * ringLng, city.center.lat + Math.sin(a2) * ringLat],
+        ],
+      })
+    }
+  }
+
+  return roads.slice(0, MAX_SYNTHETIC_ROADS)
 }
 
 function baseCongestionForHour(hour: number, isWeekend: boolean, rng: () => number): number {
@@ -200,7 +247,7 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
   const isWE = now.getDay() === 0 || now.getDay() === 6
   const rng  = seededRng(cityTimeSeed(city.id))
   const baseCongestion = Math.min(1, baseCongestionForHour(hour, isWE, rng))
-  const roads = generateCityRoads(city)
+  const roads = generateCityRoads(city).slice(0, MAX_SYNTHETIC_ROADS)
   const segments: TrafficSegment[] = []
   const heatmap: HeatmapPoint[] = []
 
@@ -270,7 +317,7 @@ export function generateTrafficFromOSMRoads(city: City, osmRoads: OSMRoad[]): Tr
   const heatmap: HeatmapPoint[] = []
 
   // Stitching logic applied to OSM roads
-  const stitchedCoords = stitchSegments(osmRoads.map(r => r.coords))
+  const stitchedCoords = stitchSegments(osmRoads.slice(0, MAX_SYNTHETIC_ROADS).map(r => r.coords))
 
   stitchedCoords.forEach((coords, idx) => {
     const midPt = coords[Math.floor(coords.length / 2)]

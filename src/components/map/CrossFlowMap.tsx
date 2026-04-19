@@ -2112,7 +2112,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       bounds.getEast(), bounds.getNorth(),
     ].map(v => Math.round(v * 1000) / 1000).join(',')
 
-    const url = `/api/idf-roads?frc=1,2,3&bbox=${bbox}&limit=800`
+    const url = `/api/idf-roads?frc=1,2,3&bbox=${bbox}&limit=400`
 
     fetch(url, { cache: 'force-cache' })
       .then(r => r.ok ? r.json() : null)

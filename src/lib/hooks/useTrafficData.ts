@@ -5,8 +5,27 @@ import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useEffect, useRef, useState } from 'react'
 
-const CACHE_KEY = 'cf_traffic_map_data'
 const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
+const MAX_CACHED_CITIES = 2
+
+type SnapshotCacheEntry = {
+  updatedAt: number
+  data: ReturnType<typeof generateTrafficSnapshot>
+}
+
+const snapshotCache = new Map<string, SnapshotCacheEntry>()
+
+function getCacheKey(cityId: string) {
+  return `traffic:${cityId}`
+}
+
+function trimSnapshotCache() {
+  while (snapshotCache.size > MAX_CACHED_CITIES) {
+    const oldestKey = snapshotCache.keys().next().value as string | undefined
+    if (!oldestKey) break
+    snapshotCache.delete(oldestKey)
+  }
+}
 
 export function useTrafficData() {
   const queryClient = useQueryClient()
@@ -15,26 +34,15 @@ export function useTrafficData() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   
   const fetchTraffic = async () => {
-    // 1. Check persistent cache (localStorage)
-    const cached = localStorage.getItem(CACHE_KEY)
-    if (cached) {
-      const { data, timestamp, cityId } = JSON.parse(cached)
-      if (cityId === city.id && Date.now() - timestamp < CACHE_TTL) {
-        console.log('[Traffic] Serving from Persistent Cache')
-        return data
-      }
+    const key = getCacheKey(city.id)
+    const cached = snapshotCache.get(key)
+    if (cached && Date.now() - cached.updatedAt < CACHE_TTL) {
+      return cached.data
     }
 
-    // 2. Fetch Fresh Data (Synthetic for now, or real API)
-    console.log('[Traffic] Fetching Fresh Data...')
     const fresh = generateTrafficSnapshot(city)
-    
-    // 3. Update Persistent Cache
-    localStorage.setItem(CACHE_KEY, JSON.stringify({
-      data: fresh,
-      timestamp: Date.now(),
-      cityId: city.id
-    }))
+    snapshotCache.set(key, { data: fresh, updatedAt: Date.now() })
+    trimSnapshotCache()
 
     return fresh
   }
@@ -43,23 +51,23 @@ export function useTrafficData() {
     queryKey: ['traffic', city.id],
     queryFn: fetchTraffic,
     staleTime: CACHE_TTL,
-    refetchInterval: CACHE_TTL, // Controlled polling
+    gcTime: CACHE_TTL * 2,
+    refetchInterval: CACHE_TTL,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
+    retry: 1,
   })
 
   // Sync with global store & track update time
   useEffect(() => {
     if (data) {
       setSnapshot(data)
-      const cached = localStorage.getItem(CACHE_KEY)
-      if (cached) {
-        const { timestamp } = JSON.parse(cached)
-        setLastUpdated(new Date(timestamp))
-      }
+      setLastUpdated(new Date(data.fetchedAt))
     }
   }, [data, setSnapshot])
 
   const manualRefresh = async () => {
-    localStorage.removeItem(CACHE_KEY)
+    snapshotCache.delete(getCacheKey(city.id))
     await queryClient.invalidateQueries({ queryKey: ['traffic', city.id] })
     await refetch()
   }
