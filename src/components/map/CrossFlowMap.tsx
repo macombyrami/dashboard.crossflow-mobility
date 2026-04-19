@@ -72,6 +72,8 @@ const TRAFFIC_SOURCE          = 'cf-traffic'
 const TRAFFIC_PREDICTION_SOURCE = 'cf-traffic-prediction'
 const TRAFFIC_ZONE_SOURCE     = 'cf-traffic-zones'
 const TRAFFIC_FLOW_SOURCE     = 'cf-traffic-flow'
+const TRAFFIC_SELECTION_SOURCE = 'cf-traffic-selection'
+const TRAFFIC_HOVER_SOURCE    = 'cf-traffic-hover'
 const HEATMAP_SOURCE          = 'cf-heatmap'
 const HEATMAP_FADE_SOURCE     = 'cf-heatmap-fade'
 const HEATMAP_PASSAGES_SOURCE = 'cf-heatmap-passages'
@@ -296,6 +298,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   const setMapReady     = useMapStore(s => s.setMapReady)
   const mode            = useMapStore(s => s.mode)
   const selectSegment   = useMapStore(s => s.selectSegment)
+  const selectedSegmentId = useMapStore(s => s.selectedSegmentId)
   const heatmapMode     = useMapStore(s => s.heatmapMode)
   const zoneActive      = useMapStore(s => s.zoneActive)
   const zoneDraft       = useMapStore(s => s.zoneDraft)
@@ -374,6 +377,41 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   useEffect(() => { dataSourceRef.current = dataSource }, [dataSource])
   useEffect(() => { snapshotRef.current = snapshot }, [snapshot])
   useEffect(() => { incidentsRef.current = incidents }, [incidents])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!mapLoaded || !map) return
+
+    const selectedSrc = safeGetSource(map, TRAFFIC_SELECTION_SOURCE) as maplibregl.GeoJSONSource | null
+    if (!selectedSrc) return
+
+    const selectedSegment = snapshot?.segments.find(segment => segment.id === selectedSegmentId)
+    if (!selectedSegment) {
+      selectedSrc.setData({ type: 'FeatureCollection', features: [] })
+      return
+    }
+
+    const speedRatio = getSpeedRatio(selectedSegment)
+    const statusLabel =
+      speedRatio >= 0.78 ? 'Relief corridor' :
+      speedRatio >= 0.56 ? 'Under pressure' :
+      'Critical corridor'
+
+    selectedSrc.setData({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        id: selectedSegment.id,
+        geometry: { type: 'LineString', coordinates: selectedSegment.coordinates },
+        properties: {
+          id: selectedSegment.id,
+          corridorLabel: selectedSegment.streetName || selectedSegment.axisName || 'Selected corridor',
+          statusLabel,
+          speedRatio,
+        },
+      }],
+    })
+  }, [mapLoaded, selectedSegmentId, snapshot])
   useEffect(() => { countdownRef.current = countdown }, [countdown])
   useEffect(() => { splitLngRef.current = splitLng }, [splitLng])
 
@@ -572,6 +610,14 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
         ])
       }
 
+      const selectionPulse = (Math.sin(now / 280) + 1) / 2
+      safeSetPaintProperty(map, TRAFFIC_SELECTION_SOURCE + '-glow', 'line-opacity', 0.12 + selectionPulse * 0.16)
+      safeSetPaintProperty(map, TRAFFIC_SELECTION_SOURCE + '-glow', 'line-width', [
+        'interpolate', ['linear'], ['zoom'],
+        11, 10 + selectionPulse * 4,
+        16, 24 + selectionPulse * 8,
+      ])
+
       // 2. Pulse Animation (Vehicles + Station Alerts)
       updateVehicles(now)
 
@@ -756,12 +802,29 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     map.on('mouseleave', TRAFFIC_SOURCE + '-lines', () => {
       if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
       popupRef.current?.remove()
+      const hoverSrc = safeGetSource(map, TRAFFIC_HOVER_SOURCE) as maplibregl.GeoJSONSource | null
+      if (hoverSrc) hoverSrc.setData({ type: 'FeatureCollection', features: [] })
     })
 
     map.on('mousemove', TRAFFIC_SOURCE + '-lines', (e) => {
       if (zoneActiveRef.current) return
       const feat = e.features?.[0]
       if (!feat) return
+      const hoverSrc = safeGetSource(map, TRAFFIC_HOVER_SOURCE) as maplibregl.GeoJSONSource | null
+      if (hoverSrc) {
+        hoverSrc.setData({
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            id: feat.id,
+            geometry: {
+              type: (feat.geometry as GeoJSON.LineString).type,
+              coordinates: (feat.geometry as GeoJSON.LineString).coordinates,
+            },
+            properties: { ...(feat.properties as Record<string, unknown>) },
+          }],
+        })
+      }
       const p = feat.properties as any
       const speedRatio = typeof p.speedRatio === 'number' ? p.speedRatio : 1
       const speed = Math.round(p.speedKmh ?? 0)
@@ -2039,6 +2102,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
               predictedSpeedRatio: predictedRatio,
               congestion: seg.congestionScore,
               importance,
+              corridorLabel: `${seg.streetName || seg.axisName || 'Urban corridor'}${predictedRatio < speedRatio - 0.04 ? ' · spike risk' : speedRatio < 0.55 ? ' · slowdown' : ''}`,
               width: computeRoadWidth(seg.roadType, seg.level, map.getZoom(), isMobile),
             },
           }
@@ -2381,7 +2445,13 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-lines', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', isDecisionMap ? 'none' : trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-corridor-labels', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', isDecisionMap ? 'none' : trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-glow', 'visibility', trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-line', 'visibility', trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_SELECTION_SOURCE + '-glow', 'visibility', trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_SELECTION_SOURCE + '-line', 'visibility', trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_SELECTION_SOURCE + '-label', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-fill', 'visibility', 'none')
     safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-line', 'visibility', 'none')
     safeSetLayoutProperty(map, 'cf-idf-roads-lines', 'visibility', trafficVis)
@@ -2402,7 +2472,13 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     if (isDecisionMap) {
       safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-lines', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', 'none')
+      safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-corridor-labels', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', 'none')
+      safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-glow', 'visibility', trafficVis)
+      safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-line', 'visibility', trafficVis)
+      safeSetLayoutProperty(map, TRAFFIC_SELECTION_SOURCE + '-glow', 'visibility', trafficVis)
+      safeSetLayoutProperty(map, TRAFFIC_SELECTION_SOURCE + '-line', 'visibility', trafficVis)
+      safeSetLayoutProperty(map, TRAFFIC_SELECTION_SOURCE + '-label', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-fill', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-line', 'visibility', trafficVis)
       safeSetLayoutProperty(map, 'cf-idf-roads-lines', 'visibility', trafficVis)
@@ -2827,6 +2903,24 @@ function initStaticSources(map: maplibregl.Map) {
     })
   }
 
+  if (!map.getSource(TRAFFIC_SELECTION_SOURCE)) {
+    map.addSource(TRAFFIC_SELECTION_SOURCE, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+      lineMetrics: true,
+      promoteId: 'id',
+    })
+  }
+
+  if (!map.getSource(TRAFFIC_HOVER_SOURCE)) {
+    map.addSource(TRAFFIC_HOVER_SOURCE, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+      lineMetrics: true,
+      promoteId: 'id',
+    })
+  }
+
   // 0. Traffic Halo (Maximum Contrast)
   if (!map.getLayer(TRAFFIC_SOURCE + '-halo')) {
     map.addLayer({
@@ -2873,6 +2967,108 @@ function initStaticSources(map: maplibregl.Map) {
           14, 0.78,
         ],
         'line-dasharray': [4, 0.1]
+      },
+    })
+  }
+
+  if (!map.getLayer(TRAFFIC_SOURCE + '-corridor-labels')) {
+    map.addLayer({
+      id: TRAFFIC_SOURCE + '-corridor-labels',
+      type: 'symbol',
+      source: TRAFFIC_SOURCE,
+      minzoom: 13,
+      filter: ['all', ['>=', ['get', 'importance'], 0.55], ['<=', ['get', 'speedRatio'], 0.68]],
+      layout: {
+        'symbol-placement': 'line-center',
+        'text-field': ['get', 'corridorLabel'],
+        'text-font': ['Open Sans Bold'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 13, 10, 16, 12],
+        'text-letter-spacing': 0.02,
+        'text-max-width': 14,
+      },
+      paint: {
+        'text-color': 'rgba(255,245,247,0.92)',
+        'text-halo-color': 'rgba(8,9,11,0.96)',
+        'text-halo-width': 2,
+      },
+    })
+  }
+
+  if (!map.getLayer(TRAFFIC_HOVER_SOURCE + '-glow')) {
+    map.addLayer({
+      id: TRAFFIC_HOVER_SOURCE + '-glow',
+      type: 'line',
+      source: TRAFFIC_HOVER_SOURCE,
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#FFFFFF',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 6, 16, 14],
+        'line-opacity': 0.14,
+        'line-blur': 4,
+      },
+    })
+  }
+
+  if (!map.getLayer(TRAFFIC_HOVER_SOURCE + '-line')) {
+    map.addLayer({
+      id: TRAFFIC_HOVER_SOURCE + '-line',
+      type: 'line',
+      source: TRAFFIC_HOVER_SOURCE,
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#F8FAFC',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 4],
+        'line-opacity': 0.72,
+      },
+    })
+  }
+
+  if (!map.getLayer(TRAFFIC_SELECTION_SOURCE + '-glow')) {
+    map.addLayer({
+      id: TRAFFIC_SELECTION_SOURCE + '-glow',
+      type: 'line',
+      source: TRAFFIC_SELECTION_SOURCE,
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#38BDF8',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 10, 16, 24],
+        'line-opacity': 0.18,
+        'line-blur': 7,
+      },
+    })
+  }
+
+  if (!map.getLayer(TRAFFIC_SELECTION_SOURCE + '-line')) {
+    map.addLayer({
+      id: TRAFFIC_SELECTION_SOURCE + '-line',
+      type: 'line',
+      source: TRAFFIC_SELECTION_SOURCE,
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#7DD3FC',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3, 16, 7],
+        'line-opacity': 0.98,
+      },
+    })
+  }
+
+  if (!map.getLayer(TRAFFIC_SELECTION_SOURCE + '-label')) {
+    map.addLayer({
+      id: TRAFFIC_SELECTION_SOURCE + '-label',
+      type: 'symbol',
+      source: TRAFFIC_SELECTION_SOURCE,
+      minzoom: 12,
+      layout: {
+        'symbol-placement': 'line-center',
+        'text-field': ['concat', ['get', 'corridorLabel'], '\n', ['get', 'statusLabel']],
+        'text-font': ['Open Sans Bold'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 12, 11, 16, 13],
+        'text-justify': 'center',
+      },
+      paint: {
+        'text-color': '#E0F2FE',
+        'text-halo-color': 'rgba(8,9,11,0.98)',
+        'text-halo-width': 2.5,
       },
     })
   }
