@@ -34,14 +34,9 @@ export default function MapPage() {
     document.title = 'Paris Live Traffic | CrossFlow'
     setCity(paris)
     setLockedCity('paris')
-    const restoreFlowLayer = !activeLayers.has('flow')
-    if (restoreFlowLayer) setLayer('flow', true)
-
-    return () => {
-      setLockedCity(null)
-      if (restoreFlowLayer) setLayer('flow', false)
-    }
-  }, [activeLayers, paris, setCity, setLayer, setLockedCity])
+    if (!activeLayers.has('flow')) setLayer('flow', true)
+    return () => setLockedCity(null)
+  }, [paris, setCity, setLayer, setLockedCity])
 
   const avgCongestion = snapshot
     ? Math.round((snapshot.segments.reduce((sum, s) => sum + s.congestionScore, 0) / Math.max(snapshot.segments.length, 1)) * 100)
