@@ -39,6 +39,8 @@ interface IdfSegment {
 // ── Spatial Grid Index (Spatial Hash) ───────────────────────────────────────
 
 const GRID_SIZE = 0.05 // degrees (~5.5km)
+const MAX_FEATURES = 600
+const MAX_COORDS_PER_FEATURE = 32
 let _segments: IdfSegment[] | null = null
 const _grid: Map<string, IdfSegment[]> = new Map()
 
@@ -108,6 +110,15 @@ function loadSegments(): IdfSegment[] {
   return _segments
 }
 
+function simplifyCoordinates(coords: [number, number][]): [number, number][] {
+  if (coords.length <= MAX_COORDS_PER_FEATURE) return coords
+  const step = Math.ceil(coords.length / MAX_COORDS_PER_FEATURE)
+  const simplified = coords.filter((_, idx) => idx % step === 0)
+  const last = coords[coords.length - 1]
+  if (simplified[simplified.length - 1] !== last) simplified.push(last)
+  return simplified
+}
+
 // ── Route handler ────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
@@ -118,7 +129,7 @@ export async function GET(req: NextRequest) {
     : null
 
   const countyFilter = sp.get('county')?.toLowerCase() ?? null
-  const limit        = Math.min(parseInt(sp.get('limit') ?? '800', 10), 3000)
+  const limit        = Math.min(parseInt(sp.get('limit') ?? '400', 10), MAX_FEATURES)
   const minMiles     = parseFloat(sp.get('minMiles') ?? '0')
 
   let bbox: [number, number, number, number] | null = null
@@ -181,7 +192,7 @@ export async function GET(req: NextRequest) {
       type: 'Feature',
       geometry: {
         type: 'LineString',
-        coordinates: seg.coordinates,
+        coordinates: simplifyCoordinates(seg.coordinates),
       },
       properties: {
         id:         seg.id,

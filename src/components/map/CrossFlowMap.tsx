@@ -1676,7 +1676,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
         const bboxStr = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
           .map(v => Math.round(v * 1000) / 1000).join(',')
         
-        const res = await fetch(`/api/idf-roads?bbox=${bboxStr}&limit=1200&frc=1,2,3,4`)
+        const res = await fetch(`/api/idf-roads?bbox=${bboxStr}&limit=400&frc=1,2,3,4`)
         if (res.ok) {
           const idfGeojson = await res.json()
           if (idfGeojson.features?.length > 0) {
