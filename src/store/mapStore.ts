@@ -102,6 +102,7 @@ interface MapStore {
 }
 
 const defaultCity = CITIES.find(c => c.id === DEFAULT_CITY_ID)!
+let latestBoundaryRequestId = 0
 
 export const useMapStore = create<MapStore>()(
   persist(
@@ -110,6 +111,7 @@ export const useMapStore = create<MapStore>()(
       cityHistory:     CITIES.slice(0, 5),
       cityBoundary:    null,
       setCity: async (city) => {
+        const requestId = ++latestBoundaryRequestId
         set({ city, selectedSegmentId: null })
         get().addToHistory(city)
         get().flyToCity(city)
@@ -117,12 +119,12 @@ export const useMapStore = create<MapStore>()(
         // Reset and fetch new boundary
         set({ cityBoundary: null })
         const boundary = await fetchCityBoundary(city.name, city.country)
-        if (boundary) {
+        if (boundary && requestId === latestBoundaryRequestId && get().city.id === city.id) {
           set({
             cityBoundary: {
               type: 'Feature',
               geometry: boundary,
-              properties: {}
+              properties: { cityId: city.id }
             } as GeoJSON.Feature
           })
         }

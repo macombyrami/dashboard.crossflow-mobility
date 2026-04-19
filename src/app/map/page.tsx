@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic'
 import type { ComponentType } from 'react'
 import { AlertTriangle, Layers3, MapPinned, Navigation2, Radar } from 'lucide-react'
 
-import { CITIES } from '@/config/cities.config'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import type { MapLayerId } from '@/types'
@@ -17,27 +16,20 @@ const CrossFlowMap = dynamic(
 )
 
 export default function MapPage() {
-  const setCity = useMapStore(s => s.setCity)
-  const setLockedCity = useMapStore(s => s.setLockedCity)
+  const city = useMapStore(s => s.city)
   const setLayer = useMapStore(s => s.setLayer)
   const activeLayers = useMapStore(s => s.activeLayers)
   const toggleLayer = useMapStore(s => s.toggleLayer)
-  const trafficMode = useMapStore(s => s.mode)
   const incidents = useTrafficStore(s => s.incidents)
   const dataSource = useTrafficStore(s => s.dataSource)
   const snapshot = useTrafficStore(s => s.snapshot)
   const trafficSummary = useTrafficStore(s => s.trafficSummary)
   const liveWeather = useTrafficStore(s => s.openMeteoWeather)
 
-  const paris = CITIES.find(c => c.id === 'paris') ?? CITIES[0]
-
   useEffect(() => {
-    document.title = 'Paris Live Traffic | CrossFlow'
-    setCity(paris)
-    setLockedCity('paris')
+    document.title = `${city.name} Live Traffic | CrossFlow`
     if (!activeLayers.has('flow')) setLayer('flow', true)
-    return () => setLockedCity(null)
-  }, [paris, setCity, setLayer, setLockedCity])
+  }, [activeLayers, city.name, setLayer])
 
   const segmentCount = trafficSummary?.segmentCount ?? snapshot?.segments.length ?? 0
   const avgCongestion = trafficSummary ? Math.round(trafficSummary.avgCongestion * 100) : 0
@@ -49,7 +41,7 @@ export default function MapPage() {
   ]
 
   return (
-    <main id="main-content" aria-label="Carte Paris en temps reel" className="fixed inset-0 isolate overflow-hidden bg-[#030303]">
+    <main id="main-content" aria-label={`Carte ${city.name} en temps reel`} className="fixed inset-0 isolate overflow-hidden bg-[#030303]">
       <div className="absolute inset-0">
         <CrossFlowMap />
       </div>
@@ -61,13 +53,13 @@ export default function MapPage() {
               <div>
                 <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.22em] text-white/45 font-black">
                   <MapPinned className="h-3.5 w-3.5 text-brand-green" />
-                  Paris uniquement
+                  {city.name}
                 </div>
                 <h1 className="mt-1 text-lg sm:text-xl lg:text-[1.7rem] font-black tracking-tight leading-tight">
-                  Lecture trafic en temps réel
+                  Lecture trafic en temps reel
                 </h1>
                 <p className="mt-1 text-xs sm:text-sm text-white/60 leading-relaxed">
-                  Vue opérationnelle consolidée pour Paris uniquement.
+                  Vue operationnelle consolidee pour {city.name}.
                 </p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 px-2.5 py-2 text-right">
@@ -76,16 +68,16 @@ export default function MapPage() {
                   'mt-0.5 text-[10px] font-bold',
                   dataSource === 'live' ? 'text-brand-green' : 'text-traffic-warning',
                 )}>
-                  {dataSource === 'live' ? 'Lecture consolidée' : 'Lecture locale'}
+                  {dataSource === 'live' ? 'Lecture consolidee' : 'Lecture locale'}
                 </div>
               </div>
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Metric label="État trafic" value={trafficSummary?.trafficLabel ?? 'Chargement'} icon={Radar} />
+              <Metric label="Etat trafic" value={trafficSummary?.trafficLabel ?? 'Chargement'} icon={Radar} />
               <Metric label="Segments utiles" value={segmentCount} icon={Layers3} />
-              <Metric label="Congestion" value={trafficSummary ? `${avgCongestion}%` : '—'} icon={AlertTriangle} />
-              <Metric label="Prévision" value={trafficSummary?.predictionLabel ?? '—'} icon={Navigation2} />
+              <Metric label="Congestion" value={trafficSummary ? `${avgCongestion}%` : '-'} icon={AlertTriangle} />
+              <Metric label="Prevision" value={trafficSummary?.predictionLabel ?? '-'} icon={Navigation2} />
             </div>
 
             <div className="mt-3 grid grid-cols-3 gap-2">
@@ -120,10 +112,10 @@ export default function MapPage() {
                 {criticalCount > 0 ? `${criticalCount} alertes` : 'Aucune alerte majeure'}
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
-                {liveWeather ? `${liveWeather.weatherEmoji} ${Math.round(liveWeather.temp)}°C` : 'Météo non chargée'}
+                {liveWeather ? `${liveWeather.weatherEmoji} ${Math.round(liveWeather.temp)}C` : 'Meteo non chargee'}
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
-                Paris verrouillé
+                {city.name} actif
               </span>
             </div>
           </div>
@@ -131,10 +123,10 @@ export default function MapPage() {
           <div className="hidden 2xl:block pointer-events-auto max-w-[18rem] rounded-[1.5rem] border border-white/10 bg-[#0B0C10]/82 p-3 text-white shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
             <p className="text-[9px] uppercase tracking-[0.22em] text-white/45 font-black">Lecture carte</p>
             <ul className="mt-2.5 space-y-1.5 text-[13px] text-white/75 leading-relaxed">
-              <li>Rouge = zone critique à traiter en priorité.</li>
-              <li>Orange = pression notable à surveiller.</li>
+              <li>Rouge = zone critique a traiter en priorite.</li>
+              <li>Orange = pression notable a surveiller.</li>
               <li>Vert = circulation fluide et stable.</li>
-              <li>La lecture reste centrée sur Paris et son bassin immédiat.</li>
+              <li>La lecture reste centree sur {city.name} et son bassin immediat.</li>
             </ul>
           </div>
         </div>

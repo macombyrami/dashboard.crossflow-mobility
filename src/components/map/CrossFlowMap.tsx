@@ -223,6 +223,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   const lastVehicleUpdateRef = useRef<number>(0)
   const previousSnapshotRef  = useRef<TrafficSnapshot | null>(null)
   const lastRefreshRef       = useRef<number>(0)
+  const refreshRequestRef    = useRef(0)
   const cityNetworkRef       = useRef<string | null>(null) // Track which city's network is loaded
   const liveVehiclesRef      = useRef<TransitVehicle[]>([])
   const pulseRef             = useRef<number>(0)
@@ -1081,23 +1082,26 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
   useEffect(() => {
     if (!mapLoaded) return
+    const cityId = city.id
 
     // Load OSM roads for real geometry
-    if (!osmRoadsRef.current.has(city.id)) {
+    if (!osmRoadsRef.current.has(cityId)) {
       fetchRoads(city.bbox, ['motorway', 'trunk', 'primary', 'secondary', 'tertiary'])
         .then(roads => {
+          if (cityRef.current.id !== cityId) return
           if (roads.length > 0) {
-            osmRoadsRef.current.set(city.id, roads.slice(0, 600))
+            osmRoadsRef.current.set(cityId, roads.slice(0, 600))
             refreshDataRef.current()
           }
         })
     }
 
     // Load POIs (traffic signals, bus stops, subway entrances) independently
-    if (!osmPoisRef.current.has(city.id)) {
+    if (!osmPoisRef.current.has(cityId)) {
       fetchTrafficPOIs(city.bbox).then(pois => {
+        if (cityRef.current.id !== cityId) return
         if (!pois.length) return
-        osmPoisRef.current.set(city.id, pois)
+        osmPoisRef.current.set(cityId, pois)
         const map = mapRef.current
         if (!map) return
         const src = map.getSource(POI_SOURCE) as maplibregl.GeoJSONSource | undefined
@@ -1584,8 +1588,10 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     src.setData({ type: 'FeatureCollection', features: [] }) // clear while loading
     if (!city.bbox) return
+    const cityId = city.id
 
     fetchCityDistricts(city.center.lat, city.center.lng).then((districts: any[]) => {
+      if (cityRef.current.id !== cityId) return
       const s = map.getSource(DISTRICTS_SOURCE) as maplibregl.GeoJSONSource | undefined
       if (s) {
         const fc: GeoJSON.FeatureCollection = {
@@ -1621,15 +1627,17 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     const map = mapRef.current
 
     const initNetwork = async () => {
-      if (cityNetworkRef.current === city.id) return
+      const cityId = city.id
+      if (cityNetworkRef.current === cityId) return
       
       const { NetworkAggregator } = await import('@/lib/engine/NetworkAggregator')
       const fc = await NetworkAggregator.getCityNetwork(city)
+      if (cityRef.current.id !== cityId) return
       
       const tSrc = safeGetSource(map, TRAFFIC_SOURCE) as maplibregl.GeoJSONSource | null
       if (tSrc) {
         tSrc.setData(fc)
-        cityNetworkRef.current = city.id
+        cityNetworkRef.current = cityId
         console.log(`[CrossFlow] UCTN Loaded for ${city.name}: ${fc.features.length} segments.`)
       }
     }
@@ -1649,6 +1657,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     const nowTs = Date.now()
     if (nowTs - lastRefreshRef.current < 5000) return
     lastRefreshRef.current = nowTs
+    const requestId = ++refreshRequestRef.current
 
     const map = mapRef.current
     const bounds = map.getBounds()
@@ -1660,6 +1669,10 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     const activeLayersNow = activeLayersRef.current
     const useHere    = hereHasKey()
     const useTomTom  = useLiveData
+    const isRequestCurrent = () =>
+      refreshRequestRef.current === requestId &&
+      cityRef.current.id === cityNow.id &&
+      mapRef.current === map
 
     // ── 1. Determine base snapshot (Synthetic or Multi-source) ────────────
     let snapshot = (() => {
@@ -1679,6 +1692,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
         const res = await fetch(`/api/idf-roads?bbox=${bboxStr}&limit=400&frc=1,2,3,4`)
         if (res.ok) {
           const idfGeojson = await res.json()
+          if (!isRequestCurrent()) return
           if (idfGeojson.features?.length > 0) {
             snapshot = generateTrafficFromIdfGeoJSON(cityNow, idfGeojson)
           }
@@ -1691,6 +1705,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     // ── 3. Overlay real-time HERE traffic if available ────────────────────
     if (useHere) {
       const hereFlow = await fetchHereFlow(cityNow.bbox)
+      if (!isRequestCurrent()) return
       if (hereFlow.length > 0) {
         const now = new Date().toISOString()
         const hereSegments: TrafficSegment[] = hereFlow
@@ -1724,6 +1739,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     }
 
     const synthetic = generateIncidents(cityNow)
+    if (!isRequestCurrent()) return
     setSnapshot(snapshot)
 
     let incidents: Incident[] = synthetic
@@ -1732,6 +1748,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     if (useTomTom) {
       // Fetch real TomTom incidents for current viewport
       const tomtomIncs = await fetchTomTomIncidents(viewportBbox)
+      if (!isRequestCurrent()) return
       if (tomtomIncs.length > 0) {
         incidents = tomtomIncs.map(inc => ({
           id:          inc.id,
@@ -1751,6 +1768,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     } else if (useHere) {
       // HERE incidents as fallback for current viewport
       const hereIncs = await fetchHereIncidents(viewportBbox)
+      if (!isRequestCurrent()) return
       if (hereIncs.length > 0) {
         incidents = hereIncs.map(inc => ({
           id:          inc.incidentId,
@@ -1773,9 +1791,11 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     }
 
     if (!snapshot) return
+    if (!isRequestCurrent()) return
 
     const { NetworkAggregator } = await import('@/lib/engine/NetworkAggregator')
     const snappedSnapshot = NetworkAggregator.snapToNetwork(cityNow, snapshot)
+    if (!isRequestCurrent()) return
     
     setSnapshot(snappedSnapshot)
     const incidentSplit = splitIncidents(incidents)
@@ -1941,6 +1961,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       if (criticalSrc) criticalSrc.setData(criticalGeo)
     }
 
+    if (!isRequestCurrent()) return
     previousSnapshotRef.current = snapshot
   }, [setSnapshot, setIncidents, setDataSource])
 
@@ -1949,11 +1970,18 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   useEffect(() => {
     if (!mapLoaded) return
     refreshData()
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
     // Viewport-aware refresh: update when user stops moving/zooming
-    const onMoveEnd = () => refreshData()
+    const onMoveEnd = () => {
+      if (timeoutId) clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => {
+        refreshData()
+      }, 180)
+    }
     mapRef.current?.on('moveend', onMoveEnd)
 
     return () => {
+      if (timeoutId) clearTimeout(timeoutId)
       mapRef.current?.off('moveend', onMoveEnd)
     }
   }, [mapLoaded, refreshData])
