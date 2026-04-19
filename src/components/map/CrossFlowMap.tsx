@@ -427,7 +427,6 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
     const map = mapRef.current
-    let offset = 0
 
     const animate = () => {
       if (document.hidden) {
@@ -436,10 +435,6 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       }
 
       const now = Date.now()
-      
-      // 1. Traffic Dash Animation
-      offset = (offset + 0.15) % 100
-      safeSetPaintProperty(map, TRAFFIC_SOURCE + '-lines', 'line-dash-offset', offset)
 
       // 1b. Phase 5: Radial Scan & Critical Pulse
       // Scan starts at 0 and grows to 1 then stays there
