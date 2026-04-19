@@ -93,7 +93,6 @@ const PREDICTIVE_EVENTS_SOURCE   = 'cf-pred-events'
 const SIM_LOCATION_SOURCE        = 'cf-sim-location'
 const SOCIAL_SOURCE              = 'cf-social'
 const WORLD_MASK_SOURCE           = 'cf-world-mask'
-const CONGESTION_HEATMAP_SOURCES = [HEATMAP_SOURCE, HEATMAP_FADE_SOURCE] as const
 
 
 // ─── Popup helpers ────────────────────────────────────────────────────────
@@ -269,6 +268,10 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   const scanRef              = useRef<number>(0) // Phase 5: Radial Scan
   const rafRef               = useRef<number>(0)
   const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
+  const heatmapWorkerRef     = useRef<Worker | null>(null)
+  const heatmapJobRef        = useRef(0)
+  const heatmapFadeRef       = useRef<number>(0)
+  const activeHeatSourceRef  = useRef<typeof HEATMAP_SOURCE | typeof HEATMAP_FADE_SOURCE>(HEATMAP_SOURCE)
 
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapError, setMapError]   = useState<string | null>(null)
@@ -373,6 +376,68 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   useEffect(() => { incidentsRef.current = incidents }, [incidents])
   useEffect(() => { countdownRef.current = countdown }, [countdown])
   useEffect(() => { splitLngRef.current = splitLng }, [splitLng])
+
+  const applyCongestionHeatmapCrossfade = useCallback((featureCollection: AggregatedHeatFeatureCollection) => {
+    const map = mapRef.current
+    if (!map) return
+
+    const currentSourceId = activeHeatSourceRef.current
+    const nextSourceId = currentSourceId === HEATMAP_SOURCE ? HEATMAP_FADE_SOURCE : HEATMAP_SOURCE
+    const nextSource = safeGetSource(map, nextSourceId) as maplibregl.GeoJSONSource | null
+    if (!nextSource) return
+
+    nextSource.setData(featureCollection)
+
+    if (heatmapFadeRef.current) cancelAnimationFrame(heatmapFadeRef.current)
+
+    const start = performance.now()
+    const duration = 320
+
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setCongestionHeatmapStackOpacity(map, currentSourceId, 1 - eased)
+      setCongestionHeatmapStackOpacity(map, nextSourceId, eased)
+
+      if (progress < 1) {
+        heatmapFadeRef.current = requestAnimationFrame(tick)
+        return
+      }
+
+      activeHeatSourceRef.current = nextSourceId
+      setCongestionHeatmapStackVisibility(map, currentSourceId, 'visible', 'none')
+      setCongestionHeatmapStackVisibility(map, nextSourceId, 'visible', 'visible')
+      setCongestionHeatmapStackOpacity(map, currentSourceId, 0)
+      setCongestionHeatmapStackOpacity(map, nextSourceId, 1)
+    }
+
+    heatmapFadeRef.current = requestAnimationFrame(tick)
+  }, [])
+
+  const scheduleCongestionHeatmapUpdate = useCallback((points: { lng: number, lat: number, intensity: number }[], zoom: number) => {
+    const worker = heatmapWorkerRef.current
+    if (!worker) return
+
+    const zoomBucket = Math.max(0, Math.round(zoom))
+    const jobId = ++heatmapJobRef.current
+    worker.postMessage({ jobId, points, zoomBucket })
+  }, [])
+
+  useEffect(() => {
+    const worker = new Worker(new URL('./workers/trafficHeatmap.worker.ts', import.meta.url))
+    heatmapWorkerRef.current = worker
+
+    worker.onmessage = (event: MessageEvent<{ jobId: number, featureCollection: AggregatedHeatFeatureCollection }>) => {
+      if (event.data.jobId !== heatmapJobRef.current) return
+      applyCongestionHeatmapCrossfade(event.data.featureCollection)
+    }
+
+    return () => {
+      if (heatmapFadeRef.current) cancelAnimationFrame(heatmapFadeRef.current)
+      worker.terminate()
+      heatmapWorkerRef.current = null
+    }
+  }, [applyCongestionHeatmapCrossfade])
 
 
 
@@ -536,6 +601,23 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     map.on('move', updateSplitLine)
     return () => { map.off('move', updateSplitLine) }
   }, [mapLoaded, splitRatio, mode])
+
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+    const map = mapRef.current
+
+    const onZoomEnd = () => {
+      const currentSnapshot = snapshotRef.current
+      if (!currentSnapshot) return
+      if (!activeLayersRef.current.has('heatmap') && !isDecisionMap) return
+      scheduleCongestionHeatmapUpdate(currentSnapshot.heatmap, map.getZoom())
+    }
+
+    map.on('zoomend', onZoomEnd)
+    return () => {
+      map.off('zoomend', onZoomEnd)
+    }
+  }, [isDecisionMap, mapLoaded, scheduleCongestionHeatmapUpdate])
 
   // ─── Cursor change when zone tool is active ──────────────────────────
   useEffect(() => {
@@ -1031,6 +1113,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       const feat = e.features?.[0]
       if (!feat) return
       const intensity = feat.properties?.intensity
+      const count = Number(feat.properties?.count ?? 1)
+      const contextLabel = String(feat.properties?.contextLabel ?? 'High congestion area')
       popupRef.current?.remove()
       popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, className: 'apple-popup' })
         .setLngLat(e.lngLat)
@@ -1040,12 +1124,15 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
             <p style="margin:4px 0 0 0; font-size:22px; font-weight:700; color:white;">
               ${Math.round(intensity * 100)}<span style="font-size:12px; font-weight:500; color:#86868B; margin-left:4px;">${unit}</span>
             </p>
+            <p style="margin:8px 0 0 0; font-size:11px; color:#D1D5DB;">${contextLabel}</p>
+            <p style="margin:4px 0 0 0; font-size:10px; color:#9CA3AF;">${count} aggregated cells contributing</p>
           </div>
         `)
         .addTo(map)
     }
 
-    map.on('click', HEATMAP_SOURCE + '-circles', handleHeatmapClick('congestion', '#FF3B30', '%'))
+    map.on('click', heatmapStackLayerId(HEATMAP_SOURCE, 'circles'), handleHeatmapClick('congestion', '#FF6B57', '%'))
+    map.on('click', heatmapStackLayerId(HEATMAP_FADE_SOURCE, 'circles'), handleHeatmapClick('congestion', '#FF6B57', '%'))
     map.on('click', HEATMAP_PASSAGES_SOURCE + '-circles', handleHeatmapClick('passages', '#FFD600', 'pts'))
     map.on('click', HEATMAP_CO2_SOURCE + '-circles', handleHeatmapClick('co2', '#A855F7', 'g'))
 
@@ -1911,16 +1998,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     // --- Heatmaps & Incidents ---
     if (activeLayersNow.has('heatmap') || isDecisionMap) {
-      const heatGeo: GeoJSON.FeatureCollection = {
-        type: 'FeatureCollection',
-        features: snapshot.heatmap.map(pt => ({
-          type: 'Feature' as const,
-          geometry: { type: 'Point' as const, coordinates: [pt.lng, pt.lat] },
-          properties: { intensity: pt.intensity },
-        })),
-      }
-      const hSrc = safeGetSource(map, HEATMAP_SOURCE) as maplibregl.GeoJSONSource | null
-      if (hSrc) hSrc.setData(heatGeo)
+      scheduleCongestionHeatmapUpdate(snapshot.heatmap, map.getZoom())
     }
 
     const incGeo: GeoJSON.FeatureCollection = {
@@ -2002,7 +2080,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     if (!isRequestCurrent()) return
     previousSnapshotRef.current = snapshot
-  }, [setSnapshot, setIncidents, setDataSource])
+  }, [scheduleCongestionHeatmapUpdate, setSnapshot, setIncidents, setDataSource])
 
   useEffect(() => { refreshDataRef.current = refreshData }, [refreshData])
 
@@ -2299,14 +2377,15 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     const flowVis = activeLayers.has('flow') ? 'visible' : 'none'
     const boundaryVis = activeLayers.has('boundary') ? 'visible' : 'none'
     const heatVis = isDecisionMap ? 'visible' : (activeLayers.has('heatmap') ? 'visible' : 'none')
+    const inactiveHeatSource = activeHeatSourceRef.current === HEATMAP_SOURCE ? HEATMAP_FADE_SOURCE : HEATMAP_SOURCE
 
     safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-lines', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', isDecisionMap ? 'none' : trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', isDecisionMap ? 'none' : trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-fill', 'visibility', 'none')
     safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-line', 'visibility', 'none')
-    safeSetLayoutProperty(map, HEATMAP_SOURCE + '-layer', 'visibility', heatVis)
-    safeSetLayoutProperty(map, HEATMAP_SOURCE + '-circles', 'visibility', heatVis)
+    setCongestionHeatmapStackVisibility(map, activeHeatSourceRef.current, heatVis, heatVis)
+    setCongestionHeatmapStackVisibility(map, inactiveHeatSource, heatVis, 'none')
     safeSetLayoutProperty(map, TRAFFIC_FLOW_SOURCE + '-layer', 'visibility', flowVis)
 
     safeSetLayoutProperty(map, INCIDENT_SOURCE + '-cluster-glow', 'visibility', incidentsVis)
@@ -2394,8 +2473,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-lineref', 'visibility', 'none')
       safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-name', 'visibility', 'none')
       safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-alert', 'visibility', 'none')
-      safeSetLayoutProperty(map, HEATMAP_SOURCE + '-layer', 'visibility', 'none')
-      safeSetLayoutProperty(map, HEATMAP_SOURCE + '-circles', 'visibility', 'none')
+      setCongestionHeatmapStackVisibility(map, HEATMAP_SOURCE, 'none', 'none')
+      setCongestionHeatmapStackVisibility(map, HEATMAP_FADE_SOURCE, 'none', 'none')
       safeSetLayoutProperty(map, HEATMAP_PASSAGES_SOURCE + '-layer', 'visibility', 'none')
       safeSetLayoutProperty(map, HEATMAP_PASSAGES_SOURCE + '-circles', 'visibility', 'none')
       safeSetLayoutProperty(map, HEATMAP_CO2_SOURCE + '-layer', 'visibility', 'none')
@@ -2421,8 +2500,10 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     if (!mapRef.current || !mapLoaded) return
     const map = mapRef.current
     const isHeatmapActive = activeLayers.has('heatmap')
-    safeSetLayoutProperty(map, HEATMAP_SOURCE          + '-layer',   'visibility', isHeatmapActive && heatmapMode === 'congestion' ? 'visible' : 'none')
-    safeSetLayoutProperty(map, HEATMAP_SOURCE          + '-circles', 'visibility', isHeatmapActive && heatmapMode === 'congestion' ? 'visible' : 'none')
+    const congestionVisibility = isHeatmapActive && heatmapMode === 'congestion' ? 'visible' : 'none'
+    const inactiveHeatSource = activeHeatSourceRef.current === HEATMAP_SOURCE ? HEATMAP_FADE_SOURCE : HEATMAP_SOURCE
+    setCongestionHeatmapStackVisibility(map, activeHeatSourceRef.current, congestionVisibility, congestionVisibility)
+    setCongestionHeatmapStackVisibility(map, inactiveHeatSource, congestionVisibility, 'none')
     
     safeSetLayoutProperty(map, HEATMAP_PASSAGES_SOURCE + '-layer',   'visibility', isHeatmapActive && heatmapMode === 'passages'   ? 'visible' : 'none')
     safeSetLayoutProperty(map, HEATMAP_PASSAGES_SOURCE + '-circles', 'visibility', isHeatmapActive && heatmapMode === 'passages'   ? 'visible' : 'none')
@@ -2997,41 +3078,12 @@ function initStaticSources(map: maplibregl.Map) {
     },
   })
 
-  // Heatmap
-  map.addSource(HEATMAP_SOURCE, { type: 'geojson', data: emptyFC })
-  map.addLayer({
-    id:     HEATMAP_SOURCE + '-layer',
-    type:   'heatmap',
-    source: HEATMAP_SOURCE,
-    maxzoom: 16,
-    layout: { visibility: 'none' },
-    paint:  {
-      'heatmap-weight':   ['interpolate', ['linear'], ['get', 'intensity'], 0, 0, 0.3, 0.18, 0.6, 0.62, 1, 1],
-      'heatmap-intensity':['interpolate', ['linear'], ['zoom'], 0, 0.8, 8, 1.8, 12, 2.8, 16, 3.6],
-      'heatmap-radius':   ['interpolate', ['linear'], ['zoom'], 0, 14, 8, 26, 12, 40, 16, 58],
-      'heatmap-opacity':  ['interpolate', ['linear'], ['zoom'], 0, 0.18, 8, 0.42, 12, 0.68, 16, 0.78],
-      'heatmap-color': [
-        'interpolate', ['linear'], ['heatmap-density'],
-        0,    'rgba(34, 197, 94, 0)',
-        0.18, 'rgba(34, 197, 94, 0.22)',
-        0.4,  'rgba(255, 214, 0, 0.35)',
-        0.65, 'rgba(255, 159, 10, 0.55)',
-        0.85, 'rgba(239, 68, 68, 0.8)',
-      ],
-    },
-  })
-
-  // Transparent click targets for heatmap
-  map.addLayer({
-    id:     HEATMAP_SOURCE + '-circles',
-    type:   'circle',
-    source: HEATMAP_SOURCE,
-    paint:  {
-      'circle-radius': 18,
-      'circle-color': 'rgba(0,0,0,0)',
-      'circle-opacity': 0
-    }
-  })
+  addCongestionHeatmapStack(map, HEATMAP_SOURCE, emptyFC)
+  addCongestionHeatmapStack(map, HEATMAP_FADE_SOURCE, emptyFC)
+  setCongestionHeatmapStackOpacity(map, HEATMAP_SOURCE, 1)
+  setCongestionHeatmapStackOpacity(map, HEATMAP_FADE_SOURCE, 0)
+  setCongestionHeatmapStackVisibility(map, HEATMAP_SOURCE, 'none', 'none')
+  setCongestionHeatmapStackVisibility(map, HEATMAP_FADE_SOURCE, 'none', 'none')
 
   // Incidents split into clusters + critical pins
   map.addSource(INCIDENT_SOURCE, {
@@ -3625,6 +3677,190 @@ function initBoundaryLayers(map: maplibregl.Map) {
       'fill-opacity': 0.95,
     },
   }, BOUNDARY_SOURCE + '-glow-outer') // Insert below boundary glows but above background
+}
+
+function addCongestionHeatmapStack(
+  map: maplibregl.Map,
+  sourceId: string,
+  emptyFC: GeoJSON.FeatureCollection,
+) {
+  map.addSource(sourceId, {
+    type: 'geojson',
+    data: emptyFC,
+    cluster: true,
+    clusterMaxZoom: 9,
+    clusterRadius: 42,
+  })
+
+  map.addLayer({
+    id: heatmapStackLayerId(sourceId, 'clusters'),
+    type: 'circle',
+    source: sourceId,
+    maxzoom: 9,
+    filter: ['has', 'point_count'],
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius': [
+        'interpolate', ['linear'], ['get', 'point_count'],
+        1, 14,
+        20, 20,
+        80, 30,
+        250, 42,
+      ],
+      'circle-color': [
+        'interpolate', ['linear'], ['get', 'point_count'],
+        1, 'rgba(52, 211, 153, 0.22)',
+        12, 'rgba(250, 204, 21, 0.28)',
+        36, 'rgba(249, 115, 22, 0.34)',
+        96, 'rgba(255, 107, 87, 0.46)',
+      ],
+      'circle-opacity': 0,
+      'circle-blur': 0.42,
+      'circle-stroke-width': 1,
+      'circle-stroke-color': 'rgba(255,255,255,0.08)',
+    },
+  })
+
+  map.addLayer({
+    id: heatmapStackLayerId(sourceId, 'cluster-count'),
+    type: 'symbol',
+    source: sourceId,
+    maxzoom: 9,
+    filter: ['has', 'point_count'],
+    layout: {
+      'text-field': ['get', 'point_count_abbreviated'],
+      'text-size': 11,
+      'text-font': ['Open Sans Bold'],
+    },
+    paint: {
+      'text-color': '#F3F4F6',
+      'text-opacity': 0,
+    },
+  })
+
+  map.addLayer({
+    id: heatmapStackLayerId(sourceId, 'layer'),
+    type: 'heatmap',
+    source: sourceId,
+    minzoom: 7,
+    maxzoom: 14,
+    filter: ['!', ['has', 'point_count']],
+    layout: { visibility: 'none' },
+    paint: {
+      'heatmap-weight': [
+        'interpolate', ['linear'], ['get', 'intensity'],
+        0, 0,
+        0.24, 0.08,
+        0.55, 0.36,
+        0.78, 0.74,
+        1, 1,
+      ],
+      'heatmap-intensity': [
+        'interpolate', ['linear'], ['zoom'],
+        7, 0.55,
+        10, 0.95,
+        13, 1.2,
+        14, 1.35,
+      ],
+      'heatmap-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        7, 18,
+        10, 30,
+        13, 42,
+        14, 52,
+      ],
+      'heatmap-opacity': buildCongestionHeatmapOpacity(1),
+      'heatmap-color': [
+        'interpolate', ['linear'], ['heatmap-density'],
+        0.0, 'rgba(0,0,0,0)',
+        0.18, 'rgba(52, 211, 153, 0.12)',
+        0.42, 'rgba(250, 204, 21, 0.18)',
+        0.64, 'rgba(249, 115, 22, 0.28)',
+        0.84, 'rgba(255, 107, 87, 0.34)',
+        1.0, 'rgba(255, 107, 87, 0.46)',
+      ],
+    },
+  })
+
+  map.addLayer({
+    id: heatmapStackLayerId(sourceId, 'hotspots-glow'),
+    type: 'circle',
+    source: sourceId,
+    minzoom: 12,
+    filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'peak'], 1]],
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        12, 14,
+        16, 30,
+      ],
+      'circle-color': '#FF6B57',
+      'circle-opacity': 0,
+      'circle-blur': 1,
+    },
+  })
+
+  map.addLayer({
+    id: heatmapStackLayerId(sourceId, 'hotspots'),
+    type: 'circle',
+    source: sourceId,
+    minzoom: 12,
+    filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'peak'], 1]],
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        12, 6,
+        16, 14,
+      ],
+      'circle-color': '#FF6B57',
+      'circle-opacity': 0,
+      'circle-stroke-width': 2,
+      'circle-stroke-color': 'rgba(255,255,255,0.16)',
+    },
+  })
+
+  map.addLayer({
+    id: heatmapStackLayerId(sourceId, 'labels'),
+    type: 'symbol',
+    source: sourceId,
+    minzoom: 12,
+    filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'peak'], 1]],
+    layout: {
+      'text-field': ['get', 'contextLabel'],
+      'text-size': 10,
+      'text-font': ['Open Sans Bold'],
+      'text-offset': [0, 1.4],
+      'text-anchor': 'top',
+      'text-allow-overlap': false,
+      'symbol-sort-key': ['get', 'intensity'],
+    },
+    paint: {
+      'text-color': '#F9FAFB',
+      'text-halo-color': 'rgba(8,9,11,0.92)',
+      'text-halo-width': 1.5,
+      'text-opacity': 0,
+    },
+  })
+
+  map.addLayer({
+    id: heatmapStackLayerId(sourceId, 'circles'),
+    type: 'circle',
+    source: sourceId,
+    filter: ['!', ['has', 'point_count']],
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        7, 16,
+        12, 22,
+        16, 28,
+      ],
+      'circle-color': 'rgba(0,0,0,0)',
+      'circle-opacity': 0,
+    },
+  })
 }
 
 function initHeatmapPassagesLayers(map: maplibregl.Map) {
