@@ -56,6 +56,8 @@ interface MapStore {
   // Selection
   selectedSegmentId: string | null
   selectSegment:     (id: string | null) => void
+  highlightedZoneLabel: string | null
+  setHighlightedZoneLabel: (label: string | null) => void
 
   // Vehicle selection & tracking
   selectedVehicleId:   string | null
@@ -173,6 +175,8 @@ export const useMapStore = create<MapStore>()(
 
       selectedSegmentId: null,
       selectSegment:     (id) => set({ selectedSegmentId: id, isPanelOpen: id !== null }),
+      highlightedZoneLabel: null,
+      setHighlightedZoneLabel: (label) => set({ highlightedZoneLabel: label }),
 
       selectedVehicleId:   null,
       setSelectedVehicle:  (id) => set({ selectedVehicleId: id }),

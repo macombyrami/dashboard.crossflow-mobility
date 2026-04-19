@@ -74,6 +74,7 @@ const TRAFFIC_ZONE_SOURCE     = 'cf-traffic-zones'
 const TRAFFIC_FLOW_SOURCE     = 'cf-traffic-flow'
 const TRAFFIC_SELECTION_SOURCE = 'cf-traffic-selection'
 const TRAFFIC_HOVER_SOURCE    = 'cf-traffic-hover'
+const TRAFFIC_FOCUS_SOURCE    = 'cf-traffic-focus'
 const HEATMAP_SOURCE          = 'cf-heatmap'
 const HEATMAP_FADE_SOURCE     = 'cf-heatmap-fade'
 const HEATMAP_PASSAGES_SOURCE = 'cf-heatmap-passages'
@@ -299,6 +300,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   const mode            = useMapStore(s => s.mode)
   const selectSegment   = useMapStore(s => s.selectSegment)
   const selectedSegmentId = useMapStore(s => s.selectedSegmentId)
+  const highlightedZoneLabel = useMapStore(s => s.highlightedZoneLabel)
   const heatmapMode     = useMapStore(s => s.heatmapMode)
   const zoneActive      = useMapStore(s => s.zoneActive)
   const zoneDraft       = useMapStore(s => s.zoneDraft)
@@ -377,6 +379,37 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   useEffect(() => { dataSourceRef.current = dataSource }, [dataSource])
   useEffect(() => { snapshotRef.current = snapshot }, [snapshot])
   useEffect(() => { incidentsRef.current = incidents }, [incidents])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!mapLoaded || !map) return
+
+    const focusSrc = safeGetSource(map, TRAFFIC_FOCUS_SOURCE) as maplibregl.GeoJSONSource | null
+    if (!focusSrc) return
+
+    if (!highlightedZoneLabel || !snapshot) {
+      focusSrc.setData({ type: 'FeatureCollection', features: [] })
+      return
+    }
+
+    const features = snapshot.segments
+      .filter(segment => {
+        const key = segment.arrondissement || segment.axisName || segment.streetName || 'Network core'
+        return key === highlightedZoneLabel
+      })
+      .map(segment => ({
+        type: 'Feature' as const,
+        id: segment.id,
+        geometry: { type: 'LineString' as const, coordinates: segment.coordinates },
+        properties: {
+          id: segment.id,
+          focusLabel: highlightedZoneLabel,
+          speedRatio: getSpeedRatio(segment),
+        },
+      }))
+
+    focusSrc.setData({ type: 'FeatureCollection', features })
+  }, [highlightedZoneLabel, mapLoaded, snapshot])
 
   useEffect(() => {
     const map = mapRef.current
@@ -616,6 +649,26 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
         'interpolate', ['linear'], ['zoom'],
         11, 10 + selectionPulse * 4,
         16, 24 + selectionPulse * 8,
+      ])
+
+      const hotspotPulse = (Math.sin(now / 520) + 1) / 2
+      safeSetPaintProperty(map, heatmapStackLayerId(HEATMAP_SOURCE, 'hotspots-glow'), 'circle-opacity', 0.1 + hotspotPulse * 0.14)
+      safeSetPaintProperty(map, heatmapStackLayerId(HEATMAP_SOURCE, 'hotspots-glow'), 'circle-radius', [
+        'interpolate', ['linear'], ['zoom'],
+        12, 14 + hotspotPulse * 4,
+        16, 30 + hotspotPulse * 8,
+      ])
+      safeSetPaintProperty(map, heatmapStackLayerId(HEATMAP_FADE_SOURCE, 'hotspots-glow'), 'circle-opacity', 0.08 + hotspotPulse * 0.1)
+      safeSetPaintProperty(map, heatmapStackLayerId(HEATMAP_FADE_SOURCE, 'hotspots-glow'), 'circle-radius', [
+        'interpolate', ['linear'], ['zoom'],
+        12, 14 + hotspotPulse * 4,
+        16, 30 + hotspotPulse * 8,
+      ])
+      safeSetPaintProperty(map, TRAFFIC_FOCUS_SOURCE + '-glow', 'line-opacity', 0.1 + hotspotPulse * 0.12)
+      safeSetPaintProperty(map, TRAFFIC_FOCUS_SOURCE + '-glow', 'line-width', [
+        'interpolate', ['linear'], ['zoom'],
+        11, 8 + hotspotPulse * 3,
+        16, 20 + hotspotPulse * 7,
       ])
 
       // 2. Pulse Animation (Vehicles + Station Alerts)
@@ -2449,6 +2502,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', isDecisionMap ? 'none' : trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-glow', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-line', 'visibility', trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_FOCUS_SOURCE + '-glow', 'visibility', trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_FOCUS_SOURCE + '-line', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_SELECTION_SOURCE + '-glow', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_SELECTION_SOURCE + '-line', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_SELECTION_SOURCE + '-label', 'visibility', trafficVis)
@@ -2476,6 +2531,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', 'none')
       safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-glow', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-line', 'visibility', trafficVis)
+      safeSetLayoutProperty(map, TRAFFIC_FOCUS_SOURCE + '-glow', 'visibility', trafficVis)
+      safeSetLayoutProperty(map, TRAFFIC_FOCUS_SOURCE + '-line', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_SELECTION_SOURCE + '-glow', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_SELECTION_SOURCE + '-line', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_SELECTION_SOURCE + '-label', 'visibility', trafficVis)
@@ -2921,6 +2978,15 @@ function initStaticSources(map: maplibregl.Map) {
     })
   }
 
+  if (!map.getSource(TRAFFIC_FOCUS_SOURCE)) {
+    map.addSource(TRAFFIC_FOCUS_SOURCE, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+      lineMetrics: true,
+      promoteId: 'id',
+    })
+  }
+
   // 0. Traffic Halo (Maximum Contrast)
   if (!map.getLayer(TRAFFIC_SOURCE + '-halo')) {
     map.addLayer({
@@ -3019,6 +3085,35 @@ function initStaticSources(map: maplibregl.Map) {
         'line-color': '#F8FAFC',
         'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 4],
         'line-opacity': 0.72,
+      },
+    })
+  }
+
+  if (!map.getLayer(TRAFFIC_FOCUS_SOURCE + '-glow')) {
+    map.addLayer({
+      id: TRAFFIC_FOCUS_SOURCE + '-glow',
+      type: 'line',
+      source: TRAFFIC_FOCUS_SOURCE,
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#4ADE80',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 8, 16, 20],
+        'line-opacity': 0.14,
+        'line-blur': 6,
+      },
+    })
+  }
+
+  if (!map.getLayer(TRAFFIC_FOCUS_SOURCE + '-line')) {
+    map.addLayer({
+      id: TRAFFIC_FOCUS_SOURCE + '-line',
+      type: 'line',
+      source: TRAFFIC_FOCUS_SOURCE,
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#86EFAC',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 16, 5.5],
+        'line-opacity': 0.94,
       },
     })
   }
