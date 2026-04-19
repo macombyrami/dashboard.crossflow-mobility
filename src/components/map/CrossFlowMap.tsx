@@ -159,9 +159,10 @@ const OSM_DARK_STYLE: maplibregl.StyleSpecification = {
       type:   'raster',
       source: 'osm-raster',
       paint:  { 
-        'raster-opacity': 0.85,
-        'raster-brightness-max': 0.45,
-        'raster-saturation': -0.45
+        'raster-opacity': 0.92,
+        'raster-brightness-max': 0.58,
+        'raster-saturation': -0.18,
+        'raster-contrast': 0.12
       }
     }
   ],
@@ -901,7 +902,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       }
       const p = feat.properties as any
       const speedRatio = typeof p.speedRatio === 'number' ? p.speedRatio : 1
-      const speed = Math.round(p.speedKmh ?? 0)
+      const speed = Math.max(0, Math.round(p.speedKmh ?? 0))
       const freeFlow = Math.round(p.freeFlowSpeedKmh ?? 0)
       const delta = freeFlow > 0 ? Math.round(((speed - freeFlow) / freeFlow) * 100) : 0
       const color = getTrafficColor(speedRatio)
@@ -916,7 +917,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
               <span style="font-size:22px;font-weight:800;color:${color};">${speed} km/h</span>
               <span style="font-size:11px;color:#86868B;">${delta >= 0 ? '+' : ''}${delta}% vs normal</span>
             </div>
-            <p style="margin:0;font-size:11px;color:#86868B;line-height:1.4;">Vitesse normalisée: ${(speedRatio * 100).toFixed(0)}% du flux libre.</p>
+            <p style="margin:0;font-size:11px;color:#86868B;line-height:1.4;">Lecture validée par CrossFlow Intelligence Engine: ${(speedRatio * 100).toFixed(0)}% du flux libre.</p>
           </div>
         `)
         .addTo(map)
@@ -961,7 +962,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
             <div style="padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; gap:8px;">
               <div style="width:6px; height:6px; border-radius:50%; background:#22C55E; box-shadow:0 0 8px #22C55E;"></div>
-              <p style="margin:0; font-size:10px; color:#86868B;">Source: TomTom Live + coherence layer</p>
+              <p style="margin:0; font-size:10px; color:#86868B;">Source: Live synchronized data</p>
             </div>
           </div>
         `)
@@ -1282,7 +1283,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     }
   }, []) // eslint-disable-line
 
-  // Helper: show real TomTom flow popup
+  // Helper: show live synchronized flow popup
   function showFlowPopup(map: maplibregl.Map, lngLat: maplibregl.LngLat, flow: Awaited<ReturnType<typeof fetchFlowSegment>>) {
     if (!flow) return
     popupRef.current?.remove()
@@ -1319,7 +1320,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
           <div style="display: flex; justify-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); pt-12px; padding-top: 10px;">
             <span style="font-size: 10px; font-weight: 500; color: #424245;">Fiabilité: ${Math.round(flow.confidence * 100)}%</span>
-            <span style="font-size: 10px; font-weight: 600; color: #22C55E; margin-left: auto;">TomTom Live</span>
+            <span style="font-size: 10px; font-weight: 600; color: #22C55E; margin-left: auto;">Live synchronized data</span>
           </div>
         </div>
       `)
@@ -2023,7 +2024,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
           address:     inc.roadNumbers.join(', ') || `${cityNow.name}`,
           startedAt:   inc.startTime,
           resolvedAt:  inc.endTime,
-          source:      'TomTom',
+          source:      'CrossFlow Intelligence Engine',
           iconColor:   getSeverityColor(tomtomSeverityToLocal(inc.magnitudeOfDelay)),
         }))
       }
@@ -2044,7 +2045,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
           address:     inc.location.description || cityNow.name,
           startedAt:   inc.startTime,
           resolvedAt:  inc.endTime,
-          source:      'HERE',
+          source:      'CrossFlow Intelligence Engine',
           iconColor:   getSeverityColor(inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium'),
         }))
       }
@@ -2518,7 +2519,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     const inactiveHeatSource = activeHeatSourceRef.current === HEATMAP_SOURCE ? HEATMAP_FADE_SOURCE : HEATMAP_SOURCE
 
     safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-lines', 'visibility', trafficVis)
-    safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', isDecisionMap ? 'none' : trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-corridor-labels', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', isDecisionMap ? 'none' : trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-glow', 'visibility', trafficVis)
@@ -2547,7 +2548,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     if (isDecisionMap) {
       safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-lines', 'visibility', trafficVis)
-      safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', 'none')
+      safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-corridor-labels', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', 'none')
       safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-glow', 'visibility', trafficVis)
@@ -2930,14 +2931,14 @@ function initStaticSources(map: maplibregl.Map) {
       source: 'base-network',
       'source-layer': 'road',
       paint: {
-        'line-color': '#1A1C22',
+        'line-color': '#262A33',
         'line-width': [
           'interpolate', ['linear'], ['zoom'],
           10, 0.5,
           13, 1.2,
           16, 2.5
         ],
-        'line-opacity': 0.8
+        'line-opacity': 0.92
       },
       layout: { 'line-cap': 'round', 'line-join': 'round' }
     })
@@ -3037,7 +3038,7 @@ function initStaticSources(map: maplibregl.Map) {
       id:     TRAFFIC_SOURCE + '-lines',
       type:   'line',
       source: TRAFFIC_SOURCE,
-      minzoom: 12,
+      minzoom: 10,
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint:  {
         'line-color': [
@@ -3054,8 +3055,8 @@ function initStaticSources(map: maplibregl.Map) {
         ],
         'line-opacity': [
           'interpolate', ['linear'], ['zoom'],
-          10, 0.2,
-          14, 0.78,
+          10, 0.46,
+          14, 0.9,
         ],
         'line-dasharray': [4, 0.1]
       },
@@ -3237,9 +3238,9 @@ function initStaticSources(map: maplibregl.Map) {
         'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 16, 12],
         'line-opacity': [
           'interpolate', ['linear'], ['zoom'],
-          11, 0,
-          12, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.65, 0.25],
-          17, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.65, 0.4]
+          10, 0.08,
+          12, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.72, 0.34],
+          17, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.72, 0.48]
         ],
         'line-blur': ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 6, 3],
       },
@@ -3264,14 +3265,14 @@ function initStaticSources(map: maplibregl.Map) {
           0.7, '#FFD600',
           1.0, '#22C55E',
         ],
-        'fill-opacity': [
-          'interpolate', ['linear'], ['get', 'segmentCount'],
-          1, 0.18,
-          4, 0.30,
-          10, 0.42,
-        ],
-      },
-    })
+      'fill-opacity': [
+        'interpolate', ['linear'], ['get', 'segmentCount'],
+        1, 0.24,
+        4, 0.36,
+        10, 0.5,
+      ],
+    },
+  })
   }
 
   if (!map.getLayer(TRAFFIC_ZONE_SOURCE + '-line')) {

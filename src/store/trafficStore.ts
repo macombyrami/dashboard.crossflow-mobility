@@ -61,6 +61,22 @@ function buildTrafficSummary(snapshot: TrafficSnapshot | null, incidents: Incide
 
   const alertCount = incidents.length
   const congestionRate = Math.max(0, Math.min(1, segmentCongestion))
+  const hasStructuredData = segmentCount > 0 || alertCount > 0
+
+  if (!hasStructuredData) {
+    return {
+      segmentCount: 0,
+      avgCongestion: 0,
+      alertCount: 0,
+      trafficStatus: 'fluid',
+      trafficLabel: 'No data available',
+      predictionLabel: 'No data available',
+      predictionDeltaPct: 0,
+      updatedAt: snapshot.fetchedAt,
+      hasData: false,
+    }
+  }
+
   const trafficStatus: TrafficSummary['trafficStatus'] =
     congestionRate >= 0.75 || alertCount >= 4
       ? 'critical'
@@ -88,7 +104,7 @@ function buildTrafficSummary(snapshot: TrafficSnapshot | null, incidents: Incide
     predictionLabel,
     predictionDeltaPct,
     updatedAt: snapshot.fetchedAt,
-    hasData: segmentCount > 0 || alertCount > 0,
+    hasData: true,
   }
 }
 

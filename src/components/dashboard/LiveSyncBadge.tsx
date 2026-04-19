@@ -33,7 +33,7 @@ export function LiveSyncBadge({ className, refreshing, lastSync: propsLastSync }
       <div className="flex flex-col">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="text-[10px] font-black text-text-primary uppercase tracking-[0.2em] leading-none">
-            {isSyncing ? 'Flux: Sync' : 'Flux: Stable'}
+            {isSyncing ? 'Live Sync' : 'Stable Feed'}
           </span>
           <Link2 className={cn("w-2.5 h-2.5", isSyncing ? "text-brand animate-pulse" : "text-brand/40")} />
         </div>
@@ -41,12 +41,12 @@ export function LiveSyncBadge({ className, refreshing, lastSync: propsLastSync }
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5">
             <span className="text-[9px] font-black font-mono text-text-muted uppercase tracking-tighter tabular-nums">
-              {lastSync ? `LAST_SYNC ${lastSync}` : 'NO_DATA'}
+              {lastSync ? `SYNC ${lastSync}` : 'NO DATA'}
             </span>
           </div>
           <div className="w-[1px] h-2 bg-white/10" />
           <span className="text-[9px] font-black font-mono text-text-muted uppercase tracking-tighter opacity-40">
-            Node-v2.4
+            CrossFlow Intelligence Engine
           </span>
         </div>
       </div>
