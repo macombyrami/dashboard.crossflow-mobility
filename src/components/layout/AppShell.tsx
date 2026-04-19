@@ -80,12 +80,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isMapRoute) {
     return (
-      <div className="app-shell bg-[#030303] min-h-screen overflow-hidden">
+      <div className="app-shell bg-[#030303] min-h-dvh overflow-hidden">
         <ConfigGuard>
           <UserCityProvider>
             <WeatherProvider />
             <TrafficSyncManager />
-            <div className="relative w-screen h-screen overflow-hidden">
+            <div className="relative w-full h-[100dvh] overflow-hidden">
               {children}
             </div>
             <Suspense fallback={null}>

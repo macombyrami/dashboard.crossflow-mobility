@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useCallback, useState, useMemo, memo } from 'react'
+import { usePathname } from 'next/navigation'
 
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -68,10 +69,13 @@ import type { Incident, HeatmapMode, CongestionLevel, TrafficSnapshot, TrafficSe
 
 const TRAFFIC_SOURCE          = 'cf-traffic'
 const TRAFFIC_PREDICTION_SOURCE = 'cf-traffic-prediction'
+const TRAFFIC_ZONE_SOURCE     = 'cf-traffic-zones'
+const TRAFFIC_FLOW_SOURCE     = 'cf-traffic-flow'
 const HEATMAP_SOURCE          = 'cf-heatmap'
 const HEATMAP_PASSAGES_SOURCE = 'cf-heatmap-passages'
 const HEATMAP_CO2_SOURCE      = 'cf-heatmap-co2'
 const INCIDENT_SOURCE         = 'cf-incidents'
+const INCIDENT_CRITICAL_SOURCE = 'cf-incidents-critical'
 const TOMTOM_FLOW             = 'tomtom-flow'
 const TOMTOM_INC              = 'tomtom-incidents'
 const BOUNDARY_SOURCE         = 'city-boundary'
@@ -205,6 +209,7 @@ function computeRoadWidth(roadType: string | undefined, level: CongestionLevel, 
 }
 
 export const CrossFlowMap = memo(function CrossFlowMap() {
+  const pathname        = usePathname()
   const mapRef          = useRef<maplibregl.Map | null>(null)
   const containerRef    = useRef<HTMLDivElement>(null)
   const popupRef        = useRef<maplibregl.Popup | null>(null)
@@ -288,6 +293,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   const setLocationPickerActive = useSimulationStore(s => s.setLocationPickerActive)
 
   const useLiveData = process.env.NEXT_PUBLIC_TOMTOM_ENABLED !== 'false'
+  const isDecisionMap = pathname.startsWith('/map')
 
   // Refs to avoid stale closures in map click handler
   const zoneActiveRef              = useRef(zoneActive)
@@ -613,6 +619,34 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     })
     map.on('mouseleave', TRAFFIC_SOURCE + '-lines', () => {
       if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
+      popupRef.current?.remove()
+    })
+
+    map.on('mousemove', TRAFFIC_SOURCE + '-lines', (e) => {
+      if (zoneActiveRef.current) return
+      const feat = e.features?.[0]
+      if (!feat) return
+      const p = feat.properties as any
+      const speedRatio = typeof p.speedRatio === 'number' ? p.speedRatio : 1
+      const speed = Math.round(p.speedKmh ?? 0)
+      const freeFlow = Math.round(p.freeFlowSpeedKmh ?? 0)
+      const delta = freeFlow > 0 ? Math.round(((speed - freeFlow) / freeFlow) * 100) : 0
+      const color = getTrafficColor(speedRatio)
+      popupRef.current?.remove()
+      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '260px', className: 'apple-popup' })
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div class="glass" style="padding:14px;border-radius:18px;color:white;border:1px solid ${color}40;font-family:Inter,sans-serif;">
+            <p style="margin:0 0 4px 0;font-size:9px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:0.08em;">${p.axisName || 'Trafic Paris'}</p>
+            <h3 style="margin:0 0 8px 0;font-size:16px;font-weight:700;">${p.streetName || 'Axe routier'}</h3>
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;">
+              <span style="font-size:22px;font-weight:800;color:${color};">${speed} km/h</span>
+              <span style="font-size:11px;color:#86868B;">${delta >= 0 ? '+' : ''}${delta}% vs normal</span>
+            </div>
+            <p style="margin:0;font-size:11px;color:#86868B;line-height:1.4;">Vitesse normalisée: ${(speedRatio * 100).toFixed(0)}% du flux libre.</p>
+          </div>
+        `)
+        .addTo(map)
     })
 
     // Click on traffic segments → Urban Insight Popup
@@ -622,8 +656,9 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       if (!feat) return
       
       const p = feat.properties as any
-      const color = p.color || '#FACC15'
-      const score = Math.round(p.congestion * 100)
+      const speedRatio = typeof p.speedRatio === 'number' ? p.speedRatio : 1
+      const color = getTrafficColor(speedRatio)
+      const score = Math.round(speedRatio * 100)
       
       popupRef.current?.remove()
       popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '300px', className: 'apple-popup' })
@@ -643,17 +678,17 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
               <div style="background:rgba(255,255,255,0.04); padding:10px; border-radius:14px;">
                 <p style="margin:0; font-size:9px; color:#86868B; text-transform:uppercase;">Vitesse</p>
-                <p style="margin:2px 0 0 0; font-size:15px; font-weight:700;">${Math.round(p.speed)} <span style="font-size:10px; font-weight:400; color:#424245;">km/h</span></p>
+                <p style="margin:2px 0 0 0; font-size:15px; font-weight:700;">${Math.round(p.speedKmh ?? 0)} <span style="font-size:10px; font-weight:400; color:#424245;">km/h</span></p>
               </div>
               <div style="background:rgba(255,255,255,0.04); padding:10px; border-radius:14px;">
                 <p style="margin:0; font-size:9px; color:#86868B; text-transform:uppercase;">Tendance</p>
-                <p style="margin:2px 0 0 0; font-size:15px; font-weight:700; color:#22C55E;">Stable</p>
+                <p style="margin:2px 0 0 0; font-size:15px; font-weight:700; color:${color};">${speedRatio >= 0.75 ? 'Fluide' : speedRatio >= 0.5 ? 'Modéré' : 'Congestion'}</p>
               </div>
             </div>
 
             <div style="padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; gap:8px;">
               <div style="width:6px; height:6px; border-radius:50%; background:#22C55E; box-shadow:0 0 8px #22C55E;"></div>
-              <p style="margin:0; font-size:10px; color:#86868B;">Source: TomTom Live + Correlation Engine</p>
+              <p style="margin:0; font-size:10px; color:#86868B;">Source: TomTom Live + coherence layer</p>
             </div>
           </div>
         `)
@@ -859,6 +894,81 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       if (!zoneActiveRef.current) map.getCanvas().style.cursor = 'pointer'
     })
     map.on('mouseleave', INCIDENT_SOURCE + '-circles', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
+    })
+
+    map.on('click', INCIDENT_SOURCE + '-cluster', async (e) => {
+      if (zoneActiveRef.current) return
+      const feat = e.features?.[0]
+      if (!feat) return
+      const clusterId = feat.properties?.cluster_id
+      const source = map.getSource(INCIDENT_SOURCE) as maplibregl.GeoJSONSource | undefined
+      if (clusterId === undefined || !source || typeof source.getClusterExpansionZoom !== 'function') return
+      const zoom = await source.getClusterExpansionZoom(clusterId as number)
+      map.easeTo({ center: (feat.geometry as GeoJSON.Point).coordinates as [number, number], zoom, duration: 650 })
+    })
+
+    map.on('click', INCIDENT_SOURCE + '-unclustered', (e) => {
+      if (zoneActiveRef.current) return
+      const feat = e.features?.[0]
+      if (!feat) return
+      const p = feat.properties as any
+      const color = p.color || '#FFD600'
+      const severity = (p.severity || 'medium').toUpperCase()
+      popupRef.current?.remove()
+      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '240px', className: 'apple-popup' })
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div class="glass" style="padding:16px; border-radius:18px; color:white; border:1px solid ${color}40;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <div style="width:8px; height:8px; border-radius:50%; background:${color}; box-shadow:0 0 8px ${color};"></div>
+              <span style="font-size:10px; font-weight:700; color:${color}; text-transform:uppercase; tracking:0.1em;">${severity}</span>
+            </div>
+            <h3 style="margin:0 0 6px 0; font-size:15px; font-weight:700;">${p.title}</h3>
+            <p style="margin:0; font-size:11px; color:#86868B; line-height:1.4;">Signalé à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
+          </div>
+        `)
+        .addTo(map)
+    })
+
+    map.on('click', INCIDENT_CRITICAL_SOURCE + '-dot', (e) => {
+      if (zoneActiveRef.current) return
+      const feat = e.features?.[0]
+      if (!feat) return
+      const p = feat.properties as any
+      const color = p.color || '#FF3B30'
+      popupRef.current?.remove()
+      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '240px', className: 'apple-popup' })
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div class="glass" style="padding:16px; border-radius:18px; color:white; border:1px solid ${color}40;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <div style="width:8px; height:8px; border-radius:50%; background:${color}; box-shadow:0 0 8px ${color};"></div>
+              <span style="font-size:10px; font-weight:700; color:${color}; text-transform:uppercase; tracking:0.1em;">CRITICAL</span>
+            </div>
+            <h3 style="margin:0 0 6px 0; font-size:15px; font-weight:700;">${p.title}</h3>
+            <p style="margin:0; font-size:11px; color:#86868B; line-height:1.4;">Détection prioritaire visible en permanence.</p>
+          </div>
+        `)
+        .addTo(map)
+    })
+
+    map.on('mouseenter', INCIDENT_SOURCE + '-cluster', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = 'pointer'
+    })
+    map.on('mouseleave', INCIDENT_SOURCE + '-cluster', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
+    })
+    map.on('mouseenter', INCIDENT_SOURCE + '-unclustered', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = 'pointer'
+    })
+    map.on('mouseleave', INCIDENT_SOURCE + '-unclustered', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
+    })
+    map.on('mouseenter', INCIDENT_CRITICAL_SOURCE + '-dot', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = 'pointer'
+    })
+    map.on('mouseleave', INCIDENT_CRITICAL_SOURCE + '-dot', () => {
       if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
     })
 
@@ -1651,6 +1761,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     const snappedSnapshot = NetworkAggregator.snapToNetwork(city, snapshot)
     
     setSnapshot(snappedSnapshot)
+    const incidentSplit = splitIncidents(incidents)
     setIncidents(incidents)
 
     // --- High Performance: UCTN Property Updates ---
@@ -1750,6 +1861,74 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     // Boundary
     const bSrc = safeGetSource(map, BOUNDARY_SOURCE) as maplibregl.GeoJSONSource | null
     if (bSrc && cityBoundary) bSrc.setData(cityBoundary)
+
+    if (isDecisionMap) {
+      const trafficGeo: GeoJSON.FeatureCollection = {
+        type: 'FeatureCollection',
+        features: snappedSnapshot.segments.map(seg => {
+          const speedRatio = getSpeedRatio(seg)
+          const predictedRatio = clamp01(speedRatio + (seg.flowTrend === 'improving' ? 0.08 : seg.flowTrend === 'worsening' ? -0.08 : -0.03))
+          const importance = clamp01(seg.priorityAxis ?? (seg.roadType === 'motorway' ? 1 : seg.roadType === 'trunk' ? 0.85 : seg.roadType === 'primary' ? 0.7 : seg.roadType === 'secondary' ? 0.55 : 0.35))
+          return {
+            type: 'Feature' as const,
+            id: seg.id,
+            geometry: { type: 'LineString' as const, coordinates: seg.coordinates },
+            properties: {
+              id: seg.id,
+              roadType: seg.roadType,
+              streetName: seg.streetName,
+              axisName: seg.axisName,
+              direction: seg.direction,
+              speedKmh: seg.speedKmh,
+              freeFlowSpeedKmh: seg.freeFlowSpeedKmh,
+              speedRatio,
+              predictedSpeedRatio: predictedRatio,
+              congestion: seg.congestionScore,
+              importance,
+              width: computeRoadWidth(seg.roadType, seg.level, map.getZoom(), isMobile),
+            },
+          }
+        }),
+      }
+
+      const zoneGeo = {
+        type: 'FeatureCollection' as const,
+        features: buildTrafficZones(snappedSnapshot.segments) as GeoJSON.Feature[],
+      }
+      const flowGeo = {
+        type: 'FeatureCollection' as const,
+        features: buildFlowMarkers(snappedSnapshot.segments) as GeoJSON.Feature[],
+      }
+      const criticalGeo = {
+        type: 'FeatureCollection' as const,
+        features: incidentSplit.critical.map(inc => ({
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: [inc.location.lng, inc.location.lat] },
+          properties: { id: inc.id, title: inc.title, severity: inc.severity, color: inc.iconColor, type: inc.type },
+        })),
+      }
+      const clusterGeo = {
+        type: 'FeatureCollection' as const,
+        features: incidentSplit.clusterable.map(inc => ({
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: [inc.location.lng, inc.location.lat] },
+          properties: { id: inc.id, title: inc.title, severity: inc.severity, color: inc.iconColor, type: inc.type },
+        })),
+      }
+
+      const trafficSrc = safeGetSource(map, TRAFFIC_SOURCE) as maplibregl.GeoJSONSource | null
+      const predSrc = safeGetSource(map, TRAFFIC_PREDICTION_SOURCE) as maplibregl.GeoJSONSource | null
+      const zoneSrc = safeGetSource(map, TRAFFIC_ZONE_SOURCE) as maplibregl.GeoJSONSource | null
+      const flowSrc = safeGetSource(map, TRAFFIC_FLOW_SOURCE) as maplibregl.GeoJSONSource | null
+      const clusterSrc = safeGetSource(map, INCIDENT_SOURCE) as maplibregl.GeoJSONSource | null
+      const criticalSrc = safeGetSource(map, INCIDENT_CRITICAL_SOURCE) as maplibregl.GeoJSONSource | null
+      if (trafficSrc) trafficSrc.setData(trafficGeo)
+      if (predSrc) predSrc.setData(trafficGeo)
+      if (zoneSrc) zoneSrc.setData(zoneGeo)
+      if (flowSrc) flowSrc.setData(flowGeo)
+      if (clusterSrc) clusterSrc.setData(clusterGeo)
+      if (criticalSrc) criticalSrc.setData(criticalGeo)
+    }
 
     previousSnapshotRef.current = snapshot
   }, [city, mapLoaded, activeLayers, useLiveData, setSnapshot, setIncidents, setDataSource])
@@ -2033,15 +2212,45 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return
     const map = mapRef.current
-    safeSetLayoutProperty(map, TRAFFIC_SOURCE  + '-lines',    'visibility', activeLayers.has('traffic')   ? 'visible' : 'none')
-    safeSetLayoutProperty(map, TRAFFIC_SOURCE  + '-glow',     'visibility', activeLayers.has('traffic')   ? 'visible' : 'none')
-    // Heatmap layers are managed by the heatmap mode effect below
-    safeSetLayoutProperty(map, INCIDENT_SOURCE + '-circles',  'visibility', activeLayers.has('incidents') ? 'visible' : 'none')
-    safeSetLayoutProperty(map, INCIDENT_SOURCE + '-glow',     'visibility', activeLayers.has('incidents') ? 'visible' : 'none')
-    safeSetLayoutProperty(map, INCIDENT_SOURCE + '-labels',   'visibility', activeLayers.has('incidents') ? 'visible' : 'none')
+    const trafficVis = activeLayers.has('traffic') ? 'visible' : 'none'
+    const incidentsVis = activeLayers.has('incidents') ? 'visible' : 'none'
+    const flowVis = activeLayers.has('flow') ? 'visible' : 'none'
+    const boundaryVis = activeLayers.has('boundary') ? 'visible' : 'none'
+
+    safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-lines', 'visibility', trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', isDecisionMap ? 'none' : trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', isDecisionMap ? 'none' : trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-fill', 'visibility', trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-line', 'visibility', trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_FLOW_SOURCE + '-layer', 'visibility', flowVis)
+
+    safeSetLayoutProperty(map, INCIDENT_SOURCE + '-cluster-glow', 'visibility', incidentsVis)
+    safeSetLayoutProperty(map, INCIDENT_SOURCE + '-cluster', 'visibility', incidentsVis)
+    safeSetLayoutProperty(map, INCIDENT_SOURCE + '-count', 'visibility', incidentsVis)
+    safeSetLayoutProperty(map, INCIDENT_SOURCE + '-unclustered', 'visibility', incidentsVis)
+    safeSetLayoutProperty(map, INCIDENT_SOURCE + '-label', 'visibility', incidentsVis)
+    safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-glow', 'visibility', incidentsVis)
+    safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-dot', 'visibility', incidentsVis)
+    safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-label', 'visibility', incidentsVis)
+
+    if (isDecisionMap) {
+      safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-lines', 'visibility', trafficVis)
+      safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', 'none')
+      safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', 'none')
+      safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-fill', 'visibility', trafficVis)
+      safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-line', 'visibility', trafficVis)
+      safeSetLayoutProperty(map, TRAFFIC_FLOW_SOURCE + '-layer', 'visibility', flowVis)
+      safeSetLayoutProperty(map, INCIDENT_SOURCE + '-cluster-glow', 'visibility', incidentsVis)
+      safeSetLayoutProperty(map, INCIDENT_SOURCE + '-cluster', 'visibility', incidentsVis)
+      safeSetLayoutProperty(map, INCIDENT_SOURCE + '-count', 'visibility', incidentsVis)
+      safeSetLayoutProperty(map, INCIDENT_SOURCE + '-unclustered', 'visibility', incidentsVis)
+      safeSetLayoutProperty(map, INCIDENT_SOURCE + '-label', 'visibility', incidentsVis)
+      safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-glow', 'visibility', incidentsVis)
+      safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-dot', 'visibility', incidentsVis)
+      safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-label', 'visibility', incidentsVis)
+    }
 
     // Boundary layers
-    const boundaryVis = activeLayers.has('boundary') ? 'visible' : 'none'
     safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-glow-outer', 'visibility', boundaryVis)
     safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-glow',       'visibility', boundaryVis)
     safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-fill',       'visibility', boundaryVis)
@@ -2080,7 +2289,46 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-lineref','visibility', transportVis)
     safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-name',   'visibility', transportVis)
     safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-alert',  'visibility', transportVis)
-  }, [activeLayers, mapLoaded, useLiveData])
+    if (isDecisionMap) {
+      safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-glow-outer', 'visibility', 'none')
+      safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-glow', 'visibility', 'none')
+      safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-fill', 'visibility', 'none')
+      safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-line', 'visibility', 'none')
+      safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-label', 'visibility', 'none')
+      safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-fill', 'visibility', 'none')
+      safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-line', 'visibility', 'none')
+      safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-label', 'visibility', 'none')
+      safeSetLayoutProperty(map, VEHICLES_SOURCE + '-glow', 'visibility', 'none')
+      safeSetLayoutProperty(map, VEHICLES_SOURCE + '-layer', 'visibility', 'none')
+      safeSetLayoutProperty(map, VEHICLES_SOURCE + '-label', 'visibility', 'none')
+      safeSetLayoutProperty(map, TRANSIT_ROUTES_SOURCE + '-bus', 'visibility', 'none')
+      safeSetLayoutProperty(map, TRANSIT_ROUTES_SOURCE + '-metro', 'visibility', 'none')
+      safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-glow', 'visibility', 'none')
+      safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-ring', 'visibility', 'none')
+      safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-dot', 'visibility', 'none')
+      safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-lineref', 'visibility', 'none')
+      safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-name', 'visibility', 'none')
+      safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-alert', 'visibility', 'none')
+      safeSetLayoutProperty(map, HEATMAP_SOURCE + '-layer', 'visibility', 'none')
+      safeSetLayoutProperty(map, HEATMAP_SOURCE + '-circles', 'visibility', 'none')
+      safeSetLayoutProperty(map, HEATMAP_PASSAGES_SOURCE + '-layer', 'visibility', 'none')
+      safeSetLayoutProperty(map, HEATMAP_PASSAGES_SOURCE + '-circles', 'visibility', 'none')
+      safeSetLayoutProperty(map, HEATMAP_CO2_SOURCE + '-layer', 'visibility', 'none')
+      safeSetLayoutProperty(map, HEATMAP_CO2_SOURCE + '-circles', 'visibility', 'none')
+      safeSetLayoutProperty(map, PREDICTIVE_AFFECTED_SOURCE + '-glow', 'visibility', 'none')
+      safeSetLayoutProperty(map, PREDICTIVE_AFFECTED_SOURCE + '-lines', 'visibility', 'none')
+      safeSetLayoutProperty(map, PREDICTIVE_EVENTS_SOURCE + '-circles', 'visibility', 'none')
+      safeSetLayoutProperty(map, PREDICTIVE_EVENTS_SOURCE + '-labels', 'visibility', 'none')
+      safeSetLayoutProperty(map, POI_SOURCE + '-signals', 'visibility', 'none')
+      safeSetLayoutProperty(map, POI_SOURCE + '-bus-stops', 'visibility', 'none')
+      safeSetLayoutProperty(map, POI_SOURCE + '-subway', 'visibility', 'none')
+      safeSetLayoutProperty(map, SOCIAL_SOURCE + '-glow', 'visibility', 'none')
+      safeSetLayoutProperty(map, SOCIAL_SOURCE + '-circles', 'visibility', 'none')
+      safeSetLayoutProperty(map, SIM_LOCATION_SOURCE + '-dot', 'visibility', 'none')
+      safeSetLayoutProperty(map, TOMTOM_FLOW + '-layer', 'visibility', 'none')
+      safeSetLayoutProperty(map, TOMTOM_INC + '-layer', 'visibility', 'none')
+    }
+  }, [activeLayers, mapLoaded, useLiveData, isDecisionMap])
 
   // ─── Heatmap mode (shows/hides correct heatmap layer) ────────────────
 
@@ -2422,16 +2670,15 @@ function initStaticSources(map: maplibregl.Map) {
       id:     TRAFFIC_SOURCE + '-lines',
       type:   'line',
       source: TRAFFIC_SOURCE,
+      minzoom: 12,
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint:  {
         'line-color': [
-          'case',
-          ['boolean', ['feature-state', 'hasData'], false],
-          ['match', ['feature-state', 'levelCode'],
-            0, '#00FF9D', 1, '#FACD15', 2, '#FF9F0A', 3, '#EF4444',
-            '#00FF9D'
-          ],
-          '#2A2D35' 
+          'interpolate', ['linear'], ['coalesce', ['get', 'speedRatio'], 1],
+          0.25, '#EF4444',
+          0.45, '#FF9F0A',
+          0.70, '#FFD600',
+          1.00, '#22C55E',
         ],
         'line-width': ['interpolate', ['linear'], ['zoom'], 
           8, ['*', 0.6, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.4]],
@@ -2440,8 +2687,8 @@ function initStaticSources(map: maplibregl.Map) {
         ],
         'line-opacity': [
           'interpolate', ['linear'], ['zoom'],
-          10, ['case', ['boolean', ['feature-state', 'hasData'], false], 0.95, 0.4],
-          14, ['case', ['boolean', ['feature-state', 'hasData'], false], 1.0, 0.6]
+          10, 0.2,
+          14, 0.78,
         ],
         'line-dasharray': [4, 0.1]
       },
@@ -2454,17 +2701,19 @@ function initStaticSources(map: maplibregl.Map) {
       id:     TRAFFIC_PREDICTION_SOURCE + '-lines',
       type:   'line',
       source: TRAFFIC_PREDICTION_SOURCE,
-      minzoom: 12,
+      minzoom: 13,
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
         'line-color': [
-          'match', ['feature-state', 'levelCode'],
-          0, '#00FF9D', 1, '#FACD15', 2, '#FF9F0A', 3, '#EF4444',
-          '#666666'
+          'interpolate', ['linear'], ['coalesce', ['get', 'predictedSpeedRatio'], 1],
+          0.25, '#EF4444',
+          0.45, '#FF9F0A',
+          0.70, '#FFD600',
+          1.00, '#22C55E',
         ],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1, 16, 3],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1, 16, 3],
         'line-dasharray': [1, 2],
-        'line-opacity': 0.4,
+        'line-opacity': 0.35,
         'line-offset': 4 
       }
     }, TRAFFIC_SOURCE + '-lines')
@@ -2497,6 +2746,86 @@ function initStaticSources(map: maplibregl.Map) {
         'line-blur': ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 6, 3],
       },
     }, TRAFFIC_SOURCE + '-lines')
+  }
+
+  if (!map.getSource(TRAFFIC_ZONE_SOURCE)) {
+    map.addSource(TRAFFIC_ZONE_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+  }
+
+  if (!map.getLayer(TRAFFIC_ZONE_SOURCE + '-fill')) {
+    map.addLayer({
+      id:     TRAFFIC_ZONE_SOURCE + '-fill',
+      type:   'fill',
+      source: TRAFFIC_ZONE_SOURCE,
+      maxzoom: 12,
+      paint:  {
+        'fill-color': [
+          'interpolate', ['linear'], ['get', 'speedRatio'],
+          0.2, '#EF4444',
+          0.45, '#FF9F0A',
+          0.7, '#FFD600',
+          1.0, '#22C55E',
+        ],
+        'fill-opacity': [
+          'interpolate', ['linear'], ['get', 'segmentCount'],
+          1, 0.18,
+          4, 0.30,
+          10, 0.42,
+        ],
+      },
+    })
+  }
+
+  if (!map.getLayer(TRAFFIC_ZONE_SOURCE + '-line')) {
+    map.addLayer({
+      id:     TRAFFIC_ZONE_SOURCE + '-line',
+      type:   'line',
+      source: TRAFFIC_ZONE_SOURCE,
+      maxzoom: 12,
+      paint:  {
+        'line-color': [
+          'interpolate', ['linear'], ['get', 'speedRatio'],
+          0.2, '#EF4444',
+          0.45, '#FF9F0A',
+          0.7, '#FFD600',
+          1.0, '#22C55E',
+        ],
+        'line-width': 1,
+        'line-opacity': 0.18,
+      },
+    })
+  }
+
+  if (!map.getSource(TRAFFIC_FLOW_SOURCE)) {
+    map.addSource(TRAFFIC_FLOW_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+  }
+
+  if (!map.getLayer(TRAFFIC_FLOW_SOURCE + '-layer')) {
+    map.addLayer({
+      id:     TRAFFIC_FLOW_SOURCE + '-layer',
+      type:   'symbol',
+      source: TRAFFIC_FLOW_SOURCE,
+      minzoom: 12,
+      layout: {
+        'symbol-placement': 'point',
+        'text-field': '➤',
+        'text-size': ['interpolate', ['linear'], ['zoom'], 12, 8, 15, 12, 18, 15],
+        'text-rotate': ['get', 'bearing'],
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
+      },
+      paint: {
+        'text-color': '#F5F5F7',
+        'text-opacity': [
+          'interpolate', ['linear'], ['get', 'speedRatio'],
+          0.2, 0.85,
+          0.6, 0.55,
+          1.0, 0.18,
+        ],
+        'text-halo-color': 'rgba(8,9,11,0.8)',
+        'text-halo-width': 1.5,
+      },
+    })
   }
 
   const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
@@ -2618,58 +2947,142 @@ function initStaticSources(map: maplibregl.Map) {
     }
   })
 
-  // Incidents (Luminous dots) - STAFF: CLUSTERING ENABLED
-  map.addSource(INCIDENT_SOURCE, { 
-    type: 'geojson', 
+  // Incidents split into clusters + critical pins
+  map.addSource(INCIDENT_SOURCE, {
+    type: 'geojson',
     data: emptyFC,
     cluster: true,
-    clusterMaxZoom: 14, 
-    clusterRadius: 50 
+    clusterMaxZoom: 14,
+    clusterRadius: 54,
   })
 
-  // Outer glow for incidents
   map.addLayer({
-    id:     INCIDENT_SOURCE + '-glow',
+    id:     INCIDENT_SOURCE + '-cluster-glow',
     type:   'circle',
     source: INCIDENT_SOURCE,
+    filter: ['has', 'point_count'],
     paint:  {
-      'circle-radius':       ['interpolate', ['linear'], ['zoom'], 8, 8, 14, 16],
-      'circle-color':        ['get', 'color'],
-      'circle-opacity':      0.2,
-      'circle-blur':         1,
+      'circle-radius': ['interpolate', ['linear'], ['get', 'point_count'], 1, 12, 8, 20, 25, 30],
+      'circle-color':  '#FFFFFF',
+      'circle-opacity': 0.10,
+      'circle-blur':    0.8,
     },
   })
 
   map.addLayer({
-    id:     INCIDENT_SOURCE + '-circles',
+    id:     INCIDENT_SOURCE + '-cluster',
     type:   'circle',
     source: INCIDENT_SOURCE,
+    filter: ['has', 'point_count'],
     paint:  {
-      'circle-radius':       ['interpolate', ['linear'], ['zoom'], 8, 4, 14, 7],
-      'circle-color':        ['get', 'color'],
-      'circle-opacity':      1,
+      'circle-radius': ['interpolate', ['linear'], ['get', 'point_count'], 1, 10, 8, 16, 25, 24],
+      'circle-color':  '#111827',
+      'circle-opacity': 0.90,
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#FFFFFF',
+    },
+  })
+
+  map.addLayer({
+    id:     INCIDENT_SOURCE + '-count',
+    type:   'symbol',
+    source: INCIDENT_SOURCE,
+    filter: ['has', 'point_count'],
+    layout: {
+      'text-field': ['concat', ['to-string', ['get', 'point_count_abbreviated']], '\nincidents'],
+      'text-font': ['Open Sans Bold'],
+      'text-size': ['interpolate', ['linear'], ['get', 'point_count'], 1, 11, 10, 13, 25, 15],
+      'text-justify': 'center',
+      'text-anchor': 'center',
+      'text-allow-overlap': true,
+      'text-ignore-placement': true,
+    },
+    paint: {
+      'text-color': '#F5F5F7',
+      'text-halo-color': 'rgba(8,9,11,0.9)',
+      'text-halo-width': 2,
+    },
+  })
+
+  map.addLayer({
+    id:     INCIDENT_SOURCE + '-unclustered',
+    type:   'circle',
+    source: INCIDENT_SOURCE,
+    filter: ['!', ['has', 'point_count']],
+    minzoom: 14,
+    paint:  {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 5, 17, 8],
+      'circle-color':  ['get', 'color'],
+      'circle-opacity': 0.95,
       'circle-stroke-width': 2,
       'circle-stroke-color': '#08090B',
     },
   })
 
   map.addLayer({
-    id:     INCIDENT_SOURCE + '-labels',
+    id:     INCIDENT_SOURCE + '-label',
     type:   'symbol',
     source: INCIDENT_SOURCE,
-    minzoom: 13,
+    filter: ['!', ['has', 'point_count']],
+    minzoom: 15,
     layout: {
-      'text-field':  ['get', 'title'],
-      'text-font':   ['Open Sans Regular'],
-      'text-size':   11,
-      'text-offset': [0, 2],
+      'text-field': ['get', 'title'],
+      'text-font': ['Open Sans Regular'],
+      'text-size': 10,
+      'text-offset': [0, 1.7],
       'text-anchor': 'top',
-      'text-letter-spacing': 0.02,
+      'text-letter-spacing': 0.01,
+      'text-allow-overlap': false,
     },
     paint: {
-      'text-color':      '#F5F5F7',
-      'text-halo-color': 'rgba(8, 9, 11, 0.8)',
+      'text-color': '#F5F5F7',
+      'text-halo-color': 'rgba(8, 9, 11, 0.85)',
       'text-halo-width': 2,
+    },
+  })
+
+  map.addSource(INCIDENT_CRITICAL_SOURCE, { type: 'geojson', data: emptyFC })
+  map.addLayer({
+    id:     INCIDENT_CRITICAL_SOURCE + '-glow',
+    type:   'circle',
+    source: INCIDENT_CRITICAL_SOURCE,
+    minzoom: 11,
+    paint:  {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 10, 15, 18],
+      'circle-color':  ['get', 'color'],
+      'circle-opacity': 0.18,
+      'circle-blur':    1,
+    },
+  })
+  map.addLayer({
+    id:     INCIDENT_CRITICAL_SOURCE + '-dot',
+    type:   'circle',
+    source: INCIDENT_CRITICAL_SOURCE,
+    minzoom: 11,
+    paint:  {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 5, 15, 8],
+      'circle-color':  ['get', 'color'],
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#FFFFFF',
+    },
+  })
+  map.addLayer({
+    id:     INCIDENT_CRITICAL_SOURCE + '-label',
+    type:   'symbol',
+    source: INCIDENT_CRITICAL_SOURCE,
+    minzoom: 13,
+    layout: {
+      'text-field': '!',
+      'text-font': ['Open Sans Bold'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 13, 11, 16, 16],
+      'text-allow-overlap': true,
+      'text-ignore-placement': true,
+      'text-anchor': 'center',
+    },
+    paint: {
+      'text-color': '#111111',
+      'text-halo-color': ['get', 'color'],
+      'text-halo-width': 3,
     },
   })
 
@@ -3401,4 +3814,139 @@ function import_scoreToCongestionLevel(score: number): CongestionLevel {
   if (score < 0.55) return 'slow'
   if (score < 0.80) return 'congested'
   return 'critical'
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value))
+}
+
+function getSpeedRatio(segment: Pick<TrafficSegment, 'speedKmh' | 'freeFlowSpeedKmh'>): number {
+  return clamp01(segment.speedKmh / Math.max(segment.freeFlowSpeedKmh, 1))
+}
+
+function getSegmentBearing(coords: [number, number][]): number {
+  if (coords.length < 2) return 0
+  const [lng1, lat1] = coords[0]
+  const [lng2, lat2] = coords[coords.length - 1]
+  const y = Math.sin((lng2 - lng1) * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+  const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+    Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos((lng2 - lng1) * Math.PI / 180)
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360
+}
+
+function getTrafficColor(speedRatio: number): string {
+  if (speedRatio >= 0.8) return '#22C55E'
+  if (speedRatio >= 0.6) return '#FFD600'
+  if (speedRatio >= 0.4) return '#FF9F0A'
+  return '#EF4444'
+}
+
+function buildTrafficZones(segments: TrafficSegment[]) {
+  const cellSize = 0.006
+  const groups = new Map<string, {
+    lng: number
+    lat: number
+    count: number
+    ratioSum: number
+    speedSum: number
+    freeFlowSum: number
+    lengthSum: number
+  }>()
+
+  segments.forEach(seg => {
+    const coords = seg.coordinates
+    if (!coords.length) return
+    const mid = coords[Math.floor(coords.length / 2)]
+    const key = `${Math.round(mid[0] / cellSize)}:${Math.round(mid[1] / cellSize)}`
+    const current = groups.get(key) ?? {
+      lng: 0,
+      lat: 0,
+      count: 0,
+      ratioSum: 0,
+      speedSum: 0,
+      freeFlowSum: 0,
+      lengthSum: 0,
+    }
+
+    current.lng += mid[0]
+    current.lat += mid[1]
+    current.count += 1
+    current.ratioSum += getSpeedRatio(seg)
+    current.speedSum += seg.speedKmh
+    current.freeFlowSum += seg.freeFlowSpeedKmh
+    current.lengthSum += seg.length
+    groups.set(key, current)
+  })
+
+  const half = cellSize * 0.45
+  return Array.from(groups.values()).map(group => {
+    const lng = group.lng / group.count
+    const lat = group.lat / group.count
+    const ratio = clamp01(group.ratioSum / group.count)
+    return {
+      type: 'Feature' as const,
+      geometry: {
+        type: 'Polygon' as const,
+        coordinates: [[
+          [lng - half, lat - half],
+          [lng + half, lat - half],
+          [lng + half, lat + half],
+          [lng - half, lat + half],
+          [lng - half, lat - half],
+        ]],
+      },
+      properties: {
+        speedRatio: ratio,
+        speedKmh: Math.round(group.speedSum / group.count),
+        freeFlowSpeedKmh: Math.round(group.freeFlowSum / group.count),
+        segmentCount: group.count,
+        intensity: clamp01(1 - ratio),
+      },
+    }
+  })
+}
+
+function buildFlowMarkers(segments: TrafficSegment[]) {
+  return segments
+    .filter(seg => {
+      const ratio = getSpeedRatio(seg)
+      return (
+        ['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link'].includes(seg.roadType ?? '') ||
+        ratio <= 0.82 ||
+        (seg.priorityAxis ?? 0) >= 0.65
+      )
+    })
+    .map(seg => {
+      const coords = seg.coordinates
+      const mid = coords[Math.floor(coords.length / 2)] ?? coords[0]
+      const ratio = getSpeedRatio(seg)
+      const importance = clamp01(seg.priorityAxis ?? (seg.roadType === 'motorway' ? 1 : seg.roadType === 'trunk' ? 0.85 : seg.roadType === 'primary' ? 0.7 : 0.45))
+      return {
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: mid,
+        },
+        properties: {
+          bearing: getSegmentBearing(coords),
+          speedRatio: ratio,
+          importance,
+          roadType: seg.roadType ?? 'road',
+        },
+      }
+    })
+}
+
+function splitIncidents(incidents: Incident[]) {
+  return incidents.reduce<{
+    critical: Incident[]
+    clusterable: Incident[]
+  }>((acc, incident) => {
+    if (incident.severity === 'critical' || incident.severity === 'high') {
+      acc.critical.push(incident)
+    } else {
+      acc.clusterable.push(incident)
+    }
+    return acc
+  }, { critical: [], clusterable: [] })
 }
