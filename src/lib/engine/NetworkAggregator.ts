@@ -9,6 +9,9 @@ import type { TrafficSnapshot, TrafficSegment, City, CongestionLevel } from '@/t
 export class NetworkAggregator {
   private static cache = new Map<string, GeoJSON.FeatureCollection>()
   private static osmRoadsCache = new Map<string, OSMRoad[]>()
+  private static readonly MAX_CACHE_CITIES = 3
+  private static readonly MAX_ROADS_PER_CITY = 900
+  private static readonly MAX_COORDS_PER_ROAD = 28
 
   /**
    * Builds the complete road graph for a city from OSM.
@@ -16,17 +19,20 @@ export class NetworkAggregator {
   static async getCityNetwork(city: City): Promise<GeoJSON.FeatureCollection> {
     if (this.cache.has(city.id)) return this.cache.get(city.id)!
 
-    // Fetch primary, secondary, tertiary and residential roads for full coverage
-    const roads = await fetchRoads(city.bbox, [
-      'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'residential', 'motorway_link', 'trunk_link'
-    ])
+    // Keep the canonical graph lean to avoid OOM on large cities.
+    const roads = (await fetchRoads(city.bbox, [
+      'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'motorway_link', 'trunk_link'
+    ])).slice(0, this.MAX_ROADS_PER_CITY)
     
     const fc: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
       features: roads.map(r => ({
         type: 'Feature',
         id: r.id, // Primary key for feature-state
-        geometry: { type: 'LineString', coordinates: r.coords },
+        geometry: {
+          type: 'LineString',
+          coordinates: this.simplifyCoords(r.coords),
+        },
         properties: {
           id: r.id,
           name: r.name || 'Rue Sans Nom',
@@ -41,6 +47,7 @@ export class NetworkAggregator {
 
     this.cache.set(city.id, fc)
     this.osmRoadsCache.set(city.id, roads)
+    this.trimCache()
     return fc
   }
 
@@ -118,5 +125,24 @@ export class NetworkAggregator {
               Math.sin(Δλ/2) * Math.sin(Δλ/2)
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
     return R * c
+  }
+
+  private static simplifyCoords(coords: [number, number][]): [number, number][] {
+    if (coords.length <= this.MAX_COORDS_PER_ROAD) return coords
+
+    const step = Math.ceil(coords.length / this.MAX_COORDS_PER_ROAD)
+    const simplified = coords.filter((_, idx) => idx % step === 0)
+    const last = coords[coords.length - 1]
+    if (simplified[simplified.length - 1] !== last) simplified.push(last)
+    return simplified
+  }
+
+  private static trimCache(): void {
+    while (this.cache.size > this.MAX_CACHE_CITIES) {
+      const oldest = this.cache.keys().next().value as string | undefined
+      if (!oldest) break
+      this.cache.delete(oldest)
+      this.osmRoadsCache.delete(oldest)
+    }
   }
 }
