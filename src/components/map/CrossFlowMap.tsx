@@ -64,6 +64,7 @@ import {
 } from '@/lib/api/here'
 import { fetchWeather as fetchOpenMeteoWeather, fetchAirQuality } from '@/lib/api/openmeteo'
 import { fetchCityBoundary, fetchCityDistricts } from '@/lib/api/geocoding'
+import type { AggregatedHeatFeatureCollection } from '@/lib/map/trafficHeatmap'
 import { useSocialStore } from '@/store/socialStore'
 import type { Incident, HeatmapMode, CongestionLevel, TrafficSnapshot, TrafficSegment, MapLayerId } from '@/types'
 
@@ -72,6 +73,7 @@ const TRAFFIC_PREDICTION_SOURCE = 'cf-traffic-prediction'
 const TRAFFIC_ZONE_SOURCE     = 'cf-traffic-zones'
 const TRAFFIC_FLOW_SOURCE     = 'cf-traffic-flow'
 const HEATMAP_SOURCE          = 'cf-heatmap'
+const HEATMAP_FADE_SOURCE     = 'cf-heatmap-fade'
 const HEATMAP_PASSAGES_SOURCE = 'cf-heatmap-passages'
 const HEATMAP_CO2_SOURCE      = 'cf-heatmap-co2'
 const INCIDENT_SOURCE         = 'cf-incidents'
@@ -91,6 +93,7 @@ const PREDICTIVE_EVENTS_SOURCE   = 'cf-pred-events'
 const SIM_LOCATION_SOURCE        = 'cf-sim-location'
 const SOCIAL_SOURCE              = 'cf-social'
 const WORLD_MASK_SOURCE           = 'cf-world-mask'
+const CONGESTION_HEATMAP_SOURCES = [HEATMAP_SOURCE, HEATMAP_FADE_SOURCE] as const
 
 
 // ─── Popup helpers ────────────────────────────────────────────────────────
@@ -179,6 +182,42 @@ const safeSetFilter = (map: maplibregl.Map | null, id: string, filter: any) => {
 }
 const safeSetFeatureState = (map: maplibregl.Map | null, feat: { source: string, id: string | number }, state: any) => {
   if (map && map.getSource(feat.source)) map.setFeatureState(feat, state)
+}
+
+const buildCongestionHeatmapOpacity = (alpha: number) => ([
+  'interpolate', ['linear'], ['zoom'],
+  7, 0,
+  8, 0.22 * alpha,
+  11, 0.48 * alpha,
+  14, 0.24 * alpha,
+] as any)
+
+const heatmapStackLayerId = (sourceId: string, suffix: string) => `${sourceId}-${suffix}`
+
+const setCongestionHeatmapStackOpacity = (map: maplibregl.Map | null, sourceId: string, alpha: number) => {
+  if (!map) return
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'clusters'), 'circle-opacity', 0.8 * alpha)
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'cluster-count'), 'text-opacity', 0.72 * alpha)
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'layer'), 'heatmap-opacity', buildCongestionHeatmapOpacity(alpha))
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'hotspots-glow'), 'circle-opacity', 0.16 * alpha)
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'hotspots'), 'circle-opacity', 0.92 * alpha)
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'labels'), 'text-opacity', 0.88 * alpha)
+}
+
+const setCongestionHeatmapStackVisibility = (
+  map: maplibregl.Map | null,
+  sourceId: string,
+  visibility: 'visible' | 'none',
+  interactionVisibility: 'visible' | 'none',
+) => {
+  if (!map) return
+  safeSetLayoutProperty(map, heatmapStackLayerId(sourceId, 'clusters'), 'visibility', visibility)
+  safeSetLayoutProperty(map, heatmapStackLayerId(sourceId, 'cluster-count'), 'visibility', visibility)
+  safeSetLayoutProperty(map, heatmapStackLayerId(sourceId, 'layer'), 'visibility', visibility)
+  safeSetLayoutProperty(map, heatmapStackLayerId(sourceId, 'hotspots-glow'), 'visibility', visibility)
+  safeSetLayoutProperty(map, heatmapStackLayerId(sourceId, 'hotspots'), 'visibility', visibility)
+  safeSetLayoutProperty(map, heatmapStackLayerId(sourceId, 'labels'), 'visibility', visibility)
+  safeSetLayoutProperty(map, heatmapStackLayerId(sourceId, 'circles'), 'visibility', interactionVisibility)
 }
 
 function computeRoadWidth(roadType: string | undefined, level: CongestionLevel, zoom: number, isMobile: boolean = false): number {
