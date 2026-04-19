@@ -7,7 +7,9 @@ import { cn } from '@/lib/utils/cn'
  * A draggable vertical line to compare Live vs Simulation.
  */
 export function MapSplitSlider() {
-  const { splitRatio, setSplitRatio, mode } = useMapStore()
+  const splitRatio = useMapStore(s => s.splitRatio)
+  const setSplitRatio = useMapStore(s => s.setSplitRatio)
+  const mode = useMapStore(s => s.mode)
 
   if (mode !== 'predict') return null
 

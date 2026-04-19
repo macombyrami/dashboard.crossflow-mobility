@@ -11,8 +11,10 @@ import { cn } from '@/lib/utils/cn'
  * Replays traffic snapshots over the last 24h.
  */
 export function TimelineScrubber() {
-  const { city, timeOffsetMinutes, setTimeOffset, mode } = useMapStore()
-  const { setSnapshot } = useTrafficStore()
+  const city = useMapStore(s => s.city)
+  const timeOffsetMinutes = useMapStore(s => s.timeOffsetMinutes)
+  const setTimeOffset = useMapStore(s => s.setTimeOffset)
+  const mode = useMapStore(s => s.mode)
   const [snapshots, setSnapshots] = useState<any[]>([])
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -26,7 +28,7 @@ export function TimelineScrubber() {
       // For this Staff implementation, I'll assume the GET /api/snapshots returns 
       // a light version by default, or I need to fetch the full segments.
     }
-  }, [timeOffsetMinutes, snapshots, setSnapshot])
+  }, [timeOffsetMinutes, snapshots])
 
   // 1. Fetch available snapshots for the last 24h
   useEffect(() => {

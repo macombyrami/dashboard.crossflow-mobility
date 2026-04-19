@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useRef, useCallback, useState, useMemo, memo } from 'react'
 import { usePathname } from 'next/navigation'
 
@@ -228,7 +228,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   const pulseRef             = useRef<number>(0)
   const scanRef              = useRef<number>(0) // Phase 5: Radial Scan
   const rafRef               = useRef<number>(0)
-const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
+  const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
 
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapError, setMapError]   = useState<string | null>(null)
@@ -295,6 +295,16 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   const useLiveData = process.env.NEXT_PUBLIC_TOMTOM_ENABLED !== 'false'
   const isDecisionMap = pathname.startsWith('/map')
 
+  const mapLoadedRef         = useRef(false)
+  const cityRef              = useRef(city)
+  const activeLayersRef      = useRef(activeLayers)
+  const modeRef              = useRef(mode)
+  const dataSourceRef        = useRef(dataSource)
+  const snapshotRef          = useRef(snapshot)
+  const incidentsRef         = useRef(incidents)
+  const countdownRef         = useRef(countdown)
+  const splitLngRef          = useRef(splitLng)
+
   // Refs to avoid stale closures in map click handler
   const zoneActiveRef              = useRef(zoneActive)
   const addZonePointRef            = useRef(addZonePoint)
@@ -314,6 +324,15 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => { vehicleTypeFilterRef.current = vehicleTypeFilter }, [vehicleTypeFilter])
   useEffect(() => { vehicleSearchRef.current = vehicleSearchQuery }, [vehicleSearchQuery])
   useEffect(() => { isTrackingRef.current = isTrackingVehicle }, [isTrackingVehicle])
+  useEffect(() => { mapLoadedRef.current = mapLoaded }, [mapLoaded])
+  useEffect(() => { cityRef.current = city }, [city])
+  useEffect(() => { activeLayersRef.current = activeLayers }, [activeLayers])
+  useEffect(() => { modeRef.current = mode }, [mode])
+  useEffect(() => { dataSourceRef.current = dataSource }, [dataSource])
+  useEffect(() => { snapshotRef.current = snapshot }, [snapshot])
+  useEffect(() => { incidentsRef.current = incidents }, [incidents])
+  useEffect(() => { countdownRef.current = countdown }, [countdown])
+  useEffect(() => { splitLngRef.current = splitLng }, [splitLng])
 
 
 
@@ -1115,12 +1134,14 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   // ─── 10-Minute Snapshot Engine (Staff Engineer) ─────────────────────
 
   const performSnapshot = useCallback(async (isInitial = false) => {
-    if (dataSource !== 'live' || !mapRef.current) return
+    const cityNow = cityRef.current
+    const dataSourceNow = dataSourceRef.current
+    if (dataSourceNow !== 'live' || !mapRef.current) return
     setIsFetching(true)
     
     try {
-      console.log('🔄 [Snapshot Engine] Fetching urban state for', city.name)
-      const snapshot = await generateTrafficSnapshot(city)
+      console.log('🔄 [Snapshot Engine] Fetching urban state for', cityNow.name)
+      const snapshot = await generateTrafficSnapshot(cityNow)
       const map = mapRef.current
 
       // Update Feature State (High Performance) - V4 Extended Metadata
@@ -1139,13 +1160,13 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       })
 
       // Sync KPIs to store
-      const kpis = generateCityKPIs(city)
+      const kpis = generateCityKPIs(cityNow)
       useTrafficStore.getState().setKPIs(kpis)
       
       // Persist to Supabase
       if (!isInitial) {
         await useTrafficStore.getState().persistSnapshot({
-          city_id: city.id,
+          city_id: cityNow.id,
           provider: provider,
           fetched_at: new Date().toISOString(),
           stats: {
@@ -1153,9 +1174,9 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
             incident_count: kpis.activeIncidents,
             active_segments: snapshot.segments.length
           },
-          bbox: city.bbox
+          bbox: cityNow.bbox
         })
-        toast.success(`Snapshot ${city.name} synchronisé avec succès.`)
+        toast.success(`Snapshot ${cityNow.name} synchronisé avec succès.`)
       }
 
       setLastSnapshot(new Date().toLocaleTimeString())
@@ -1166,11 +1187,11 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     } finally {
       setIsFetching(false)
     }
-  }, [city.id, city.name, dataSource, provider])
+  }, [provider])
 
   // Scheduler with Visibility Guard
   useEffect(() => {
-    if (!mapLoaded) return
+    if (!mapLoadedRef.current) return
 
     // Initial sync
     performSnapshot(true)
@@ -1191,7 +1212,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         // If we were hidden and missed a sync, sync now
-        if (countdown <= 1) performSnapshot()
+        if (countdownRef.current <= 1) performSnapshot()
       }
     }
 
@@ -1200,24 +1221,26 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       clearInterval(timer)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [mapLoaded, performSnapshot])
+  }, [performSnapshot])
 
   // ─── Social Scheduler ──────────────────────────────────────────────
   
   const performSocialCollection = useCallback(async () => {
-    if (dataSource !== 'live' || document.visibilityState !== 'visible') return
-    console.log('📡 [Social Engine] Triggering 10min collection for', city.name)
+    const cityNow = cityRef.current
+    const dataSourceNow = dataSourceRef.current
+    if (dataSourceNow !== 'live' || document.visibilityState !== 'visible') return
+    console.log('📡 [Social Engine] Triggering 10min collection for', cityNow.name)
     try {
       const { collectSocialSignals } = await import('@/lib/api/social')
-      await collectSocialSignals(city.id)
+      await collectSocialSignals(cityNow.id)
       // Optional: force refresh timeline state if needed
     } catch (err) {
       console.warn('[Social Engine] Collection failed:', err)
     }
-  }, [city.id, city.name, dataSource])
+  }, [])
 
   useEffect(() => {
-    if (!mapLoaded) return
+    if (!mapLoadedRef.current) return
 
     // Initial collect
     performSocialCollection()
@@ -1236,7 +1259,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       if (socialIntervalRef.current) clearInterval(socialIntervalRef.current)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [mapLoaded, performSocialCollection])
+  }, [performSocialCollection])
 
   // ─── Social Pins Sync ──────────────────────────────────────────────
   const socialEvents = useSocialStore((s: any) => s.events)
@@ -1617,7 +1640,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
   // ─── Data refresh ─────────────────────────────────────────────────────
 
   const refreshData = useCallback(async () => {
-    if (!mapRef.current || !mapLoaded) return
+    if (!mapRef.current || !mapLoadedRef.current) return
 
     // CRITICAL: Stop background work if tab is inactive
     if (document.visibilityState === 'hidden') return
@@ -1633,19 +1656,21 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()
     ]
 
+    const cityNow = cityRef.current
+    const activeLayersNow = activeLayersRef.current
     const useHere    = hereHasKey()
     const useTomTom  = useLiveData
 
     // ── 1. Determine base snapshot (Synthetic or Multi-source) ────────────
     let snapshot = (() => {
-      const osmRoads = osmRoadsRef.current.get(city.id)
+      const osmRoads = osmRoadsRef.current.get(cityNow.id)
       return osmRoads && osmRoads.length > 0
-        ? generateTrafficFromOSMRoads(city, osmRoads)
-        : generateTrafficSnapshot(city)
+        ? generateTrafficFromOSMRoads(cityNow, osmRoads)
+        : generateTrafficSnapshot(cityNow)
     })()
 
     // ── 2. Regional Scaling — Load real IDF network if applicable ────────
-    if (isIdfCity(city) && dataSource === 'synthetic') {
+    if (isIdfCity(cityNow) && dataSourceRef.current === 'synthetic') {
       try {
         const bounds = map.getBounds()
         const bboxStr = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
@@ -1655,7 +1680,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
         if (res.ok) {
           const idfGeojson = await res.json()
           if (idfGeojson.features?.length > 0) {
-            snapshot = generateTrafficFromIdfGeoJSON(city, idfGeojson)
+            snapshot = generateTrafficFromIdfGeoJSON(cityNow, idfGeojson)
           }
         }
       } catch (err) {
@@ -1665,7 +1690,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
 
     // ── 3. Overlay real-time HERE traffic if available ────────────────────
     if (useHere) {
-      const hereFlow = await fetchHereFlow(city.bbox)
+      const hereFlow = await fetchHereFlow(cityNow.bbox)
       if (hereFlow.length > 0) {
         const now = new Date().toISOString()
         const hereSegments: TrafficSegment[] = hereFlow
@@ -1677,7 +1702,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
             const roadType   = freeFlow > 100 ? 'motorway' : freeFlow > 80 ? 'trunk' : freeFlow > 55 ? 'primary' : freeFlow > 35 ? 'secondary' : 'tertiary'
             const length     = estimateSegmentLength(s.coords)
             return {
-              id:               `here-${city.id}-${i}`,
+              id:               `here-${cityNow.id}-${i}`,
               roadType,
               coordinates:      s.coords,
               speedKmh:         Math.round(speed),
@@ -1696,12 +1721,12 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
         const heatmapPassages = hereSegments.map(s => ({ lng: s.coordinates[0][0], lat: s.coordinates[0][1], intensity: Math.min(1, s.flowVehiclesPerHour / 2000) }))
         const heatmapCo2      = hereSegments.map(s => ({ lng: s.coordinates[0][0], lat: s.coordinates[0][1], intensity: (120 + s.congestionScore * 180) / 300 }))
 
-        snapshot = { cityId: city.id, segments: hereSegments, heatmap, heatmapPassages, heatmapCo2, fetchedAt: now }
+        snapshot = { cityId: cityNow.id, segments: hereSegments, heatmap, heatmapPassages, heatmapCo2, fetchedAt: now }
         setDataSource('live')
       }
     }
 
-    const synthetic = generateIncidents(city)
+    const synthetic = generateIncidents(cityNow)
     setSnapshot(snapshot)
 
     let incidents: Incident[] = synthetic
@@ -1718,7 +1743,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
           title:       inc.description || `Incident sur ${inc.from || 'route'}`,
           description: `${inc.from ? 'De ' + inc.from : ''}${inc.to ? ' vers ' + inc.to : ''}. Délai: ${Math.round(inc.delay / 60)} min.`,
           location:    { lat: inc.point.latitude, lng: inc.point.longitude },
-          address:     inc.roadNumbers.join(', ') || `${city.name}`,
+          address:     inc.roadNumbers.join(', ') || `${cityNow.name}`,
           startedAt:   inc.startTime,
           resolvedAt:  inc.endTime,
           source:      'TomTom',
@@ -1738,7 +1763,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
           title:       inc.description,
           description: `${inc.location.description} — ${inc.type}`,
           location:    { lat: inc.location.lat, lng: inc.location.lng },
-          address:     inc.location.description || city.name,
+          address:     inc.location.description || cityNow.name,
           startedAt:   inc.startTime,
           resolvedAt:  inc.endTime,
           source:      'HERE',
@@ -1753,7 +1778,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     if (!snapshot) return
 
     const { NetworkAggregator } = await import('@/lib/engine/NetworkAggregator')
-    const snappedSnapshot = NetworkAggregator.snapToNetwork(city, snapshot)
+    const snappedSnapshot = NetworkAggregator.snapToNetwork(cityNow, snapshot)
     
     setSnapshot(snappedSnapshot)
     const incidentSplit = splitIncidents(incidents)
@@ -1792,7 +1817,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       })
 
       // Sync geometries if city changed
-      if (cityNetworkRef.current !== city.id) {
+      if (cityNetworkRef.current !== cityNow.id) {
         const geo: GeoJSON.FeatureCollection = {
           type: 'FeatureCollection',
           features: snappedSnapshot.segments.map(s => ({
@@ -1809,16 +1834,16 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
         const s2 = safeGetSource(map, TRAFFIC_PREDICTION_SOURCE) as maplibregl.GeoJSONSource | null
         if (s1) s1.setData(geo)
         if (s2) s2.setData(geo)
-        cityNetworkRef.current = city.id
+        cityNetworkRef.current = cityNow.id
       }
 
       // ─── A/B Split View Filtering ───
-      if (mode === 'predict') {
-        const filters: any = ['<', ['get', 'midpoint_lng'], splitLng]
+      if (modeRef.current === 'predict') {
+        const filters: any = ['<', ['get', 'midpoint_lng'], splitLngRef.current]
         safeSetFilter(map, TRAFFIC_SOURCE + '-lines', filters)
         safeSetFilter(map, TRAFFIC_SOURCE + '-glow',  filters)
         safeSetFilter(map, TRAFFIC_SOURCE + '-halo',  filters)
-        safeSetFilter(map, TRAFFIC_PREDICTION_SOURCE + '-lines', ['>', ['get', 'midpoint_lng'], splitLng] as any)
+        safeSetFilter(map, TRAFFIC_PREDICTION_SOURCE + '-lines', ['>', ['get', 'midpoint_lng'], splitLngRef.current] as any)
       } else {
         // Reset filters in other modes
         safeSetFilter(map, TRAFFIC_SOURCE + '-lines', null)
@@ -1829,7 +1854,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     }
 
     // --- Heatmaps & Incidents ---
-    if (activeLayers.has('heatmap') || isDecisionMap) {
+    if (activeLayersNow.has('heatmap') || isDecisionMap) {
       const heatGeo: GeoJSON.FeatureCollection = {
         type: 'FeatureCollection',
         features: snapshot.heatmap.map(pt => ({
@@ -1920,7 +1945,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
     }
 
     previousSnapshotRef.current = snapshot
-  }, [city, mapLoaded, activeLayers, useLiveData, setSnapshot, setIncidents, setDataSource])
+  }, [setSnapshot, setIncidents, setDataSource])
 
   useEffect(() => { refreshDataRef.current = refreshData }, [refreshData])
 
@@ -1938,32 +1963,36 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
 
   // ─── 10-Minute Persistence Sampler (Staff Engineer Architecture) ───────
   useEffect(() => {
-    if (!mapLoaded || !snapshot || mode !== 'live') return
+    if (!mapLoadedRef.current || mode !== 'live') return
 
     let lastSnapshotTime = 0
     let interval: NodeJS.Timeout | null = null
 
     const capture = async () => {
-      if (document.hidden || !snapshot) return
+      const snapshotNow = snapshotRef.current
+      const incidentsNow = incidentsRef.current
+      const cityNow = cityRef.current
+      const dataSourceNow = dataSourceRef.current
+      if (document.hidden || !snapshotNow) return
       
       const now = Date.now()
       if (now - lastSnapshotTime < 550000) return // Throttle to ~10 min
 
-      console.log('[Snapshot Sampler] Capturing state for city:', city.id)
+      console.log('[Snapshot Sampler] Capturing state for city:', cityNow.id)
       setIsSyncing(true)
       
       try {
         const { saveSnapshot } = await import('@/lib/api/snapshots')
         await saveSnapshot({
-          city_id:  city.id,
-          provider: dataSource,
+          city_id:  cityNow.id,
+          provider: dataSourceNow,
           fetched_at: new Date().toISOString(),
           stats:    { 
-            avg_congestion: snapshot.segments.reduce((a, b) => a + b.congestionScore, 0) / snapshot.segments.length,
-            incident_count: incidents.length,
-            active_segments: snapshot.segments.length 
+            avg_congestion: snapshotNow.segments.reduce((a, b) => a + b.congestionScore, 0) / snapshotNow.segments.length,
+            incident_count: incidentsNow.length,
+            active_segments: snapshotNow.segments.length 
           },
-          bbox: city.bbox
+          bbox: cityNow.bbox
         })
         setLastSync(new Date())
       } catch (err) {
@@ -1988,7 +2017,7 @@ const socialIntervalRef    = useRef<NodeJS.Timeout | null>(null)
       if (interval) clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [mapLoaded, city.id, mode, dataSource, snapshot, setIsSyncing, setLastSync])
+  }, [mode, setIsSyncing, setLastSync])
 
   // ─── Simulation overlay — tint segment colors by delta ────────────────
 

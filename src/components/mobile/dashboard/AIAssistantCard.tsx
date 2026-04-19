@@ -38,7 +38,7 @@ function AIAssistantCardInner({
   },
   className,
 }: Props) {
-  const { city } = useMapStore()
+  const city = useMapStore(s => s.city)
   const store = useSimulationStore()
   const [isApplying, setIsApplying] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)

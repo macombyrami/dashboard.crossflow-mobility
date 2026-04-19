@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils/cn'
  * Visualizes road network temporal stability and variance.
  */
 export function TrafficStabilityWidget() {
-  const { city } = useMapStore()
+  const city = useMapStore(s => s.city)
   const [stabilityData, setStabilityData] = useState<any[] | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 

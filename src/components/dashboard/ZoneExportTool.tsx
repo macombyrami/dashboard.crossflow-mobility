@@ -2,7 +2,6 @@
 import { useState } from 'react'
 import { Download, FileJson, FileSpreadsheet, Loader2 } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
-import { useTrafficStore } from '@/store/trafficStore'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -10,8 +9,8 @@ import { cn } from '@/lib/utils/cn'
  * Exports the active zone (or viewport) to GeoJSON/CSV.
  */
 export function ZoneExportTool() {
-  const { zonePolygon, city } = useMapStore()
-  const { snapshot } = useTrafficStore()
+  const zonePolygon = useMapStore(s => s.zonePolygon)
+  const city = useMapStore(s => s.city)
   const [isExporting, setIsExporting] = useState(false)
 
   const handleExport = async (format: 'geojson' | 'csv') => {

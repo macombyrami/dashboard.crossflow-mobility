@@ -17,8 +17,11 @@ interface Insight {
 }
 
 export function AIAssistantOverlay() {
-  const { snapshot, incidents, kpis } = useTrafficStore()
-  const { mode, setMode } = useMapStore()
+  const snapshotVersion = useTrafficStore(s => s.snapshot?.fetchedAt ?? null)
+  const incidents = useTrafficStore(s => s.incidents)
+  const kpis = useTrafficStore(s => s.kpis)
+  const mode = useMapStore(s => s.mode)
+  const setMode = useMapStore(s => s.setMode)
   const [activeInsightIndex, setActiveInsightIndex] = useState(0)
   const [isVisible, setIsVisible] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -80,7 +83,7 @@ export function AIAssistantOverlay() {
     }
 
     return list.sort((a, b) => b.priority - a.priority)
-  }, [snapshot, incidents, mode])
+  }, [snapshotVersion, incidents, kpis, mode])
 
   useEffect(() => {
     // Show after 2 seconds
