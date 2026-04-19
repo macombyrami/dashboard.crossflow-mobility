@@ -26,6 +26,7 @@ export default function MapPage() {
   const incidents = useTrafficStore(s => s.incidents)
   const dataSource = useTrafficStore(s => s.dataSource)
   const snapshot = useTrafficStore(s => s.snapshot)
+  const trafficSummary = useTrafficStore(s => s.trafficSummary)
   const liveWeather = useTrafficStore(s => s.openMeteoWeather)
 
   const paris = CITIES.find(c => c.id === 'paris') ?? CITIES[0]
@@ -38,11 +39,9 @@ export default function MapPage() {
     return () => setLockedCity(null)
   }, [paris, setCity, setLayer, setLockedCity])
 
-  const avgCongestion = snapshot
-    ? Math.round((snapshot.segments.reduce((sum, s) => sum + s.congestionScore, 0) / Math.max(snapshot.segments.length, 1)) * 100)
-    : 0
-
-  const criticalCount = incidents.filter(i => i.severity === 'critical' || i.severity === 'high').length
+  const segmentCount = trafficSummary?.segmentCount ?? snapshot?.segments.length ?? 0
+  const avgCongestion = trafficSummary ? Math.round(trafficSummary.avgCongestion * 100) : 0
+  const criticalCount = trafficSummary?.alertCount ?? incidents.filter(i => i.severity === 'critical' || i.severity === 'high').length
   const layerPills: Array<{ id: MapLayerId, label: string, tone: string, hint: string }> = [
     { id: 'traffic', label: 'Traffic', tone: 'text-brand-green', hint: 'Zones + routes' },
     { id: 'incidents', label: 'Incidents', tone: 'text-traffic-warning', hint: 'Clusters + pins' },
@@ -83,10 +82,10 @@ export default function MapPage() {
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Metric label="Segments" value={snapshot?.segments.length ?? 0} icon={Layers3} />
-              <Metric label="Congestion" value={snapshot ? `${avgCongestion}%` : '—'} icon={Radar} />
-              <Metric label="Alertes" value={incidents.length} icon={AlertTriangle} />
-              <Metric label="Mode" value={trafficMode === 'live' ? 'Live' : trafficMode} icon={Navigation2} />
+              <Metric label="État trafic" value={trafficSummary?.trafficLabel ?? 'Chargement'} icon={Radar} />
+              <Metric label="Segments utiles" value={segmentCount} icon={Layers3} />
+              <Metric label="Congestion" value={trafficSummary ? `${avgCongestion}%` : '—'} icon={AlertTriangle} />
+              <Metric label="Prévision" value={trafficSummary?.predictionLabel ?? '—'} icon={Navigation2} />
             </div>
 
             <div className="mt-3 grid grid-cols-3 gap-2">
@@ -118,7 +117,7 @@ export default function MapPage() {
 
             <div className="mt-3 flex flex-wrap gap-2 text-[9px] font-bold uppercase tracking-[0.15em] text-white/55">
               <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
-                {criticalCount} incidents majeurs
+                {criticalCount > 0 ? `${criticalCount} alertes` : 'Aucune alerte majeure'}
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
                 {liveWeather ? `${liveWeather.weatherEmoji} ${Math.round(liveWeather.temp)}°C` : 'Météo non chargée'}

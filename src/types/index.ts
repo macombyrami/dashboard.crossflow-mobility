@@ -105,6 +105,18 @@ export interface TrafficSnapshot {
   fetchedAt:       string
 }
 
+export interface TrafficSummary {
+  segmentCount: number
+  avgCongestion: number // 0-1
+  alertCount: number
+  trafficStatus: 'fluid' | 'moderate' | 'critical'
+  trafficLabel: string
+  predictionLabel: string
+  predictionDeltaPct: number
+  updatedAt: string
+  hasData: boolean
+}
+
 // ─── Incidents ────────────────────────────────────────────────────────────────
 
 export interface Incident {

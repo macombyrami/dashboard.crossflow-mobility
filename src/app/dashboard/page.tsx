@@ -43,8 +43,13 @@ function ChartSkeleton() {
 
 function kpisFromSnapshot(cityId: string, snapshot: TrafficSnapshot, incidentCount: number, base: CityKPIs): CityKPIs {
   const segs = snapshot.segments
-  if (!segs.length) return base
-  const congestionRate = segs.reduce((a, s) => a + s.congestionScore, 0) / segs.length
+  const sourceScores = segs.length > 0
+    ? segs.map(s => s.congestionScore)
+    : snapshot.heatmap.length > 0
+      ? snapshot.heatmap.map(pt => pt.intensity)
+      : []
+  if (!sourceScores.length) return base
+  const congestionRate = sourceScores.reduce((a, score) => a + score, 0) / sourceScores.length
   const avgTravelMin = Math.max(5, 10 + congestionRate * 40)
   const pollutionIndex = Math.min(10, Math.max(0.5, congestionRate * 8 + 0.5))
   const networkEfficiency = Math.max(0.1, 1 - congestionRate * 0.85)

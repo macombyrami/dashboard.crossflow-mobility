@@ -1,11 +1,12 @@
 import { create } from 'zustand'
-import type { TrafficSnapshot, Incident, CityKPIs } from '@/types'
+import type { TrafficSnapshot, TrafficSummary, Incident, CityKPIs } from '@/types'
 import type { WeatherData } from '@/lib/api/tomtom'
 import type { OpenMeteoWeather, AirQuality } from '@/lib/api/openmeteo'
 import { mobilityCore } from '@/lib/engine/MobilityCore'
 
 interface TrafficStore {
   snapshot:             TrafficSnapshot | null
+  trafficSummary:       TrafficSummary | null
   incidents:            Incident[]
   socialIncidents:      Incident[]
   dismissedIncidentIds: Set<string>
@@ -38,8 +39,62 @@ interface TrafficStore {
   clearAll:             () => void
 }
 
-export const useTrafficStore = create<TrafficStore>()((set) => ({
+function average(values: number[]): number {
+  if (values.length === 0) return 0
+  return values.reduce((sum, value) => sum + value, 0) / values.length
+}
+
+function buildTrafficSummary(snapshot: TrafficSnapshot | null, incidents: Incident[], dataSource: 'live' | 'synthetic'): TrafficSummary | null {
+  if (!snapshot) return null
+
+  const segmentCount = snapshot.segments.length > 0
+    ? snapshot.segments.length
+    : snapshot.heatmap.length > 0
+      ? Math.max(1, Math.round(snapshot.heatmap.length / 3))
+      : 0
+
+  const segmentCongestion = snapshot.segments.length > 0
+    ? average(snapshot.segments.map(seg => seg.congestionScore))
+    : snapshot.heatmap.length > 0
+      ? average(snapshot.heatmap.map(pt => pt.intensity))
+      : 0
+
+  const alertCount = incidents.length
+  const congestionRate = Math.max(0, Math.min(1, segmentCongestion))
+  const trafficStatus: TrafficSummary['trafficStatus'] =
+    congestionRate >= 0.75 || alertCount >= 4
+      ? 'critical'
+      : congestionRate >= 0.38 || alertCount >= 2
+        ? 'moderate'
+        : 'fluid'
+
+  const trafficLabel =
+    trafficStatus === 'critical' ? 'Trafic critique' :
+    trafficStatus === 'moderate' ? 'Trafic modéré' :
+    'Trafic fluide'
+
+  const predicted = Math.max(0, Math.min(1, congestionRate + 0.18 + Math.min(0.12, alertCount * 0.02)))
+  const predictionDeltaPct = Math.max(0, Math.round((predicted - congestionRate) * 100))
+  const predictionLabel = predictionDeltaPct === 0
+    ? 'Stable sur 45 min'
+    : `+${predictionDeltaPct}% dans 45 min`
+
+  return {
+    segmentCount,
+    avgCongestion: Math.round(congestionRate * 100) / 100,
+    alertCount,
+    trafficStatus,
+    trafficLabel,
+    predictionLabel,
+    predictionDeltaPct,
+    updatedAt: snapshot.fetchedAt,
+    hasData: segmentCount > 0 || alertCount > 0,
+  }
+}
+
+export const useTrafficStore = create<TrafficStore>()((set, get) => ({
   snapshot:             null,
+  trafficSummary:       null,
   incidents:            [],
   socialIncidents:      [],
   dismissedIncidentIds: new Set(),
@@ -56,14 +111,25 @@ export const useTrafficStore = create<TrafficStore>()((set) => ({
     // 🧠 V4 Core Normalization
     const typical = null // In a real system, this would be fetched from history
     const normalized = mobilityCore.normalizeTraffic(s, typical)
-    set({ snapshot: normalized, lastUpdate: new Date() })
+    const currentIncidents = [...get().incidents, ...get().socialIncidents]
+    const dataSource = get().dataSource
+    set({
+      snapshot: normalized,
+      trafficSummary: buildTrafficSummary(normalized, currentIncidents, dataSource),
+      lastUpdate: new Date(),
+    })
   },
 
   setIncidents: (i) => {
     mobilityCore.setIncidents(i)
-    set((state) => ({ 
-      incidents: i.filter(inc => !state.dismissedIncidentIds.has(inc.id)) 
-    }))
+    set((state) => {
+      const incidents = i.filter(inc => !state.dismissedIncidentIds.has(inc.id))
+      const allIncidents = [...incidents, ...state.socialIncidents]
+      return {
+        incidents,
+        trafficSummary: buildTrafficSummary(state.snapshot, allIncidents, state.dataSource),
+      }
+    })
   },
 
   setSocialIncidents: (i) => {
@@ -71,9 +137,14 @@ export const useTrafficStore = create<TrafficStore>()((set) => ({
     const intensity = Math.min(1, i.length / 10) 
     mobilityCore.updateSocialPulse(intensity)
     
-    set((state) => ({ 
-      socialIncidents: i.filter(inc => !state.dismissedIncidentIds.has(inc.id)) 
-    }))
+    set((state) => {
+      const socialIncidents = i.filter(inc => !state.dismissedIncidentIds.has(inc.id))
+      const allIncidents = [...state.incidents, ...socialIncidents]
+      return {
+        socialIncidents,
+        trafficSummary: buildTrafficSummary(state.snapshot, allIncidents, state.dataSource),
+      }
+    })
   },
 
   setKPIs:             (k)   => set({ kpis: k }),
@@ -85,7 +156,10 @@ export const useTrafficStore = create<TrafficStore>()((set) => ({
   },
   setOpenMeteoWeather: (w)   => set({ openMeteoWeather: w }),
   setAirQuality:       (a)   => set({ airQuality: a }),
-  setDataSource:       (src) => set({ dataSource: src }),
+  setDataSource:       (src) => set((state) => ({
+    dataSource: src,
+    trafficSummary: buildTrafficSummary(state.snapshot, [...state.incidents, ...state.socialIncidents], src),
+  })),
   
   setLastSync:         (d)   => set({ lastSync: d }),
   setIsSyncing:        (b)   => set({ isSyncing: b }),
@@ -113,12 +187,14 @@ export const useTrafficStore = create<TrafficStore>()((set) => ({
       ...state.socialIncidents.map(inc => inc.id)
     ]),
     incidents: [],
-    socialIncidents: []
+    socialIncidents: [],
+    trafficSummary: buildTrafficSummary(state.snapshot, [], state.dataSource),
   })),
   clearAll:            ()    => set({
     snapshot: null, incidents: [], socialIncidents: [], kpis: null,
     weather: null, openMeteoWeather: null, airQuality: null,
     lastUpdate: null, lastSync: null, isSyncing: false, 
-    dismissedIncidentIds: new Set(), dataSource: 'synthetic'
+    dismissedIncidentIds: new Set(), dataSource: 'synthetic',
+    trafficSummary: null,
   }),
 }))
