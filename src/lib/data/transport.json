@@ -1,0 +1,25 @@
+{
+  "routeBases": {
+    "subway":   { "rushFreq": 3,  "offFreq": 7,  "rushCap": 38000, "offCap": 12000 },
+    "train":    { "rushFreq": 6,  "offFreq": 15, "rushCap": 22000, "offCap": 7000  },
+    "tram":     { "rushFreq": 5,  "offFreq": 10, "rushCap": 5500,  "offCap": 2000  },
+    "bus":      { "rushFreq": 8,  "offFreq": 16, "rushCap": 1800,  "offCap": 700   },
+    "monorail": { "rushFreq": 4,  "offFreq": 9,  "rushCap": 9000,  "offCap": 3000  },
+    "ferry":    { "rushFreq": 15, "offFreq": 30, "rushCap": 600,   "offCap": 200   }
+  },
+  "typeLabels": {
+    "bus":      "Bus",
+    "tram":     "Tramway",
+    "subway":   "Métro",
+    "train":    "Train",
+    "monorail": "Monorail",
+    "ferry":    "Ferry"
+  },
+  "networkCategories": {
+    "metros":     { "label": "Métro",    "type": "subway" },
+    "rers":       { "label": "RER",      "type": "train"  },
+    "tramways":   { "label": "Tramway",  "type": "tram"   },
+    "buses":      { "label": "Bus",      "type": "bus"    },
+    "noctiliens": { "label": "Noctilien","type": "bus"    }
+  }
+}

@@ -21,15 +21,27 @@ const config: Config = {
           accent:    '#FFFFFF',
         },
         brand: {
-          DEFAULT: '#22C55E',
-          dim:     'rgba(34,197,94,0.15)',
-          glow:    'rgba(34,197,94,0.25)',
+          DEFAULT: '#00FF9D',
+          dim:     'rgba(0, 255, 157, 0.15)',
+          glow:    'rgba(0, 255, 157, 0.25)',
+        },
+        antigravity: {
+          primary: '#00FF9D',
+          deep:    '#08090B',
+          void:    '#030303',
+          accent:  '#64f9c3',
         },
         traffic: {
-          free:      '#22C55E',
+          free:      '#00FF9D',
           slow:      '#FFD600',
           congested: '#FF9F0A',
           critical:  '#FF3B30',
+        },
+        status: {
+          ok:       '#00FF9D',
+          warn:     '#FACD15',
+          critical: '#EF4444',
+          info:     '#0A84FF',
         },
         // Apple system colors
         apple: {
@@ -40,14 +52,15 @@ const config: Config = {
           red:    '#FF3B30',
           orange: '#FF9F0A',
           yellow: '#FFD60A',
-          green:  '#32D74B',
+          green:  '#00FF9D',
           teal:   '#5AC8F5',
           cyan:   '#5AC8FA',
         },
       },
       fontFamily: {
-        sans:  ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
-        mono:  ['JetBrains Mono', 'SF Mono', 'Fira Code', 'monospace'],
+        sans:    ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        heading: ['var(--font-space-grotesk)', 'Space Grotesk', 'sans-serif'],
+        mono:    ['JetBrains Mono', 'SF Mono', 'Fira Code', 'monospace'],
       },
       fontSize: {
         '2xs': ['10px', { lineHeight: '14px', letterSpacing: '0.01em' }],
@@ -77,8 +90,8 @@ const config: Config = {
       boxShadow: {
         glass:  '0 8px 32px 0 rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)',
         card:   '0 2px 8px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.06)',
-        glow:   '0 0 20px rgba(34,197,94,0.3)',
-        'glow-sm': '0 0 10px rgba(34,197,94,0.2)',
+        glow:   '0 0 20px rgba(16,168,84,0.3)',
+        'glow-sm': '0 0 10px rgba(16,168,84,0.2)',
         float:  '0 16px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)',
       },
       backdropBlur: {
@@ -109,8 +122,8 @@ const config: Config = {
         'slide-left': { from: { transform: 'translateX(8px)', opacity: '0' }, to: { transform: 'translateX(0)', opacity: '1' } },
         'scale-in':   { from: { transform: 'scale(0.92)', opacity: '0' }, to: { transform: 'scale(1)', opacity: '1' } },
         'pulse-glow': {
-          '0%,100%': { boxShadow: '0 0 8px rgba(34,197,94,0.2)' },
-          '50%':     { boxShadow: '0 0 20px rgba(34,197,94,0.5)' },
+          '0%,100%': { boxShadow: '0 0 8px rgba(16,168,84,0.2)' },
+          '50%':     { boxShadow: '0 0 20px rgba(16,168,84,0.5)' },
         },
       },
       screens: {

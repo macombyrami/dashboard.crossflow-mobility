@@ -33,6 +33,8 @@ export interface Bounds {
 export interface City {
   id:         string
   name:       string
+  fullName?:  string // e.g. "Paris, France"
+  state?:     string // e.g. "Île-de-France"
   country:    string
   countryCode:string
   center:     LatLng
@@ -45,10 +47,27 @@ export interface City {
 
 // ─── Traffic ──────────────────────────────────────────────────────────────────
 
+export interface ContextFactors {
+  weatherImpact:  'none' | 'minor' | 'moderate' | 'severe'
+  eventIntensity: number // 0 (none) to 1 (major)
+  hourOfDay:      number
+  isWeekend:      boolean
+  publicTransportLoad: number // 0-1
+  socialPulse:    number // 0-1
+}
+
+export interface IntelligenceResult {
+  score:       number
+  level:       CongestionLevel
+  anomalyScore:number // 0-1
+  multipliers: Record<string, number>
+}
+
 export interface TrafficSegment {
   id:               string
   name?:            string
-  roadType?:        string   // motorway | trunk | primary | secondary | tertiary
+  streetName?:      string
+  roadType?:        string   // motorway | trunk | primary | secondary | tertiary | residential
   coordinates:      [number, number][] // [lng, lat][]
   speedKmh:         number
   freeFlowSpeedKmh: number
@@ -59,6 +78,16 @@ export interface TrafficSegment {
   length:           number // meters
   mode:             TransportMode
   lastUpdated:      string // ISO
+
+  // Detailed GIS Enrichment
+  arrondissement?:  string   // e.g. "1er arrondissement"
+  direction?:       string   // Cardinal: N, S, E, W, NE, etc.
+  isIntersection?:  boolean
+  hasTrafficLight?: boolean
+  priorityAxis?:    number   // 0-1 (importance score)
+  axisName?:        string   // e.g. "Boulevard Saint-Michel"
+  flowTrend?:       'improving' | 'stable' | 'worsening'
+  anomalyScore?:    number   // 0-1 (V4 Engine Delta)
 }
 
 export interface HeatmapPoint {
@@ -155,6 +184,12 @@ export interface SimulationResult {
   }
   alternativePaths: number
   completedAt?: string
+  /** Route comparison from the FastAPI predictive backend (optional) */
+  predictive?: {
+    normal:    { total_distance_m: number; total_time_s: number }
+    simulated: { total_distance_m: number; total_time_s: number }
+    delta:     { distance_m: number; time_s: number; avoided_edges: string[]; added_edges: string[] }
+  }
 }
 
 // ─── KPIs ─────────────────────────────────────────────────────────────────────

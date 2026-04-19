@@ -39,6 +39,9 @@ export interface PredictiveContext {
   // Confidence
   confidence:       number
 
+  // Operational strategy derived from all signals
+  strategy:         string[]
+
   // Cache key
   computedAt:       string
 }
@@ -115,7 +118,7 @@ export async function buildPredictiveContext(
       value:  `Perturbations TC (Lignes: ${activeLines.join(', ')})`,
       impact: 'negative',
       factor: transportFactor,
-      source: 'Navitia',
+      source: 'PRIM IDFM',
     })
   }
 
@@ -189,6 +192,12 @@ export async function buildPredictiveContext(
   if (disruptions.length > 0) confidence += 0.15
   confidence = Math.min(1, confidence)
 
+  // Operational strategy
+  const strategy = buildStrategy(
+    pressureLevel, totalFactor,
+    calendarFactor, weatherFactor, transportFactor, eventFactor, aqFactor,
+  )
+
   return {
     calendarFactor,
     eventFactor,
@@ -201,8 +210,77 @@ export async function buildPredictiveContext(
     totalFactor,
     signals,
     confidence,
+    strategy,
     computedAt: new Date().toISOString(),
   }
+}
+
+// ─── Operational strategy builder ─────────────────────────────────────────
+
+function buildStrategy(
+  pressureLevel:   'LOW' | 'MEDIUM' | 'HIGH',
+  totalFactor:     number,
+  calendarFactor:  number,
+  weatherFactor:   number,
+  transportFactor: number,
+  eventFactor:     number,
+  aqFactor:        number,
+): string[] {
+  const tips: string[] = []
+  const hour = new Date().getHours()
+
+  if (pressureLevel === 'LOW') {
+    if (calendarFactor < 0.9) {
+      tips.push('Trafic allégé — profitez de l\'accalmie pour vos déplacements non urgents.')
+    } else {
+      tips.push('Circulation fluide — conditions normales de déplacement.')
+    }
+  }
+
+  if (pressureLevel === 'MEDIUM') {
+    tips.push('Anticipez les délais : privilégiez les itinéraires alternatifs aux axes chargés.')
+    if (weatherFactor > 1.15) {
+      tips.push('Météo dégradée — augmentez les distances de sécurité et réduisez la vitesse.')
+    }
+    if (transportFactor > 1.1) {
+      tips.push('Perturbations TC actives — décalez votre départ de 20-30 min ou optez pour votre véhicule.')
+    }
+    if (eventFactor > 1.3) {
+      tips.push('Événement majeur à proximité — évitez le périmètre entre 18h et 23h.')
+    }
+  }
+
+  if (pressureLevel === 'HIGH') {
+    tips.push('Situation tendue — limitez les déplacements non essentiels durant la prochaine heure.')
+    if (totalFactor > 1.8) {
+      tips.push('Congestion sévère prévue — report ou télétravail fortement recommandé.')
+    }
+    if (transportFactor > 1.2) {
+      tips.push('Réseau TC fortement perturbé — recalculez vos trajets en temps réel avant de partir.')
+    }
+    if (weatherFactor > 1.3) {
+      tips.push('Conditions météo difficiles — risque d\'incident multiplié, préférez les transports collectifs.')
+    }
+    if (eventFactor > 1.5) {
+      tips.push('Grand événement en cours — prévoyez +30 à 45 min de trajet dans le secteur concerné.')
+    }
+  }
+
+  // Air quality advisory (independent of pressure level)
+  if (aqFactor > 1.1) {
+    tips.push('Qualité de l\'air dégradée — évitez les axes à fort trafic, préférez les voies vertes.')
+  }
+
+  // Time-of-day tip
+  if (hour >= 7 && hour <= 9) {
+    tips.push('Heure de pointe matinale — RER et métros chargés jusqu\'à 9h30.')
+  } else if (hour >= 16 && hour <= 19) {
+    tips.push('Heure de pointe du soir — pic routier attendu jusqu\'à 19h30.')
+  } else if (hour >= 22 || hour < 6) {
+    tips.push('Circulation nocturne — vérifiez les derniers passages TC avant de partir.')
+  }
+
+  return tips.slice(0, 4)
 }
 
 function computeTransportFactor(disruptions: NavitiaDisruption[]): number {

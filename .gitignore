@@ -23,7 +23,7 @@ yarn-error.log*
 # vercel
 .vercel
 
-# crossflow data
-data/
+# crossflow data (raw IDF datasets at project root — not src/lib/data/)
+/data/
 outputs/
 scripts/

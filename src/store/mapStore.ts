@@ -57,6 +57,16 @@ interface MapStore {
   selectedSegmentId: string | null
   selectSegment:     (id: string | null) => void
 
+  // Vehicle selection & tracking
+  selectedVehicleId:   string | null
+  setSelectedVehicle:  (id: string | null) => void
+  isTrackingVehicle:   boolean
+  setTrackingVehicle:  (tracking: boolean) => void
+  vehicleTypeFilter:   Set<string>  // empty = show all
+  toggleVehicleType:   (type: string) => void
+  vehicleSearchQuery:  string
+  setVehicleSearch:    (query: string) => void
+
   // Timeline
   timeOffsetMinutes: number
   setTimeOffset:     (min: number) => void
@@ -85,6 +95,10 @@ interface MapStore {
   setAIPanelOpen:(open: boolean) => void
   isMapReady:    boolean
   setMapReady:   (ready: boolean) => void
+
+  // Staff Features
+  splitRatio:    number
+  setSplitRatio: (ratio: number) => void
 }
 
 const defaultCity = CITIES.find(c => c.id === DEFAULT_CITY_ID)!
@@ -104,7 +118,13 @@ export const useMapStore = create<MapStore>()(
         set({ cityBoundary: null })
         const boundary = await fetchCityBoundary(city.name, city.country)
         if (boundary) {
-          set({ cityBoundary: boundary })
+          set({
+            cityBoundary: {
+              type: 'Feature',
+              geometry: boundary,
+              properties: {}
+            } as GeoJSON.Feature
+          })
         }
       },
       setCityBoundary: (boundary) => set({ cityBoundary: boundary }),
@@ -152,6 +172,19 @@ export const useMapStore = create<MapStore>()(
       selectedSegmentId: null,
       selectSegment:     (id) => set({ selectedSegmentId: id, isPanelOpen: id !== null }),
 
+      selectedVehicleId:   null,
+      setSelectedVehicle:  (id) => set({ selectedVehicleId: id }),
+      isTrackingVehicle:   false,
+      setTrackingVehicle:  (tracking) => set({ isTrackingVehicle: tracking }),
+      vehicleTypeFilter:   new Set<string>(),
+      toggleVehicleType:   (type) => set(s => {
+        const next = new Set(s.vehicleTypeFilter)
+        next.has(type) ? next.delete(type) : next.add(type)
+        return { vehicleTypeFilter: next }
+      }),
+      vehicleSearchQuery:  '',
+      setVehicleSearch:    (query) => set({ vehicleSearchQuery: query }),
+
       timeOffsetMinutes: 0,
       setTimeOffset:     (min) => set({ timeOffsetMinutes: min }),
 
@@ -175,38 +208,66 @@ export const useMapStore = create<MapStore>()(
       setAIPanelOpen: (open) => set({ isAIPanelOpen: open }),
       isMapReady:     false,
       setMapReady:    (ready) => set({ isMapReady: ready }),
+
+      // Staff Features
+      splitRatio:    50,
+      setSplitRatio: (ratio) => set({ splitRatio: ratio }),
     })),
     {
-      name: 'cf-map-storage',
-      // Since activeLayers is a Set, we need to handle its serialization
+      name: 'cf-map-storage-v2', // v2 — incompatible shape from v1 (cityId vs city object)
       storage: {
         getItem: (name) => {
           const str = localStorage.getItem(name)
           if (!str) return null
           const data = JSON.parse(str)
-          if (data.state && data.state.activeLayers) {
+          // Rehydrate activeLayers Set from persisted array
+          if (data.state?.activeLayers) {
             data.state.activeLayers = new Set(data.state.activeLayers)
+          }
+          // Rehydrate city from persisted cityId
+          if (data.state?.cityId) {
+            const found = CITIES.find(c => c.id === data.state.cityId)
+            data.state.city = found ?? defaultCity
+            delete data.state.cityId
+          }
+          // Rehydrate cityHistory from persisted IDs
+          if (data.state?.cityHistoryIds) {
+            data.state.cityHistory = data.state.cityHistoryIds
+              .map((id: string) => CITIES.find(c => c.id === id))
+              .filter(Boolean) as City[]
+            delete data.state.cityHistoryIds
           }
           return data
         },
         setItem: (name, value) => {
-          const data = { ...value }
-          if (data.state && data.state.activeLayers instanceof Set) {
-            // @ts-ignore
-            data.state.activeLayers = Array.from(data.state.activeLayers)
+          const data = { ...value } as any
+          if (data.state) {
+            // Serialize Set → Array
+            if (data.state.activeLayers instanceof Set) {
+              data.state.activeLayers = Array.from(data.state.activeLayers)
+            }
+            // Persist only city ID — not the full object (~5KB → 20 bytes)
+            if (data.state.city) {
+              data.state.cityId = data.state.city.id
+              delete data.state.city
+            }
+            // Persist only city history IDs
+            if (Array.isArray(data.state.cityHistory)) {
+              data.state.cityHistoryIds = data.state.cityHistory.map((c: City) => c.id)
+              delete data.state.cityHistory
+            }
           }
           localStorage.setItem(name, JSON.stringify(data))
         },
         removeItem: (name) => localStorage.removeItem(name),
       },
-      // We only want to persist some parts of the store
       partialize: (state) => ({
-        city:         state.city,
-        cityHistory:  state.cityHistory,
+        city:         state.city,        // serialized as cityId by setItem above
+        cityHistory:  state.cityHistory, // serialized as cityHistoryIds by setItem above
         activeLayers: state.activeLayers,
         mode:         state.mode,
-        // cityBoundary intentionally NOT persisted (large JSON)
-      } as MapStore), // Cast to satisfy the expected type, though only data is returned
+        lockedCityId: state.lockedCityId,
+      } as MapStore),
     }
   )
 )

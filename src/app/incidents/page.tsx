@@ -4,8 +4,16 @@ import { AlertTriangle, RefreshCw, MapPin, Clock, Zap, Download, TrendingUp, Tre
 import { SeverityPill } from '@/components/ui/SeverityPill'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
+import { useTranslation } from '@/lib/hooks/useTranslation'
 import { generateIncidents, generateCityKPIs } from '@/lib/engine/traffic.engine'
-import { generateSytadinKPIs, generateSytadinTravelTimes, injectSytadinIncidents } from '@/lib/engine/sytadin.engine'
+import {
+  fetchSytadinKPIs,
+  generateSytadinKPIs,
+  generateSytadinTravelTimes,
+  fetchAndInjectSytadinIncidents,
+  injectSytadinIncidents,
+  isIdfCity,
+} from '@/lib/engine/sytadin.engine'
 import { exportToCsv } from '@/lib/utils/export'
 import { formatDistanceToNow } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -31,23 +39,28 @@ export default function IncidentsPage() {
   const [filter, setFilter] = useState<IncidentSeverity | 'all'>('all')
   const [lastRefresh, setLastRefresh] = useState(new Date())
   const [mounted, setMounted] = useState(false)
+  const [csvExported, setCsvExported] = useState(false)
 
   // Sytadin state (for Paris only)
   const [sytadinData, setSytadinData] = useState<any>(null)
   const [travelTimes, setTravelTimes] = useState<any[]>([])
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => { document.title = `Incidents — ${city.name} | CrossFlow` }, [city.name])
 
-  const refresh = () => {
-    if (city.id === 'paris') {
-      const sytadinKpi = generateSytadinKPIs(city)
-      setSytadinData(sytadinKpi)
+  const refresh = async () => {
+    if (isIdfCity(city)) {
+      // Try live Sytadin data first, fall back to synthetic
+      const [kpi] = await Promise.all([
+        fetchSytadinKPIs().catch(() => generateSytadinKPIs(city)),
+      ])
+      setSytadinData(kpi)
       setTravelTimes(generateSytadinTravelTimes())
-      
-      const baseIncidents = dataSource === 'live' ? incidents : generateIncidents(city)
-      setIncidents(injectSytadinIncidents(city, baseIncidents))
+
+      const base = dataSource === 'live' ? incidents : generateIncidents(city)
+      const merged = await fetchAndInjectSytadinIncidents(city, base)
+        .catch(() => injectSytadinIncidents(city, base))
+      setIncidents(merged)
     } else {
       setSytadinData(null)
       setTravelTimes([])
@@ -55,7 +68,7 @@ export default function IncidentsPage() {
         setIncidents(generateIncidents(city))
       }
     }
-    
+
     if (dataSource !== 'live') {
       setKPIs(generateCityKPIs(city))
     }
@@ -64,26 +77,31 @@ export default function IncidentsPage() {
 
   useEffect(() => {
     refresh()
-    const interval = setInterval(refresh, 60_000)
+    const interval = setInterval(refresh, 180_000) // 3 min — matches Sytadin refresh rate
     return () => clearInterval(interval)
   }, [city.id, dataSource]) // eslint-disable-line
 
+  // Normalize severity to lowercase to handle Sytadin uppercase values (#25)
+  const normSeverity = (s: string): IncidentSeverity =>
+    (s.toLowerCase() as IncidentSeverity)
+
   const filtered = useMemo(() => {
     return [...incidents]
-      .filter(i => filter === 'all' || i.severity === filter)
+      .filter(i => filter === 'all' || normSeverity(i.severity) === filter)
       .sort((a, b) => {
         if (a.source === 'Sytadin' && b.source !== 'Sytadin') return -1
         if (a.source !== 'Sytadin' && b.source === 'Sytadin') return 1
-        return SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
+        return (SEVERITY_ORDER[normSeverity(a.severity)] ?? 3) - (SEVERITY_ORDER[normSeverity(b.severity)] ?? 3)
       })
   }, [incidents, filter])
 
+  // Use normSeverity for counts to match filter behavior (#25)
   const counts = {
     all:      incidents.length,
-    critical: incidents.filter(i => i.severity === 'critical').length,
-    high:     incidents.filter(i => i.severity === 'high').length,
-    medium:   incidents.filter(i => i.severity === 'medium').length,
-    low:      incidents.filter(i => i.severity === 'low').length,
+    critical: incidents.filter(i => normSeverity(i.severity) === 'critical').length,
+    high:     incidents.filter(i => normSeverity(i.severity) === 'high').length,
+    medium:   incidents.filter(i => normSeverity(i.severity) === 'medium').length,
+    low:      incidents.filter(i => normSeverity(i.severity) === 'low').length,
   }
 
   const FILTERS: { id: IncidentSeverity | 'all'; label: string }[] = [
@@ -95,7 +113,7 @@ export default function IncidentsPage() {
   ]
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-5xl mx-auto custom-scrollbar">
+    <main className="min-h-full p-4 sm:p-6 space-y-6 max-w-5xl mx-auto custom-scrollbar pb-safe">
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-slide-up">
         <div>
@@ -110,15 +128,19 @@ export default function IncidentsPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => exportToCsv(
-              `incidents-${city.id}-${new Date().toISOString().slice(0, 10)}`,
-              ['ID', 'Type', 'Sévérité', 'Titre', 'Adresse', 'Source', 'Début'],
-              incidents.map(i => [i.id, i.type, i.severity, i.title, i.address, i.source, i.startedAt]),
-            )}
+            onClick={() => {
+              exportToCsv(
+                `incidents-${city.id}-${new Date().toISOString().slice(0, 10)}`,
+                ['ID', 'Type', 'Sévérité', 'Titre', 'Adresse', 'Source', 'Début'],
+                incidents.map(i => [i.id, i.type, i.severity, i.title, i.address, i.source, i.startedAt]),
+              )
+              setCsvExported(true)
+              setTimeout(() => setCsvExported(false), 3000)
+            }}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-brand/40 transition-all text-sm font-semibold text-text-secondary hover:text-white group"
           >
-            <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
-            Exporter CSV
+            <Download className={cn('w-4 h-4 transition-transform', csvExported ? 'text-brand' : 'group-hover:-translate-y-0.5')} />
+            {csvExported ? `${incidents.length} lignes exportées ✓` : 'Exporter CSV'}
           </button>
           <button
             onClick={refresh}
@@ -130,8 +152,8 @@ export default function IncidentsPage() {
         </div>
       </div>
 
-      {/* Sytadin Dashboard (Paris Only) */}
-      {city.id === 'paris' && sytadinData && (
+      {/* Sytadin Dashboard (IDF cities) */}
+      {isIdfCity(city) && sytadinData && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-slide-up" style={{ animationDelay: '0.1s' }}>
           {/* Main KPI */}
           <div className="lg:col-span-1 glass-card p-6 flex flex-col justify-between relative overflow-hidden group">
@@ -139,9 +161,23 @@ export default function IncidentsPage() {
               <Zap className="w-16 h-16 text-brand" />
             </div>
             <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
                 <span className="text-[11px] font-bold text-brand uppercase tracking-[0.2em]">Sytadin — IDF</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+                {sytadinData.source === 'live' ? (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-brand/10 border border-brand/30 text-brand uppercase tracking-wider">
+                    Live sytadin.fr
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-muted uppercase tracking-wider">
+                    Estimé
+                  </span>
+                )}
+                {sytadinData.degraded && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 uppercase tracking-wider">
+                    Mode dégradé
+                  </span>
+                )}
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-5xl font-bold text-white tabular-nums">{sytadinData.totalCongestionKm}</span>

@@ -1,5 +1,5 @@
 'use client'
-import { X, Gauge, Clock, Car, TrendingDown, TrendingUp, Minus, BrainCircuit } from 'lucide-react'
+import { X, Gauge, Clock, Car, TrendingDown, TrendingUp, Minus, BrainCircuit, Zap } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { CongestionBadge } from '@/components/ui/CongestionBadge'
@@ -28,20 +28,31 @@ export function EdgeDetailPanel() {
   const delayMin     = Math.max(0, travelMin - freeFlowTime)
   const speedRatio   = segment.speedKmh / segment.freeFlowSpeedKmh
 
-  // Fake prediction trend
-  const trend  = segment.congestionScore > 0.6 ? 'worsening' : segment.congestionScore > 0.35 ? 'stable' : 'improving'
+  // Use enriched trend or fallback to score-based
+  const trend = segment.flowTrend || (segment.congestionScore > 0.6 ? 'worsening' : segment.congestionScore > 0.35 ? 'stable' : 'improving')
   const predicted = Math.max(0, Math.min(1, segment.congestionScore + (trend === 'improving' ? -0.12 : trend === 'worsening' ? +0.10 : 0)))
 
   return (
     <div className="absolute top-4 right-4 w-72 bg-bg-elevated border border-bg-border rounded-2xl shadow-panel z-20 animate-slide-in overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-bg-border flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs text-text-muted mb-1 uppercase tracking-widest">Segment sélectionné</p>
-          <p className="text-sm font-semibold text-text-primary truncate font-mono">{segment.id.split('-').slice(-2).join('-').toUpperCase()}</p>
+      <div className="p-4 border-b border-bg-border flex items-start justify-between gap-2 bg-gradient-to-br from-bg-elevated to-bg-surface">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] text-brand-green font-bold mb-1 uppercase tracking-widest flex items-center gap-1.5">
+            {segment.priorityAxis && segment.priorityAxis > 0.7 && <Zap className="w-3 h-3 fill-current" />}
+            {segment.arrondissement || 'Secteur Urbain'}
+          </p>
+          <h3 className="text-sm font-bold text-text-primary leading-tight mb-0.5" title={segment.axisName}>
+            {segment.streetName || 'Axe non identifié'}
+          </h3>
+          <p className="text-[10px] text-text-muted font-mono flex items-center gap-2">
+            <span className="bg-bg-subtle px-1.5 py-0.5 rounded border border-bg-border text-text-secondary font-bold">
+              {segment.direction || '—'}
+            </span>
+            <span className="truncate opacity-60 text-[9px]">{segment.id.split('-').pop()}</span>
+          </p>
         </div>
-        <button onClick={close} className="p-1.5 rounded-lg hover:bg-bg-surface text-text-muted hover:text-text-primary transition-colors flex-shrink-0">
-          <X className="w-4 h-4" />
+        <button onClick={close} className="p-2 rounded-xl hover:bg-bg-surface text-text-muted hover:text-text-primary transition-all flex-shrink-0 -mt-1 -mr-1">
+          <X className="w-5 h-5" />
         </button>
       </div>
 

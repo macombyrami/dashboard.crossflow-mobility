@@ -8,11 +8,9 @@
  */
 
 const BASE_V2 = 'https://data.sncf.com/api/explore/v2.1/catalog/datasets'
-// API temps réel Navitia pour SNCF
-const NAVITIA_SNCF = 'https://api.navitia.io/v1/coverage/sncf'
 
-function getNavitiaKey(): string {
-  return process.env.NEXT_PUBLIC_NAVITIA_API_KEY ?? ''
+function hasNavitiaKey(): boolean {
+  return false // Navitia supprimé — utiliser PRIM IDFM ou SNCF Open Data
 }
 
 export interface SNCFTrainStatus {
@@ -49,17 +47,12 @@ export interface SNCFPonctualite {
 // ─── Perturbations en cours ────────────────────────────────────────────────
 
 export async function fetchSNCFDisruptions(): Promise<SNCFDisruption[]> {
-  const key = getNavitiaKey()
-  if (!key) return await fetchSNCFDisruptionsOpenData()
+  if (!hasNavitiaKey()) return await fetchSNCFDisruptionsOpenData()
 
   try {
     const res = await fetch(
-      `${NAVITIA_SNCF}/disruptions?count=30`,
-      {
-        headers: { Authorization: key },
-        signal:  AbortSignal.timeout(6000),
-        next:    { revalidate: 120 },
-      },
+      `/api/navitia/coverage/sncf/disruptions?count=30`,
+      { signal: AbortSignal.timeout(6000) },
     )
     if (!res.ok) throw new Error('navitia failed')
     const data = await res.json()

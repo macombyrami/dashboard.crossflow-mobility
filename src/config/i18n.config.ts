@@ -15,6 +15,7 @@ export const translations = {
       calculating: 'Calcul...',
       recalculate: 'Recalculer',
       name: 'Nom',
+      yesterday: 'hier',
     },
     nav: {
       map: 'Carte Live',
@@ -80,6 +81,7 @@ export const translations = {
       ask_question: 'Posez une question sur le trafic',
       quick_prompts: 'ou utilisez un prompt rapide',
       input_placeholder: 'Question sur le trafic... (Entrée pour envoyer)',
+      welcome_title: 'Expert Mobilité IA',
     }
   },
   en: {
@@ -96,6 +98,7 @@ export const translations = {
       calculating: 'Calculating...',
       recalculate: 'Recalculate',
       name: 'Name',
+      yesterday: 'yesterday',
     },
     nav: {
       map: 'Live Map',
@@ -161,6 +164,7 @@ export const translations = {
       ask_question: 'Ask a question about traffic',
       quick_prompts: 'or use a quick prompt',
       input_placeholder: 'Question about traffic... (Enter to send)',
+      welcome_title: 'AI Mobility Expert',
     }
   }
 }

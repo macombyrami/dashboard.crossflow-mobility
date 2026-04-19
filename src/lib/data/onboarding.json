@@ -1,0 +1,59 @@
+{
+  "roles": [
+    { "id": "city_planner", "label": "Planificateur urbain",  "emoji": "🏙️", "desc": "Gestion de la mobilité en ville"   },
+    { "id": "researcher",   "label": "Chercheur / Analyste",  "emoji": "🔬", "desc": "Études de flux et données trafic"  },
+    { "id": "operator",     "label": "Opérateur transport",   "emoji": "🚌", "desc": "Gestion de réseaux TC"             },
+    { "id": "other",        "label": "Autre / Curieux",       "emoji": "🌍", "desc": "Je découvre CrossFlow"             }
+  ],
+  "features": [
+    {
+      "iconName": "MapPin",
+      "color":    "#22C55E",
+      "title":    "Carte trafic temps réel",
+      "desc":     "Segments colorés sur les vraies rues avec données HERE & TomTom. Zoom, clic sur une route pour la vitesse instantanée."
+    },
+    {
+      "iconName": "Layers",
+      "color":    "#3B82F6",
+      "title":    "3 modes de heatmap",
+      "desc":     "Visualisez la congestion, le nombre de passages ou les émissions CO₂ par zone. Activez le calque Heatmap dans les contrôles."
+    },
+    {
+      "iconName": "PenLine",
+      "color":    "#FACC15",
+      "title":    "Outil Zone",
+      "desc":     "Dessinez un polygone sur la carte et obtenez instantanément les stats agrégées : congestion, flux véhicules, CO₂ moyen."
+    },
+    {
+      "iconName": "Brain",
+      "color":    "#A855F7",
+      "title":    "Prévisions IA +30 min",
+      "desc":     "Anticipez l'évolution du trafic sur les 30 prochaines minutes. Passez en mode Prévision dans le sélecteur en haut."
+    },
+    {
+      "iconName": "BarChart3",
+      "color":    "#F97316",
+      "title":    "Dashboard KPIs",
+      "desc":     "Météo réelle, qualité de l'air, congestion globale, vitesse moyenne et modal split — tout en un coup d'œil."
+    },
+    {
+      "iconName": "Car",
+      "color":    "#EF4444",
+      "title":    "Simulation de scénarios",
+      "desc":     "Fermez une rue, ajoutez une piste cyclable ou réduisez la vitesse et mesurez l'impact sur le réseau."
+    }
+  ],
+  "steps": ["Bienvenue", "Votre ville", "Fonctionnalités", "C'est parti !"],
+  "defaultCityId": "paris",
+  "copy": {
+    "welcomeTitle":      "Bienvenue sur {appName}",
+    "welcomeDesc":       "La plateforme de mobilité urbaine intelligente. Quelques secondes pour personnaliser votre expérience.",
+    "cityTitle":         "Votre ville principale",
+    "cityDesc":          "{appName} s'adapte à chaque ville. Choisissez celle que vous gérez ou analysez en priorité.",
+    "featuresTitle":     "Ce que vous pouvez faire",
+    "featuresDesc":      "{appName} réunit trafic temps réel, IA prédictive et simulation en une seule interface.",
+    "readyDesc":         "{appName} est configuré sur {city} — votre centre opérationnel principal.",
+    "launchButton":      "Lancer {appName}",
+    "intelligenceLabel": "HERE + TomTom Live"
+  }
+}

@@ -12,7 +12,10 @@
 
 import { overpassLimiter } from '@/lib/utils/rateLimiter'
 
-const OVERPASS_BASE = 'https://overpass-api.de/api/interpreter'
+// Route through our server proxy (caches 1h, avoids browser rate-limits + CORS)
+const OVERPASS_BASE = typeof window !== 'undefined'
+  ? '/api/overpass'
+  : 'https://overpass-api.de/api/interpreter'
 
 export interface OSMRoad {
   id:       number
@@ -57,7 +60,7 @@ export async function fetchRoads(
     (
       way["highway"~"^(${highwayTypes.join('|')})$"](${south},${west},${north},${east});
     );
-    out body;
+    out tags qt;
     >;
     out skel qt;
   `
@@ -74,7 +77,8 @@ export async function fetchRoads(
     const data = await res.json()
 
     return parseWays(data)
-  } catch {
+  } catch (err) {
+    console.error(`[Overpass API] Failed to fetch roads for ${bbox.join(',')}:`, err)
     return []
   }
 }
@@ -94,7 +98,7 @@ export async function fetchTrafficPOIs(
       node["railway"="subway_entrance"](${south},${west},${north},${east});
       node["amenity"="charging_station"](${south},${west},${north},${east});
     );
-    out body qt 500;
+    out tags center qt 500;
   `
 
   try {
@@ -141,7 +145,7 @@ export async function fetchCycleNetwork(
       way["highway"="cycleway"](${south},${west},${north},${east});
       way["cycleway"~"^(lane|track|shared_lane)$"](${south},${west},${north},${east});
     );
-    out body;
+    out tags qt;
     >;
     out skel qt;
   `
@@ -223,6 +227,94 @@ export async function fetchCityStats(cityName: string, countryCode: string): Pro
   }
 }
 
+// ─── Metro stations with line associations ────────────────────────────────
+
+export interface MetroStation {
+  id:    number
+  name:  string
+  lat:   number
+  lng:   number
+  lines: string[]   // sorted line refs e.g. ["1", "4", "7"]
+}
+
+/**
+ * Fetch subway stations (railway=station + stop_position) AND subway route
+ * relations in one Overpass call. Associates each station with its metro line
+ * numbers by cross-referencing route-relation member node IDs.
+ */
+export async function fetchMetroStations(
+  bbox: [number, number, number, number],
+): Promise<MetroStation[]> {
+  const [west, south, east, north] = bbox
+  // Fetch stations + route relations (for line→station mapping)
+  // Also include RER (route=train, network~RATP) and tram stops
+  const query = `
+    [out:json][timeout:40];
+    (
+      node["railway"="station"]["station"="subway"](${south},${west},${north},${east});
+      node["railway"="station"]["station"="light_rail"](${south},${west},${north},${east});
+      node["public_transport"="stop_position"]["subway"="yes"](${south},${west},${north},${east});
+      node["public_transport"="stop_position"]["tram"="yes"](${south},${west},${north},${east});
+      relation["type"="route"]["route"="subway"](${south},${west},${north},${east});
+      relation["type"="route"]["route"="tram"](${south},${west},${north},${east});
+      relation["type"="route"]["route"="train"]["network"~"RATP|SNCF|Transilien|RER",i](${south},${west},${north},${east});
+    );
+    out tags center qt 2000;
+  `
+  try {
+    await overpassLimiter.acquire()
+    const res = await fetch(OVERPASS_BASE, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    `data=${encodeURIComponent(query)}`,
+      signal:  AbortSignal.timeout(40000),
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+
+    // 1. Build nodeId → Set<lineRef> from route relations
+    const nodeLines = new Map<number, Set<string>>()
+    for (const el of data.elements ?? []) {
+      if (el.type !== 'relation') continue
+      const ref = (el.tags?.ref ?? '').trim()
+      if (!ref) continue
+      for (const member of el.members ?? []) {
+        if (member.type === 'node') {
+          if (!nodeLines.has(member.ref)) nodeLines.set(member.ref, new Set())
+          nodeLines.get(member.ref)!.add(ref)
+        }
+      }
+    }
+
+    // 2. Collect station nodes, merge by name to deduplicate multi-stop stations
+    const byName = new Map<string, MetroStation>()
+    for (const el of data.elements ?? []) {
+      if (el.type !== 'node' || el.lat === undefined) continue
+      const tags = el.tags ?? {}
+      const isStation =
+        (tags.railway === 'station' && (tags.station === 'subway' || tags.subway === 'yes')) ||
+        (tags.public_transport === 'stop_position' && tags.subway === 'yes' && tags.name)
+      if (!isStation) continue
+      const name = (tags.name ?? tags['name:fr'] ?? '').trim()
+      if (!name) continue
+      const lines = [...(nodeLines.get(el.id) ?? new Set())].sort()
+      const key   = name.toLowerCase()
+      const exist = byName.get(key)
+      if (!exist) {
+        byName.set(key, { id: el.id, name, lat: el.lat, lng: el.lon, lines })
+      } else {
+        // Merge lines from multiple stop_position nodes for same station
+        const merged = [...new Set([...exist.lines, ...lines])].sort()
+        byName.set(key, { ...exist, lines: merged })
+      }
+    }
+
+    return [...byName.values()].slice(0, 400)
+  } catch {
+    return []
+  }
+}
+
 // ─── Transit route relations ──────────────────────────────────────────────
 
 export interface OSMTransitLine {
@@ -296,10 +388,10 @@ export async function fetchRouteGeometries(
   maxRoutes = 30,
 ): Promise<OSMRouteGeometry[]> {
   const [west, south, east, north] = bbox
-  // Prioritise metro + tram (fewer routes, better geometry), then bus
   const types = routeTypes.join('|')
+  // Sort by route type priority: subway/tram first, then others
   const query = `
-    [out:json][timeout:35];
+    [out:json][timeout:40];
     (
       relation["type"="route"]["route"~"^(${types})$"](${south},${west},${north},${east});
     );
@@ -312,7 +404,7 @@ export async function fetchRouteGeometries(
       method:  'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body:    `data=${encodeURIComponent(query)}`,
-      signal:  AbortSignal.timeout(20000),
+      signal:  AbortSignal.timeout(40000),
     })
     if (!res.ok) return []
     const data = await res.json()
