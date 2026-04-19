@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Activity } from 'lucide-react'
@@ -88,7 +88,7 @@ export function SimulationMap() {
       >
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; CARTO &copy; OpenStreetMap'
+          attribution='&copy; CARTO'
         />
 
         <GraphLayer
@@ -109,18 +109,18 @@ export function SimulationMap() {
       <div className="absolute top-4 left-4 z-20 rounded-2xl border border-white/10 bg-bg-surface/90 backdrop-blur-md px-4 py-3 shadow-xl max-w-[320px]">
         <div className="flex items-center gap-2 mb-2">
           <Activity className="w-4 h-4 text-brand" />
-          <p className="text-[10px] uppercase tracking-[0.2em] text-text-muted font-semibold">Carte simulation</p>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-text-muted font-semibold">Carte de simulation</p>
         </div>
         <p className="text-xs text-text-secondary leading-relaxed">
-          Meme carte que le projet source: reseau routier, noeuds notables et interactions par clic.
+          Même carte que la lecture principale : réseau routier, nœuds notables et interactions par clic.
         </p>
       </div>
 
       <div className="absolute bottom-4 left-4 z-20 rounded-2xl border border-white/10 bg-bg-surface/90 backdrop-blur-md px-4 py-3 shadow-xl space-y-2">
-        <div className="text-[10px] uppercase tracking-[0.2em] text-text-muted font-semibold">Legende</div>
+        <div className="text-[10px] uppercase tracking-[0.2em] text-text-muted font-semibold">Légende</div>
         <LegendItem color="#4A5568" label="Route normale" />
         <LegendItem color="#FF6D00" label="Trafic ralenti" />
-        <LegendItem color="#FF1744" label="Route bloquee" />
+        <LegendItem color="#FF1744" label="Route bloquée" />
         <LegendItem color="#68D391" label="Feu de signalisation" dot />
       </div>
 
@@ -132,7 +132,7 @@ export function SimulationMap() {
             : interactionMode === SIMULATION_INTERACTION_MODE.ADD_TRAFFIC
               ? 'Ajouter du trafic'
               : locationPickerActive
-                ? 'Placer un evenement'
+                ? 'Placer un événement'
                 : 'Navigation libre'}
         </p>
       </div>
@@ -185,24 +185,28 @@ function MapEventsBridge({
   setLocationPickerActive: (active: boolean) => void
   setEventLocation: (loc: { lat: number; lng: number } | null) => void
 }) {
-  useMapEvents({
+  const map = useMapEvents({
     click(e) {
       if (!locationPickerActive) return
       setEventLocation({ lat: e.latlng.lat, lng: e.latlng.lng })
       setLocationPickerActive(false)
     },
   })
+
+  useEffect(() => {
+    void map
+  }, [map])
+
   return null
 }
 
 function LegendItem({ color, label, dot = false }: { color: string; label: string; dot?: boolean }) {
   return (
-    <div className="flex items-center gap-2 text-xs text-text-secondary">
-      {dot ? (
-        <span className="w-2.5 h-2.5 rounded-full border border-black/40" style={{ backgroundColor: color }} />
-      ) : (
-        <span className="w-5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
-      )}
+    <div className="flex items-center gap-2 text-[10px] text-text-secondary">
+      <span
+        className={cn('inline-block shrink-0', dot ? 'w-2 h-2 rounded-full' : 'w-4 h-0.5 rounded-full')}
+        style={{ backgroundColor: color }}
+      />
       <span>{label}</span>
     </div>
   )

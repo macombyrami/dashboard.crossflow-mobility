@@ -4,7 +4,6 @@ import { AlertTriangle, RefreshCw, MapPin, Clock, Zap, Download, TrendingUp, Tre
 import { SeverityPill } from '@/components/ui/SeverityPill'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
-import { useTranslation } from '@/lib/hooks/useTranslation'
 import { generateIncidents, generateCityKPIs } from '@/lib/engine/traffic.engine'
 import {
   fetchSytadinKPIs,
@@ -22,39 +21,37 @@ import type { IncidentSeverity, IncidentType } from '@/types'
 
 const SEVERITY_ORDER: Record<IncidentSeverity, number> = { critical: 0, high: 1, medium: 2, low: 3 }
 const TYPE_LABELS: Record<IncidentType, string> = {
-  accident:   'Accident',
-  roadwork:   'Travaux',
+  accident: 'Accident',
+  roadwork: 'Travaux',
   congestion: 'Congestion',
-  anomaly:    'Anomalie IA',
-  event:      'Événement',
+  anomaly: 'Anomalie IA',
+  event: 'Événement',
 }
 
 export default function IncidentsPage() {
-  const city        = useMapStore(s => s.city)
-  const incidents   = useTrafficStore(s => s.incidents)
-  const dataSource  = useTrafficStore(s => s.dataSource)
+  const city = useMapStore(s => s.city)
+  const incidents = useTrafficStore(s => s.incidents)
+  const dataSource = useTrafficStore(s => s.dataSource)
   const setIncidents = useTrafficStore(s => s.setIncidents)
-  const setKPIs     = useTrafficStore(s => s.setKPIs)
+  const setKPIs = useTrafficStore(s => s.setKPIs)
   
   const [filter, setFilter] = useState<IncidentSeverity | 'all'>('all')
   const [lastRefresh, setLastRefresh] = useState(new Date())
   const [mounted, setMounted] = useState(false)
   const [csvExported, setCsvExported] = useState(false)
 
-  // Sytadin state (for Paris only)
-  const [sytadinData, setSytadinData] = useState<any>(null)
+  const [idfData, setIdfData] = useState<any>(null)
   const [travelTimes, setTravelTimes] = useState<any[]>([])
 
   useEffect(() => { setMounted(true) }, [])
-  useEffect(() => { document.title = `Incidents — ${city.name} | CrossFlow` }, [city.name])
+  useEffect(() => { document.title = `Alertes — ${city.name} | CrossFlow` }, [city.name])
 
   const refresh = async () => {
     if (isIdfCity(city)) {
-      // Try live Sytadin data first, fall back to synthetic
       const [kpi] = await Promise.all([
         fetchSytadinKPIs().catch(() => generateSytadinKPIs(city)),
       ])
-      setSytadinData(kpi)
+      setIdfData(kpi)
       setTravelTimes(generateSytadinTravelTimes())
 
       const base = dataSource === 'live' ? incidents : generateIncidents(city)
@@ -62,7 +59,7 @@ export default function IncidentsPage() {
         .catch(() => injectSytadinIncidents(city, base))
       setIncidents(merged)
     } else {
-      setSytadinData(null)
+      setIdfData(null)
       setTravelTimes([])
       if (dataSource !== 'live') {
         setIncidents(generateIncidents(city))
@@ -77,11 +74,10 @@ export default function IncidentsPage() {
 
   useEffect(() => {
     refresh()
-    const interval = setInterval(refresh, 180_000) // 3 min — matches Sytadin refresh rate
+    const interval = setInterval(refresh, 180_000)
     return () => clearInterval(interval)
   }, [city.id, dataSource]) // eslint-disable-line
 
-  // Normalize severity to lowercase to handle Sytadin uppercase values (#25)
   const normSeverity = (s: string): IncidentSeverity =>
     (s.toLowerCase() as IncidentSeverity)
 
@@ -89,19 +85,18 @@ export default function IncidentsPage() {
     return [...incidents]
       .filter(i => filter === 'all' || normSeverity(i.severity) === filter)
       .sort((a, b) => {
-        if (a.source === 'Sytadin' && b.source !== 'Sytadin') return -1
-        if (a.source !== 'Sytadin' && b.source === 'Sytadin') return 1
+        if (a.source === 'Lecture directe' && b.source !== 'Lecture directe') return -1
+        if (a.source !== 'Lecture directe' && b.source === 'Lecture directe') return 1
         return (SEVERITY_ORDER[normSeverity(a.severity)] ?? 3) - (SEVERITY_ORDER[normSeverity(b.severity)] ?? 3)
       })
   }, [incidents, filter])
 
-  // Use normSeverity for counts to match filter behavior (#25)
   const counts = {
-    all:      incidents.length,
+    all: incidents.length,
     critical: incidents.filter(i => normSeverity(i.severity) === 'critical').length,
-    high:     incidents.filter(i => normSeverity(i.severity) === 'high').length,
-    medium:   incidents.filter(i => normSeverity(i.severity) === 'medium').length,
-    low:      incidents.filter(i => normSeverity(i.severity) === 'low').length,
+    high: incidents.filter(i => normSeverity(i.severity) === 'high').length,
+    medium: incidents.filter(i => normSeverity(i.severity) === 'medium').length,
+    low: incidents.filter(i => normSeverity(i.severity) === 'low').length,
   }
 
   const FILTERS: { id: IncidentSeverity | 'all'; label: string }[] = [
@@ -114,12 +109,11 @@ export default function IncidentsPage() {
 
   return (
     <main className="min-h-full p-4 sm:p-6 space-y-6 max-w-5xl mx-auto custom-scrollbar pb-safe">
-      {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-slide-up">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-3">
             <AlertTriangle className="w-6 h-6 text-brand" />
-            Alertes & Incidents
+            Alertes & points d’attention
             <span className="text-text-muted font-medium ml-1">— {city.flag} {city.name}</span>
           </h1>
           <p className="text-sm text-text-muted mt-1 font-medium">
@@ -152,54 +146,51 @@ export default function IncidentsPage() {
         </div>
       </div>
 
-      {/* Sytadin Dashboard (IDF cities) */}
-      {isIdfCity(city) && sytadinData && (
+      {isIdfCity(city) && idfData && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-          {/* Main KPI */}
           <div className="lg:col-span-1 glass-card p-6 flex flex-col justify-between relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
               <Zap className="w-16 h-16 text-brand" />
             </div>
             <div className="relative z-10">
               <div className="flex items-center gap-2 mb-4 flex-wrap">
-                <span className="text-[11px] font-bold text-brand uppercase tracking-[0.2em]">Sytadin — IDF</span>
+                <span className="text-[11px] font-bold text-brand uppercase tracking-[0.2em]">Lecture IDF</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-                {sytadinData.source === 'live' ? (
+                {idfData.source === 'live' ? (
                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-brand/10 border border-brand/30 text-brand uppercase tracking-wider">
-                    Live sytadin.fr
+                    Lecture active
                   </span>
                 ) : (
                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-muted uppercase tracking-wider">
                     Estimé
                   </span>
                 )}
-                {sytadinData.degraded && (
+                {idfData.degraded && (
                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 uppercase tracking-wider">
                     Mode dégradé
                   </span>
                 )}
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-bold text-white tabular-nums">{sytadinData.totalCongestionKm}</span>
+                <span className="text-5xl font-bold text-white tabular-nums">{idfData.totalCongestionKm}</span>
                 <span className="text-lg font-bold text-text-muted">km</span>
               </div>
-              <p className="text-sm font-semibold text-text-secondary mt-1">Cumul de bouchons actuel</p>
+              <p className="text-sm font-semibold text-text-secondary mt-1">Pression cumulée actuelle</p>
             </div>
             <div className={cn(
               "flex items-center gap-2 mt-6 font-bold text-[13px]",
-              sytadinData.trend === 'increasing' ? "text-red-500" : sytadinData.trend === 'decreasing' ? "text-brand" : "text-text-muted"
+              idfData.trend === 'increasing' ? "text-red-500" : idfData.trend === 'decreasing' ? "text-brand" : "text-text-muted"
             )}>
-              {sytadinData.trend === 'increasing' ? <TrendingUp className="w-4 h-4" /> : sytadinData.trend === 'decreasing' ? <TrendingDown className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
-              {sytadinData.trend === 'increasing' ? "En forte augmentation" : sytadinData.trend === 'decreasing' ? "Tendance à la baisse" : "Trafic stable"}
+              {idfData.trend === 'increasing' ? <TrendingUp className="w-4 h-4" /> : idfData.trend === 'decreasing' ? <TrendingDown className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+              {idfData.trend === 'increasing' ? "En hausse" : idfData.trend === 'decreasing' ? "En baisse" : "Stabilisé"}
             </div>
           </div>
 
-          {/* Travel Times Table */}
           <div className="lg:col-span-2 glass-card overflow-hidden flex flex-col">
             <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Route className="w-4 h-4 text-text-muted" />
-                <span className="text-[12px] font-bold text-text-secondary uppercase tracking-widest">Temps de parcours — Axes Majeurs</span>
+                <span className="text-[12px] font-bold text-text-secondary uppercase tracking-widest">Temps de parcours — Axes majeurs</span>
               </div>
             </div>
             <div className="flex-1 overflow-x-auto custom-scrollbar">
@@ -209,7 +200,7 @@ export default function IncidentsPage() {
                     <th className="px-6 py-3 text-[10px] font-bold text-text-muted uppercase tracking-wider">Axe</th>
                     <th className="px-6 py-3 text-[10px] font-bold text-text-muted uppercase tracking-wider">Parcours</th>
                     <th className="px-6 py-3 text-[10px] font-bold text-text-muted uppercase tracking-wider text-right">Temps</th>
-                    <th className="px-6 py-3 text-[10px] font-bold text-text-muted uppercase tracking-wider text-right">Status</th>
+                    <th className="px-6 py-3 text-[10px] font-bold text-text-muted uppercase tracking-wider text-right">État</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -231,7 +222,7 @@ export default function IncidentsPage() {
                             "text-[13px] font-bold tabular-nums",
                             tt.timeMin > tt.normalTimeMin * 1.5 ? "text-red-500" : "text-white"
                           )}>{tt.timeMin} min</span>
-                          <span className="text-[10px] text-text-muted font-medium">Hab: {tt.normalTimeMin} min</span>
+                          <span className="text-[10px] text-text-muted font-medium">Réf.: {tt.normalTimeMin} min</span>
                         </div>
                       </td>
                       <td className="px-6 py-3 text-right">
@@ -253,7 +244,6 @@ export default function IncidentsPage() {
         </div>
       )}
 
-      {/* Filter tabs */}
       <div className="flex items-center gap-2 flex-wrap animate-slide-up" style={{ animationDelay: '0.2s' }}>
         {FILTERS.map(f => (
           <button
@@ -271,15 +261,14 @@ export default function IncidentsPage() {
         ))}
       </div>
 
-      {/* Incident list */}
       <div className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
         {filtered.length === 0 ? (
           <div className="glass-card p-16 text-center">
             <div className="w-16 h-16 rounded-3xl bg-brand/10 flex items-center justify-center mx-auto mb-4 border border-brand/20">
               <Zap className="w-8 h-8 text-brand" />
             </div>
-            <h3 className="text-white font-bold mb-1">Tout est fluide</h3>
-            <p className="text-text-muted text-sm">Aucun incident critique détecté pour le moment.</p>
+            <h3 className="text-white font-bold mb-1">Lecture fluide</h3>
+            <p className="text-text-muted text-sm">Aucun point d’attention critique détecté pour le moment.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-3">
@@ -289,22 +278,21 @@ export default function IncidentsPage() {
                 className={cn(
                   'glass-card p-5 group transition-all duration-300 relative overflow-hidden',
                   inc.severity === 'critical' ? 'border-red-500/20' :
-                  inc.severity === 'high'     ? 'border-orange-500/20' :
-                                                'border-white/5',
+                  inc.severity === 'high' ? 'border-orange-500/20' :
+                                            'border-white/5',
                 )}
               >
-                {/* Visual accent for Sytadin sources */}
-                {inc.source === 'Sytadin' && (
+                {inc.source === 'Lecture directe' && (
                   <div className="absolute top-0 right-0 px-3 py-1 bg-brand text-black text-[9px] font-bold uppercase tracking-widest rounded-bl-xl shadow-lg z-20">
-                    Sytadin Direct
+                    Lecture directe
                   </div>
                 )}
 
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
                   <div className="flex items-start gap-4 flex-1">
                     <div className="mt-1 flex-shrink-0">
-                      <div 
-                        className="w-10 h-10 rounded-[14px] flex items-center justify-center text-lg shadow-sm border" 
+                      <div
+                        className="w-10 h-10 rounded-[14px] flex items-center justify-center text-lg shadow-sm border"
                         style={{ backgroundColor: `${inc.iconColor}14`, borderColor: `${inc.iconColor}25` }}
                       >
                          <AlertTriangle className="w-5 h-5" style={{ color: inc.iconColor }} />
@@ -330,7 +318,7 @@ export default function IncidentsPage() {
                     </div>
                     <div className="ml-auto lg:ml-0 flex items-center gap-2">
                        <span className="text-[10px] font-bold text-text-muted px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 uppercase tracking-widest">
-                         {inc.source}
+                         {inc.source === 'Lecture directe' ? 'Lecture directe' : inc.source}
                        </span>
                     </div>
                   </div>

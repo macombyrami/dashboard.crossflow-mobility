@@ -87,7 +87,7 @@ export default function PredictionPage() {
                   <p className="text-sm font-semibold text-text-primary">{t('prediction.factor')}</p>
                   <span className="text-xs text-text-muted" title={ctx.confidence <= 0.5 ? 'Confiance limitée : données météo / événements indisponibles' : undefined}>
                     {t('prediction.confidence')}: {Math.round(ctx.confidence * 100)}%
-                    {ctx.confidence <= 0.5 && <span className="ml-1 text-[10px] text-[#FFB300]" title="Sources de données limitées">⚠</span>}
+                    {ctx.confidence <= 0.5 && <span className="ml-1 text-[10px] text-[#FFB300]" title="Lecture contextuelle limitée">⚠</span>}
                   </span>
                 </div>
                 <p className="text-xs text-text-muted mb-4">
@@ -185,7 +185,7 @@ export default function PredictionPage() {
                           <span className="text-[10px] text-text-muted">×{s.factor.toFixed(2)}</span>
                         </div>
                         <p className="text-[11px] text-text-secondary mt-0.5">{s.value}</p>
-                        <p className="text-[10px] text-text-muted mt-0.5">Source: {s.source}</p>
+                        <p className="text-[10px] text-text-muted mt-0.5">Signal: {s.source}</p>
                       </div>
                       <span className={cn(
                         'text-[10px] font-semibold px-2 py-0.5 rounded-lg flex-shrink-0',

@@ -83,7 +83,7 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
       avgTravelMin:    kpis?.avgTravelMin,
       pollutionIndex:  kpis?.pollutionIndex,
       activeIncidents: kpis?.activeIncidents,
-      dataSource:      dataSource === 'live' ? 'TomTom Live' : `${appData.name} Engine`,
+      dataSource:      dataSource === 'live' ? 'Lecture consolidée' : `${appData.name} Engine`,
       zone:            zoneContext,
       history:         recentHistory,
       prediction:      currentSimResult?.predictive ? {
@@ -178,10 +178,10 @@ export function AIPanel({ onClose }: { onClose?: () => void }) {
             <BrainCircuit className="w-5 h-5 text-brand-green group-hover:scale-110 transition-transform" />
           </div>
           <div>
-            <p className="text-sm font-black text-text-primary uppercase tracking-tighter leading-none mb-1">Consultant IA</p>
+            <p className="text-sm font-black text-text-primary uppercase tracking-tighter leading-none mb-1">Assistant de pilotage</p>
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse" />
-              <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">En ligne · {city.name}</p>
+            <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">En ligne · {city.name}</p>
             </div>
           </div>
         </div>

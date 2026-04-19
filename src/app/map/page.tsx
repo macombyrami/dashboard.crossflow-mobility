@@ -64,19 +64,19 @@ export default function MapPage() {
                   Paris uniquement
                 </div>
                 <h1 className="mt-1 text-lg sm:text-xl lg:text-[1.7rem] font-black tracking-tight leading-tight">
-                  Carte trafic temps reel
+                  Lecture trafic en temps réel
                 </h1>
                 <p className="mt-1 text-xs sm:text-sm text-white/60 leading-relaxed">
-                  TomTom live, incidents, travaux, météo et couche réseau sont chargés pour Paris uniquement.
+                  Vue opérationnelle consolidée pour Paris uniquement.
                 </p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 px-2.5 py-2 text-right">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-brand-green font-black">TomTom</div>
+                <div className="text-[10px] uppercase tracking-[0.18em] text-brand-green font-black">Flux actif</div>
                 <div className={cn(
                   'mt-0.5 text-[10px] font-bold',
                   dataSource === 'live' ? 'text-brand-green' : 'text-traffic-warning',
                 )}>
-                  {dataSource === 'live' ? 'Flux live' : 'Fallback synthétique'}
+                  {dataSource === 'live' ? 'Lecture consolidée' : 'Lecture locale'}
                 </div>
               </div>
             </div>
@@ -123,7 +123,7 @@ export default function MapPage() {
                 {liveWeather ? `${liveWeather.weatherEmoji} ${Math.round(liveWeather.temp)}°C` : 'Météo non chargée'}
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
-                Paris verrouillÃ©
+                Paris verrouillé
               </span>
             </div>
           </div>
@@ -131,10 +131,10 @@ export default function MapPage() {
           <div className="hidden 2xl:block pointer-events-auto max-w-[18rem] rounded-[1.5rem] border border-white/10 bg-[#0B0C10]/82 p-3 text-white shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
             <p className="text-[9px] uppercase tracking-[0.22em] text-white/45 font-black">Lecture carte</p>
             <ul className="mt-2.5 space-y-1.5 text-[13px] text-white/75 leading-relaxed">
-              <li>Rouge = incident critique ou fort ralentissement.</li>
-              <li>Orange = congestion visible ou impact moyen.</li>
-              <li>Vert = trafic fluide ou faible charge.</li>
-              <li>Les routes affichées sont bornées au bassin parisien.</li>
+              <li>Rouge = zone critique à traiter en priorité.</li>
+              <li>Orange = pression notable à surveiller.</li>
+              <li>Vert = circulation fluide et stable.</li>
+              <li>La lecture reste centrée sur Paris et son bassin immédiat.</li>
             </ul>
           </div>
         </div>

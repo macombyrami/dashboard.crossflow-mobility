@@ -2,41 +2,41 @@
 
 import React from 'react'
 import { motion } from 'framer-motion'
-import { Activity, ShieldCheck, Zap, Globe, GitBranch, Bot } from 'lucide-react'
+import { Activity, ShieldCheck, Bot, GitBranch } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 const Features = [
   {
-    title:       "OPÉRATIONS LIVE",
-    description: "Synchronisation milliseconde des flux urbains via TomTom et données citoyennes.",
-    icon:        Activity,
-    color:       "text-brand",
-    bg:          "bg-brand/5",
-    grid:        "md:col-span-2"
+    title: 'LECTURE TEMPS RÉEL',
+    description: 'Vue continue des mouvements urbains pour orienter les décisions avec précision.',
+    icon: Activity,
+    color: 'text-brand',
+    bg: 'bg-brand/5',
+    grid: 'md:col-span-2'
   },
   {
-    title:       "SOUVERAINETÉ EU",
-    description: "Hébergement sécurisé conforme RGPD pour une gestion publique indépendante.",
-    icon:        ShieldCheck,
-    color:       "text-blue-400",
-    bg:          "bg-blue-500/5",
-    grid:        "md:col-span-1"
+    title: 'HÉBERGEMENT SÛR',
+    description: 'Infrastructure sécurisée et conforme pour les organisations publiques et conseil.',
+    icon: ShieldCheck,
+    color: 'text-blue-400',
+    bg: 'bg-blue-500/5',
+    grid: 'md:col-span-1'
   },
   {
-    title:       "PRÉDICTION IA",
-    description: "Anticipation des congestions avant qu'elles ne surviennent via notre moteur CrossFlow V4.",
-    icon:        Bot,
-    color:       "text-yellow-400",
-    bg:          "bg-yellow-500/5",
-    grid:        "md:col-span-1"
+    title: 'LECTURE ANTICIPÉE',
+    description: 'Projection des tensions avant leur apparition pour agir plus tôt et plus juste.',
+    icon: Bot,
+    color: 'text-yellow-400',
+    bg: 'bg-yellow-500/5',
+    grid: 'md:col-span-1'
   },
   {
-    title:       "INTEROPÉRABILITÉ",
-    description: "Connexion directe avec les API institutionnelles pour une vision 360° du territoire.",
-    icon:        GitBranch,
-    color:       "text-purple-400",
-    bg:          "bg-purple-500/5",
-    grid:        "md:col-span-2"
+    title: 'VISION UNIFIÉE',
+    description: 'Toutes les dimensions utiles du territoire réunies dans une seule lecture stratégique.',
+    icon: GitBranch,
+    color: 'text-purple-400',
+    bg: 'bg-purple-500/5',
+    grid: 'md:col-span-2'
   }
 ]
 
@@ -44,8 +44,8 @@ export function FeaturesGrid() {
   return (
     <section className="relative w-full max-w-6xl px-6 py-24 mx-auto">
       <div className="flex flex-col items-center text-center mb-16">
-        <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-brand mb-4">Système d'exploitation</h2>
-        <h3 className="text-3xl md:text-5xl font-black uppercase tracking-tight italic">UNE ARCHITECTURE DE CONTRÔLE SANS ÉGALE.</h3>
+        <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-brand mb-4">Système de pilotage</h2>
+        <h3 className="text-3xl md:text-5xl font-black uppercase tracking-tight italic">UNE LECTURE URBAINE D’UNE CLARTÉ RARE.</h3>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6" role="list">
@@ -58,15 +58,14 @@ export function FeaturesGrid() {
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: i * 0.1 }}
             className={cn(
-               "glass-card p-6 md:p-10 rounded-2xl md:rounded-3xl border border-white/5 transition-all duration-500 hover:border-white/10 group overflow-hidden relative",
+               'glass-card p-6 md:p-10 rounded-2xl md:rounded-3xl border border-white/5 transition-all duration-500 hover:border-white/10 group overflow-hidden relative',
                f.grid
             )}
           >
-            {/* Visual Depth */}
-            <div className={cn("absolute -top-10 -right-10 w-40 h-40 blur-[80px] opacity-20", f.bg)} aria-hidden="true" />
+            <div className={cn('absolute -top-10 -right-10 w-40 h-40 blur-[80px] opacity-20', f.bg)} aria-hidden="true" />
             
-            <div className={cn("w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center mb-6 md:mb-10 transition-transform group-hover:scale-110 flex-shrink-0", f.bg)}>
-              <f.icon className={cn("w-6 h-6 md:w-7 md:h-7", f.color)} strokeWidth={2.5} aria-hidden="true" />
+            <div className={cn('w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center mb-6 md:mb-10 transition-transform group-hover:scale-110 flex-shrink-0', f.bg)}>
+              <f.icon className={cn('w-6 h-6 md:w-7 md:h-7', f.color)} strokeWidth={2.5} aria-hidden="true" />
             </div>
 
             <h4 className="text-lg md:text-xl font-black uppercase tracking-widest mb-3 md:mb-4 italic group-hover:text-brand transition-colors">

@@ -1,29 +1,29 @@
 {
   "tabs": [
-    { "key": "all",           "label": "Tous",     "emoji": "🗂" },
-    { "key": "concert",       "label": "Concerts",  "emoji": "🎵" },
-    { "key": "festival",      "label": "Festivals", "emoji": "🎪" },
-    { "key": "sport",         "label": "Sports",    "emoji": "⚽" },
-    { "key": "manifestation", "label": "Manifs",    "emoji": "📢" },
-    { "key": "exposition",    "label": "Expos",     "emoji": "🏛️" },
-    { "key": "congrès",       "label": "Congrès",   "emoji": "🎙" }
+    { "key": "all",          "label": "Tous",      "emoji": "🗂" },
+    { "key": "concert",      "label": "Concerts",  "emoji": "🎵" },
+    { "key": "festival",     "label": "Festivals", "emoji": "🎪" },
+    { "key": "sport",        "label": "Sports",    "emoji": "⚽" },
+    { "key": "manifestation","label": "Défilés",   "emoji": "📢" },
+    { "key": "exposition",   "label": "Expos",     "emoji": "🏛️" },
+    { "key": "congrès",      "label": "Congrès",   "emoji": "🎙" }
   ],
   "categoryConfig": {
-    "concert":        { "emoji": "🎵", "color": "#AF52DE", "bg": "rgba(175,82,222,0.14)"  },
-    "festival":       { "emoji": "🎪", "color": "#FF6B35", "bg": "rgba(255,107,53,0.14)"  },
-    "sport":          { "emoji": "⚽", "color": "#0A84FF", "bg": "rgba(10,132,255,0.14)"  },
-    "manifestation":  { "emoji": "📢", "color": "#FF453A", "bg": "rgba(255,69,58,0.14)"   },
-    "exposition":     { "emoji": "🏛️", "color": "#64D2FF", "bg": "rgba(100,210,255,0.14)" },
-    "marché":         { "emoji": "🛒", "color": "#FFD60A", "bg": "rgba(255,214,10,0.14)"  },
-    "congrès":        { "emoji": "🎙", "color": "#FF9F0A", "bg": "rgba(255,159,10,0.14)"  },
-    "autre":          { "emoji": "📍", "color": "#8E8E93", "bg": "rgba(142,142,147,0.14)" }
+    "concert":       { "emoji": "🎵", "color": "#AF52DE", "bg": "rgba(175,82,222,0.14)" },
+    "festival":      { "emoji": "🎪", "color": "#FF6B35", "bg": "rgba(255,107,53,0.14)" },
+    "sport":         { "emoji": "⚽", "color": "#0A84FF", "bg": "rgba(10,132,255,0.14)" },
+    "manifestation": { "emoji": "📢", "color": "#FF453A", "bg": "rgba(255,69,58,0.14)" },
+    "exposition":    { "emoji": "🏛️", "color": "#64D2FF", "bg": "rgba(100,210,255,0.14)" },
+    "marché":        { "emoji": "🛒", "color": "#FFD60A", "bg": "rgba(255,214,10,0.14)" },
+    "congrès":       { "emoji": "🎙", "color": "#FF9F0A", "bg": "rgba(255,159,10,0.14)" },
+    "autre":         { "emoji": "📍", "color": "#8E8E93", "bg": "rgba(142,142,147,0.14)" }
   },
   "sourceBadge": {
-    "paris-opendata":   { "label": "Paris OD",     "color": "#0062FF" },
-    "openagenda":       { "label": "OpenAgenda",   "color": "#6C47FF" },
-    "predicthq":        { "label": "PredictHQ",    "color": "#22C55E" },
-    "ticketmaster":     { "label": "Ticketmaster", "color": "#00A8E8" },
-    "crossflow-engine": { "label": "CrossFlow",    "color": "#FF9F0A" }
+    "paris-opendata":   { "label": "Signal public",     "color": "#0062FF" },
+    "openagenda":       { "label": "Agenda urbain",     "color": "#6C47FF" },
+    "predicthq":        { "label": "Prévision locale",  "color": "#22C55E" },
+    "ticketmaster":     { "label": "Billetterie",       "color": "#00A8E8" },
+    "crossflow-engine": { "label": "Lecture CrossFlow", "color": "#FF9F0A" }
   },
   "severityThresholds": {
     "high":   { "min": 0.75, "text": "#FF3B30", "bg": "rgba(255,59,48,0.12)",   "border": "rgba(255,59,48,0.25)"  },

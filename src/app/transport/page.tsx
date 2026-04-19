@@ -109,10 +109,10 @@ function SummaryBar({
   total, totalPax, avgLoad, disrupted, loading, unavailable = false,
 }: { total: number; totalPax: number; avgLoad: number; disrupted: number; loading: boolean; unavailable?: boolean }) {
   const cards = [
-    { label: 'Lignes actives', value: total,                      unit: '',     color: '#22C55E', icon: Activity },
-    { label: 'Pax réseau / h', value: Math.round(totalPax / 1000), unit: 'k',  color: '#3B82F6', icon: Users },
+    { label: 'Lignes utiles', value: total,                      unit: '',     color: '#22C55E', icon: Activity },
+    { label: 'Capacité horaire', value: Math.round(totalPax / 1000), unit: 'k',  color: '#3B82F6', icon: Users },
     { label: 'Charge moyenne', value: Math.round(avgLoad),        unit: '%',    color: loadColor(avgLoad), icon: TrendingUp },
-    { label: 'Perturbations',  value: disrupted,                  unit: '',     color: disrupted > 0 ? '#EF4444' : '#22C55E', icon: AlertTriangle },
+    { label: 'Points d’attention',  value: disrupted,            unit: '',     color: disrupted > 0 ? '#EF4444' : '#22C55E', icon: AlertTriangle },
   ]
   return (
     <div className="kpi-grid">
@@ -205,15 +205,15 @@ function LineCard({
       {/* Metrics row */}
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-bg-elevated/50 border border-white/5 rounded-xl py-2 px-1 text-center group-hover:bg-bg-elevated transition-colors">
-          <p className="text-[8px] font-black uppercase tracking-widest text-text-muted mb-1 opacity-60">Fréq.</p>
+          <p className="text-[8px] font-black uppercase tracking-widest text-text-muted mb-1 opacity-60">Intervalle</p>
           <p className="text-[14px] font-black text-text-primary tabular-nums">{metrics.freqMin}<span className="text-[9px] ml-0.5 font-bold text-text-muted italic">min</span></p>
         </div>
         <div className="bg-bg-elevated/50 border border-white/5 rounded-xl py-2 px-1 text-center group-hover:bg-bg-elevated transition-colors">
-          <p className="text-[8px] font-black uppercase tracking-widest text-text-muted mb-1 opacity-60">Passage</p>
+          <p className="text-[8px] font-black uppercase tracking-widest text-text-muted mb-1 opacity-60">Prochaine fenêtre</p>
           <p className="text-[14px] font-black text-text-primary tabular-nums">{metrics.nextMin}<span className="text-[9px] ml-0.5 font-bold text-text-muted italic">min</span></p>
         </div>
         <div className="bg-bg-elevated/50 border border-white/5 rounded-xl py-2 px-1 text-center group-hover:bg-bg-elevated transition-colors">
-          <p className="text-[8px] font-black uppercase tracking-widest text-text-muted mb-1 opacity-60">Trend</p>
+          <p className="text-[8px] font-black uppercase tracking-widest text-text-muted mb-1 opacity-60">Tendance</p>
           <div className="flex items-center justify-center gap-1">
             {trend === 'up' ? <TrendingUp className="w-3.5 h-3.5 text-traffic-critical" /> : 
              trend === 'down' ? <TrendingDown className="w-3.5 h-3.5 text-brand-green" /> : 
@@ -230,7 +230,7 @@ function LineCard({
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-1.5">
             <Users className="w-3 h-3 text-text-muted opacity-50" />
-            <span className="text-[9px] text-text-muted font-bold uppercase tracking-widest">Charge Réseau</span>
+            <span className="text-[9px] text-text-muted font-bold uppercase tracking-widest">Charge globale</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] font-bold text-text-muted tabular-nums">
@@ -302,7 +302,7 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
       setLines(lines)
       setLastUpdate(new Date())
     } catch {
-      setError("Impossible de contacter l'API RATP")
+      setError("Lecture temporairement indisponible")
     } finally {
       setLoading(false)
     }
@@ -346,14 +346,14 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
         <div>
           <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
             <Train className="w-5 h-5 text-brand" />
-            Trafic RATP — Temps réel
+            Réseau de transport — Temps réel
           </h1>
           <p className="text-sm text-text-secondary mt-1 flex items-center gap-2 flex-wrap">
             <Wifi className="w-3 h-3 text-brand" />
             Île-de-France Mobilités
             {hasPrim && (
               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-brand/10 text-brand border border-brand/30 uppercase tracking-wide">
-                PRIM officiel
+                Lecture enrichie
               </span>
             )}
             {lastUpdate && mounted && (
@@ -373,14 +373,14 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
 
       {error && (
         <div className="bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.3)] rounded-xl p-4 text-sm text-[#EF4444]">
-          {error} — L'API est non-officielle et peut être temporairement indisponible.
+          {error} — La lecture peut être temporairement indisponible.
         </div>
       )}
 
       {loading && lines.length === 0 && (
         <div className="border border-bg-border rounded-3xl p-16 text-center">
           <div className="w-10 h-10 border-[3px] border-brand-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[13px] font-bold text-text-secondary uppercase tracking-tight">Initialisation du flux RATP…</p>
+          <p className="text-[13px] font-bold text-text-secondary uppercase tracking-tight">Préparation de la lecture…</p>
         </div>
       )}
 
@@ -410,8 +410,8 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
       {lines.length > 0 && (
         <p className="text-xs text-text-muted text-center pb-2">
           {hasPrim
-            ? 'Source: PRIM IDFM (officiel) + API RATP · Perturbations temps réel · Actualisé toutes les 60 s'
-            : 'Source: API RATP · Charge & fréquences estimées en temps réel · Actualisé toutes les 60 s'
+            ? 'Lecture consolidée · Actualisée toutes les 60 s'
+            : 'Lecture consolidée du réseau · Actualisée toutes les 60 s'
           }
         </p>
       )}
@@ -486,11 +486,11 @@ function OsmTransitView({ city, mounted }: { city: OsmCity; mounted: boolean }) 
         <div>
           <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
             <Bus className="w-5 h-5 text-brand" />
-            Réseau transport — {city.flag} {city.name}
+            Réseau local — {city.flag} {city.name}
           </h1>
           <p className="text-sm text-text-secondary mt-1 flex items-center gap-2">
             <Globe className="w-3 h-3 text-[#3B82F6]" />
-            OpenStreetMap
+            Réseau local
             {lastUpdate && mounted && (
               <span className="text-text-muted">· {formatDistanceToNow(lastUpdate, { locale: fr, addSuffix: true })}</span>
             )}
@@ -510,15 +510,15 @@ function OsmTransitView({ city, mounted }: { city: OsmCity; mounted: boolean }) 
       <div className="bg-[rgba(59,130,246,0.07)] border border-[rgba(59,130,246,0.2)] rounded-xl px-4 py-3 flex items-start gap-3">
         <Zap className="w-4 h-4 text-[#3B82F6] mt-0.5 shrink-0" />
         <p className="text-xs text-[#93C5FD] leading-relaxed">
-          Réseau issu d'OpenStreetMap. Charge & fréquences estimées selon le type de ligne et l'heure actuelle.
-          Les perturbations temps réel nécessitent l'API opérateur de {city.name}.
+          Lecture opérationnelle du réseau, avec estimation de charge selon le type de ligne et l'heure actuelle.
+          Les perturbations en direct nécessitent l'accès opérationnel de {city.name}.
         </p>
       </div>
 
       {loading && (
         <div className="border border-bg-border rounded-3xl p-16 text-center">
           <div className="w-10 h-10 border-[3px] border-brand-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[13px] font-bold text-text-secondary uppercase tracking-tight">Chargement réseau OSM…</p>
+          <p className="text-[13px] font-bold text-text-secondary uppercase tracking-tight">Préparation du réseau…</p>
         </div>
       )}
 
@@ -559,7 +559,7 @@ function OsmTransitView({ city, mounted }: { city: OsmCity; mounted: boolean }) 
 
       {!loading && lines.length > 0 && (
         <p className="text-xs text-text-muted text-center pb-2">
-          Source: OpenStreetMap / Overpass API · {lines.length} lignes · Fréquences & charge estimées
+          Lecture consolidée · {lines.length} lignes · Charge estimée
         </p>
       )}
     </main>

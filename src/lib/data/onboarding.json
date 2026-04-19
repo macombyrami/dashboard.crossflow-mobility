@@ -1,59 +1,59 @@
 {
   "roles": [
-    { "id": "city_planner", "label": "Planificateur urbain",  "emoji": "🏙️", "desc": "Gestion de la mobilité en ville"   },
-    { "id": "researcher",   "label": "Chercheur / Analyste",  "emoji": "🔬", "desc": "Études de flux et données trafic"  },
-    { "id": "operator",     "label": "Opérateur transport",   "emoji": "🚌", "desc": "Gestion de réseaux TC"             },
-    { "id": "other",        "label": "Autre / Curieux",       "emoji": "🌍", "desc": "Je découvre CrossFlow"             }
+    { "id": "city_planner", "label": "Décideur urbain", "emoji": "🏙️", "desc": "Pilotage de la mobilité en ville" },
+    { "id": "researcher", "label": "Analyste", "emoji": "🔬", "desc": "Lecture des flux et des tendances" },
+    { "id": "operator", "label": "Exploitant", "emoji": "🚌", "desc": "Supervision opérationnelle du réseau" },
+    { "id": "other", "label": "Découverte", "emoji": "🌍", "desc": "Je découvre CrossFlow" }
   ],
   "features": [
     {
       "iconName": "MapPin",
-      "color":    "#22C55E",
-      "title":    "Carte trafic temps réel",
-      "desc":     "Segments colorés sur les vraies rues avec données HERE & TomTom. Zoom, clic sur une route pour la vitesse instantanée."
+      "color": "#22C55E",
+      "title": "Vue trafic en temps réel",
+      "desc": "Lecture claire des axes actifs, des congestions et des zones prioritaires sur la carte."
     },
     {
       "iconName": "Layers",
-      "color":    "#3B82F6",
-      "title":    "3 modes de heatmap",
-      "desc":     "Visualisez la congestion, le nombre de passages ou les émissions CO₂ par zone. Activez le calque Heatmap dans les contrôles."
+      "color": "#3B82F6",
+      "title": "3 lectures utiles",
+      "desc": "Concentration, passage et impact environnemental par zone, sans surcharge visuelle."
     },
     {
       "iconName": "PenLine",
-      "color":    "#FACC15",
-      "title":    "Outil Zone",
-      "desc":     "Dessinez un polygone sur la carte et obtenez instantanément les stats agrégées : congestion, flux véhicules, CO₂ moyen."
+      "color": "#FACC15",
+      "title": "Analyse de zone",
+      "desc": "Dessinez un périmètre et obtenez immédiatement ses indicateurs clés."
     },
     {
       "iconName": "Brain",
-      "color":    "#A855F7",
-      "title":    "Prévisions IA +30 min",
-      "desc":     "Anticipez l'évolution du trafic sur les 30 prochaines minutes. Passez en mode Prévision dans le sélecteur en haut."
+      "color": "#A855F7",
+      "title": "Anticipation à 30 min",
+      "desc": "Visualisez la pression attendue à court terme et préparez vos décisions."
     },
     {
       "iconName": "BarChart3",
-      "color":    "#F97316",
-      "title":    "Dashboard KPIs",
-      "desc":     "Météo réelle, qualité de l'air, congestion globale, vitesse moyenne et modal split — tout en un coup d'œil."
+      "color": "#F97316",
+      "title": "Tableau de pilotage",
+      "desc": "Congestion, vitesse moyenne, santé du réseau et impact global réunis dans une lecture unique."
     },
     {
       "iconName": "Car",
-      "color":    "#EF4444",
-      "title":    "Simulation de scénarios",
-      "desc":     "Fermez une rue, ajoutez une piste cyclable ou réduisez la vitesse et mesurez l'impact sur le réseau."
+      "color": "#EF4444",
+      "title": "Simulation d'impact",
+      "desc": "Testez une action et mesurez son effet sur le réseau avant de l'appliquer."
     }
   ],
   "steps": ["Bienvenue", "Votre ville", "Fonctionnalités", "C'est parti !"],
   "defaultCityId": "paris",
   "copy": {
-    "welcomeTitle":      "Bienvenue sur {appName}",
-    "welcomeDesc":       "La plateforme de mobilité urbaine intelligente. Quelques secondes pour personnaliser votre expérience.",
-    "cityTitle":         "Votre ville principale",
-    "cityDesc":          "{appName} s'adapte à chaque ville. Choisissez celle que vous gérez ou analysez en priorité.",
-    "featuresTitle":     "Ce que vous pouvez faire",
-    "featuresDesc":      "{appName} réunit trafic temps réel, IA prédictive et simulation en une seule interface.",
-    "readyDesc":         "{appName} est configuré sur {city} — votre centre opérationnel principal.",
-    "launchButton":      "Lancer {appName}",
-    "intelligenceLabel": "HERE + TomTom Live"
+    "welcomeTitle": "Bienvenue sur {appName}",
+    "welcomeDesc": "Votre plateforme de lecture et de pilotage de la mobilité urbaine.",
+    "cityTitle": "Ville principale",
+    "cityDesc": "{appName} s'adapte à chaque territoire. Choisissez votre centre de suivi.",
+    "featuresTitle": "Ce que vous pouvez faire",
+    "featuresDesc": "{appName} réunit lecture terrain, anticipation et simulation dans une seule interface.",
+    "readyDesc": "{appName} est configuré sur {city} — votre centre opérationnel principal.",
+    "launchButton": "Lancer {appName}",
+    "intelligenceLabel": "Lecture unifiée"
   }
 }

@@ -203,7 +203,7 @@ export function EventsWidget({ lat, lng, radiusKm = 15, maxItems = 8 }: EventsWi
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-          <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Live IDF</span>
+          <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Lecture active</span>
         </div>
       </div>
     </div>

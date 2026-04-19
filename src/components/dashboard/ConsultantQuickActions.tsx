@@ -1,13 +1,13 @@
 'use client'
-import { Search, Activity, TrendingUp, Zap, AlertTriangle, GitBranch } from 'lucide-react'
+import { Search, Activity, TrendingUp, Zap, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 const QUICK_ACTIONS = [
   { id: 'analyze', icon: Search, label: 'Analyser ma zone', prompt: 'Analyse ma zone actuelle. Quels sont les points critiques ?', color: 'text-brand bg-brand/5 border-brand/20' },
-  { id: 'congestion', icon: Activity, label: 'Comprendre la congestion', prompt: 'Pourquoi y a-t-il de la congestion ici ? Est-ce lié aux travaux ou aux événements ?', color: 'text-orange-400 bg-orange-400/5 border-orange-400/20' },
-  { id: 'forecast', icon: TrendingUp, label: 'Prévoir le trafic', prompt: 'Que va-t-il se passer dans 30 min ? Quelle est la tendance ?', color: 'text-blue-400 bg-blue-400/5 border-blue-400/20' },
-  { id: 'optimize', icon: Zap, label: 'Optimiser la circulation', prompt: 'Propose-moi 3 actions pour fluidifier cet axe immédiatement.', color: 'text-emerald-400 bg-emerald-400/5 border-emerald-400/20' },
-  { id: 'incident', icon: AlertTriangle, label: 'Impact incident', prompt: 'Simule l’impact de la fermeture de cet axe majeur sur le reste du réseau.', color: 'text-rose-400 bg-rose-400/5 border-rose-400/20' },
+  { id: 'congestion', icon: Activity, label: 'Comprendre la pression', prompt: 'Pourquoi la pression est-elle élevée ici ? Quels facteurs dominent ?', color: 'text-orange-400 bg-orange-400/5 border-orange-400/20' },
+  { id: 'forecast', icon: TrendingUp, label: 'Anticiper l’évolution', prompt: 'Que va-t-il se passer dans 30 min ? Quelle est la tendance ?', color: 'text-blue-400 bg-blue-400/5 border-blue-400/20' },
+  { id: 'optimize', icon: Zap, label: 'Fluidifier la zone', prompt: 'Propose-moi 3 actions pour fluidifier cet axe immédiatement.', color: 'text-emerald-400 bg-emerald-400/5 border-emerald-400/20' },
+  { id: 'incident', icon: AlertTriangle, label: 'Impact d’une fermeture', prompt: 'Simule l’impact de la fermeture de cet axe majeur sur le reste du réseau.', color: 'text-rose-400 bg-rose-400/5 border-rose-400/20' },
 ]
 
 interface Props {

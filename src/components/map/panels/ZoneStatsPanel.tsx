@@ -30,7 +30,7 @@ export function ZoneStatsPanel() {
 
   if (inZone.length === 0) return (
     <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 glass rounded-apple px-4 py-3 border border-yellow-400/20 text-sm text-text-muted">
-      Aucun segment dans cette zone
+      Aucune lecture utile dans cette zone
     </div>
   )
 
@@ -47,8 +47,8 @@ export function ZoneStatsPanel() {
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-yellow-400" />
-          <span className="text-[12px] font-bold text-yellow-400 uppercase tracking-wider">Zone analysée</span>
-          <span className="text-[11px] text-text-muted">· {inZone.length} segments</span>
+          <span className="text-[12px] font-bold text-yellow-400 uppercase tracking-wider">Zone de lecture</span>
+          <span className="text-[11px] text-text-muted">· {inZone.length} segments utiles</span>
         </div>
         <button onClick={clearZone} className="text-text-muted hover:text-white transition-colors">
           <X className="w-3.5 h-3.5" />
@@ -58,23 +58,23 @@ export function ZoneStatsPanel() {
       <div className="grid grid-cols-2 gap-px bg-white/5 p-px">
         <div className="bg-bg-elevated px-4 py-3">
           <p className="text-[9px] font-bold uppercase tracking-wider text-text-muted mb-1 flex items-center gap-1">
-            <Car className="w-3 h-3" /> Congestion
+            <Car className="w-3 h-3" /> Densité
           </p>
           <p className="text-2xl font-bold" style={{ color: congColor }}>{congPct}<span className="text-sm ml-0.5">%</span></p>
-          <p className="text-[10px] text-text-muted mt-0.5">{Math.round(avgSpeed)} km/h moy.</p>
+          <p className="text-[10px] text-text-muted mt-0.5">{Math.round(avgSpeed)} km/h en moyenne</p>
         </div>
 
         <div className="bg-bg-elevated px-4 py-3">
           <p className="text-[9px] font-bold uppercase tracking-wider text-text-muted mb-1 flex items-center gap-1">
-            <Users className="w-3 h-3" /> Passages
+            <Users className="w-3 h-3" /> Flux
           </p>
           <p className="text-2xl font-bold text-brand-green">{totalPassages.toLocaleString('fr-FR')}</p>
-          <p className="text-[10px] text-text-muted mt-0.5">véh/h total zone</p>
+          <p className="text-[10px] text-text-muted mt-0.5">Flux total de la zone</p>
         </div>
 
         <div className="bg-bg-elevated px-4 py-3 col-span-2">
           <p className="text-[9px] font-bold uppercase tracking-wider text-text-muted mb-1 flex items-center gap-1">
-            <Wind className="w-3 h-3" /> Émissions CO₂ moyennes
+            <Wind className="w-3 h-3" /> Impact environnemental
           </p>
           <div className="flex items-baseline gap-2">
             <p className="text-xl font-bold text-orange-400">{Math.round(avgCo2)}<span className="text-sm ml-1">g/km</span></p>
@@ -82,7 +82,7 @@ export function ZoneStatsPanel() {
               <div className="h-full rounded-full bg-gradient-to-r from-green-500 to-red-500" style={{ width: `${Math.min(100, (avgCo2 / 300) * 100)}%` }} />
             </div>
           </div>
-          <p className="text-[10px] text-text-muted mt-0.5">Référence: 120 g/km (fluide) → 300 g/km (embouteillage)</p>
+          <p className="text-[10px] text-text-muted mt-0.5">Lecture comparative entre état fluide et saturation</p>
         </div>
       </div>
     </div>

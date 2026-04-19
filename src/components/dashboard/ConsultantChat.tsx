@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { Send, Loader2, Bot, Trash2, Download, Sparkles, FileJson, FileText, Share2, PlusCircle } from 'lucide-react'
+import { Send, Loader2, Bot, Trash2, Download, Sparkles, FileJson, FileText } from 'lucide-react'
 import { ConsultantMessage } from './ConsultantMessage'
 import { ConsultantQuickActions } from './ConsultantQuickActions'
 import { askConsultant, type ConsultantContext } from '@/lib/api/ai/consultant'
@@ -22,7 +22,7 @@ export function ConsultantChat({ initialContext }: Props) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: `Bonjour. Je suis CrossFlow AI Consultant. Comment puis-je vous aider à optimiser la mobilité de **${initialContext.city}** aujourd'hui ?`,
+      content: `Bonjour. Je suis CrossFlow Advisor. Comment puis-je vous aider à piloter la mobilité de **${initialContext.city}** aujourd’hui ?`,
       timestamp: new Date()
     }
   ])
@@ -43,14 +43,14 @@ export function ConsultantChat({ initialContext }: Props) {
     const doc = jsPDF ? new jsPDF() : null
     if (!doc) return
     doc.setFontSize(16)
-    doc.text(`Conversation IA CrossFlow - ${initialContext.city}`, 10, 10)
+    doc.text(`Conversation CrossFlow - ${initialContext.city}`, 10, 10)
     doc.setFontSize(10)
     messages.forEach((m, i) => {
       const y = 20 + (i * 15)
       doc.text(`${m.role.toUpperCase()}: ${m.content.slice(0, 80)}...`, 10, y)
     })
     doc.save('conversation_ia.pdf')
-    toast.success('Rapport PDF généré')
+    toast.success('Rapport généré')
   }
 
   const handleExportJSON = () => {
@@ -60,14 +60,13 @@ export function ConsultantChat({ initialContext }: Props) {
     link.href = url
     link.download = 'conversation-ai.json'
     link.click()
-    toast.success('Données JSON exportées')
+    toast.success('Données exportées')
   }
 
   const handleSend = async (text: string) => {
     if (!text.trim()) return
     setIsLoading(true)
     
-    // Append user message
     const userMsg: Message = { role: 'user', content: text, timestamp: new Date() }
     setMessages(prev => [...prev, userMsg])
     setInput('')
@@ -78,10 +77,10 @@ export function ConsultantChat({ initialContext }: Props) {
       setMessages(prev => [...prev, assistantMsg])
     } catch (err) {
       console.error('AI Error:', err)
-      const errorMsg: Message = { 
-        role: 'assistant', 
-        content: "🚨 Une erreur est survenue lors de la consultation. Veuillez vérifier votre connexion au moteur d'intelligence.",
-        timestamp: new Date() 
+      const errorMsg: Message = {
+        role: 'assistant',
+        content: 'Une erreur est survenue pendant la consultation. Vérifiez la connexion au moteur.',
+        timestamp: new Date()
       }
       setMessages(prev => [...prev, errorMsg])
     } finally {
@@ -94,8 +93,6 @@ export function ConsultantChat({ initialContext }: Props) {
       "flex flex-col h-[calc(100dvh-120px)] max-w-5xl mx-auto w-full relative transition-all duration-500",
       isPredictiveMode && "ring-2 ring-brand/20 rounded-3xl p-1 bg-brand/5"
     )}>
-      
-      {/* Integrated Action Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/[0.02]">
         <div className="flex items-center gap-2">
            <button 
@@ -108,7 +105,7 @@ export function ConsultantChat({ initialContext }: Props) {
              )}
            >
              <Sparkles className="w-3 h-3" />
-             {isPredictiveMode ? 'Prédictions ON' : 'Prédictions OFF'}
+             {isPredictiveMode ? 'Prévision active' : 'Prévision inactive'}
            </button>
         </div>
 
@@ -135,14 +132,13 @@ export function ConsultantChat({ initialContext }: Props) {
         </div>
       </div>
       
-      {/* Top Banner for Predictive Mode */}
       {isPredictiveMode && (
         <div className="mx-4 mb-4 p-4 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-between animate-in slide-in-from-top-4 duration-500">
            <div className="flex items-center gap-3">
               <Sparkles className="w-5 h-5 text-brand animate-pulse" />
               <div>
-                 <p className="text-[11px] font-black text-brand uppercase tracking-widest italic">Insights Prédictifs Activés</p>
-                 <p className="text-[9px] text-brand/60 uppercase tracking-tight">Analyse anticipée J+7 & Recommandations prioritaires</p>
+                 <p className="text-[11px] font-black text-brand uppercase tracking-widest italic">Lecture anticipée activée</p>
+                 <p className="text-[9px] text-brand/60 uppercase tracking-tight">Analyse à horizon 7 jours et recommandations prioritaires</p>
               </div>
            </div>
            <div className="flex items-center gap-2">
@@ -151,7 +147,6 @@ export function ConsultantChat({ initialContext }: Props) {
         </div>
       )}
 
-      {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-6 px-4">
         <ConsultantQuickActions onAction={handleSend} disabled={isLoading} />
         
@@ -169,13 +164,12 @@ export function ConsultantChat({ initialContext }: Props) {
              <div className="w-8 h-8 rounded-full bg-brand/10 border border-brand/30 flex items-center justify-center">
                 <Loader2 className="w-4 h-4 text-brand animate-spin" />
              </div>
-             <span className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em]">Consultant IA en train de réfléchir...</span>
+             <span className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em]">Lecture en cours...</span>
           </div>
         )}
         <div ref={scrollRef} />
       </div>
 
-      {/* Input Section */}
       <div className="p-4 bg-[#08090B] border-t border-white/5 rounded-b-3xl">
         <form 
           onSubmit={(e) => { e.preventDefault(); handleSend(input) }}
@@ -190,7 +184,7 @@ export function ConsultantChat({ initialContext }: Props) {
                value={input}
                onChange={(e) => setInput(e.target.value)}
                disabled={isLoading}
-               placeholder="Posez votre question sur la mobilité..."
+               placeholder="Posez votre question de pilotage..."
                className="flex-1 bg-transparent border-none focus:ring-0 text-base text-white placeholder:text-text-muted/60 pl-2 py-4"
              />
              <button
@@ -206,7 +200,7 @@ export function ConsultantChat({ initialContext }: Props) {
           </div>
         </form>
         <p className="text-[10px] text-center text-text-muted/40 font-bold uppercase tracking-[0.2em] mt-6 select-none">
-           IA décisionnelle · Analyse basée sur des données probantes · CrossFlow 2026
+           Analyse décisionnelle · CrossFlow 2026
         </p>
       </div>
     </div>

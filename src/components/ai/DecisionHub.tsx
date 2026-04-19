@@ -29,10 +29,10 @@ export function DecisionHub() {
     if (highCongestion) {
       list.push({
         id: 'rec-dyn-1',
-        title: 'Report multimodal immédiat',
+        title: 'Action multimodale immédiate',
         impact: 'HAUTE',
         type: 'transport',
-        action: 'Augmenter la fréquence des transports en commun sur les axes saturés et informer via SMS/App.',
+        action: 'Renforcer les capacités sur les axes saturés et diffuser une consigne claire aux équipes.',
         benefit: [
           { label: 'Congestion', val: '-15%', icon: Target },
           { label: 'CO2', val: '-8%', icon: Leaf }
@@ -44,10 +44,10 @@ export function DecisionHub() {
     incidents.filter(i => i.severity === 'critical' || i.severity === 'high').forEach((inc, idx) => {
       list.push({
         id: `rec-ext-${inc.id}`,
-        title: `Intervention: ${inc.title}`,
+        title: `Intervention prioritaire : ${inc.title}`,
         impact: 'CRITIQUE',
         type: 'emergency',
-        action: `Dépêcher une équipe d'intervention à ${inc.address} et dévoyer le flux via les axes secondaires.`,
+        action: `Déployer une équipe sur ${inc.address} et orienter le flux vers les axes de délestage.`,
         benefit: [
           { label: 'Sécurité', val: 'MAX', icon: ShieldAlert },
           { label: 'Temps', val: '-10m', icon: Zap }
@@ -59,10 +59,10 @@ export function DecisionHub() {
     if (list.length === 0) {
       list.push({
         id: 'rec-idle',
-        title: 'Maintenance préventive',
+        title: 'Maintien préventif',
         impact: 'Basse',
         type: 'traffic',
-        action: 'Aucune anomalie critique. Vérification des capteurs IoT en cours.',
+        action: 'Aucune anomalie critique. Contrôle de stabilité en cours.',
         benefit: [{ label: 'Stabilité', val: '100%', icon: Target }]
       })
     }
@@ -97,7 +97,7 @@ export function DecisionHub() {
           )}
         >
           <Info className="w-3.5 h-3.5" />
-          EXPLAIN
+          COMPRENDRE
         </button>
         <button
           onClick={() => setActiveTab('recommend')}
@@ -107,7 +107,7 @@ export function DecisionHub() {
           )}
         >
           <Lightbulb className="w-3.5 h-3.5" />
-          RECOMMEND
+          DÉCIDER
         </button>
       </div>
 
@@ -120,7 +120,7 @@ export function DecisionHub() {
               icon={Zap}
               value={`${Math.round((kpis?.congestionRate ?? 0) * 100)}%`}
               metric="ANALYSE CONGESTION"
-              context="Source TomTom + IoT"
+              context="Lecture consolidée"
               badge={ (kpis?.congestionRate || 0) > 0.4 ? "⚠️ CRITIQUE" : "✅ STABLE"}
               variant={(kpis?.congestionRate || 0) > 0.4 ? "danger" : "success"}
               className="w-full"
@@ -131,7 +131,7 @@ export function DecisionHub() {
                <div className="absolute top-0 left-0 w-1 h-full bg-brand" />
                <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider mb-2 flex items-center gap-2">
                  <ShieldAlert className="w-3.5 h-3.5 text-brand" />
-                 Intelligence Cause Racine
+                 Cause racine
                </h3>
                <p className="text-xs text-text-secondary leading-relaxed" dangerouslySetInnerHTML={{ __html: getRootCause().replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') }} />
             </div>
@@ -143,7 +143,7 @@ export function DecisionHub() {
                 icon={AlertTriangle}
                 value="🚨"
                 metric={inc.title}
-                context={`${inc.severity} Severity`}
+                context={`Niveau ${inc.severity}`}
                 badge="ACTIF"
                 variant="danger"
                 className="w-full shadow-glow-red/5"
@@ -187,7 +187,7 @@ export function DecisionHub() {
       <div className="p-4 border-t border-bg-border bg-bg-surface/50">
         <div className="flex items-center justify-center gap-2 opacity-30 grayscale hover:grayscale-0 transition-all">
            <Zap className="w-3 h-3" />
-           <span className="text-[9px] font-black uppercase tracking-widest">CrossFlow Intelligent OS</span>
+           <span className="text-[9px] font-black uppercase tracking-widest">CrossFlow Intelligence</span>
         </div>
       </div>
     </div>

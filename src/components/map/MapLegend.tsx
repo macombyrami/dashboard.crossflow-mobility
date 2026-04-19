@@ -17,8 +17,7 @@ export default function MapLegend({ showTraffic = true, showIncidents = true, cl
 
   return (
     <div className={cn("z-20 pointer-events-auto transition-all duration-500", className)}>
-      {/* 🔘 HUD Toggle Button */}
-      <button 
+      <button
         className={cn(
           "flex items-center justify-between gap-3 h-10 px-4 rounded-xl transition-all duration-300",
           "bg-bg-surface/60 backdrop-blur-3xl border border-white/10 shadow-prestige",
@@ -30,7 +29,7 @@ export default function MapLegend({ showTraffic = true, showIncidents = true, cl
       >
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-brand" />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Légende Flux</span>
+          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Lecture</span>
         </div>
         {isOpen ? <ChevronDown className="w-4 h-4 opacity-40" /> : <ChevronUp className="w-4 h-4 opacity-40" />}
       </button>
@@ -41,13 +40,13 @@ export default function MapLegend({ showTraffic = true, showIncidents = true, cl
       )}>
         {showTraffic && (
           <Legend
-            title="Index de Congestion"
+            title="État du trafic"
             items={[
-              { label: "Nominal", color: "#00FF9D" },
-              { label: "Saturé", color: "#FFD60A" },
+              { label: "Fluidité", color: "#00FF9D" },
+              { label: "Pression", color: "#FFD60A" },
               { label: "Critique", color: "#FF3B30" }
             ]}
-            description="Télémétrie multisources (TomTom + HERE + Flux V2X)."
+            description="Lecture consolidée des zones de circulation."
             className="w-56"
           />
         )}

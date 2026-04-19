@@ -54,37 +54,37 @@ export function PredictionTabs() {
 
   const topIncidents = sortedIncidents.slice(0, 2)
   const predictionTitle = !kpis
-    ? 'PROCHAINES 2 HEURES'
+    ? 'HORIZON 2 HEURES'
     : kpis.congestionRate >= 0.75
-      ? 'CONGESTION CRITIQUE SUR 2 H'
+      ? 'PRESSION CRITIQUE SUR 2 H'
       : kpis.congestionRate >= 0.55
-        ? 'CONGESTION EN HAUSSE SUR 2 H'
-        : 'RÉSEAU SOUS CONTRÔLE SUR 2 H'
+        ? 'PRESSION EN HAUSSE SUR 2 H'
+        : 'RÉSEAU MAÎTRISÉ SUR 2 H'
 
   const predictionCopy = !kpis
     ? 'Lecture en cours'
     : kpis.congestionRate >= 0.75
-      ? 'Montée progressive et saturation probable sur les axes principaux.'
+      ? 'La pression va monter sur les axes structurants. Préparez les arbitrages.'
       : kpis.congestionRate >= 0.55
-        ? 'Pression attendue pendant la pointe. Anticiper les déviations.'
-        : 'Risque contenu. Surveillance recommandée sur les créneaux de pointe.'
+        ? 'La tension augmente sur les créneaux clés. Anticipez les actions.'
+        : 'Situation stable. Surveillance légère recommandée.'
 
   const recommendation = !kpis
     ? 'Analyse en cours'
     : kpis.congestionRate >= 0.55
-      ? 'Anticiper 30 min avant la pointe'
-      : 'Maintenir la surveillance'
+      ? 'Agir avant la pointe'
+      : 'Maintenir la veille'
 
   const weatherLine = openMeteoWeather
     ? openMeteoWeather.trafficImpact === 'none'
-      ? 'Météo : aucun impact'
+      ? 'Contexte météo : neutre'
       : openMeteoWeather.trafficImpact === 'minor'
-        ? `Météo : ${openMeteoWeather.weatherLabel} · impact faible`
-        : `Météo : ${openMeteoWeather.weatherLabel} · impact fort`
-    : 'Météo : indisponible'
+        ? `Contexte météo : ${openMeteoWeather.weatherLabel} · impact léger`
+        : `Contexte météo : ${openMeteoWeather.weatherLabel} · impact marqué`
+    : 'Contexte météo : indisponible'
 
   const contextLine = airQuality
-    ? `Air : ${airQuality.level.toUpperCase()} · IQA ${airQuality.aqiEuropean}/100`
+    ? `Air : ${airQuality.level.toUpperCase()} · score ${airQuality.aqiEuropean}/100`
     : 'Air : indisponible'
 
   return (
@@ -113,7 +113,7 @@ export function PredictionTabs() {
               {recommendation}
             </span>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-muted">
-              3 secondes pour lire l&apos;état utile
+              Lecture utile en 3 secondes
             </p>
           </div>
         </div>
@@ -137,7 +137,7 @@ export function PredictionTabs() {
           ))}
           {sortedIncidents.length > topIncidents.length && (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">
-              + {sortedIncidents.length - topIncidents.length} autres alertes
+              + {sortedIncidents.length - topIncidents.length} autres points d'attention
             </span>
           )}
         </div>
@@ -170,9 +170,9 @@ export function PredictionTabs() {
       {activeTab === 'alerts' && (
         <IncidentFeed
           maxItems={3}
-          title="Alertes actives"
-          subtitle="Triées par sévérité, 3 visibles maximum"
-          ctaLabel="Voir sur la carte"
+          title="Points d'attention"
+          subtitle="Triés par priorité, 3 visibles maximum"
+          ctaLabel="Ouvrir la carte"
           onCtaClick={() => { window.location.href = '/map' }}
         />
       )}
@@ -187,12 +187,12 @@ export function PredictionTabs() {
       {activeTab === 'data' && (
         <div className="space-y-4">
           <section className="rounded-3xl border border-white/5 bg-white/[0.02] p-4 sm:p-5 space-y-4">
-            <div className="space-y-1">
-              {sectionTitle('Trafic · 24h passées')}
-              <p className="text-[12px] sm:text-[13px] text-text-secondary">
-                Pic 17h-18h hier, lecture directe des tendances et des écarts.
-              </p>
-            </div>
+              <div className="space-y-1">
+                {sectionTitle('Trafic · 24h')}
+                <p className="text-[12px] sm:text-[13px] text-text-secondary">
+                  Lecture des tendances et des écarts sur la journée écoulée.
+                </p>
+              </div>
             <TrafficChart />
           </section>
 
@@ -201,7 +201,7 @@ export function PredictionTabs() {
               <div className="space-y-1">
                 {sectionTitle('Répartition modale')}
                 <p className="text-[12px] sm:text-[13px] text-text-secondary">
-                  Pression transports visible d&apos;un coup d&apos;oeil.
+                  Répartition des usages visible d&apos;un coup d&apos;œil.
                 </p>
               </div>
               <ModalSplitChart />
@@ -211,7 +211,7 @@ export function PredictionTabs() {
               <div className="space-y-1">
                 {sectionTitle('Stabilité du réseau')}
                 <p className="text-[12px] sm:text-[13px] text-text-secondary">
-                  Efficacité sur 24h passées et volatilité du flux.
+                  Stabilité et volatilité du réseau sur 24h.
                 </p>
               </div>
               <TrafficStabilityWidget />
@@ -223,7 +223,7 @@ export function PredictionTabs() {
               <div className="space-y-1">
                 {sectionTitle('Historique 24h')}
                 <p className="text-[12px] sm:text-[13px] text-text-secondary">
-                  Relecture complète des snapshots si vous avez besoin d&apos;un zoom temporel.
+                  Relecture complète des lectures si vous avez besoin d&apos;un zoom temporel.
                 </p>
               </div>
               <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">

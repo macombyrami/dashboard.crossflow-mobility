@@ -1,6 +1,6 @@
 'use client'
 import { memo } from 'react'
-import { MapPin, Activity, Zap, CheckCircle2, AlertTriangle, Info, Clock, BarChart3, TrendingUp } from 'lucide-react'
+import { MapPin, Activity, Zap, CheckCircle2, Info, Clock, BarChart3, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 interface MessageProps {
@@ -23,7 +23,6 @@ export const ConsultantMessage = memo(({ role, content, timestamp = new Date() }
     )
   }
 
-  // Parses the structured consultant response
   const lines = content.split('\n')
   const zone = lines.find(l => l.includes('📍 Zone :'))?.split('📍 Zone :')[1]?.trim()
   const confidence = lines.find(l => l.includes('🧠 Niveau de confiance :'))?.split('🧠 Niveau de confiance :')[1]?.trim()
@@ -34,20 +33,17 @@ export const ConsultantMessage = memo(({ role, content, timestamp = new Date() }
   return (
     <div className="flex flex-col gap-4 mb-10 animate-in slide-in-from-left-4 fade-in duration-700">
       <div className="max-w-[95%] glass-card border border-white/5 bg-[#0A0B0E]/80 backdrop-blur-xl rounded-[28px] overflow-hidden shadow-apple transition-all hover:border-white/10">
-        
-        {/* Header: Identity & Status */}
         <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
            <div className="flex items-center gap-3">
              <div className="w-8 h-8 rounded-full bg-brand/10 border border-brand/30 flex items-center justify-center">
                <Zap className="w-4 h-4 text-brand" />
              </div>
              <div>
-               <div className="text-[12px] font-bold text-white tracking-tight uppercase">CrossFlow AI Consultant</div>
-               <div className="text-[9px] font-bold text-text-muted uppercase tracking-widest leading-none mt-0.5">Mobility Insight Engine</div>
+               <div className="text-[12px] font-bold text-white tracking-tight uppercase">CrossFlow Advisor</div>
+               <div className="text-[9px] font-bold text-text-muted uppercase tracking-widest leading-none mt-0.5">Lecture décisionnelle</div>
              </div>
            </div>
            
-           {/* Confidence Badge */}
            {confidence && (
              <div className={cn(
                "px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5",
@@ -61,9 +57,7 @@ export const ConsultantMessage = memo(({ role, content, timestamp = new Date() }
            )}
         </div>
 
-        {/* Content Area */}
         <div className="p-6 space-y-6">
-           {/* Zone Info */}
            {zone && (
              <div className="flex items-center gap-2 text-brand font-bold text-[13px] tracking-tight mb-2">
                <MapPin className="w-4 h-4" />
@@ -72,13 +66,12 @@ export const ConsultantMessage = memo(({ role, content, timestamp = new Date() }
            )}
 
            <div className="prose prose-invert prose-sm max-w-none prose-headings:text-white prose-p:text-text-secondary prose-strong:text-white">
-             {/* We manually map the markdown structure to styled components for that Palantir Look */}
              {content.split('\n\n').map((block, i) => {
                 if (block.includes('🚦 Situation')) {
                   return (
                     <div key={i} className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 mb-4">
                       <div className="flex items-center gap-2 mb-2 text-white font-bold text-[11px] uppercase tracking-widest">
-                        <Activity className="w-3.5 h-3.5 text-brand" /> Situation Actuelle
+                        <Activity className="w-3.5 h-3.5 text-brand" /> Lecture actuelle
                       </div>
                       <div className="text-[13px] text-text-secondary leading-relaxed">{block.replace('🚦 Situation actuelle :', '').trim()}</div>
                     </div>
@@ -88,7 +81,7 @@ export const ConsultantMessage = memo(({ role, content, timestamp = new Date() }
                   return (
                     <div key={i} className="mb-4">
                       <div className="flex items-center gap-2 mb-3 text-white font-bold text-[11px] uppercase tracking-widest">
-                        <Zap className="w-3.5 h-3.5 text-brand" /> Recommandations Opérationnelles
+                        <Zap className="w-3.5 h-3.5 text-brand" /> Actions recommandées
                       </div>
                       <div className="space-y-2">
                          {block.replace('⚡ Recommandations :', '').split('\n').filter(l => l.trim()).map((rec, ri) => (
@@ -105,7 +98,7 @@ export const ConsultantMessage = memo(({ role, content, timestamp = new Date() }
                   return (
                     <div key={i} className="mb-4">
                        <div className="flex items-center gap-2 mb-2 text-white font-bold text-[11px] uppercase tracking-widest">
-                         <BarChart3 className="w-3.5 h-3.5 text-text-muted" /> Analyse des Données
+                         <BarChart3 className="w-3.5 h-3.5 text-text-muted" /> Lecture de fond
                        </div>
                        <p className="text-[13px] text-text-secondary leading-relaxed border-l-2 border-brand/30 pl-4 py-1 italic">
                          {block.replace('🔍 Analyse :', '').trim()}
@@ -113,17 +106,15 @@ export const ConsultantMessage = memo(({ role, content, timestamp = new Date() }
                     </div>
                   )
                 }
-                // Default block rendering
                 return <div key={i} className="text-[14px] text-text-muted mb-4">{block}</div>
              })}
            </div>
         </div>
         
-        {/* Footer: Timeline & Source Badges */}
         <div className="px-6 py-4 border-t border-white/5 bg-white/[0.01] flex flex-wrap gap-2">
-           <SourceTag icon={<TrendingUp className="w-3 h-3" />} label="Trafic Live" active />
-           <SourceTag icon={<Info className="w-3 h-3" />} label="Events" active />
-           <SourceTag icon={<Activity className="w-3 h-3" />} label="Social NLP" active />
+           <SourceTag icon={<TrendingUp className="w-3 h-3" />} label="Trafic" active />
+           <SourceTag icon={<Info className="w-3 h-3" />} label="Événements" active />
+           <SourceTag icon={<Activity className="w-3 h-3" />} label="Veille" active />
            <div className="ml-auto text-[10px] font-bold text-text-muted uppercase tracking-widest flex items-center gap-2">
              <Clock className="w-3 h-3" /> {timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
            </div>

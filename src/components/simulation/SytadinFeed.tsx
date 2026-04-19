@@ -15,7 +15,7 @@ interface SocialPost {
 }
 
 interface FeedData {
-  posts:     SocialPost[]
+  posts: SocialPost[]
   fetchedAt: string
   degraded?: boolean
 }
@@ -28,15 +28,15 @@ const SEVERITY_CONFIG = {
 }
 
 const TYPE_ICON = {
-  alert:      AlertTriangle,
+  alert: AlertTriangle,
   congestion: TrendingUp,
-  info:       Info,
+  info: Info,
 }
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'à l\'instant'
+  if (mins < 1) return "à l'instant"
   if (mins < 60) return `il y a ${mins} min`
   const hrs = Math.floor(mins / 60)
   return `il y a ${hrs}h`
@@ -51,7 +51,6 @@ function PostCard({ post }: { post: SocialPost }) {
       className="rounded-2xl border p-4 space-y-3 transition-all hover:scale-[1.01]"
       style={{ background: sev.bg, borderColor: sev.border }}
     >
-      {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <div
@@ -62,8 +61,8 @@ function PostCard({ post }: { post: SocialPost }) {
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-text-primary">@Sytadin</span>
-              <span className="text-[10px] text-text-muted">· DiRIF</span>
+              <span className="text-xs font-semibold text-text-primary">Lecture routière</span>
+              <span className="text-[10px] text-text-muted">· IDF</span>
             </div>
             <span className="text-[10px] text-text-muted">{timeAgo(post.timestamp)}</span>
           </div>
@@ -76,7 +75,6 @@ function PostCard({ post }: { post: SocialPost }) {
         </span>
       </div>
 
-      {/* Content */}
       <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">
         {post.text.split(/(https?:\/\/[^\s]+)/g).map((part, i) => (
           part.match(/^https?:\/\//) ? (
@@ -87,8 +85,6 @@ function PostCard({ post }: { post: SocialPost }) {
         ))}
       </p>
 
-
-      {/* Location + km */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-1 text-[10px] text-text-muted">
           <MapPin className="w-3 h-3" />
@@ -105,7 +101,6 @@ function PostCard({ post }: { post: SocialPost }) {
         )}
       </div>
 
-      {/* Tags */}
       {post.tags.length > 0 && (
         <div className="flex gap-1.5 flex-wrap">
           {post.tags.map(tag => (
@@ -124,9 +119,9 @@ function PostCard({ post }: { post: SocialPost }) {
 }
 
 export function SytadinFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
-  const [data, setData]             = useState<FeedData | null>(null)
-  const [loading, setLoading]       = useState(true)
-  const [staleError, setStaleError] = useState(false)   // error on refresh, but stale data still shown
+  const [data, setData] = useState<FeedData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [staleError, setStaleError] = useState(false)
 
   const fetchFeed = useCallback(async () => {
     setLoading(true)
@@ -134,9 +129,7 @@ export function SytadinFeed({ onUpdate }: { onUpdate?: (count: number) => void }
       const res = await fetch('/api/social/sytadin')
       if (!res.ok) throw new Error('fetch error')
       let json: FeedData = await res.json()
-      
-      // FALLBACK: If Sytadin website is empty but the user sees tweets,
-      // we try to pull from our X-Pulse high-density feed.
+
       if (json.posts.length === 0) {
         const xRes = await fetch('/api/social/x-pulse')
         if (xRes.ok) {
@@ -146,7 +139,7 @@ export function SytadinFeed({ onUpdate }: { onUpdate?: (count: number) => void }
               posts: xData.posts.map((p: any) => ({
                 ...p,
                 id: `hybrid-${p.id}`,
-                text: `[X-Pulse] ${p.text}`
+                text: `[Signal routier] ${p.text}`
               })),
               fetchedAt: new Date().toISOString(),
               degraded: true
@@ -159,11 +152,10 @@ export function SytadinFeed({ onUpdate }: { onUpdate?: (count: number) => void }
       setStaleError(false)
       onUpdate?.(json.posts.length)
 
-      // Update global intelligence
       if (typeof window !== 'undefined' && 'updateAlerts' in window) {
         (window as any).updateAlerts(json.posts.map(p => ({
           text: p.text,
-          source: 'SYTADIN',
+          source: 'RÉSEAU',
           severity: p.severity
         })))
       }
@@ -174,25 +166,22 @@ export function SytadinFeed({ onUpdate }: { onUpdate?: (count: number) => void }
     }
   }, [onUpdate])
 
-
   useEffect(() => {
     fetchFeed()
-
-    const id = setInterval(fetchFeed, 3 * 60 * 1000) // refresh every 3 min
+    const id = setInterval(fetchFeed, 3 * 60 * 1000)
     return () => clearInterval(id)
   }, [fetchFeed])
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="px-5 py-4 border-b border-bg-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-[#1DA1F2] flex items-center justify-center">
             <Twitter className="w-3.5 h-3.5 text-white" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-text-primary">@Sytadin</h2>
-            <p className="text-[10px] text-text-muted">Trafic Île-de-France · DiRIF</p>
+            <h2 className="text-sm font-semibold text-text-primary">Flux routier</h2>
+            <p className="text-[10px] text-text-muted">Lecture consolidée · IDF</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -209,7 +198,7 @@ export function SytadinFeed({ onUpdate }: { onUpdate?: (count: number) => void }
             <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
           </button>
           <a
-            href="https://x.com/Sytadin"
+            href="https://www.sytadin.fr"
             target="_blank"
             rel="noopener noreferrer"
             className="p-1.5 rounded-lg hover:bg-bg-elevated transition-colors text-text-muted hover:text-[#1DA1F2]"
@@ -219,26 +208,23 @@ export function SytadinFeed({ onUpdate }: { onUpdate?: (count: number) => void }
         </div>
       </div>
 
-      {/* Stale-data warning banner */}
       {staleError && data && (
         <div className="px-4 py-2 bg-orange-500/10 border-b border-orange-500/20 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <AlertTriangle className="w-3 h-3 text-orange-400 shrink-0" />
-            <span className="text-[10px] text-orange-400 font-medium">Données en cache · {timeAgo(data.fetchedAt)}</span>
+            <span className="text-[10px] text-orange-400 font-medium">Lecture en cache · {timeAgo(data.fetchedAt)}</span>
           </div>
           <button onClick={fetchFeed} className="text-[10px] text-orange-400 hover:underline">Réessayer</button>
         </div>
       )}
 
-      {/* Degraded-mode badge */}
       {data?.degraded && !staleError && (
         <div className="px-4 py-1.5 bg-yellow-500/8 border-b border-yellow-500/15 flex items-center gap-1.5">
           <Info className="w-3 h-3 text-yellow-400 shrink-0" />
-          <span className="text-[10px] text-yellow-400 font-medium">Mode dégradé — données estimées (Sytadin.fr inaccessible)</span>
+          <span className="text-[10px] text-yellow-400 font-medium">Mode dégradé — données estimées</span>
         </div>
       )}
 
-      {/* Severity summary bar */}
       {data && !loading && (
         <div className="px-4 py-2.5 border-b border-bg-border flex items-center gap-3">
           {(['critical', 'high', 'medium', 'low'] as const).map(sev => {
@@ -257,7 +243,6 @@ export function SytadinFeed({ onUpdate }: { onUpdate?: (count: number) => void }
         </div>
       )}
 
-      {/* Feed */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {loading && (
           <div className="space-y-3">
@@ -283,13 +268,10 @@ export function SytadinFeed({ onUpdate }: { onUpdate?: (count: number) => void }
           <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
             <AlertTriangle className="w-8 h-8 text-text-muted" />
             <div>
-              <p className="text-sm font-medium text-text-primary">Données indisponibles</p>
-              <p className="text-xs text-text-muted mt-1">Impossible de joindre Sytadin.fr</p>
+              <p className="text-sm font-medium text-text-primary">Lecture indisponible</p>
+              <p className="text-xs text-text-muted mt-1">Impossible de joindre le flux routier</p>
             </div>
-            <button
-              onClick={fetchFeed}
-              className="text-xs text-brand hover:underline"
-            >
+            <button onClick={fetchFeed} className="text-xs text-brand hover:underline">
               Réessayer
             </button>
           </div>
@@ -307,16 +289,15 @@ export function SytadinFeed({ onUpdate }: { onUpdate?: (count: number) => void }
         )}
       </div>
 
-      {/* Footer */}
       <div className="px-4 py-2.5 border-t border-bg-border flex items-center justify-between">
-        <p className="text-[10px] text-text-muted">Source : sytadin.fr (DiRIF)</p>
+        <p className="text-[10px] text-text-muted">Lecture consolidée · IDF</p>
         <a
           href="https://www.sytadin.fr"
           target="_blank"
           rel="noopener noreferrer"
           className="text-[10px] text-brand hover:underline"
         >
-          Voir le site complet
+          Ouvrir la lecture externe
         </a>
       </div>
     </div>

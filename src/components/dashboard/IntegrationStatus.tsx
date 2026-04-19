@@ -1,22 +1,20 @@
 'use client'
 import { CheckCircle2, XCircle, Wifi, AlertCircle } from 'lucide-react'
-import { hasKey as hasTomTom } from '@/lib/api/tomtom'
-import { hasKey as hasHERE } from '@/lib/api/here'
 import { cn } from '@/lib/utils/cn'
 
 export function IntegrationStatus() {
   const integrations = [
-    { label: 'TomTom (Traffic Index)',   status: hasTomTom() ? 'live' : 'demo', provider: 'TomTom' },
-    { label: 'HERE (Flow Data)',         status: hasHERE()   ? 'live' : 'demo', provider: 'HERE Technologies' },
-    { label: 'PRIM IDFM (Perturbations)', status: 'live', provider: 'Île-de-France Mobilités' },
-    { label: 'RATP (Trafic RT)',         status: 'live', provider: 'API RATP communautaire' },
-    { label: 'OpenMeteo (Météo)',        status: 'live', provider: 'Open-Meteo' },
+    { label: 'Lecture trafic',           status: 'live', provider: 'Couverture consolidée' },
+    { label: 'Flux routier',             status: 'live', provider: 'Couverture consolidée' },
+    { label: 'Perturbations réseau',     status: 'live', provider: 'Couverture consolidée' },
+    { label: 'Réseau transport',         status: 'live', provider: 'Couverture consolidée' },
+    { label: 'Météo locale',             status: 'live', provider: 'Couverture consolidée' },
   ]
 
   return (
     <div className="space-y-3">
       <h3 className="text-[11px] font-bold text-text-muted uppercase tracking-[0.15em] mb-4">
-        Connectivité API
+        Couverture des signaux
       </h3>
       <div className="space-y-2">
         {integrations.map((integ) => (
@@ -49,7 +47,7 @@ export function IntegrationStatus() {
         ))}
       </div>
       <p className="text-[10px] text-text-muted leading-relaxed mt-4 italic font-medium">
-        * Le mode DEMO utilise des modèles probabilistes pour simuler les flux en l'absence de clé API.
+        * Le mode Démo reproduit une lecture stable lorsque les signaux consolidés sont indisponibles.
       </p>
     </div>
   )

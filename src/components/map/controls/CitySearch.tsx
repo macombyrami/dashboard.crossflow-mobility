@@ -108,7 +108,7 @@ export function CitySearch() {
                 ref={inputRef}
                 value={query}
                 onChange={handleInput}
-                placeholder="Rechercher une destination..."
+                placeholder="Rechercher une ville ou un secteur..."
                 className="bg-transparent text-[14px] text-white placeholder-white/30 outline-none w-full font-medium"
               />
               {query && (
@@ -118,7 +118,7 @@ export function CitySearch() {
               )}
             </div>
             <p className="text-[9px] font-bold text-text-muted mt-3 pl-1 uppercase tracking-[0.15em] opacity-50">
-              Moteur Global · OpenStreetMap
+              Recherche unifiée
             </p>
           </div>
 
@@ -132,7 +132,7 @@ export function CitySearch() {
               <div className="animate-fade-in">
                 <div className="px-5 pt-4 pb-2 flex items-center gap-2">
                   <Clock className="w-3.5 h-3.5 text-text-muted" />
-                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em]">Destinations Récentes</span>
+                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em]">Recherches récentes</span>
                 </div>
                 {items.map(c => (
                   <CityRow key={c.id} city={c} selected={c.id === city.id} onClick={() => select(c)} />

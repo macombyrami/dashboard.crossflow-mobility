@@ -51,8 +51,8 @@ function RatpFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
             <Train className="w-3.5 h-3.5 text-white" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-text-primary">Info Trafic RATP</h2>
-            <p className="text-[10px] text-text-muted">Réseau ferré francilien</p>
+            <h2 className="text-sm font-semibold text-text-primary">Lecture réseau</h2>
+            <p className="text-[10px] text-text-muted">Vue consolidée du réseau</p>
           </div>
         </div>
         <button onClick={refresh} className="p-1.5 rounded-lg hover:bg-bg-elevated transition-colors text-text-muted disabled:opacity-50">
@@ -104,7 +104,7 @@ function XPulseFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
       <div className="px-5 py-4 border-b border-bg-border flex items-center justify-between bg-bg-surface">
         <div className="flex items-center gap-2">
           <Twitter className="w-4 h-4 text-white p-1 rounded bg-black" />
-          <h2 className="text-sm font-semibold text-text-primary">X Traffic Pulse</h2>
+          <h2 className="text-sm font-semibold text-text-primary">Signal social</h2>
         </div>
         <button onClick={refresh} className="p-1.5 rounded-lg hover:bg-bg-elevated transition-colors">
           <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
@@ -148,7 +148,7 @@ function CommunityFeed({ onUpdate }: { onUpdate?: (count: number) => void }) {
   return (
     <div className="flex flex-col h-full bg-bg-base/50">
       <div className="px-5 py-4 border-b border-bg-border flex items-center justify-between bg-bg-surface">
-        <h2 className="text-sm font-semibold text-text-primary">Signalements Locale</h2>
+        <h2 className="text-sm font-semibold text-text-primary">Signalements locaux</h2>
         <button onClick={refresh} className="p-1.5 rounded-lg hover:bg-bg-elevated transition-colors">
           <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
         </button>
@@ -193,7 +193,7 @@ function IntelligenceDashboard() {
           location:    { lat: 48.8566, lng: 2.3522 }, // Default to Paris center if no coordinates
           address:     ev.area_context || 'Zone Urbaine',
           startedAt:   ev.created_at || new Date().toISOString(),
-          source:      'AI Pulse',
+          source:      'Lecture IA',
           iconColor:   ev.severity > 80 ? '#FF1744' : '#FF6D00',
         }))
         useTrafficStore.getState().setSocialIncidents(mappedIncidents)
@@ -255,7 +255,7 @@ function IntelligenceDashboard() {
               <span className="text-[10px] font-bold text-brand uppercase tracking-widest">AI Confidence</span>
             </div>
             <p className="text-2xl font-bold text-white mt-2">94.2%</p>
-            <p className="text-[11px] text-text-muted">Multi-source signal validation</p>
+            <p className="text-[11px] text-text-muted">Validation croisée des signaux</p>
           </div>
 
           <div className="p-4 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1">
@@ -379,16 +379,16 @@ export default function SocialPage() {
               <Rss className="w-4 h-4 text-brand" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-text-primary tracking-tight">{city.name} Social Hub</h2>
+              <h2 className="text-base font-bold text-text-primary tracking-tight">{city.name} Veille urbaine</h2>
               <LiveIndicator label="TEMPS RÉEL" className="px-2 py-0.5 scale-75 origin-left" />
             </div>
           </div>
 
           <div className="space-y-1.5">
             {[
-              { id: 'intelligence', icon: Sparkles, label: 'Pulse AI Insights', color: 'text-brand' },
-              { id: 'sytadin', icon: Twitter, label: 'Sytadin DiRIF', color: 'text-[#1DA1F2]' },
-              { id: 'ratp', icon: Train, label: 'RATP & Transilien', color: 'text-[#00A88F]' },
+              { id: 'intelligence', icon: Sparkles, label: 'Lecture IA', color: 'text-brand' },
+              { id: 'sytadin', icon: Twitter, label: 'Flux routier', color: 'text-[#1DA1F2]' },
+              { id: 'ratp', icon: Train, label: 'Réseau ferré', color: 'text-[#00A88F]' },
               { id: 'community', icon: AlertTriangle, label: 'Signalements', color: 'text-brand' },
             ].map(tab => (
               <button 
