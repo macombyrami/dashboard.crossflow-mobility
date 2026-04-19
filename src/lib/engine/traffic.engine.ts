@@ -300,8 +300,8 @@ export function generateTrafficSnapshot(city: City): TrafficSnapshot {
     cityId: city.id,
     segments: enrichSnapshot(segments),
     heatmap,
-    heatmapPassages: heatmap, // Placeholder for heatmap passages
-    heatmapCo2: heatmap, // Placeholder for heatmap co2
+    heatmapPassages: [],
+    heatmapCo2: [],
     fetchedAt: now.toISOString()
   }
 }
@@ -364,8 +364,8 @@ export function generateTrafficFromOSMRoads(city: City, osmRoads: OSMRoad[]): Tr
     cityId: city.id,
     segments: enrichSnapshot(segments),
     heatmap,
-    heatmapPassages: heatmap,
-    heatmapCo2: heatmap,
+    heatmapPassages: [],
+    heatmapCo2: [],
     fetchedAt: now.toISOString()
   }
 }

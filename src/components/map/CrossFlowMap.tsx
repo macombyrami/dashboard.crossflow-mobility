@@ -1718,10 +1718,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
           })
 
         const heatmap         = hereSegments.map(s => ({ lng: s.coordinates[0][0], lat: s.coordinates[0][1], intensity: s.congestionScore }))
-        const heatmapPassages = hereSegments.map(s => ({ lng: s.coordinates[0][0], lat: s.coordinates[0][1], intensity: Math.min(1, s.flowVehiclesPerHour / 2000) }))
-        const heatmapCo2      = hereSegments.map(s => ({ lng: s.coordinates[0][0], lat: s.coordinates[0][1], intensity: (120 + s.congestionScore * 180) / 300 }))
-
-        snapshot = { cityId: cityNow.id, segments: hereSegments, heatmap, heatmapPassages, heatmapCo2, fetchedAt: now }
+        snapshot = { cityId: cityNow.id, segments: hereSegments, heatmap, heatmapPassages: [], heatmapCo2: [], fetchedAt: now }
         setDataSource('live')
       }
     }

@@ -40,6 +40,13 @@ export class MobilityCore {
    * Cross-references with Weather and Social signals.
    */
   public normalizeTraffic(raw: TrafficSnapshot, typical: TrafficSnapshot | null): TrafficSnapshot {
+    const typicalIndex = new Map<string, number>()
+    if (typical?.segments?.length) {
+      for (const seg of typical.segments) {
+        typicalIndex.set(seg.id, seg.congestionScore)
+      }
+    }
+
     const context: ContextFactors = {
       weatherImpact: this.state.weatherImpact,
       eventIntensity: this.state.incidents.some(i => i.severity === 'critical') ? 0.8 : 0,
@@ -50,8 +57,8 @@ export class MobilityCore {
     }
 
     const normalizedSegments = raw.segments.map(s => {
-      const typicalSegment = typical?.segments.find(ts => ts.id === s.id)
-      const intel = calculateV4TrafficScore(s.congestionScore, typicalSegment?.congestionScore || 0.3, context)
+      const typicalScore = typicalIndex.get(s.id) ?? 0.3
+      const intel = calculateV4TrafficScore(s.congestionScore, typicalScore, context)
       
       return {
         ...s,
