@@ -15,18 +15,23 @@ interface Props {
   color?:     string
   warning?:   boolean
   critical?:  boolean
+  status?:    'optimal' | 'warning' | 'critical'
   sub?:       string
+  variant?:   'default' | 'mini'
   className?: string
 }
 
 export function KPICard({
   label, value, unit, delta, deltaUnit = '%', inverse = false,
-  icon: Icon, color = '#22C55E', warning, critical, sub, className,
+  icon: Icon, color = '#22C55E', warning, critical, status, sub, variant = 'default', className,
 }: Props) {
   const { t } = useTranslation()
+  const isWarning = warning ?? status === 'warning'
+  const isCritical = critical ?? status === 'critical'
   return (
     <div className={cn(
-      'glass-card p-5 sm:p-6 space-y-5 hover:shadow-apple transition-all duration-500 relative group overflow-hidden animate-scale-in',
+      'glass-card hover:shadow-apple transition-all duration-500 relative group overflow-hidden animate-scale-in',
+      variant === 'mini' ? 'p-4 space-y-4' : 'p-5 sm:p-6 space-y-5',
       className,
     )}>
       {/* Background Glow Overlay (Apple-style subtle vibrancy) */}
@@ -48,8 +53,9 @@ export function KPICard({
       <div className="relative z-10">
         <div className="flex items-baseline gap-2">
           <span className={cn(
-            "text-3xl sm:text-4xl font-bold tracking-tight text-text-primary",
-            critical ? "text-[#FF3B30]" : warning ? "text-[#FF9F0A]" : ""
+            variant === 'mini' ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl',
+            'font-bold tracking-tight text-text-primary',
+            isCritical ? 'text-[#FF3B30]' : isWarning ? 'text-[#FF9F0A]' : ''
           )}>
             {value}
           </span>

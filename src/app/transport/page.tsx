@@ -264,7 +264,8 @@ function RatpView({ mounted, cityPop }: { mounted: boolean; cityPop: number }) {
   const refresh = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      setLines(await fetchAllTrafficStatus())
+      const trafficStatus = await fetchAllTrafficStatus()
+      setLines(trafficStatus.lines)
       setLastUpdate(new Date())
     } catch {
       setError("Impossible de contacter l'API RATP")
