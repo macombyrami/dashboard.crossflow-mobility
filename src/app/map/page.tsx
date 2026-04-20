@@ -1,14 +1,16 @@
 'use client'
 import dynamic from 'next/dynamic'
-import { ModeSelector }    from '@/components/map/controls/ModeSelector'
-import { LayerControls }   from '@/components/map/controls/LayerControls'
-import { MapLegend }       from '@/components/map/MapLegend'
-import { EdgeDetailPanel } from '@/components/map/panels/EdgeDetailPanel'
-import { ZoneStatsPanel }  from '@/components/map/panels/ZoneStatsPanel'
+import { ModeSelector }      from '@/components/map/controls/ModeSelector'
+import { LayerControls }     from '@/components/map/controls/LayerControls'
+import { TrafficFilterBar }  from '@/components/map/controls/TrafficFilterBar'
+import { MapLegend }         from '@/components/map/MapLegend'
+import { EdgeDetailPanel }   from '@/components/map/panels/EdgeDetailPanel'
+import { ZoneStatsPanel }    from '@/components/map/panels/ZoneStatsPanel'
 import { SimulationPanel }   from '@/components/simulation/SimulationPanel'
 import { SimulationResults } from '@/components/simulation/SimulationResults'
 import { AIPanel }           from '@/components/ai/AIPanel'
 import { DataSourceBadge }   from '@/components/map/DataSourceBadge'
+import { GlobalTrafficBanner } from '@/components/dashboard/GlobalTrafficBanner'
 import { useMapStore }       from '@/store/mapStore'
 import { useTrafficStore }   from '@/store/trafficStore'
 import { generateCityKPIs }  from '@/lib/engine/traffic.engine'
@@ -38,10 +40,24 @@ export default function MapPage() {
       <div className="flex-1 relative overflow-hidden">
         <CrossFlowMap />
 
-        {/* Mode selector — top center */}
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+        {/* Global traffic banner — top center above mode selector */}
+        {mode !== 'simulate' && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none w-max max-w-[calc(100vw-280px)]">
+            <GlobalTrafficBanner />
+          </div>
+        )}
+
+        {/* Mode selector — below banner */}
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
           <ModeSelector />
         </div>
+
+        {/* Filter bar — below mode selector */}
+        {mode === 'live' && (
+          <div className="absolute top-[108px] left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+            <TrafficFilterBar />
+          </div>
+        )}
 
         {/* Data source badge — top right */}
         <div className="absolute top-3 right-3 z-10 pointer-events-auto">
@@ -66,7 +82,7 @@ export default function MapPage() {
         {/* Map legend */}
         <MapLegend />
 
-        {/* Edge detail panel (offset below the data source badge) */}
+        {/* Edge detail panel */}
         {mode !== 'simulate' && <EdgeDetailPanel />}
 
         {/* Zone stats panel */}

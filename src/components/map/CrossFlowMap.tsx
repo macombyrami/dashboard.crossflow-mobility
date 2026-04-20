@@ -136,6 +136,8 @@ export function CrossFlowMap() {
       zoom:      city.zoom,
       pitch:     30,
       bearing:   0,
+      minZoom:   10,
+      maxBounds: [[2.10, 48.70], [2.62, 49.02]],
     })
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right')

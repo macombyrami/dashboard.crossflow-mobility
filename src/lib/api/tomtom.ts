@@ -21,14 +21,14 @@ export function hasKey(): boolean {
 export function getTrafficFlowTileUrl(): string {
   const key = getKey()
   if (!key) return ''
-  // relative0-dark: dark-themed relative speed tiles (perfect for dark map)
-  return `${BASE}/traffic/map/4/tile/flow/relative0-dark/{z}/{x}/{y}.png?key=${key}&tileSize=256`
+  // absolute: shows green/yellow/red road segments by speed — most visible on dark maps
+  return `${BASE}/traffic/map/4/tile/flow/absolute/{z}/{x}/{y}.png?key=${key}`
 }
 
 export function getTrafficIncidentTileUrl(): string {
   const key = getKey()
   if (!key) return ''
-  return `${BASE}/traffic/map/4/tile/incidents/night/{z}/{x}/{y}.png?key=${key}&tileSize=256`
+  return `${BASE}/traffic/map/4/tile/incidents/s3/{z}/{x}/{y}.png?key=${key}`
 }
 
 // ─── Flow Segment Data (JSON — real speed for a point on the road) ─────────
