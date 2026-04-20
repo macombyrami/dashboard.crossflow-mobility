@@ -222,8 +222,9 @@ export default function MapPage() {
         </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-y-[108px] left-0 right-0 z-30 flex justify-between gap-4 px-3 pb-[110px] lg:px-4">
-        <aside className="pointer-events-auto hidden w-[320px] xl:block">
+      <div className="pointer-events-none absolute inset-x-0 top-[188px] bottom-[124px] z-30 flex justify-between gap-4 px-3 lg:top-[206px] lg:bottom-[132px] lg:px-4">
+        <aside className="pointer-events-auto hidden h-full w-[320px] min-h-0 xl:block">
+          <div className="h-full overflow-y-auto pr-1 no-scrollbar">
           <PanelCard title="Focus zones" subtitle="Where attention is needed">
             {zones.length > 0 ? (
               <div className="space-y-2">
@@ -262,53 +263,56 @@ export default function MapPage() {
               </div>
             ) : (
               <EmptyState title="No critical zones detected" description="The network remains distributed with no dominant pressure zone." />
-            )}
-          </PanelCard>
-
-          <div className="mt-3">
-            <PanelCard title="Live alerts" subtitle="Current incident state">
-              {activeAlerts.length > 0 ? (
-                <div className="space-y-2">
-                  {activeAlerts.map(alert => (
-                    <div key={alert.id} className="rounded-2xl border border-white/8 bg-white/[0.04] p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-bold text-white">{alert.title}</span>
-                        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FFB454]">{alert.severity}</span>
-                      </div>
-                      <div className="mt-1 text-[11px] text-white/56">{alert.address || alert.description}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="No active incidents" description="Traffic is calm and no incident currently requires escalation." />
               )}
             </PanelCard>
+
+            <div className="mt-3">
+              <PanelCard title="Live alerts" subtitle="Current incident state">
+                {activeAlerts.length > 0 ? (
+                  <div className="space-y-2">
+                    {activeAlerts.map(alert => (
+                      <div key={alert.id} className="rounded-2xl border border-white/8 bg-white/[0.04] p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-bold text-white">{alert.title}</span>
+                          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FFB454]">{alert.severity}</span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-white/56">{alert.address || alert.description}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState title="No active incidents" description="Traffic is calm and no incident currently requires escalation." />
+                )}
+              </PanelCard>
+            </div>
           </div>
         </aside>
 
         <div className="flex-1" />
 
-        <aside className="pointer-events-auto hidden w-[360px] lg:block">
-          <PanelCard title="Local analysis" subtitle={focusAnalysis?.subtitle || 'No area selected'}>
-            {focusAnalysis ? (
-              <>
-                <div className="text-base font-black text-white">{focusAnalysis.title}</div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                  <MetricMini label="Speed" value={focusAnalysis.speed ? `${focusAnalysis.speed} km/h` : 'No data'} />
-                  <MetricMini label="Load" value={`${focusAnalysis.load}%`} />
-                  <MetricMini label="Alerts" value={focusAnalysis.alerts} />
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/8">
-                  <div className="h-full rounded-full bg-[linear-gradient(90deg,#22C55E_0%,#FACC15_55%,#EF4444_100%)]" style={{ width: `${Math.max(8, focusAnalysis.load)}%` }} />
-                </div>
-                <div className="mt-3 rounded-2xl border border-white/8 bg-white/[0.04] p-3 text-sm text-white/68">
-                  Status: <span className="font-bold text-white">{focusAnalysis.status}</span>. Use the map and focus zones to inspect nearby corridors and incident spillover.
-                </div>
-              </>
-            ) : (
-              <EmptyState title="No area selected" description="Click a corridor or a focus zone to inspect local metrics." />
-            )}
-          </PanelCard>
+        <aside className="pointer-events-auto hidden h-full w-[360px] min-h-0 lg:block">
+          <div className="h-full overflow-y-auto pl-1 no-scrollbar">
+            <PanelCard title="Local analysis" subtitle={focusAnalysis?.subtitle || 'No area selected'}>
+              {focusAnalysis ? (
+                <>
+                  <div className="text-base font-black text-white">{focusAnalysis.title}</div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <MetricMini label="Speed" value={focusAnalysis.speed ? `${focusAnalysis.speed} km/h` : 'No data'} />
+                    <MetricMini label="Load" value={`${focusAnalysis.load}%`} />
+                    <MetricMini label="Alerts" value={focusAnalysis.alerts} />
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/8">
+                    <div className="h-full rounded-full bg-[linear-gradient(90deg,#22C55E_0%,#FACC15_55%,#EF4444_100%)]" style={{ width: `${Math.max(8, focusAnalysis.load)}%` }} />
+                  </div>
+                  <div className="mt-3 rounded-2xl border border-white/8 bg-white/[0.04] p-3 text-sm text-white/68">
+                    Status: <span className="font-bold text-white">{focusAnalysis.status}</span>. Use the map and focus zones to inspect nearby corridors and incident spillover.
+                  </div>
+                </>
+              ) : (
+                <EmptyState title="No area selected" description="Click a corridor or a focus zone to inspect local metrics." />
+              )}
+            </PanelCard>
+          </div>
         </aside>
       </div>
 
