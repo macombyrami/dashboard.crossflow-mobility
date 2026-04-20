@@ -188,24 +188,33 @@ const safeSetFeatureState = (map: maplibregl.Map | null, feat: { source: string,
   if (map && map.getSource(feat.source)) map.setFeatureState(feat, state)
 }
 
-const buildCongestionHeatmapOpacity = (alpha: number) => ([
+function clampUnit(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(1, value))
+}
+
+const buildCongestionHeatmapOpacity = (alpha: number) => {
+  const safeAlpha = clampUnit(alpha)
+  return ([
   'interpolate', ['linear'], ['zoom'],
   7, 0,
-  8, 0.22 * alpha,
-  11, 0.48 * alpha,
-  14, 0.24 * alpha,
+  8, 0.22 * safeAlpha,
+  11, 0.48 * safeAlpha,
+  14, 0.24 * safeAlpha,
 ] as any)
+}
 
 const heatmapStackLayerId = (sourceId: string, suffix: string) => `${sourceId}-${suffix}`
 
 const setCongestionHeatmapStackOpacity = (map: maplibregl.Map | null, sourceId: string, alpha: number) => {
   if (!map) return
-  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'clusters'), 'circle-opacity', 0.8 * alpha)
-  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'cluster-count'), 'text-opacity', 0.72 * alpha)
-  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'layer'), 'heatmap-opacity', buildCongestionHeatmapOpacity(alpha))
-  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'hotspots-glow'), 'circle-opacity', 0.16 * alpha)
-  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'hotspots'), 'circle-opacity', 0.92 * alpha)
-  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'labels'), 'text-opacity', 0.88 * alpha)
+  const safeAlpha = clampUnit(alpha)
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'clusters'), 'circle-opacity', clampUnit(0.8 * safeAlpha))
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'cluster-count'), 'text-opacity', clampUnit(0.72 * safeAlpha))
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'layer'), 'heatmap-opacity', buildCongestionHeatmapOpacity(safeAlpha))
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'hotspots-glow'), 'circle-opacity', clampUnit(0.16 * safeAlpha))
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'hotspots'), 'circle-opacity', clampUnit(0.92 * safeAlpha))
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'labels'), 'text-opacity', clampUnit(0.88 * safeAlpha))
 }
 
 const setCongestionHeatmapStackVisibility = (
@@ -1938,7 +1947,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       cityRef.current.id === cityNow.id &&
       mapRef.current === map
 
-    // ── 1. Determine base snapshot (Synthetic or Multi-source) ────────────
+    // ── 1. Determine base snapshot (road geometry only) ───────────────────
     let snapshot = (() => {
       const osmRoads = osmRoadsRef.current.get(cityNow.id)
       return osmRoads && osmRoads.length > 0
@@ -1962,7 +1971,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
           }
         }
       } catch (err) {
-        console.warn('[CrossFlowMap] Failed to scale IDF network, using fallback grid.', err)
+        console.warn('[CrossFlowMap] Failed to scale IDF network, keeping road-aligned snapshot only.', err)
       }
     }
 

@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' data: https://fonts.gstatic.com https://fonts.openmaptiles.org",
       "img-src 'self' blob: data: https://*.cartocdn.com https://*.tile.openstreetmap.org https://api.tomtom.com https://tile.tomtom.com https://grainy-gradients.vercel.app https://static.openagenda.com https://opendata.paris.fr",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.tomtom.com https://router.hereapi.com https://traffic.ls.hereapi.com https://overpass-api.de https://nominatim.openstreetmap.org https://api.open-meteo.com https://air-quality-api.open-meteo.com https://*.cartocdn.com https://*.tile.openstreetmap.org https://tiles.stadiamaps.com https://prim.iledefrance-mobilites.fr https://data.sytadin.fr https://openrouter.ai https://opendata.paris.fr https://api.openagenda.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.tomtom.com https://router.hereapi.com https://traffic.ls.hereapi.com https://overpass-api.de https://nominatim.openstreetmap.org https://api.open-meteo.com https://air-quality-api.open-meteo.com https://*.cartocdn.com https://*.tile.openstreetmap.org https://tiles.stadiamaps.com https://prim.iledefrance-mobilites.fr https://data.sytadin.fr https://openrouter.ai https://opendata.paris.fr https://api.openagenda.com https://fonts.openmaptiles.org",
       "worker-src blob: 'self'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
