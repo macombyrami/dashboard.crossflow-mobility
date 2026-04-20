@@ -20,10 +20,10 @@ export function IntegrationStatus() {
         {integrations.map((integ) => (
           <div 
             key={integ.label}
-            className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group"
+            className="flex items-center justify-between p-3 rounded-xl bg-bg-subtle border border-bg-border hover:bg-bg-hover transition-colors group"
           >
             <div className="flex flex-col">
-              <span className="text-xs font-semibold text-white group-hover:text-brand-green transition-colors">
+              <span className="text-xs font-semibold text-text-primary group-hover:text-brand transition-colors">
                 {integ.label}
               </span>
               <span className="text-[10px] text-text-muted">
@@ -33,7 +33,7 @@ export function IntegrationStatus() {
             <div className={cn(
               "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
               integ.status === 'live' 
-                ? "bg-brand-green/10 text-brand-green border-brand-green/20"
+                ? "bg-brand/10 text-brand border-brand/20"
                 : "bg-orange-500/10 text-orange-500 border-orange-500/20"
             )}>
               {integ.status === 'live' ? (

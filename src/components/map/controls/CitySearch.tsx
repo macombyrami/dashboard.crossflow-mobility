@@ -80,13 +80,13 @@ export function CitySearch() {
       {/* Trigger button */}
       <button
         onClick={() => { setOpen(o => !o); setTimeout(() => inputRef.current?.focus(), 50) }}
-        className="flex items-center gap-3 px-5 py-2.5 rounded-apple glass border border-white/5 hover:bg-white/5 hover:border-white/10 transition-all duration-300 shadow-apple group"
+        className="flex items-center gap-3 px-5 py-2.5 rounded-apple glass border border-bg-border hover:bg-bg-subtle hover:border-bg-border transition-all duration-300 shadow-apple group"
       >
-        <div className="w-8 h-8 rounded-apple bg-brand-green/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-          <MapPin className="w-4 h-4 text-brand-green" />
+        <div className="w-8 h-8 rounded-apple bg-brand/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+          <MapPin className="w-4 h-4 text-brand" />
         </div>
         <div className="flex flex-col items-start translate-y-[-1px]">
-          <span className="text-[14px] font-bold text-white tracking-tight leading-none group-hover:text-brand-green transition-colors">
+          <span className="text-[14px] font-bold text-text-primary tracking-tight leading-none group-hover:text-brand transition-colors">
             {city.flag} {city.name}
           </span>
           <span className="text-[10px] font-bold text-text-muted uppercase tracking-[0.1em] mt-1.5">{city.country}</span>
@@ -96,29 +96,29 @@ export function CitySearch() {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute top-full mt-3 left-0 w-[calc(100vw-32px)] sm:w-[340px] glass rounded-apple shadow-apple z-50 animate-fade-in overflow-hidden border border-white/10">
+        <div className="absolute top-full mt-3 left-0 w-[calc(100vw-32px)] sm:w-[340px] glass rounded-apple shadow-apple z-50 animate-fade-in overflow-hidden border border-bg-border">
           {/* Search input */}
-          <div className="p-4 border-b border-white/5">
-            <div className="flex items-center gap-3 bg-white/5 rounded-apple px-4 py-3 border border-white/5 focus-within:border-brand-green/30 transition-all duration-300 shadow-inner">
+          <div className="p-4 border-b border-bg-border">
+            <div className="flex items-center gap-3 bg-bg-subtle rounded-apple px-4 py-3 border border-bg-border focus-within:border-brand/30 transition-all duration-300 shadow-inner">
               {loading
-                ? <Loader2 className="w-4 h-4 text-brand-green animate-spin flex-shrink-0" />
+                ? <Loader2 className="w-4 h-4 text-brand animate-spin flex-shrink-0" />
                 : <Search className="w-4 h-4 text-text-muted flex-shrink-0" />
               }
               <input
                 ref={inputRef}
                 value={query}
                 onChange={handleInput}
-                placeholder="Rechercher une ville ou un secteur..."
-                className="bg-transparent text-[14px] text-white placeholder-white/30 outline-none w-full font-medium"
+                placeholder="Rechercher une destination..."
+                className="bg-transparent text-[14px] text-text-primary placeholder-white/30 outline-none w-full font-medium"
               />
               {query && (
-                <button onClick={() => { setQuery(''); setResults([]); inputRef.current?.focus() }} className="p-1 hover:bg-white/10 rounded-full transition-colors">
-                  <X className="w-4 h-4 text-text-muted hover:text-white" />
+                <button onClick={() => { setQuery(''); setResults([]); inputRef.current?.focus() }} className="p-1 hover:bg-bg-hover rounded-full transition-colors">
+                  <X className="w-4 h-4 text-text-muted hover:text-text-primary" />
                 </button>
               )}
             </div>
             <p className="text-[9px] font-bold text-text-muted mt-3 pl-1 uppercase tracking-[0.15em] opacity-50">
-              Recherche unifiée
+              Moteur Global · OpenStreetMap
             </p>
           </div>
 
@@ -132,7 +132,7 @@ export function CitySearch() {
               <div className="animate-fade-in">
                 <div className="px-5 pt-4 pb-2 flex items-center gap-2">
                   <Clock className="w-3.5 h-3.5 text-text-muted" />
-                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em]">Recherches récentes</span>
+                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em]">Destinations Récentes</span>
                 </div>
                 {items.map(c => (
                   <CityRow key={c.id} city={c} selected={c.id === city.id} onClick={() => select(c)} />
@@ -164,21 +164,21 @@ function CityRow({ city, selected, onClick }: { city: City; selected: boolean; o
     <button
       onClick={onClick}
       className={cn(
-        'w-full flex items-center gap-4 px-6 py-4 text-left hover:bg-white/5 transition-all duration-300 relative group',
-        selected && 'bg-brand-green/10',
+        'w-full flex items-center gap-4 px-6 py-4 text-left hover:bg-bg-subtle transition-all duration-300 relative group',
+        selected && 'bg-brand/10',
       )}
     >
-      <div className="w-10 h-10 rounded-apple bg-white/5 flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform">
+      <div className="w-10 h-10 rounded-apple bg-bg-subtle flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform">
         {city.flag}
       </div>
       <div className="flex-1 min-w-0">
-        <p className={cn('text-[14px] font-bold truncate transition-colors', selected ? 'text-brand-green' : 'text-white group-hover:text-brand-green')}>
+        <p className={cn('text-[14px] font-bold truncate transition-colors', selected ? 'text-brand' : 'text-text-primary group-hover:text-brand')}>
           {city.name}
         </p>
         <p className="text-[11px] font-medium text-text-muted/60 mt-0.5 truncate uppercase tracking-wider">{city.country}</p>
       </div>
       {selected && (
-        <div className="w-2 h-2 rounded-full bg-brand-green shadow-glow animate-pulse" />
+        <div className="w-2 h-2 rounded-full bg-brand shadow-glow animate-pulse" />
       )}
     </button>
   )
@@ -197,16 +197,16 @@ function ResultRow({ result, onClick }: { result: GeocodingResult; onClick: () =
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-4 px-6 py-4 text-left hover:bg-white/5 transition-all duration-300 group"
+      className="w-full flex items-center gap-4 px-6 py-4 text-left hover:bg-bg-subtle transition-all duration-300 group"
     >
-      <div className="w-10 h-10 rounded-apple bg-white/5 flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform">
+      <div className="w-10 h-10 rounded-apple bg-bg-subtle flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform">
         {flag}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[14px] font-bold text-white truncate group-hover:text-brand-green transition-colors">{result.name}</p>
+        <p className="text-[14px] font-bold text-text-primary truncate group-hover:text-brand transition-colors">{result.name}</p>
         <p className="text-[11px] font-medium text-text-muted/60 mt-0.5 truncate uppercase tracking-wider">{short}</p>
       </div>
-      <span className="text-[9px] font-bold text-brand-green bg-brand-green/10 px-2 py-1 rounded-apple flex-shrink-0 uppercase tracking-widest border border-brand-green/20 shadow-glow-sm">
+      <span className="text-[9px] font-bold text-brand bg-brand/10 px-2 py-1 rounded-apple flex-shrink-0 uppercase tracking-widest border border-brand/20 shadow-glow-sm">
         {result.type}
       </span>
     </button>

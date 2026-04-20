@@ -90,6 +90,10 @@ interface MapStore {
   lockedCityId:    string | null
   setLockedCity:   (id: string | null) => void
 
+  // Filter mode (map layer quick-filter)
+  filterMode:    'all' | 'congestion' | 'incidents' | 'travaux' | 'flux'
+  setFilterMode: (mode: MapStore['filterMode']) => void
+
   // UI
   isPanelOpen:   boolean
   setPanelOpen:  (open: boolean) => void
@@ -207,6 +211,9 @@ export const useMapStore = create<MapStore>()(
 
       lockedCityId:   null,
       setLockedCity:  (id) => set({ lockedCityId: id }),
+
+      filterMode:     'all',
+      setFilterMode:  (mode) => set({ filterMode: mode }),
 
       isPanelOpen:    false,
       setPanelOpen:   (open) => set({ isPanelOpen: open }),

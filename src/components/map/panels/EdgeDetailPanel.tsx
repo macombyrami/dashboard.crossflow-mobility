@@ -33,7 +33,7 @@ export function EdgeDetailPanel() {
   const predicted = Math.max(0, Math.min(1, segment.congestionScore + (trend === 'improving' ? -0.12 : trend === 'worsening' ? +0.10 : 0)))
 
   return (
-    <div className="absolute top-4 right-4 w-72 bg-bg-elevated border border-bg-border rounded-2xl shadow-panel z-20 animate-slide-in overflow-hidden">
+    <div className="absolute top-16 right-3 w-72 bg-bg-elevated border border-bg-border rounded-2xl shadow-panel z-20 animate-slide-in overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-bg-border flex items-start justify-between gap-2 bg-gradient-to-br from-bg-elevated to-bg-surface">
         <div className="min-w-0 flex-1">
@@ -88,7 +88,7 @@ export function EdgeDetailPanel() {
       {/* Prediction */}
       <div className="p-4">
         <div className="flex items-center gap-2 mb-3">
-          <BrainCircuit className="w-3.5 h-3.5 text-brand-green" />
+          <BrainCircuit className="w-3.5 h-3.5 text-brand" />
           <span className="text-xs font-semibold text-text-secondary uppercase tracking-widest">Prédiction +30 min</span>
         </div>
         <div className="flex items-center justify-between">

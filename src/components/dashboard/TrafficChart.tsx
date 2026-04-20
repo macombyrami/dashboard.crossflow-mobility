@@ -52,7 +52,7 @@ function TrafficChartInner() {
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <p className="text-[11px] font-bold text-text-muted uppercase tracking-[0.18em]">Activité Réseau</p>
-          <p className="text-[16px] font-bold text-white tracking-tight">Trafic — 24h</p>
+          <p className="text-[16px] font-bold text-text-primary tracking-tight">Trafic — 24h</p>
         </div>
         <div className="flex items-center gap-6">
           {METRICS.map(m => (

@@ -1,54 +1,87 @@
 'use client'
-import React, { useState } from 'react'
-import { Layers, ChevronDown, ChevronUp } from 'lucide-react'
-import { cn } from '@/lib/utils/cn'
-import { Legend } from '@/components/ui/Legend'
+import { useMapStore } from '@/store/mapStore'
 
-interface MapLegendProps {
-  showTraffic?: boolean
-  showIncidents?: boolean
-  className?: string
-}
+const TRAFFIC_LEVELS = [
+  { label: 'Fluide',    color: '#22C55E' },
+  { label: 'Ralenti',   color: '#FFD600' },
+  { label: 'Impacté',   color: '#FF6D00' },
+  { label: 'Critique',  color: '#FF1744' },
+]
 
-export default function MapLegend({ showTraffic = true, showIncidents = true, className }: MapLegendProps) {
-  const [isOpen, setIsOpen] = useState(false)
+const TRANSPORT_ITEMS = [
+  { label: 'Bus',      color: '#3B82F6' },
+  { label: 'Métro',    color: '#A855F7' },
+  { label: 'Incident', color: '#FF3B30' },
+]
 
-  if (!showTraffic && !showIncidents) return null
+export function MapLegend() {
+  const activeLayers = useMapStore(s => s.activeLayers)
+  const heatmapMode  = useMapStore(s => s.heatmapMode)
+
+  const isTraffic   = activeLayers.has('traffic')
+  const isHeatmap   = activeLayers.has('heatmap')
+  const isTransport = activeLayers.has('transport')
+  const isIncidents = activeLayers.has('incidents')
+
+  if (!isTraffic && !isHeatmap && !isTransport && !isIncidents) return null
 
   return (
-    <div className={cn("z-20 pointer-events-auto transition-all duration-500", className)}>
-      <button
-        className={cn(
-          "flex items-center justify-between gap-3 h-10 px-4 rounded-xl transition-all duration-300",
-          "bg-bg-surface/60 backdrop-blur-3xl border border-white/10 shadow-prestige",
-          "hover:bg-white/10 text-white/80 hover:text-white",
-          isOpen ? "mb-2" : ""
+    <div className="absolute bottom-6 left-3 z-10 pointer-events-none">
+      <div className="bg-bg-surface/90 backdrop-blur-md border border-bg-border rounded-xl px-3 py-2.5 shadow-lg space-y-2 min-w-[120px]">
+        {/* Traffic flow levels */}
+        {isTraffic && (
+          <div className="space-y-1.5">
+            {TRAFFIC_LEVELS.map(({ label, color }) => (
+              <div key={label} className="flex items-center gap-2">
+                <div
+                  className="w-6 h-1.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: color, boxShadow: `0 0 4px ${color}60` }}
+                />
+                <span className="text-[10px] font-semibold text-text-secondary">{label}</span>
+              </div>
+            ))}
+          </div>
         )}
-        onClick={() => setIsOpen(!isOpen)}
-        aria-expanded={isOpen}
-      >
-        <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-brand" />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Lecture</span>
-        </div>
-        {isOpen ? <ChevronDown className="w-4 h-4 opacity-40" /> : <ChevronUp className="w-4 h-4 opacity-40" />}
-      </button>
 
-      <div className={cn(
-        "transition-all duration-500",
-        isOpen ? "flex animate-in fade-in slide-in-from-bottom-2" : "hidden md:flex"
-      )}>
-        {showTraffic && (
-          <Legend
-            title="État du trafic"
-            items={[
-              { label: "Fluidité", color: "#00FF9D" },
-              { label: "Pression", color: "#FFD60A" },
-              { label: "Critique", color: "#FF3B30" }
-            ]}
-            description="Lecture consolidée des zones de circulation."
-            className="w-56"
-          />
+        {/* Heatmap gradient */}
+        {isHeatmap && (
+          <div>
+            {isTraffic && <div className="h-px bg-bg-border mb-2" />}
+            <p className="text-[9px] font-bold text-text-muted uppercase tracking-wider mb-1.5">
+              {heatmapMode === 'congestion' ? 'Congestion'
+               : heatmapMode === 'passages' ? 'Passages'
+               : 'CO₂'}
+            </p>
+            <div
+              className="h-1.5 rounded-full w-full"
+              style={{ background: 'linear-gradient(to right, #22C55E, #FFD600, #FF3B30)' }}
+            />
+            <div className="flex justify-between text-[8px] text-text-muted mt-0.5">
+              <span>Faible</span>
+              <span>Élevé</span>
+            </div>
+          </div>
+        )}
+
+        {/* Transport / incidents */}
+        {(isTransport || isIncidents) && (
+          <div>
+            {(isTraffic || isHeatmap) && <div className="h-px bg-bg-border mb-2" />}
+            <div className="space-y-1.5">
+              {isTransport && TRANSPORT_ITEMS.slice(0, 2).map(({ label, color }) => (
+                <div key={label} className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                  <span className="text-[10px] font-semibold text-text-secondary">{label}</span>
+                </div>
+              ))}
+              {isIncidents && (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#FF3B30' }} />
+                  <span className="text-[10px] font-semibold text-text-secondary">Incident</span>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>

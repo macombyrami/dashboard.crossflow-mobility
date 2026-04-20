@@ -49,7 +49,7 @@ export default function PredictionPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-brand-green" />
+                <TrendingUp className="w-5 h-5 text-brand" />
                 {t('prediction.title')} — {city.flag} {city.name}
               </h1>
               <p className="text-sm text-text-secondary mt-1">
@@ -63,7 +63,7 @@ export default function PredictionPage() {
                 'flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border transition-all',
                 loading
                   ? 'bg-bg-elevated border-bg-border text-text-muted'
-                  : 'bg-brand-green-dim border-brand-green/30 text-brand-green hover:bg-brand-green/20',
+                  : 'bg-brand-dim border-brand/30 text-brand hover:bg-brand/20',
               )}
             >
               <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
@@ -73,7 +73,7 @@ export default function PredictionPage() {
 
           {loading && !ctx && (
             <div className="bg-bg-surface border border-bg-border rounded-2xl p-8 sm:p-12 text-center">
-              <RefreshCw className="w-8 h-8 text-brand-green animate-spin mx-auto mb-3" />
+              <RefreshCw className="w-8 h-8 text-brand animate-spin mx-auto mb-3" />
               <p className="text-sm text-text-secondary">{t('common.calculating')}...</p>
               <p className="text-xs text-text-muted mt-1">Calendrier · Événements · Météo · Saisonnalité</p>
             </div>
@@ -111,7 +111,7 @@ export default function PredictionPage() {
                         "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
                         ctx.pressureLevel === 'HIGH' ? "bg-red-500/10 text-red-500 border border-red-500/20" :
                         ctx.pressureLevel === 'MEDIUM' ? "bg-orange-500/10 text-orange-500 border border-orange-500/20" :
-                        "bg-brand-green/10 text-brand-green border border-brand-green/20"
+                        "bg-brand/10 text-brand border border-brand/20"
                       )}>
                         {ctx.pressureLevel === 'HIGH' ? 'RISQUE ÉLEVÉ' : ctx.pressureLevel === 'MEDIUM' ? 'RISQUE MODÉRÉ' : 'RISQUE FAIBLE'} (Score : {ctx.pressureScore.toFixed(2)})
                       </div>
@@ -132,8 +132,8 @@ export default function PredictionPage() {
               {/* Feedback UI */}
               <div className="bg-bg-surface border border-bg-border rounded-2xl p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-brand-green/10 flex items-center justify-center">
-                    <Zap className="w-4 h-4 text-brand-green" />
+                  <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center">
+                    <Zap className="w-4 h-4 text-brand" />
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-text-primary">Cette prédiction vous semble-t-elle correcte ?</p>
@@ -142,7 +142,7 @@ export default function PredictionPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {feedback ? (
-                    <div className="flex items-center gap-2 text-brand-green text-xs font-medium px-3 py-1.5 bg-brand-green/10 rounded-xl animate-in fade-in zoom-in duration-300">
+                    <div className="flex items-center gap-2 text-brand text-xs font-medium px-3 py-1.5 bg-brand/10 rounded-xl animate-in fade-in zoom-in duration-300">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       Merci pour votre retour !
                     </div>
@@ -150,7 +150,7 @@ export default function PredictionPage() {
                     <>
                       <button 
                         onClick={() => setFeedback('positive')}
-                        className="p-2 hover:bg-bg-elevated rounded-xl border border-bg-border text-text-secondary hover:text-brand-green transition-colors"
+                        className="p-2 hover:bg-bg-elevated rounded-xl border border-bg-border text-text-secondary hover:text-brand transition-colors"
                       >
                         <ThumbsUp className="w-4 h-4" />
                       </button>
@@ -168,7 +168,7 @@ export default function PredictionPage() {
               {/* Signals */}
               <div className="bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-bg-border flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-brand-green" />
+                  <AlertCircle className="w-4 h-4 text-brand" />
                   <p className="text-sm font-semibold text-text-primary">{t('prediction.signals')} ({ctx.signals.length})</p>
                 </div>
                 <div className="divide-y divide-bg-border">

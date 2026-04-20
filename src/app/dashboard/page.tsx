@@ -1,125 +1,82 @@
 'use client'
-
-import { useEffect, useMemo, useState } from 'react'
-import dynamic from 'next/dynamic'
-import type { ReactNode } from 'react'
-import { Activity, ArrowRight, Clock, Download, Wind, AlertTriangle, Zap } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
-import { fr } from 'date-fns/locale'
-import { cn } from '@/lib/utils/cn'
-import appData from '@/lib/data/app.json'
-
+import { useEffect, useState } from 'react'
+import { Activity, Clock, Wind, AlertTriangle, Zap, Download } from 'lucide-react'
 import { KPICard } from '@/components/dashboard/KPICard'
-import { ZoneExportTool } from '@/components/dashboard/ZoneExportTool'
-import { LiveSyncBadge } from '@/components/dashboard/LiveSyncBadge'
-import { StatusBar } from '@/components/dashboard/StatusBar'
-import { PredictionTabs } from '@/components/dashboard/PredictionTabs'
-
-import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
-import { MobileDashboardView } from '@/components/mobile/dashboard/MobileDashboardView'
+import { cn } from '@/lib/utils/cn'
+import { TrafficChart } from '@/components/dashboard/TrafficChart'
+import { IncidentFeed } from '@/components/dashboard/IncidentFeed'
+import { ModalSplitChart } from '@/components/dashboard/ModalSplitChart'
+import { WeatherCard } from '@/components/dashboard/WeatherCard'
+import { AirQualityCard } from '@/components/dashboard/AirQualityCard'
+import { EventsWidget } from '@/components/dashboard/EventsWidget'
+import { GlobalTrafficBanner } from '@/components/dashboard/GlobalTrafficBanner'
+import { TrafficIndexWidget } from '@/components/dashboard/TrafficIndexWidget'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useKPIHistoryStore } from '@/store/kpiHistoryStore'
 import { useTranslation } from '@/lib/hooks/useTranslation'
 import { generateCityKPIs, generateIncidents } from '@/lib/engine/traffic.engine'
+import { fetchWeather, fetchAirQuality } from '@/lib/api/openmeteo'
 import { exportToPdf } from '@/lib/utils/export'
 import { platformConfig } from '@/config/platform.config'
 import { pollutionLabel } from '@/lib/utils/congestion'
-import { getSnapshots } from '@/lib/api/snapshots'
 import type { CityKPIs, TrafficSnapshot } from '@/types'
-
-const TrafficChart = dynamic(() => import('@/components/dashboard/TrafficChart').then(m => m.TrafficChart), {
-  ssr: false,
-  loading: () => <ChartSkeleton />,
-})
-
-function ChartSkeleton() {
-  return (
-    <div className="w-full h-[320px] bg-bg-elevated/40 border border-bg-border rounded-3xl animate-pulse flex items-center justify-center">
-      <Activity className="w-8 h-8 text-white/10" />
-    </div>
-  )
-}
 
 function kpisFromSnapshot(cityId: string, snapshot: TrafficSnapshot, incidentCount: number, base: CityKPIs): CityKPIs {
   const segs = snapshot.segments
-  const sourceScores = segs.length > 0
-    ? segs.map(s => s.congestionScore)
-    : snapshot.heatmap.length > 0
-      ? snapshot.heatmap.map(pt => pt.intensity)
-      : []
-  if (!sourceScores.length) return base
-  const congestionRate = sourceScores.reduce((a, score) => a + score, 0) / sourceScores.length
-  const avgTravelMin = Math.max(5, 10 + congestionRate * 40)
-  const pollutionIndex = Math.min(10, Math.max(0.5, congestionRate * 8 + 0.5))
-  const networkEfficiency = Math.max(0.1, 1 - congestionRate * 0.85)
+  if (!segs.length) return base
+  const congestionRate     = segs.reduce((a, s) => a + s.congestionScore, 0) / segs.length
+  const avgTravelMin       = Math.max(5, 10 + congestionRate * 40)
+  const pollutionIndex     = Math.min(10, Math.max(0.5, congestionRate * 8 + 0.5))
+  const networkEfficiency  = Math.max(0.1, 1 - congestionRate * 0.85)
   return {
     ...base,
     cityId,
     congestionRate,
     avgTravelMin,
     pollutionIndex,
-    activeIncidents: incidentCount,
+    activeIncidents:  incidentCount,
     networkEfficiency,
     capturedAt: snapshot.fetchedAt,
   }
 }
 
-function SectionCard({
-  title,
-  subtitle,
-  children,
-  className,
-}: {
-  title: string
-  subtitle?: string
-  children: ReactNode
-  className?: string
-}) {
+function DashboardSkeleton() {
   return (
-    <section className={cn('card-premium overflow-hidden border border-white/5', className)}>
-      <div className="px-5 sm:px-6 py-4 border-b border-white/5 bg-white/[0.02]">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-[13px] font-black uppercase tracking-[0.18em] text-white">{title}</h2>
-          {subtitle && <p className="text-[11px] text-text-muted">{subtitle}</p>}
+    <main className="flex-1 min-h-0 overflow-y-auto page-scroll">
+      <div className="page-container space-y-6 sm:space-y-8">
+        <div className="h-10 bg-bg-subtle rounded-2xl animate-pulse" />
+        <div className="h-8 w-48 bg-bg-subtle rounded-xl animate-pulse" />
+        <div className="kpi-grid">
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} className="glass-card p-6 rounded-[22px] h-36 animate-pulse" />
+          ))}
         </div>
+        <div className="h-64 bg-bg-subtle rounded-[22px] animate-pulse" />
       </div>
-      <div className="p-4 sm:p-5">{children}</div>
-    </section>
+    </main>
   )
 }
 
 export default function DashboardPage() {
   const { t } = useTranslation()
-  const city = useMapStore(s => s.city)
-  const kpis = useTrafficStore(s => s.kpis)
-  const setKPIs = useTrafficStore(s => s.setKPIs)
-  const setIncidents = useTrafficStore(s => s.setIncidents)
-  const snapshot = useTrafficStore(s => s.snapshot)
-  const incidents = useTrafficStore(s => s.incidents)
-  const dataSource = useTrafficStore(s => s.dataSource)
-  const openMeteoWeather = useTrafficStore(s => s.openMeteoWeather)
-  const lastUpdate = useTrafficStore(s => s.lastUpdate)
-  const addSnapshot = useKPIHistoryStore(s => s.addSnapshot)
-  const syncSnapshots = useKPIHistoryStore(s => s.syncHistoricalSnapshots)
+  const city                = useMapStore(s => s.city)
+  const kpis                = useTrafficStore(s => s.kpis)
+  const setKPIs             = useTrafficStore(s => s.setKPIs)
+  const setIncidents        = useTrafficStore(s => s.setIncidents)
+  const snapshot            = useTrafficStore(s => s.snapshot)
+  const incidents           = useTrafficStore(s => s.incidents)
+  const dataSource          = useTrafficStore(s => s.dataSource)
+  const openMeteoWeather    = useTrafficStore(s => s.openMeteoWeather)
+  const setOpenMeteoWeather = useTrafficStore(s => s.setOpenMeteoWeather)
+  const airQuality          = useTrafficStore(s => s.airQuality)
+  const setAirQuality       = useTrafficStore(s => s.setAirQuality)
+  const addSnapshot  = useKPIHistoryStore(s => s.addSnapshot)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
-  useEffect(() => { document.title = `Tableau de bord — ${city.name} | CrossFlow` }, [city.name])
 
-  useEffect(() => {
-    if (!mounted) return
-    async function hydrate() {
-      try {
-        const history = await getSnapshots(city.id, 1440)
-        if (history && history.length > 0) syncSnapshots(city.id, history)
-      } catch (err) {
-        console.warn('[Dashboard Hydration] Failed to fetch history, falling back to synthetic.', err)
-      }
-    }
-    hydrate()
-  }, [mounted, city.id, syncSnapshots])
-
+  // Synthetic KPIs + incidents baseline (only when no live data)
   useEffect(() => {
     if (dataSource === 'live') return
     setKPIs(generateCityKPIs(city))
@@ -131,251 +88,254 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [city, dataSource, setKPIs, setIncidents])
 
+  // Real KPIs derived from HERE live snapshot
   useEffect(() => {
-    if (!snapshot) return
+    if (!snapshot || dataSource !== 'live') return
     const base = generateCityKPIs(city)
     setKPIs(kpisFromSnapshot(city.id, snapshot, incidents.length, base))
   }, [snapshot, dataSource, city, incidents.length, setKPIs])
 
+  // Record KPI snapshot to history store (30-min buckets)
   useEffect(() => {
     if (kpis) addSnapshot(kpis)
   }, [kpis, addSnapshot])
 
-  const isMobile = useMediaQuery('(max-width: 1023px)')
-
-  const derived = useMemo(() => {
-    if (!kpis) return null
-    const targets = platformConfig.kpi.targets
-    const congPct = Math.round(kpis.congestionRate * 100)
-    const congWarn = kpis.congestionRate >= targets.congestion_rate.warning
-    const congCrit = kpis.congestionRate >= targets.congestion_rate.critical
-    const travelWarn = kpis.avgTravelMin >= targets.avg_travel_time_min.warning
-    const pollWarn = kpis.pollutionIndex >= targets.pollution_index.warning
-    const pollColor = pollutionLabel(kpis.pollutionIndex).color
-
-    const history = useKPIHistoryStore.getState().getForCity(city.id, 96)
-    let cDelta: number | undefined
-    let tDelta: number | undefined
-    if (history.length >= 2) {
-      const BUCKET_24H = 48
-      const latest = history[history.length - 1]
-      const yesterday = history.find(s =>
-        s.cityId === city.id && Math.abs(s.bucketKey - (latest.bucketKey - BUCKET_24H)) <= 2,
-      )
-      if (yesterday) {
-        cDelta = Math.round((latest.congestion - yesterday.congestion) * 10) / 10
-        tDelta = Math.round((latest.avgTravelMin - yesterday.avgTravelMin) * 10) / 10
+  // Real weather from OpenMeteo (free, no key)
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      const [w, a] = await Promise.all([
+        fetchWeather(city.center.lat, city.center.lng),
+        fetchAirQuality(city.center.lat, city.center.lng),
+      ])
+      if (!cancelled) {
+        setOpenMeteoWeather(w)
+        setAirQuality(a)
       }
     }
+    load()
+    const interval = setInterval(load, 5 * 60 * 1000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [city.center.lat, city.center.lng, setOpenMeteoWeather, setAirQuality])
 
-    const weatherImpact: 'none' | 'low' | 'high' = !openMeteoWeather || openMeteoWeather.trafficImpact === 'none'
-      ? 'none'
-      : openMeteoWeather.trafficImpact === 'minor'
-        ? 'low'
-        : 'high'
-    const status: 'optimal' | 'warning' | 'critical' = congCrit
-      ? 'critical'
-      : (congWarn && travelWarn) || pollWarn
-        ? 'warning'
-        : 'optimal'
+  if (!kpis) return <DashboardSkeleton />
 
-    const incidentsStatus: 'optimal' | 'warning' | 'critical' = incidents.length >= 8 ? 'critical' : incidents.length >= 4 ? 'warning' : 'optimal'
+  const congPct    = Math.round(kpis.congestionRate * 100)
+  const targets    = platformConfig.kpi.targets
+  const congWarn   = kpis.congestionRate >= targets.congestion_rate.warning
+  const congCrit   = kpis.congestionRate >= targets.congestion_rate.critical
+  const travelWarn = kpis.avgTravelMin   >= targets.avg_travel_time_min.warning
+  const pollWarn   = kpis.pollutionIndex >= targets.pollution_index.warning
+  const pollColor  = pollutionLabel(kpis.pollutionIndex).color
 
-    return {
-      congPct,
-      congWarn,
-      congCrit,
-      travelWarn,
-      pollWarn,
-      pollColor,
-      cDelta,
-      tDelta,
-      status,
-      weatherImpact,
-      incidentsStatus,
-    }
-  }, [kpis, city.id, incidents.length, openMeteoWeather])
-
-  if (!kpis || !derived) return null
-
-  if (isMobile) {
-    return (
-      <MobileDashboardView
-        kpis={kpis}
-        city={city}
-        incidents={incidents}
-        status={derived.status}
-        weatherImpact={derived.weatherImpact}
-        refreshedAt={snapshot ? new Date(snapshot.fetchedAt) : lastUpdate}
-      />
-    )
-  }
-
-  const updatedAt = lastUpdate ?? (snapshot ? new Date(snapshot.fetchedAt) : null)
-  const relativeUpdated = updatedAt
-    ? `Mis à jour il y a ${formatDistanceToNow(updatedAt, { locale: fr, addSuffix: false })}`
-    : t('dashboard.updated')
+  // Stable deltas (seeded by city + minute, only after mount to avoid hydration mismatch)
+  const seed = mounted ? (city.id.charCodeAt(0) + new Date().getMinutes()) : city.id.charCodeAt(0)
+  const congDelta   = ((seed % 21) - 10) / 10
+  const travelDelta = ((seed % 11) - 5)  / 10
+  const pollDelta   = ((seed % 31) - 15) / 10
 
   return (
-    <main className="min-h-full p-4 sm:p-6 lg:p-8 pb-safe space-y-6 lg:space-y-8">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-8 bg-brand rounded-full shadow-glow" />
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tighter uppercase font-heading">
-              {city.flag} {city.name}
-            </h1>
+    <main className="flex-1 min-h-0 overflow-y-auto page-scroll">
+      <div className="page-container space-y-6 sm:space-y-8 2xl:space-y-10">
+
+        {/* Bandeau état global — 3 secondes */}
+        <GlobalTrafficBanner className="animate-slide-up" />
+
+        {/* Title & Stats Summary */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6">
+          <div>
+            <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2 animate-slide-up">
+              <div className="w-1.5 h-6 sm:w-2 sm:h-7 bg-brand rounded-full shadow-glow" />
+              <h1 className="heading-fluid-1 text-text-primary tracking-tight">
+                {city.flag} {city.name}
+              </h1>
+            </div>
+            <p className="text-[12px] sm:text-[14px] font-medium text-text-secondary flex flex-wrap items-center gap-2 animate-slide-up [animation-delay:100ms]">
+              {t('dashboard.title')} · <span className="text-text-muted">{t('dashboard.updated')}</span>
+              {dataSource === 'live' && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-brand/10 border border-brand/30 text-brand text-[9px] font-bold uppercase tracking-wider">
+                  <Zap className="w-2 h-2" />Live
+                </span>
+              )}
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-[12px] sm:text-[13px] font-medium text-text-secondary">
-            <span>{t('dashboard.title')}</span>
-            <span className="text-text-muted">•</span>
-            <span>{relativeUpdated}</span>
-            {dataSource === 'live' && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-brand">
-                <Zap className="w-2 h-2" />
-                Live
-              </span>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <button
+              onClick={() => exportToPdf(`CrossFlow — ${city.name} Dashboard`)}
+              className="print-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-xs text-text-secondary hover:text-text-primary"
+            >
+              <Download className="w-3.5 h-3.5" />
+              PDF
+            </button>
+            {openMeteoWeather && (
+              <div className="glass-light px-4 py-2 rounded-xl flex items-center gap-2.5">
+                <span className="text-xl">{openMeteoWeather.weatherEmoji}</span>
+                <div className="flex flex-col">
+                  <span className="text-[13px] font-bold text-text-primary leading-none">{openMeteoWeather.temp}°C</span>
+                  <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider mt-1">{openMeteoWeather.weatherLabel}</span>
+                </div>
+              </div>
             )}
-            <LiveSyncBadge className="scale-90 origin-left" />
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <ZoneExportTool />
-          <PDFButton city={city} />
-          <button
-            onClick={() => { window.location.href = '/map' }}
-            className="print-hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-brand/10 border border-brand/20 hover:bg-brand/15 transition-all text-xs text-brand font-bold"
-          >
-            <ArrowRight className="w-3.5 h-3.5" />
-            Voir la carte
-          </button>
-        </div>
-      </div>
+        {/* Network status banner */}
+        <div className={cn(
+          "relative overflow-hidden p-[1px] rounded-[22px] group animate-slide-up [animation-delay:200ms]",
+          congCrit ? "bg-gradient-to-r from-red-500/30 to-transparent" :
+          congWarn ? "bg-gradient-to-r from-orange-500/30 to-transparent" :
+                    "bg-gradient-to-r from-brand/30 to-transparent"
+        )}>
+          <div className="glass px-5 sm:px-7 py-4 sm:py-5 rounded-[21px] flex items-center gap-4">
+            <div className="relative">
+              <div className={cn(
+                "w-3 h-3 rounded-full shadow-glow animate-pulse",
+                congCrit ? "bg-red-500" : congWarn ? "bg-orange-500" : "bg-brand"
+              )} />
+              <div className={cn(
+                "absolute inset-0 w-3 h-3 rounded-full blur-sm",
+                congCrit ? "bg-red-500" : congWarn ? "bg-orange-500" : "bg-brand"
+              )} />
+            </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.42fr)_minmax(0,0.58fr)]">
-        <div className="space-y-5">
-          <StatusBar
-            status={derived.status}
-            efficiency={Math.round(kpis.networkEfficiency * 100)}
-            weatherImpact={derived.weatherImpact}
-            refreshedAt={updatedAt}
-            live={dataSource === 'live'}
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <span className="text-[14px] font-bold text-text-primary tracking-tight uppercase">
+                  {t('dashboard.performance')}
+                </span>
+                <span className={cn(
+                  "text-[10px] font-bold px-2 py-0.5 rounded-full border tracking-widest uppercase",
+                  congCrit ? "text-red-500 border-red-500/20 bg-red-500/10" :
+                  congWarn ? "text-orange-500 border-orange-500/20 bg-orange-500/10" :
+                            "text-brand border-brand/20 bg-brand/10"
+                )}>
+                  {congCrit ? 'Critique' : congWarn ? 'Attention' : 'Optimal'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 sm:gap-8 pr-1 sm:pr-2">
+              <div className="flex flex-col items-end">
+                <p className="text-[8px] sm:text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Efficacité</p>
+                <p className="text-[13px] sm:text-[15px] font-bold text-text-primary tabular-nums">{Math.round(kpis.networkEfficiency * 100)}%</p>
+              </div>
+              <div className="w-[1px] h-6 sm:h-8 bg-bg-border hidden xs:block" />
+              <div className="flex-col items-end hidden xs:flex">
+                <p className="text-[8px] sm:text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Impact Météo</p>
+                <p className={cn("text-[11px] sm:text-[13px] font-bold tabular-nums", openMeteoWeather?.trafficImpact === 'none' ? 'text-brand' : 'text-orange-500')}>
+                  {openMeteoWeather
+                    ? openMeteoWeather.trafficImpact === 'none' ? 'Aucun impact'
+                      : openMeteoWeather.trafficImpact === 'minor' ? 'Impact mineur'
+                      : openMeteoWeather.trafficImpact === 'moderate' ? 'Impact modéré'
+                      : 'Impact sévère'
+                    : 'Aucun impact'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Indice global de trafic */}
+        <TrafficIndexWidget />
+
+        {/* KPI grid */}
+        <div className="kpi-grid">
+          <KPICard
+            label={t('dashboard.congestion')}
+            value={congPct}
+            unit="%"
+            delta={congDelta}
+            inverse
+            icon={Activity}
+            color={congCrit ? '#FF1744' : congWarn ? '#FF6D00' : '#00E676'}
+            warning={congWarn}
+            critical={congCrit}
+            sub={`Seuil : ${Math.round(targets.congestion_rate.warning * 100)}%`}
           />
-
-          <SectionCard
-            title="État du réseau"
-            subtitle="Vue prioritaire : congestion, retard, impacts et coûts"
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <KPICard
-                label="Congestion"
-                value={derived.congPct}
-                unit="%"
-                delta={derived.cDelta}
-                deltaLabel="vs 24h"
-                deltaUnit="%"
-                inverse
-                icon={Activity}
-                color={derived.congCrit ? '#FF1744' : derived.congWarn ? '#FF6D00' : '#00E676'}
-                warning={derived.congWarn}
-                critical={derived.congCrit}
-                status={derived.congCrit ? 'critical' : derived.congWarn ? 'warning' : 'optimal'}
-                sub={derived.congCrit ? 'Réseau sous tension immédiate' : derived.congWarn ? 'Trafic à surveiller' : 'Réseau nominal'}
-              />
-              <KPICard
-                label="Retard moyen"
-                value={kpis.avgTravelMin.toFixed(0)}
-                unit="min"
-                delta={derived.tDelta}
-                deltaLabel="vs 24h"
-                deltaUnit=" min"
-                inverse
-                icon={Clock}
-                color={derived.travelWarn ? '#FF6D00' : '#2979FF'}
-                warning={derived.travelWarn}
-                status={derived.travelWarn ? 'warning' : 'optimal'}
-                sub="Impact direct sur la productivité urbaine"
-              />
-              <KPICard
-                label="Impact sanitaire"
-                value={kpis.pollutionIndex.toFixed(1)}
-                unit="/ 10"
-                inverse
-                icon={Wind}
-                color={derived.pollColor}
-                warning={derived.pollWarn}
-                status={derived.pollWarn ? 'warning' : 'optimal'}
-                sub={`Exposition NO2 · ${pollutionLabel(kpis.pollutionIndex).label}`}
-              />
-              <KPICard
-                label="Coût des incidents"
-                value={incidents.length}
-                icon={AlertTriangle}
-                color={incidents.length > 5 ? '#FF6D00' : '#FFD600'}
-                status={derived.incidentsStatus}
-                sub={`Est. ${incidents.length * 450} € de perte sèche / heure`}
-              />
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Trafic : tendance 24h"
-            subtitle={derived.congWarn ? 'Pic et ralentissements à surveiller' : 'Tendance stable avec marges de fluidité'}
-          >
-            <div className="space-y-4">
-              <TrafficChart />
-            </div>
-          </SectionCard>
+          <KPICard
+            label={t('dashboard.travel_time')}
+            value={kpis.avgTravelMin.toFixed(0)}
+            unit="min"
+            delta={travelDelta}
+            deltaUnit=" min"
+            inverse
+            icon={Clock}
+            color={travelWarn ? '#FF6D00' : '#2979FF'}
+            warning={travelWarn}
+            sub="Durée moyenne de trajet"
+          />
+          <KPICard
+            label={t('dashboard.pollution')}
+            value={kpis.pollutionIndex.toFixed(1)}
+            unit="/ 10"
+            delta={pollDelta}
+            deltaUnit=" pt"
+            inverse
+            icon={Wind}
+            color={pollColor}
+            warning={pollWarn}
+            sub={pollutionLabel(kpis.pollutionIndex).label}
+          />
+          <KPICard
+            label={t('dashboard.active_incidents')}
+            value={kpis.activeIncidents}
+            icon={AlertTriangle}
+            color={kpis.activeIncidents > 5 ? '#FF6D00' : '#FFD600'}
+            sub="Incidents actifs"
+          />
         </div>
 
-        <div className="space-y-5">
-          <SectionCard
-            title="Prochaines 2 heures"
-            subtitle="Alertes, contexte et données pour décider vite"
-          >
-            <PredictionTabs />
-          </SectionCard>
+        {/* Charts + real data row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
+            <TrafficChart />
+          </div>
+          <div className="space-y-4">
+            <ModalSplitChart />
+            <div className="glass-card rounded-[22px] p-6 shadow-sm group animate-scale-in [animation-delay:600ms]">
+              <div className="flex items-center gap-2.5 mb-5">
+                <div className="w-1.5 h-4.5 bg-brand rounded-full shadow-glow" />
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-[0.18em]">{t('dashboard.performance')}</p>
+              </div>
+              <EfficiencyBar label="Axes principaux"    value={kpis.networkEfficiency * 0.9 + 0.1} />
+              <EfficiencyBar label="Transports publics" value={0.78}  color="#0A84FF" />
+              <EfficiencyBar label="Réseau cyclable"    value={0.85}  color="#30D158" />
+              <EfficiencyBar label="Zones piétonnes"    value={0.92}  color="#AF52DE" />
+            </div>
+          </div>
+        </div>
+
+        {/* Real weather + air quality (OpenMeteo, no key) */}
+        {(openMeteoWeather || airQuality) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {openMeteoWeather && <WeatherCard weather={openMeteoWeather} />}
+            {airQuality       && <AirQualityCard aq={airQuality} />}
+          </div>
+        )}
+
+        {/* Événements & incidents */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <EventsWidget lat={city.center.lat} lng={city.center.lng} radiusKm={15} maxItems={5} />
+          <IncidentFeed maxItems={5} />
         </div>
       </div>
     </main>
   )
 }
 
-function PDFButton({ city }: { city: { name: string } }) {
-  const [isGenerating, setIsGenerating] = useState(false)
-
-  const handleExport = async () => {
-    setIsGenerating(true)
-    try {
-      await exportToPdf(`${appData.name} — ${city.name} Dashboard`)
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
+function EfficiencyBar({ label, value, color = '#22C55E' }: { label: string; value: number; color?: string }) {
   return (
-    <button
-      onClick={handleExport}
-      disabled={isGenerating}
-      className={cn(
-        'print-hidden flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all text-xs font-bold',
-        isGenerating
-          ? 'bg-bg-border border-transparent text-text-muted cursor-not-allowed opacity-70'
-          : 'bg-bg-elevated border-bg-border hover:border-text-muted text-text-secondary hover:text-text-primary',
-      )}
-    >
-      {isGenerating ? (
-        <>
-          <div className="w-3 h-3 border-2 border-brand/30 border-t-brand rounded-full animate-spin" />
-          Génération...
-        </>
-      ) : (
-        <>
-          <Download className="w-3.5 h-3.5" />
-          PDF
-        </>
-      )}
-    </button>
+    <div className="space-y-2 mb-4 group">
+      <div className="flex justify-between items-end">
+        <span className="text-[10px] sm:text-[11px] font-bold text-text-muted uppercase tracking-[0.1em]">{label}</span>
+        <span className="text-[12px] sm:text-[13px] font-bold tabular-nums" style={{ color }}>{Math.round(value * 100)}%</span>
+      </div>
+      <div className="h-2 rounded-full bg-bg-subtle overflow-hidden shadow-inner">
+        <div
+          className="h-full rounded-full transition-all duration-1000 ease-out"
+          style={{ width: `${value * 100}%`, backgroundColor: color, boxShadow: `0 0 12px ${color}40` }}
+        />
+      </div>
+    </div>
   )
 }
