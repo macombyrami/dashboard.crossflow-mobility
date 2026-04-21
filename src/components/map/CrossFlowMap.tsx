@@ -1361,26 +1361,36 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     const color   = ratio > 0.75 ? '#22C55E' : ratio > 0.5 ? '#FFD600' : ratio > 0.25 ? '#FF9F0A' : '#FF3B30'
     const delay   = Math.max(0, flow.currentTravelTime - flow.freeFlowTravelTime)
 
-    popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '280px', className: 'apple-popup' })
+    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '280px', className: 'apple-popup' })
       .setLngLat(lngLat)
       .setHTML(`
-        <div class="glass" style="padding: 16px; border-radius: 20px; font-family: Inter, -apple-system, sans-serif; color:var(--popup-text); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
-          <div style="display: flex; align-items: center; justify-between; margin-bottom: 12px; gap: 12px;">
-             <div style="flex: 1;">
-                <p style="font-size: 10px; font-weight: 700; color:var(--popup-secondary); text-transform: uppercase; tracking: 0.1em; margin: 0 0 4px 0;">Vitesse Actuelle</p>
-                <p style="font-size: 24px; font-weight: 700; color:var(--popup-text); margin: 0;">${flow.currentSpeed} <span style="font-size: 14px; font-weight: 500; color:var(--popup-secondary);">km/h</span></p>
-             </div>
-             <div style="width: 44px; h-44px; border-radius: 12px; background: ${color}15; border: 1px solid ${color}30; display: flex; items-center; justify-center; height: 44px;">
-                <div style="width: 10px; height: 10px; border-radius: 50%; background: ${color}; box-shadow: 0 0 12px ${color};"></div>
-             </div>
+        <div class="glass" style="padding: 16px; border-radius: 20px; font-family: Inter, -apple-system, sans-serif; color:var(--popup-text); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 32px rgba(0,0,0,0.15);">
+          <!-- Header row: title + speed dot + close button -->
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; gap: 8px;">
+            <div style="flex: 1;">
+              <p style="font-size: 10px; font-weight: 700; color:var(--popup-secondary); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 4px 0;">Vitesse Actuelle</p>
+              <p style="font-size: 24px; font-weight: 700; color:var(--popup-text); margin: 0; line-height: 1;">${flow.currentSpeed} <span style="font-size: 14px; font-weight: 500; color:var(--popup-secondary);">km/h</span></p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+              <div style="width: 36px; height: 36px; border-radius: 10px; background: ${color}15; border: 1px solid ${color}30; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 10px; height: 10px; border-radius: 50%; background: ${color}; box-shadow: 0 0 10px ${color};"></div>
+              </div>
+              <button
+                onclick="this.closest('.maplibregl-popup').remove()"
+                title="Fermer"
+                style="width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(128,128,128,0.2); background: var(--popup-surface); color: var(--popup-secondary); font-size: 14px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0;"
+                onmouseover="this.style.background='rgba(255,59,48,0.12)';this.style.color='#FF3B30';this.style.borderColor='rgba(255,59,48,0.25)'"
+                onmouseout="this.style.background='var(--popup-surface)';this.style.color='var(--popup-secondary)';this.style.borderColor='rgba(128,128,128,0.2)'"
+              >✕</button>
+            </div>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-            <div style="background:var(--popup-surface); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.05);">
+            <div style="background:var(--popup-surface); border-radius: 14px; padding: 10px; border: 1px solid rgba(128,128,128,0.1);">
               <p style="color:var(--popup-secondary); font-size: 9px; font-weight: 600; text-transform: uppercase; margin: 0 0 4px 0;">Trajet</p>
-              <p style="font-size: 15px; font-weight: 700; color:var(--popup-text); margin: 0;">${Math.round(flow.currentTravelTime / 60)} <span style="font-size: 11px; font-color:var(--popup-secondary);">min</span></p>
+              <p style="font-size: 15px; font-weight: 700; color:var(--popup-text); margin: 0;">${Math.round(flow.currentTravelTime / 60)} <span style="font-size: 11px; color:var(--popup-secondary);">min</span></p>
             </div>
-            <div style="background:var(--popup-surface); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.05);">
+            <div style="background:var(--popup-surface); border-radius: 14px; padding: 10px; border: 1px solid rgba(128,128,128,0.1);">
               <p style="color:var(--popup-secondary); font-size: 9px; font-weight: 600; text-transform: uppercase; margin: 0 0 4px 0;">Retard</p>
               <p style="font-size: 15px; font-weight: 700; color: ${delay > 0 ? '#FF9F0A' : '#22C55E'}; margin: 0;">
                 ${delay > 0 ? '+' : ''}${Math.round(delay / 60)} <span style="font-size: 11px;">min</span>
@@ -1388,13 +1398,14 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
             </div>
           </div>
 
-          <div style="display: flex; justify-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); pt-12px; padding-top: 10px;">
-            <span style="font-size: 10px; font-weight: 500; color: #424245;">Fiabilité: ${Math.round(flow.confidence * 100)}%</span>
-            <span style="font-size: 10px; font-weight: 600; color: #22C55E; margin-left: auto;">Live synchronized data</span>
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(128,128,128,0.1); padding-top: 10px;">
+            <span style="font-size: 10px; font-weight: 500; color: var(--popup-secondary);">Fiabilité: ${Math.round(flow.confidence * 100)}%</span>
+            <span style="font-size: 10px; font-weight: 600; color: #22C55E;">Live synchronized data</span>
           </div>
         </div>
       `)
       .addTo(map)
+    popupRef.current = popup
   }
 
   // ─── Load boundary for initial city ──────────────────────────────────
