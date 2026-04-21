@@ -967,9 +967,9 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
             <h3 style="margin:0 0 8px 0;font-size:16px;font-weight:700;">${p.streetName || 'Axe routier'}</h3>
             <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;">
               <span style="font-size:22px;font-weight:800;color:${color};">${speed} km/h</span>
-              <span style="font-size:11px;color:#86868B;">${delta >= 0 ? '+' : ''}${delta}% vs normal</span>
+              <span style="font-size:11px;color:var(--popup-secondary);">${delta >= 0 ? '+' : ''}${delta}% vs normal</span>
             </div>
-            <p style="margin:0;font-size:11px;color:#86868B;line-height:1.4;">Lecture validée par CrossFlow Intelligence Engine: ${(speedRatio * 100).toFixed(0)}% du flux libre.</p>
+            <p style="margin:0;font-size:11px;color:var(--popup-secondary);line-height:1.4;">Lecture validée par CrossFlow Intelligence Engine: ${(speedRatio * 100).toFixed(0)}% du flux libre.</p>
           </div>
         `)
         .addTo(map)
@@ -1002,19 +1002,19 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
             </div>
 
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
-              <div style="background:rgba(255,255,255,0.04); padding:10px; border-radius:14px;">
-                <p style="margin:0; font-size:9px; color:#86868B; text-transform:uppercase;">Vitesse</p>
+              <div style="background:var(--popup-surface); padding:10px; border-radius:14px;">
+                <p style="margin:0; font-size:9px; color:var(--popup-secondary); text-transform:uppercase;">Vitesse</p>
                 <p style="margin:2px 0 0 0; font-size:15px; font-weight:700;">${Math.round(p.speedKmh ?? 0)} <span style="font-size:10px; font-weight:400; color:#424245;">km/h</span></p>
               </div>
-              <div style="background:rgba(255,255,255,0.04); padding:10px; border-radius:14px;">
-                <p style="margin:0; font-size:9px; color:#86868B; text-transform:uppercase;">Tendance</p>
+              <div style="background:var(--popup-surface); padding:10px; border-radius:14px;">
+                <p style="margin:0; font-size:9px; color:var(--popup-secondary); text-transform:uppercase;">Tendance</p>
                 <p style="margin:2px 0 0 0; font-size:15px; font-weight:700; color:${color};">${speedRatio >= 0.75 ? 'Fluide' : speedRatio >= 0.5 ? 'Modéré' : 'Congestion'}</p>
               </div>
             </div>
 
             <div style="padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; gap:8px;">
               <div style="width:6px; height:6px; border-radius:50%; background:#22C55E; box-shadow:0 0 8px #22C55E;"></div>
-              <p style="margin:0; font-size:10px; color:#86868B;">Source: Live synchronized data</p>
+              <p style="margin:0; font-size:10px; color:var(--popup-secondary);">Source: Live synchronized data</p>
             </div>
           </div>
         `)
@@ -1085,7 +1085,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
         const isDisrupted = disrupted.has(line.toUpperCase())
         const tc          = textOnBg(color)
         return `
-          <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:8px;background:var(--popup-surface);border:1px solid rgba(255,255,255,0.07)">
             <div style="width:20px;height:20px;border-radius:5px;background:${color};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:${tc};flex-shrink:0">${line}</div>
             <span style="font-size:10px;color:${isDisrupted ? '#EF4444' : '#22C55E'};font-weight:600">${isDisrupted ? '⚠ Perturbé' : '● Normal'}</span>
           </div>`
@@ -1096,9 +1096,9 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
         .setLngLat(e.lngLat)
         .setHTML(`
           <div style="font-family:Inter,sans-serif;padding:14px;min-width:180px">
-            <p style="margin:0 0 3px 0;font-size:9px;font-weight:700;color:#86868B;text-transform:uppercase;letter-spacing:0.12em">Station</p>
-            <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:700;color:#F5F5F7">${name}</h3>
-            ${lines.length ? `<div style="display:flex;flex-direction:column;gap:4px">${linesBadges}</div>` : `<p style="margin:0;font-size:11px;color:#86868B">Aucune ligne associée</p>`}
+            <p style="margin:0 0 3px 0;font-size:9px;font-weight:700;color:var(--popup-secondary);text-transform:uppercase;letter-spacing:0.12em">Station</p>
+            <h3 style="margin:0 0 10px 0;font-size:15px;font-weight:700;color:var(--popup-text)">${name}</h3>
+            ${lines.length ? `<div style="display:flex;flex-direction:column;gap:4px">${linesBadges}</div>` : `<p style="margin:0;font-size:11px;color:var(--popup-secondary)">Aucune ligne associée</p>`}
           </div>
         `)
         .addTo(map)
@@ -1118,20 +1118,20 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '240px', className: 'apple-popup' })
         .setLngLat(e.lngLat)
         .setHTML(`
-          <div class="glass" style="padding: 16px; border-radius: 20px; color: white; border: 1px solid rgba(34,197,94,0.2);">
+          <div class="glass" style="padding: 16px; border-radius: 20px; color:var(--popup-text); border: 1px solid rgba(34,197,94,0.2);">
             <p style="margin:0 0 4px 0; font-size:10px; font-weight:700; color:#22C55E; text-transform:uppercase; tracking:0.1em;">Périmètre Urbain</p>
             <h3 style="margin:0 0 12px 0; font-size:18px;">${city.name}</h3>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-              <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:12px;">
-                <p style="margin:0; font-size:9px; color:#86868B;">POPULATION</p>
+              <div style="background:var(--popup-surface); padding:8px; border-radius:12px;">
+                <p style="margin:0; font-size:9px; color:var(--popup-secondary);">POPULATION</p>
                 <p style="margin:0; font-size:13px; font-weight:600;">${city.population.toLocaleString()}</p>
               </div>
-              <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:12px;">
-                <p style="margin:0; font-size:9px; color:#86868B;">PAYS</p>
+              <div style="background:var(--popup-surface); padding:8px; border-radius:12px;">
+                <p style="margin:0; font-size:9px; color:var(--popup-secondary);">PAYS</p>
                 <p style="margin:0; font-size:13px; font-weight:600;">${city.country} ${city.flag}</p>
               </div>
             </div>
-            <p style="margin:12px 0 0 0; font-size:10px; color:#86868B; line-height:1.4;">
+            <p style="margin:12px 0 0 0; font-size:10px; color:var(--popup-secondary); line-height:1.4;">
               Analyse en temps réel du flux de mobilité sur l'ensemble de la zone métropolitaine.
             </p>
           </div>
@@ -1163,18 +1163,18 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
               <span style="font-size:13px;font-weight:700;color:${color};min-width:36px;">${pct}%</span>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-              <div style="background:rgba(255,255,255,0.04);padding:8px;border-radius:10px;">
-                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase;">Score Predictif</p>
+              <div style="background:var(--popup-surface);padding:8px;border-radius:10px;">
+                <p style="margin:0;font-size:9px;color:var(--popup-secondary);text-transform:uppercase;">Score Predictif</p>
                 <p style="margin:3px 0 0 0;font-size:13px;font-weight:600;color:${color};">${label}</p>
               </div>
-              <div style="background:rgba(255,255,255,0.04);padding:8px;border-radius:10px;">
-                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase;">Multiplier</p>
+              <div style="background:var(--popup-surface);padding:8px;border-radius:10px;">
+                <p style="margin:0;font-size:9px;color:var(--popup-secondary);text-transform:uppercase;">Multiplier</p>
                 <p style="margin:3px 0 0 0;font-size:13px;font-weight:600;">×1.24</p>
               </div>
             </div>
             <div style="padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; gap:6px;">
               <div style="width:6px; height:6px; border-radius:50%; background:#22C55E; box-shadow:0 0 6px #22C55E;"></div>
-              <p style="margin:0;font-size:9px;color:#86868B;font-weight:500;">Intelligence Engine: Validated Scoring</p>
+              <p style="margin:0;font-size:9px;color:var(--popup-secondary);font-weight:500;">Intelligence Engine: Validated Scoring</p>
             </div>
           </div>
         `)
@@ -1206,7 +1206,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
               <span style="font-size:10px; font-weight:700; color:${color}; text-transform:uppercase; tracking:0.1em;">${severity}</span>
             </div>
             <h3 style="margin:0 0 6px 0; font-size:15px; font-weight:700;">${p.title}</h3>
-            <p style="margin:0; font-size:11px; color:#86868B; line-height:1.4;">Signalé à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
+            <p style="margin:0; font-size:11px; color:var(--popup-secondary); line-height:1.4;">Signalé à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
             <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between;">
                <span style="font-size:9px; color:#424245;">ID: ${p.id.slice(0,8)}</span>
                <span style="font-size:10px; font-weight:600; color:#22C55E;">Détails &rarr;</span>
@@ -1251,7 +1251,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
               <span style="font-size:10px; font-weight:700; color:${color}; text-transform:uppercase; tracking:0.1em;">${severity}</span>
             </div>
             <h3 style="margin:0 0 6px 0; font-size:15px; font-weight:700;">${p.title}</h3>
-            <p style="margin:0; font-size:11px; color:#86868B; line-height:1.4;">Signalé à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
+            <p style="margin:0; font-size:11px; color:var(--popup-secondary); line-height:1.4;">Signalé à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
           </div>
         `)
         .addTo(map)
@@ -1273,7 +1273,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
               <span style="font-size:10px; font-weight:700; color:${color}; text-transform:uppercase; tracking:0.1em;">CRITICAL</span>
             </div>
             <h3 style="margin:0 0 6px 0; font-size:15px; font-weight:700;">${p.title}</h3>
-            <p style="margin:0; font-size:11px; color:#86868B; line-height:1.4;">Détection prioritaire visible en permanence.</p>
+            <p style="margin:0; font-size:11px; color:var(--popup-secondary); line-height:1.4;">Détection prioritaire visible en permanence.</p>
           </div>
         `)
         .addTo(map)
@@ -1312,7 +1312,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
           <div class="glass" style="padding:12px; border-radius:16px; min-width:140px; border:1px solid ${color}40;">
             <p style="margin:0; font-size:9px; font-weight:700; color:${color}; text-transform:uppercase;">Intensité ${mode}</p>
             <p style="margin:4px 0 0 0; font-size:22px; font-weight:700; color:white;">
-              ${Math.round(intensity * 100)}<span style="font-size:12px; font-weight:500; color:#86868B; margin-left:4px;">${unit}</span>
+              ${Math.round(intensity * 100)}<span style="font-size:12px; font-weight:500; color:var(--popup-secondary); margin-left:4px;">${unit}</span>
             </p>
             <p style="margin:8px 0 0 0; font-size:11px; color:#D1D5DB;">${contextLabel}</p>
             <p style="margin:4px 0 0 0; font-size:10px; color:#9CA3AF;">${count} aggregated cells contributing</p>
@@ -1347,11 +1347,11 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '280px', className: 'apple-popup' })
       .setLngLat(lngLat)
       .setHTML(`
-        <div class="glass" style="padding: 16px; border-radius: 20px; font-family: Inter, -apple-system, sans-serif; color: #F5F5F7; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
+        <div class="glass" style="padding: 16px; border-radius: 20px; font-family: Inter, -apple-system, sans-serif; color:var(--popup-text); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
           <div style="display: flex; align-items: center; justify-between; margin-bottom: 12px; gap: 12px;">
              <div style="flex: 1;">
-                <p style="font-size: 10px; font-weight: 700; color: #86868B; text-transform: uppercase; tracking: 0.1em; margin: 0 0 4px 0;">Vitesse Actuelle</p>
-                <p style="font-size: 24px; font-weight: 700; color: white; margin: 0;">${flow.currentSpeed} <span style="font-size: 14px; font-weight: 500; color: #86868B;">km/h</span></p>
+                <p style="font-size: 10px; font-weight: 700; color:var(--popup-secondary); text-transform: uppercase; tracking: 0.1em; margin: 0 0 4px 0;">Vitesse Actuelle</p>
+                <p style="font-size: 24px; font-weight: 700; color:var(--popup-text); margin: 0;">${flow.currentSpeed} <span style="font-size: 14px; font-weight: 500; color:var(--popup-secondary);">km/h</span></p>
              </div>
              <div style="width: 44px; h-44px; border-radius: 12px; background: ${color}15; border: 1px solid ${color}30; display: flex; items-center; justify-center; height: 44px;">
                 <div style="width: 10px; height: 10px; border-radius: 50%; background: ${color}; box-shadow: 0 0 12px ${color};"></div>
@@ -1359,12 +1359,12 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-            <div style="background: rgba(255,255,255,0.03); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.05);">
-              <p style="color: #86868B; font-size: 9px; font-weight: 600; text-transform: uppercase; margin: 0 0 4px 0;">Trajet</p>
-              <p style="font-size: 15px; font-weight: 700; color: white; margin: 0;">${Math.round(flow.currentTravelTime / 60)} <span style="font-size: 11px; font-color: #86868B;">min</span></p>
+            <div style="background:var(--popup-surface); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.05);">
+              <p style="color:var(--popup-secondary); font-size: 9px; font-weight: 600; text-transform: uppercase; margin: 0 0 4px 0;">Trajet</p>
+              <p style="font-size: 15px; font-weight: 700; color:var(--popup-text); margin: 0;">${Math.round(flow.currentTravelTime / 60)} <span style="font-size: 11px; font-color:var(--popup-secondary);">min</span></p>
             </div>
-            <div style="background: rgba(255,255,255,0.03); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.05);">
-              <p style="color: #86868B; font-size: 9px; font-weight: 600; text-transform: uppercase; margin: 0 0 4px 0;">Retard</p>
+            <div style="background:var(--popup-surface); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.05);">
+              <p style="color:var(--popup-secondary); font-size: 9px; font-weight: 600; text-transform: uppercase; margin: 0 0 4px 0;">Retard</p>
               <p style="font-size: 15px; font-weight: 700; color: ${delay > 0 ? '#FF9F0A' : '#22C55E'}; margin: 0;">
                 ${delay > 0 ? '+' : ''}${Math.round(delay / 60)} <span style="font-size: 11px;">min</span>
               </p>
