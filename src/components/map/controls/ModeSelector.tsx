@@ -1,47 +1,17 @@
 'use client'
-import { Radio, Brain, FlaskConical } from 'lucide-react'
-import { useMapStore } from '@/store/mapStore'
-import { cn } from '@/lib/utils/cn'
-import type { TrafficMode } from '@/types'
 
-const MODES: { id: TrafficMode; label: string; sublabel: string; icon: typeof Radio }[] = [
-  { id: 'live',     label: 'Temps réel', sublabel: 'En direct', icon: Radio        },
-  { id: 'predict',  label: 'Prévision',  sublabel: '+30 min',   icon: Brain        },
-  { id: 'simulate', label: 'Simulation', sublabel: 'Scénarios', icon: FlaskConical },
-]
+import { Radio } from 'lucide-react'
 
 export function ModeSelector() {
-  const mode    = useMapStore(s => s.mode)
-  const setMode = useMapStore(s => s.setMode)
-
   return (
-    <div className="glass-card flex rounded-xl p-1 gap-1">
-      {MODES.map(({ id, label, sublabel, icon: Icon }) => {
-        const active = mode === id
-        return (
-          <button
-            key={id}
-            onClick={() => setMode(id)}
-            className={cn(
-              'flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-[13px] font-semibold transition-all duration-200 group',
-              active
-                ? 'bg-brand text-black shadow-md'
-                : 'text-text-secondary hover:text-text-primary hover:bg-bg-subtle',
-            )}
-          >
-            <Icon
-              className={cn('w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110', active ? 'text-black' : 'text-text-muted group-hover:text-text-secondary')}
-              strokeWidth={2}
-            />
-            <div className="flex flex-col items-start leading-none">
-              <span className="tracking-tight">{label}</span>
-              <span className={cn('text-[9px] font-bold uppercase tracking-wider mt-0.5 opacity-70', active ? 'text-black' : 'text-text-muted')}>
-                {sublabel}
-              </span>
-            </div>
-          </button>
-        )
-      })}
+    <div className="glass-card flex rounded-2xl px-4 py-2 items-center gap-2 border border-brand/20 bg-[linear-gradient(135deg,rgba(43,213,118,0.14),rgba(10,14,20,0.82))]">
+      <div className="w-8 h-8 rounded-xl bg-brand/15 border border-brand/20 flex items-center justify-center">
+        <Radio className="w-4 h-4 text-brand" strokeWidth={2.2} />
+      </div>
+      <div className="flex flex-col items-start leading-none">
+        <span className="tracking-tight text-[13px] font-semibold text-text-primary">Temps réel</span>
+        <span className="text-[9px] font-bold uppercase tracking-wider mt-0.5 text-brand">Marquage trafic au sol</span>
+      </div>
     </div>
   )
 }

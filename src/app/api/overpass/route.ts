@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cache } from '@/lib/cache'
 
-const OVERPASS_BASE = 'https://overpass-api.de/api/interpreter'
+const OVERPASS_ENDPOINTS = [
+  'https://lz4.overpass-api.de/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+] as const
 const CACHE_TTL_SEC = 3_600 // 1 hour — shared across all instances via Redis
 
 export async function POST(req: NextRequest) {
@@ -24,14 +28,34 @@ export async function POST(req: NextRequest) {
     const data = await cache.getOrSetDeduped(
       cacheKey,
       async () => {
-        const res = await fetch(OVERPASS_BASE, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body:    `data=${encodeURIComponent(rawQuery)}`,
-          signal:  AbortSignal.timeout(40_000),
-        })
-        if (!res.ok) throw Object.assign(new Error('Overpass error'), { httpStatus: res.status })
-        return res.json()
+        let lastStatus: number | undefined
+        let lastError: Error | null = null
+
+        for (const endpoint of OVERPASS_ENDPOINTS) {
+          try {
+            const res = await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json,text/plain,*/*',
+                'User-Agent': 'CrossFlow Intelligence Engine/1.0',
+              },
+              body: `data=${encodeURIComponent(rawQuery)}`,
+              signal: AbortSignal.timeout(40_000),
+              cache: 'no-store',
+            })
+            if (!res.ok) {
+              lastStatus = res.status
+              lastError = new Error(`Overpass upstream ${endpoint} returned ${res.status}`)
+              continue
+            }
+            return res.json()
+          } catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error))
+          }
+        }
+
+        throw Object.assign(lastError ?? new Error('Overpass error'), { httpStatus: lastStatus })
       },
       CACHE_TTL_SEC,
     )

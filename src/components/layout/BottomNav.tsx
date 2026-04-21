@@ -1,20 +1,19 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Map, TrendingUp, Cpu, AlertTriangle, Rss, Loader2 } from 'lucide-react'
+import { Map, Cpu, AlertTriangle, Rss, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import React, { useTransition } from 'react'
 
 const TABS = [
-  { href: '/map',        icon: Map,             label: 'Carte' },
-  { href: '/prediction', icon: TrendingUp,      label: 'Prévisions' },
-  { href: '/simulation', icon: Cpu,             label: 'Simulation' },
-  { href: '/incidents',  icon: AlertTriangle,   label: 'Alertes' },
-  { href: '/social',     icon: Rss,             label: 'Social' },
+  { href: '/map',        icon: Map,           label: 'Carte' },
+  { href: '/simulation', icon: Cpu,           label: 'Simulation' },
+  { href: '/incidents',  icon: AlertTriangle, label: 'Alertes' },
+  { href: '/social',     icon: Rss,           label: 'Social' },
 ]
 
 export function BottomNav() {
   const pathname = usePathname()
-  const router   = useRouter()
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
   const handleNav = (href: string) => {
@@ -28,8 +27,8 @@ export function BottomNav() {
       aria-label="Navigation principale mobile"
       className="print-hidden md:hidden fixed bottom-0 left-0 right-0 z-[100] border-t border-white/5 bg-[#030303]/90 backdrop-blur-2xl"
       style={{
-        paddingBottom:           'env(safe-area-inset-bottom)',
-        height:                  'calc(64px + env(safe-area-inset-bottom))',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        height: 'calc(64px + env(safe-area-inset-bottom))',
       }}
     >
       <div className="flex h-16 items-center justify-around px-2" role="list">

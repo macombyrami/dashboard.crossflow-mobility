@@ -15,7 +15,13 @@ import { overpassLimiter } from '@/lib/utils/rateLimiter'
 // Route through our server proxy (caches 1h, avoids browser rate-limits + CORS)
 const OVERPASS_BASE = typeof window !== 'undefined'
   ? '/api/overpass'
-  : 'https://overpass-api.de/api/interpreter'
+  : 'https://lz4.overpass-api.de/api/interpreter'
+const OVERPASS_SERVER_ENDPOINTS = [
+  'https://lz4.overpass-api.de/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+] as const
+const PARIS_BBOX: [number, number, number, number] = [2.224, 48.815, 2.470, 48.902]
 
 export interface OSMRoad {
   id:       number
@@ -53,7 +59,6 @@ export async function fetchRoads(
   highwayTypes: string[] = ['motorway', 'trunk', 'primary', 'secondary'],
 ): Promise<OSMRoad[]> {
   const [west, south, east, north] = bbox
-  const highwayFilter = highwayTypes.map(t => `["highway"="${t}"]`).join('')
 
   const query = `
     [out:json][timeout:25];
@@ -67,19 +72,18 @@ export async function fetchRoads(
 
   try {
     await overpassLimiter.acquire()
-    const res = await fetch(OVERPASS_BASE, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    `data=${encodeURIComponent(query)}`,
-      signal:  AbortSignal.timeout(15000),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
+    const data = await fetchOverpassJson(query, 15000)
+    const roads = parseWays(data)
+    if (roads.length > 0) return roads
 
-    return parseWays(data)
+    const fallbackRoads = await loadBundledRoadFallback(bbox, highwayTypes)
+    if (fallbackRoads.length > 0) {
+      console.warn(`[Overpass API] Using bundled road fallback for bbox ${bbox.join(',')}`)
+    }
+    return fallbackRoads
   } catch (err) {
     console.error(`[Overpass API] Failed to fetch roads for ${bbox.join(',')}:`, err)
-    return []
+    return loadBundledRoadFallback(bbox, highwayTypes)
   }
 }
 
@@ -103,14 +107,7 @@ export async function fetchTrafficPOIs(
 
   try {
     await overpassLimiter.acquire()
-    const res = await fetch(OVERPASS_BASE, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    `data=${encodeURIComponent(query)}`,
-      signal:  AbortSignal.timeout(12000),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
+    const data = await fetchOverpassJson(query, 12000)
 
     return (data.elements ?? [])
       .filter((el: any) => el.type === 'node')
@@ -152,14 +149,7 @@ export async function fetchCycleNetwork(
 
   try {
     await overpassLimiter.acquire()
-    const res = await fetch(OVERPASS_BASE, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    `data=${encodeURIComponent(query)}`,
-      signal:  AbortSignal.timeout(12000),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
+    const data = await fetchOverpassJson(query, 12000)
 
     return parseWays(data).map(w => ({
       id:     w.id,
@@ -263,14 +253,7 @@ export async function fetchMetroStations(
   `
   try {
     await overpassLimiter.acquire()
-    const res = await fetch(OVERPASS_BASE, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    `data=${encodeURIComponent(query)}`,
-      signal:  AbortSignal.timeout(40000),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
+    const data = await fetchOverpassJson(query, 40000)
 
     // 1. Build nodeId → Set<lineRef> from route relations
     const nodeLines = new Map<number, Set<string>>()
@@ -297,6 +280,7 @@ export async function fetchMetroStations(
       if (!isStation) continue
       const name = (tags.name ?? tags['name:fr'] ?? '').trim()
       if (!name) continue
+      if (el.lon === undefined) continue
       const lines = [...(nodeLines.get(el.id) ?? new Set())].sort()
       const key   = name.toLowerCase()
       const exist = byName.get(key)
@@ -342,14 +326,7 @@ export async function fetchTransitRoutes(
 
   try {
     await overpassLimiter.acquire()
-    const res = await fetch(OVERPASS_BASE, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    `data=${encodeURIComponent(query)}`,
-      signal:  AbortSignal.timeout(15000),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
+    const data = await fetchOverpassJson(query, 15000)
 
     return (data.elements ?? [])
       .filter((el: any) => el.type === 'relation')
@@ -400,14 +377,7 @@ export async function fetchRouteGeometries(
 
   try {
     await overpassLimiter.acquire()
-    const res = await fetch(OVERPASS_BASE, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    `data=${encodeURIComponent(query)}`,
-      signal:  AbortSignal.timeout(40000),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
+    const data = await fetchOverpassJson(query, 40000)
 
     return (data.elements ?? [])
       .filter((el: any) => el.type === 'relation')
@@ -491,12 +461,109 @@ function transitDefaultColor(route?: string): string {
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 interface OverpassElement {
-  type:    'way' | 'node'
+  type:    'way' | 'node' | 'relation'
   id:      number
   nodes?:  number[]
   lat?:    number
   lon?:    number
   tags?:   Record<string, string>
+  members?: Array<{
+    type: 'node' | 'way' | 'relation'
+    ref: number
+    geometry?: Array<{ lat: number, lon: number }>
+  }>
+}
+
+async function fetchOverpassJson(query: string, timeoutMs: number): Promise<{ elements: OverpassElement[] }> {
+  if (typeof window !== 'undefined') {
+    const res = await fetch(OVERPASS_BASE, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json,text/plain,*/*',
+      },
+      body: `data=${encodeURIComponent(query)}`,
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!res.ok) throw new Error(`Overpass proxy returned ${res.status}`)
+    return res.json()
+  }
+
+  let lastError: Error | null = null
+  for (const endpoint of OVERPASS_SERVER_ENDPOINTS) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json,text/plain,*/*',
+          'User-Agent': 'CrossFlow Intelligence Engine/1.0',
+        },
+        body: `data=${encodeURIComponent(query)}`,
+        signal: AbortSignal.timeout(timeoutMs),
+        cache: 'no-store',
+      })
+      if (!res.ok) {
+        lastError = new Error(`Overpass upstream ${endpoint} returned ${res.status}`)
+        continue
+      }
+      return res.json()
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+    }
+  }
+
+  throw lastError ?? new Error('Overpass upstream unavailable')
+}
+
+type BundledRoadEntry = {
+  id: string | number
+  name?: string
+  type?: string
+  coords?: [number, number][]
+}
+
+async function loadBundledRoadFallback(
+  bbox: [number, number, number, number],
+  highwayTypes: string[],
+): Promise<OSMRoad[]> {
+  if (!intersectsBBox(bbox, PARIS_BBOX)) return []
+
+  const module = await import('@/lib/data/paris_network.json')
+  const roads = (module.default as unknown as BundledRoadEntry[])
+    .filter((road): road is BundledRoadEntry & { coords: [number, number][] } =>
+      Array.isArray(road.coords) &&
+      road.coords.length >= 2 &&
+      road.coords.every(
+        (coord): coord is [number, number] =>
+          Array.isArray(coord) &&
+          coord.length >= 2 &&
+          Number.isFinite(coord[0]) &&
+          Number.isFinite(coord[1]),
+      ),
+    )
+    .filter(road => !road.type || highwayTypes.includes(road.type))
+    .filter(road => road.coords.some(coord => pointInBBox(coord, bbox)))
+    .map((road): OSMRoad => ({
+      id: Number(road.id),
+      name: road.name ?? '',
+      highway: road.type ?? 'secondary',
+      maxspeed: defaultMaxspeedForHighway(road.type),
+      oneway: false,
+      lanes: defaultLanesForHighway(road.type),
+      coords: road.coords,
+      length: estimateLength(road.coords),
+    }))
+
+  return roads
+}
+
+function intersectsBBox(a: [number, number, number, number], b: [number, number, number, number]): boolean {
+  return !(a[2] < b[0] || a[0] > b[2] || a[3] < b[1] || a[1] > b[3])
+}
+
+function pointInBBox(coord: [number, number], bbox: [number, number, number, number]): boolean {
+  return coord[0] >= bbox[0] && coord[0] <= bbox[2] && coord[1] >= bbox[1] && coord[1] <= bbox[3]
 }
 
 function parseWays(data: { elements: OverpassElement[] }): OSMRoad[] {
@@ -504,8 +571,10 @@ function parseWays(data: { elements: OverpassElement[] }): OSMRoad[] {
   const roads:   OSMRoad[] = []
 
   for (const el of data.elements ?? []) {
-    if (el.type === 'node' && el.lat && el.lon) {
-      nodeMap.set(el.id, [el.lon, el.lat])
+    if (el.type === 'node' && Number.isFinite(el.lat) && Number.isFinite(el.lon)) {
+      const lon = Number(el.lon)
+      const lat = Number(el.lat)
+      nodeMap.set(el.id, [lon, lat])
     }
   }
 
@@ -541,6 +610,24 @@ function parseMaxspeed(val?: string): number {
   if (val === 'FR:motorway')return 130
   const n = parseInt(val)
   return isNaN(n) ? 50 : n
+}
+
+function defaultMaxspeedForHighway(highway?: string): number {
+  if (!highway) return 50
+  if (highway.includes('motorway')) return 90
+  if (highway.includes('trunk')) return 70
+  if (highway.includes('primary')) return 50
+  if (highway.includes('secondary')) return 40
+  if (highway.includes('tertiary')) return 35
+  return 30
+}
+
+function defaultLanesForHighway(highway?: string): number {
+  if (!highway) return 1
+  if (highway.includes('motorway')) return 3
+  if (highway.includes('trunk')) return 2
+  if (highway.includes('primary')) return 2
+  return 1
 }
 
 function estimateLength(coords: [number, number][]): number {
