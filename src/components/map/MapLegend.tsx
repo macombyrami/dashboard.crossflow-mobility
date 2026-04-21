@@ -28,10 +28,10 @@ export function MapLegend() {
 
   return (
     <div className="absolute bottom-5 left-4 z-10 pointer-events-none">
-      <div className="min-w-[190px] rounded-2xl border border-white/10 bg-[linear-gradient(160deg,rgba(10,12,18,0.92),rgba(16,20,28,0.82))] px-3.5 py-3 backdrop-blur-md shadow-[0_20px_60px_rgba(0,0,0,0.28)] space-y-3">
+      <div className="min-w-[160px] rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.10)] space-y-2.5 dark:bg-[rgba(12,15,22,0.82)] dark:border-white/10">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-text-muted">Map legend</span>
-          <span className="text-[10px] font-semibold text-text-muted">CrossFlow live</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Trafic</span>
+          <span className="text-[9px] font-medium text-text-muted/60">Live</span>
         </div>
 
         {isTraffic && (

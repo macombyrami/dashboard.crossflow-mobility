@@ -143,13 +143,27 @@ const METRO_HUBS = [
 // Lightweight vector-first base style. The actual theme is applied dynamically.
 const BASE_MAP_STYLE: maplibregl.StyleSpecification = {
   version: 8,
-  sources: {},
+  sources: {
+    'carto-light': {
+      type: 'raster',
+      tiles: ['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors © CARTO',
+      maxzoom: 19,
+    },
+  },
   layers: [
     {
-      id:     'background-pure',
-      type:   'background',
-      paint:  { 'background-color': '#F4F6F8' }
-    }
+      id:    'background-pure',
+      type:  'background',
+      paint: { 'background-color': '#F8F9FA' }
+    },
+    {
+      id:     'carto-base',
+      type:   'raster',
+      source: 'carto-light',
+      paint:  { 'raster-opacity': 1 },
+    },
   ],
   glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
 }
@@ -186,12 +200,15 @@ function applyMapTheme(map: maplibregl.Map | null, theme: 'light' | 'dark') {
   safeSetPaintProperty(map, BASE_LANDUSE_LAYER, 'fill-color', isLight ? '#EEF3E6' : '#0D1C16')
   safeSetPaintProperty(map, BASE_BUILDINGS_LAYER, 'fill-color', isLight ? '#E6EAEE' : '#111C26')
   safeSetPaintProperty(map, BASE_BUILDINGS_LAYER, 'fill-opacity', isLight ? 0.72 : 0.42)
-  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-color', isLight ? '#FFFFFF' : '#304255')
-  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-color', isLight ? '#E4E8EC' : '#1A2834')
+  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-color', isLight ? '#C4CBD8' : '#304255')
+  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-opacity', isLight ? 0.5 : 0.98)
+  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-color', isLight ? '#D0D7E0' : '#1A2834')
+  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-opacity', isLight ? 0.4 : 0.96)
   safeSetPaintProperty(map, ROAD_LABELS_LAYER, 'text-color', isLight ? '#4B5563' : '#C7D2DA')
   safeSetPaintProperty(map, ROAD_LABELS_LAYER, 'text-halo-color', isLight ? 'rgba(255,255,255,0.95)' : 'rgba(7,16,24,0.94)')
 
-  safeSetPaintProperty(map, TRAFFIC_SOURCE + '-halo', 'line-color', isLight ? 'rgba(255,255,255,0.92)' : 'rgba(4,6,10,0.96)')
+  safeSetPaintProperty(map, TRAFFIC_SOURCE + '-halo', 'line-color', isLight ? 'rgba(255,255,255,0.88)' : 'rgba(4,6,10,0.96)')
+  safeSetPaintProperty(map, TRAFFIC_SOURCE + '-halo', 'line-opacity', isLight ? 0.55 : 0.72)
   safeSetPaintProperty(map, TRAFFIC_SELECTION_SOURCE + '-label', 'text-halo-color', isLight ? 'rgba(255,255,255,0.98)' : 'rgba(8,9,11,0.98)')
   safeSetPaintProperty(map, TRAFFIC_HOVER_SOURCE + '-line', 'line-color', isLight ? '#0F172A' : '#F8FAFC')
   safeSetPaintProperty(map, TRAFFIC_HOVER_SOURCE + '-glow', 'line-color', isLight ? '#38BDF8' : '#FFFFFF')
@@ -3110,7 +3127,7 @@ function initStaticSources(map: maplibregl.Map) {
         false,
       ] as any,
       paint: {
-        'line-color': '#FFFFFF',
+        'line-color': '#C4CBD8',
         'line-width': [
           'interpolate', ['linear'], ['zoom'],
           8, 0.9,
@@ -3118,7 +3135,7 @@ function initStaticSources(map: maplibregl.Map) {
           14, 4.2,
           17, 10,
         ],
-        'line-opacity': 0.98,
+        'line-opacity': 0.5,  // semi-transparent — CartoDB roads show through
       },
       layout: { 'line-cap': 'round', 'line-join': 'round' }
     })
@@ -3137,14 +3154,14 @@ function initStaticSources(map: maplibregl.Map) {
         false,
       ] as any,
       paint: {
-        'line-color': '#E4E8EC',
+        'line-color': '#D0D7E0',
         'line-width': [
           'interpolate', ['linear'], ['zoom'],
           13, 0.7,
           15, 1.5,
           17, 3.6,
         ],
-        'line-opacity': 0.96,
+        'line-opacity': 0.4,
       },
       layout: { 'line-cap': 'round', 'line-join': 'round' }
     })
@@ -3226,13 +3243,13 @@ function initStaticSources(map: maplibregl.Map) {
       source: TRAFFIC_SOURCE,
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
-        'line-color': 'rgba(255,255,255,0.92)',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 
+        'line-color': 'rgba(255,255,255,0.88)',
+        'line-width': ['interpolate', ['linear'], ['zoom'],
           8, ['*', 1.3, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.2, 'trunk', 3.3, 'primary', 2.7, 'secondary', 2, 1.45]],
           13, ['*', 1.45, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.2, 'trunk', 3.3, 'primary', 2.7, 'secondary', 2, 1.45]],
           17, ['*', 1.8, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.2, 'trunk', 3.3, 'primary', 2.7, 'secondary', 2, 1.45]]
         ],
-        'line-opacity': 0.72,
+        'line-opacity': 0.55,
       }
     })
   }
@@ -4196,14 +4213,14 @@ function initBoundaryLayers(map: maplibregl.Map) {
     },
   })
 
-  // 3. Fill — Elegant glassmorphism area
+  // 3. Fill — removed (map must remain fully visible, outline handles boundary)
   map.addLayer({
     id:     BOUNDARY_SOURCE + '-fill',
     type:   'fill',
     source: BOUNDARY_SOURCE,
     paint:  {
       'fill-color':   '#22C55E',
-      'fill-opacity': 0.03,
+      'fill-opacity': 0,
     },
   })
 
@@ -4242,17 +4259,17 @@ function initBoundaryLayers(map: maplibregl.Map) {
     maxzoom: 13,
   })
 
-  // 6. WORLD MASK — Masks out other cities
+  // 6. WORLD MASK — kept as source only (no visual mask, full map stays visible)
   map.addSource(WORLD_MASK_SOURCE, { type: 'geojson', data: emptyFC })
   map.addLayer({
     id:     WORLD_MASK_SOURCE + '-fill',
     type:   'fill',
     source: WORLD_MASK_SOURCE,
     paint:  {
-      'fill-color':   '#08090B',
-      'fill-opacity': 0.95,
+      'fill-color':   '#F0EDE8',
+      'fill-opacity': 0,  // invisible — city boundary line handles the visual
     },
-  }, BOUNDARY_SOURCE + '-glow-outer') // Insert below boundary glows but above background
+  }, BOUNDARY_SOURCE + '-glow-outer')
 }
 
 function addCongestionHeatmapStack(
