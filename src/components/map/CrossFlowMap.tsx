@@ -3286,19 +3286,21 @@ function initStaticSources(map: maplibregl.Map) {
           0.85, '#57E89C',   // good — light green
           1.00, '#2BD576',   // fluid — green
         ],
-        // Road-type-aware width: motorways thick, local streets thin
+        // Road-type-aware width: every road visible (Waze-like)
         'line-width': ['interpolate', ['linear'], ['zoom'],
-          8,  ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 3.2, 'trunk', 2.4, 'primary', 1.8, 'secondary', 1.2, 0.7],
-          12, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 5.0, 'trunk', 3.8, 'primary', 3.0, 'secondary', 2.2, 1.4],
-          15, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 8.0, 'trunk', 6.0, 'primary', 4.8, 'secondary', 3.5, 2.4],
-          18, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 14,  'trunk', 10,  'primary', 8,   'secondary', 6,   4],
+          7,  ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 5.0, 'trunk', 4.0, 'primary', 3.0, 'secondary', 2.2, 1.4],
+          8,  ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 6.0, 'trunk', 4.8, 'primary', 3.8, 'secondary', 2.8, 1.8],
+          11, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 8.0, 'trunk', 6.0, 'primary', 4.8, 'secondary', 3.6, 2.4],
+          14, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 12, 'trunk', 9,  'primary', 7,   'secondary', 5.2, 3.4],
+          17, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 16, 'trunk', 12, 'primary', 10,  'secondary', 7.5, 5],
         ],
-        // High opacity from the start — Waze always shows traffic clearly
+        // Ultra-high opacity for day mode readability (Waze visibility on light background)
         'line-opacity': [
           'interpolate', ['linear'], ['zoom'],
-          8,  0.72,
-          11, 0.88,
-          14, 0.96,
+          7,  0.85,
+          9,  0.92,
+          12, 0.96,
+          14, 0.98,
         ],
         'line-offset': ['case', ['==', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway_link'], 0.2, 0]
       },
