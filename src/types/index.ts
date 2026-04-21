@@ -243,3 +243,12 @@ export interface MapViewState {
   pitch:     number
   bearing:   number
 }
+
+export interface SearchFocusTarget {
+  id: string
+  label: string
+  latitude: number
+  longitude: number
+  bbox?: [number, number, number, number] | null
+  kind?: string
+}

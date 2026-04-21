@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import { ModeSelector } from '@/components/map/controls/ModeSelector'
 import { LayerControls } from '@/components/map/controls/LayerControls'
+import { MapSearchControl } from '@/components/map/controls/MapSearchControl'
 import { TrafficFilterBar } from '@/components/map/controls/TrafficFilterBar'
 import { MapLegend } from '@/components/map/MapLegend'
 import { EdgeDetailPanel } from '@/components/map/panels/EdgeDetailPanel'
@@ -40,8 +41,12 @@ export default function MapPage() {
       <div className="flex-1 relative overflow-hidden">
         <CrossFlowMap />
 
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 w-[min(920px,calc(100vw-32px))] pointer-events-none">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 w-[min(980px,calc(100vw-24px))] pointer-events-none">
           <div className="flex flex-col items-center gap-2.5">
+            <div className="pointer-events-auto w-full flex justify-center">
+              <MapSearchControl />
+            </div>
+
             <div className="pointer-events-none w-max max-w-full">
               <GlobalTrafficBanner />
             </div>

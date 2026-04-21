@@ -4,13 +4,15 @@ import { Radio } from 'lucide-react'
 
 export function ModeSelector() {
   return (
-    <div className="glass-card flex rounded-2xl px-4 py-2 items-center gap-2 border border-brand/20 bg-[linear-gradient(135deg,rgba(43,213,118,0.14),rgba(10,14,20,0.82))]">
-      <div className="w-8 h-8 rounded-xl bg-brand/15 border border-brand/20 flex items-center justify-center">
-        <Radio className="w-4 h-4 text-brand" strokeWidth={2.2} />
+    <div className="flex rounded-2xl border border-black/8 bg-white/92 px-4 py-2 shadow-lg backdrop-blur-xl items-center gap-3">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50">
+        <Radio className="h-4 w-4 text-emerald-600" strokeWidth={2.2} />
       </div>
       <div className="flex flex-col items-start leading-none">
-        <span className="tracking-tight text-[13px] font-semibold text-text-primary">Temps réel</span>
-        <span className="text-[9px] font-bold uppercase tracking-wider mt-0.5 text-brand">Marquage trafic au sol</span>
+        <span className="text-[13px] font-semibold tracking-tight text-slate-900">Navigation en temps réel</span>
+        <span className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600">
+          Réseau routier + trafic superposé
+        </span>
       </div>
     </div>
   )

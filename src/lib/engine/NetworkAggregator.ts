@@ -10,7 +10,7 @@ export class NetworkAggregator {
   private static cache = new Map<string, GeoJSON.FeatureCollection>()
   private static osmRoadsCache = new Map<string, OSMRoad[]>()
   private static readonly MAX_CACHE_CITIES = 3
-  private static readonly MAX_ROADS_PER_CITY = 900
+  private static readonly MAX_ROADS_PER_CITY = 1800
   private static readonly MAX_COORDS_PER_ROAD = 28
 
   /**
@@ -21,7 +21,8 @@ export class NetworkAggregator {
 
     // Keep the canonical graph lean to avoid OOM on large cities.
     const roads = (await fetchRoads(city.bbox, [
-      'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'motorway_link', 'trunk_link'
+      'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
+      'motorway_link', 'trunk_link', 'residential', 'unclassified', 'service', 'living_street'
     ])).slice(0, this.MAX_ROADS_PER_CITY)
     
     const fc: GeoJSON.FeatureCollection = {

@@ -7,6 +7,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
+import { useThemeStore } from '@/store/themeStore'
 import { useSimulationStore } from '@/store/simulationStore'
 import { SIMULATION_INTERACTION_MODE } from '@/store/simulationStore'
 import { simulationService } from '@/lib/services/SimulationService'
@@ -97,6 +98,13 @@ const PREDICTIVE_EVENTS_SOURCE   = 'cf-pred-events'
 const SIM_LOCATION_SOURCE        = 'cf-sim-location'
 const SOCIAL_SOURCE              = 'cf-social'
 const WORLD_MASK_SOURCE           = 'cf-world-mask'
+const BASE_NETWORK_SOURCE         = 'base-network'
+const BASE_WATER_LAYER            = 'base-water'
+const BASE_LANDUSE_LAYER          = 'base-landuse'
+const BASE_BUILDINGS_LAYER        = 'base-buildings'
+const BASE_ROADS_MAJOR_LAYER      = 'base-roads-major'
+const BASE_ROADS_LOCAL_LAYER      = 'base-roads-local'
+const ROAD_LABELS_LAYER           = 'road-labels'
 
 
 // ─── Popup helpers ────────────────────────────────────────────────────────
@@ -132,38 +140,15 @@ const METRO_HUBS = [
 ]
 
 
-// Reliable Raster Dark Style (CartoDB Dark Matter)
-const OSM_DARK_STYLE: maplibregl.StyleSpecification = {
+// Lightweight vector-first base style. The actual theme is applied dynamically.
+const BASE_MAP_STYLE: maplibregl.StyleSpecification = {
   version: 8,
-  sources: {
-    'osm-raster': {
-      type: 'raster',
-      tiles: [
-        'https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
-        'https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
-        'https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
-        'https://d.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png'
-      ],
-      tileSize: 256,
-      attribution: '© OpenStreetMap contributors © CARTO'
-    }
-  },
+  sources: {},
   layers: [
     {
       id:     'background-pure',
       type:   'background',
-      paint:  { 'background-color': '#08090B' }
-    },
-    {
-      id:     'osm-raster-layer',
-      type:   'raster',
-      source: 'osm-raster',
-      paint:  { 
-        'raster-opacity': 0.92,
-        'raster-brightness-max': 0.58,
-        'raster-saturation': -0.18,
-        'raster-contrast': 0.12
-      }
+      paint:  { 'background-color': '#F4F6F8' }
     }
   ],
   glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
@@ -186,6 +171,32 @@ const safeSetFilter = (map: maplibregl.Map | null, id: string, filter: any) => {
 }
 const safeSetFeatureState = (map: maplibregl.Map | null, feat: { source: string, id: string | number }, state: any) => {
   if (map && map.getSource(feat.source)) map.setFeatureState(feat, state)
+}
+
+function roadClassExpression() {
+  return ['coalesce', ['get', 'class'], ['get', 'type'], ['get', 'highway']]
+}
+
+function applyMapTheme(map: maplibregl.Map | null, theme: 'light' | 'dark') {
+  if (!map) return
+  const isLight = theme === 'light'
+
+  safeSetPaintProperty(map, 'background-pure', 'background-color', isLight ? '#F4F6F8' : '#071018')
+  safeSetPaintProperty(map, BASE_WATER_LAYER, 'fill-color', isLight ? '#D9EBFF' : '#10273B')
+  safeSetPaintProperty(map, BASE_LANDUSE_LAYER, 'fill-color', isLight ? '#EEF3E6' : '#0D1C16')
+  safeSetPaintProperty(map, BASE_BUILDINGS_LAYER, 'fill-color', isLight ? '#E6EAEE' : '#111C26')
+  safeSetPaintProperty(map, BASE_BUILDINGS_LAYER, 'fill-opacity', isLight ? 0.72 : 0.42)
+  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-color', isLight ? '#FFFFFF' : '#304255')
+  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-color', isLight ? '#E4E8EC' : '#1A2834')
+  safeSetPaintProperty(map, ROAD_LABELS_LAYER, 'text-color', isLight ? '#4B5563' : '#C7D2DA')
+  safeSetPaintProperty(map, ROAD_LABELS_LAYER, 'text-halo-color', isLight ? 'rgba(255,255,255,0.95)' : 'rgba(7,16,24,0.94)')
+
+  safeSetPaintProperty(map, TRAFFIC_SOURCE + '-halo', 'line-color', isLight ? 'rgba(255,255,255,0.92)' : 'rgba(4,6,10,0.96)')
+  safeSetPaintProperty(map, TRAFFIC_SELECTION_SOURCE + '-label', 'text-halo-color', isLight ? 'rgba(255,255,255,0.98)' : 'rgba(8,9,11,0.98)')
+  safeSetPaintProperty(map, TRAFFIC_HOVER_SOURCE + '-line', 'line-color', isLight ? '#0F172A' : '#F8FAFC')
+  safeSetPaintProperty(map, TRAFFIC_HOVER_SOURCE + '-glow', 'line-color', isLight ? '#38BDF8' : '#FFFFFF')
+  safeSetPaintProperty(map, TRAFFIC_SOURCE + '-corridor-labels', 'text-color', isLight ? 'rgba(17,24,39,0.88)' : 'rgba(255,245,247,0.92)')
+  safeSetPaintProperty(map, TRAFFIC_SOURCE + '-corridor-labels', 'text-halo-color', isLight ? 'rgba(255,255,255,0.96)' : 'rgba(8,9,11,0.96)')
 }
 
 function clampUnit(value: number): number {
@@ -286,6 +297,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   const mapRef          = useRef<maplibregl.Map | null>(null)
   const containerRef    = useRef<HTMLDivElement>(null)
   const popupRef        = useRef<maplibregl.Popup | null>(null)
+  const searchMarkerRef = useRef<maplibregl.Marker | null>(null)
   const osmRoadsRef     = useRef<Map<string, OSMRoad[]>>(new Map())
   const osmPoisRef      = useRef<Map<string, OSMPOIPoint[]>>(new Map())
   const osmRoutesRef    = useRef<Map<string, OSMRouteGeometry[]>>(new Map())
@@ -326,6 +338,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
   const city            = useMapStore(s => s.city)
   const cityBoundary    = useMapStore(s => s.cityBoundary)
+  const searchFocus     = useMapStore(s => s.searchFocus)
   const setCityBoundary = useMapStore(s => s.setCityBoundary)
   const activeLayers    = useMapStore(s => s.activeLayers)
   const activeQuickFilters = useMapStore(s => s.activeQuickFilters)
@@ -342,6 +355,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   // Vehicle selection / tracking
   const selectedVehicleId  = useMapStore(s => s.selectedVehicleId)
   const isMobile = useMediaQuery('(max-width: 768px)')
+  const theme = useThemeStore(s => s.theme)
   const setSelectedVehicle = useMapStore(s => s.setSelectedVehicle)
   const isTrackingVehicle  = useMapStore(s => s.isTrackingVehicle)
   const setTrackingVehicle = useMapStore(s => s.setTrackingVehicle)
@@ -777,6 +791,11 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     mapRef.current.getCanvas().style.cursor = (zoneActive || locationPickerActive) ? 'crosshair' : ''
   }, [zoneActive, locationPickerActive])
 
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return
+    applyMapTheme(mapRef.current, theme)
+  }, [mapLoaded, theme])
+
   // ─── Init map ────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -784,13 +803,12 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style:     OSM_DARK_STYLE,
+      style:     BASE_MAP_STYLE,
       center:    [city.center.lng, city.center.lat],
       zoom:      city.zoom,
-      pitch:     20,
+      pitch:     0,
       bearing:   0,
-      minZoom:   10,
-      maxBounds: [[2.10, 48.70], [2.62, 49.02]],
+      minZoom:   8,
     })
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right')
@@ -799,6 +817,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     map.on('load', () => {
       console.log('[CrossFlow] Map loaded successfully')
       initStaticSources(map)
+      applyMapTheme(map, theme)
       initBoundaryLayers(map)
       initDistrictsLayers(map)
       initHeatmapPassagesLayers(map)
@@ -1310,6 +1329,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     mapRef.current = map
     return () => {
       popupRef.current?.remove()
+      searchMarkerRef.current?.remove()
       map.remove()
       mapRef.current = null
       setMapLoaded(false)
@@ -1383,11 +1403,11 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     // Load OSM roads for real geometry
     if (!osmRoadsRef.current.has(cityId)) {
-      fetchRoads(city.bbox, ['motorway', 'trunk', 'primary', 'secondary', 'tertiary'])
+      fetchRoads(city.bbox, ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'residential', 'unclassified', 'service'])
         .then(roads => {
           if (cityRef.current.id !== cityId) return
           if (roads.length > 0) {
-            osmRoadsRef.current.set(cityId, roads.slice(0, 600))
+            osmRoadsRef.current.set(cityId, roads.slice(0, 1200))
             refreshDataRef.current()
           }
         })
@@ -1761,6 +1781,46 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       essential: true,
     })
   }, [city.id, mapLoaded]) // eslint-disable-line
+
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded || !searchFocus) return
+
+    const map = mapRef.current
+    popupRef.current?.remove()
+
+    if (!searchMarkerRef.current) {
+      const el = document.createElement('div')
+      el.className = 'cf-search-marker'
+      el.innerHTML = '<div style="width:18px;height:18px;border-radius:999px;background:#0F172A;border:4px solid #22C55E;box-shadow:0 8px 24px rgba(34,197,94,0.28)"></div>'
+      searchMarkerRef.current = new maplibregl.Marker({ element: el, anchor: 'center' })
+    }
+
+    searchMarkerRef.current
+      .setLngLat([searchFocus.longitude, searchFocus.latitude])
+      .addTo(map)
+
+    if (searchFocus.bbox) {
+      map.fitBounds(
+        [
+          [searchFocus.bbox[0], searchFocus.bbox[1]],
+          [searchFocus.bbox[2], searchFocus.bbox[3]],
+        ],
+        {
+          padding: 72,
+          duration: 1400,
+          maxZoom: 16,
+          essential: true,
+        },
+      )
+    } else {
+      map.easeTo({
+        center: [searchFocus.longitude, searchFocus.latitude],
+        zoom: Math.max(map.getZoom(), 15),
+        duration: 1200,
+        essential: true,
+      })
+    }
+  }, [mapLoaded, searchFocus])
  
   // ─── Predictive Simulation Results — Visual Sync ─────────────────────
   const simulationResult = useSimulationStore(s => s.currentResult)
@@ -2986,13 +3046,10 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 // ─── Sources init ─────────────────────────────────────────────────────────────
 
 function initStaticSources(map: maplibregl.Map) {
-  // ─── Road Network Source (OSM Vector) ──────────────────────────────────
-  // This provides the "skeleton" of the map
-  if (!map.getSource('base-network')) {
-    map.addSource('base-network', {
+  if (!map.getSource(BASE_NETWORK_SOURCE)) {
+    map.addSource(BASE_NETWORK_SOURCE, {
       type: 'vector',
       tiles: [
-        // Using provided Stadia Maps API Key for authorized access
         `https://tiles.stadiamaps.com/data/openmaptiles/{z}/{x}/{y}.pbf?api_key=${process.env.NEXT_PUBLIC_STADIA_API_KEY}`
       ],
       maxzoom: 14,
@@ -3000,33 +3057,104 @@ function initStaticSources(map: maplibregl.Map) {
     })
   }
 
-  // ─── Base Roads Layer (The complete road network) ──────────────────────
-  if (!map.getLayer('base-roads')) {
+  if (!map.getLayer(BASE_WATER_LAYER)) {
     map.addLayer({
-      id: 'base-roads',
-      type: 'line',
-      source: 'base-network',
-      'source-layer': 'road',
+      id: BASE_WATER_LAYER,
+      type: 'fill',
+      source: BASE_NETWORK_SOURCE,
+      'source-layer': 'water',
       paint: {
-        'line-color': '#262A33',
+        'fill-color': '#D9EBFF',
+        'fill-opacity': 0.92,
+      },
+    })
+  }
+
+  if (!map.getLayer(BASE_LANDUSE_LAYER)) {
+    map.addLayer({
+      id: BASE_LANDUSE_LAYER,
+      type: 'fill',
+      source: BASE_NETWORK_SOURCE,
+      'source-layer': 'landuse',
+      maxzoom: 16,
+      paint: {
+        'fill-color': '#EEF3E6',
+        'fill-opacity': 0.62,
+      },
+    })
+  }
+
+  if (!map.getLayer(BASE_BUILDINGS_LAYER)) {
+    map.addLayer({
+      id: BASE_BUILDINGS_LAYER,
+      type: 'fill',
+      source: BASE_NETWORK_SOURCE,
+      'source-layer': 'building',
+      minzoom: 13,
+      paint: {
+        'fill-color': '#E6EAEE',
+        'fill-opacity': 0.72,
+      },
+    })
+  }
+
+  if (!map.getLayer(BASE_ROADS_MAJOR_LAYER)) {
+    map.addLayer({
+      id: BASE_ROADS_MAJOR_LAYER,
+      type: 'line',
+      source: BASE_NETWORK_SOURCE,
+      'source-layer': 'road',
+      filter: ['match', roadClassExpression(),
+        ['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary'],
+        true,
+        false,
+      ] as any,
+      paint: {
+        'line-color': '#FFFFFF',
         'line-width': [
           'interpolate', ['linear'], ['zoom'],
-          10, 0.5,
-          13, 1.2,
-          16, 2.5
+          8, 0.9,
+          11, 1.8,
+          14, 4.2,
+          17, 10,
         ],
-        'line-opacity': 0.92
+        'line-opacity': 0.98,
       },
       layout: { 'line-cap': 'round', 'line-join': 'round' }
     })
   }
 
-  // ─── Labels ───────────────────────────────────────────────────────────
-  if (!map.getLayer('road-labels')) {
+  if (!map.getLayer(BASE_ROADS_LOCAL_LAYER)) {
     map.addLayer({
-      id: 'road-labels',
+      id: BASE_ROADS_LOCAL_LAYER,
+      type: 'line',
+      source: BASE_NETWORK_SOURCE,
+      'source-layer': 'road',
+      minzoom: 13,
+      filter: ['match', roadClassExpression(),
+        ['residential', 'service', 'unclassified', 'minor', 'living_street', 'road'],
+        true,
+        false,
+      ] as any,
+      paint: {
+        'line-color': '#E4E8EC',
+        'line-width': [
+          'interpolate', ['linear'], ['zoom'],
+          13, 0.7,
+          15, 1.5,
+          17, 3.6,
+        ],
+        'line-opacity': 0.96,
+      },
+      layout: { 'line-cap': 'round', 'line-join': 'round' }
+    })
+  }
+
+  if (!map.getLayer(ROAD_LABELS_LAYER)) {
+    map.addLayer({
+      id: ROAD_LABELS_LAYER,
       type: 'symbol',
-      source: 'base-network',
+      source: BASE_NETWORK_SOURCE,
       'source-layer': 'road',
       minzoom: 14,
       layout: {
@@ -3037,9 +3165,9 @@ function initStaticSources(map: maplibregl.Map) {
         'text-rotation-alignment': 'map'
       },
       paint: {
-        'text-color': '#424245',
-        'text-halo-color': '#08090B',
-        'text-halo-width': 1
+        'text-color': '#4B5563',
+        'text-halo-color': 'rgba(255,255,255,0.95)',
+        'text-halo-width': 1.4
       }
     })
   }
@@ -3098,7 +3226,7 @@ function initStaticSources(map: maplibregl.Map) {
       source: TRAFFIC_SOURCE,
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
-        'line-color': 'rgba(4,6,10,0.96)',
+        'line-color': 'rgba(255,255,255,0.92)',
         'line-width': ['interpolate', ['linear'], ['zoom'], 
           8, ['*', 1.3, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.2, 'trunk', 3.3, 'primary', 2.7, 'secondary', 2, 1.45]],
           13, ['*', 1.45, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.2, 'trunk', 3.3, 'primary', 2.7, 'secondary', 2, 1.45]],
@@ -3156,8 +3284,8 @@ function initStaticSources(map: maplibregl.Map) {
         'text-max-width': 14,
       },
       paint: {
-        'text-color': 'rgba(255,245,247,0.92)',
-        'text-halo-color': 'rgba(8,9,11,0.96)',
+        'text-color': 'rgba(17,24,39,0.88)',
+        'text-halo-color': 'rgba(255,255,255,0.96)',
         'text-halo-width': 2,
       },
     })
@@ -3170,7 +3298,7 @@ function initStaticSources(map: maplibregl.Map) {
       source: TRAFFIC_HOVER_SOURCE,
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
-        'line-color': '#FFFFFF',
+        'line-color': '#38BDF8',
         'line-width': ['interpolate', ['linear'], ['zoom'], 11, 6, 16, 14],
         'line-opacity': 0.14,
         'line-blur': 4,
@@ -3185,7 +3313,7 @@ function initStaticSources(map: maplibregl.Map) {
       source: TRAFFIC_HOVER_SOURCE,
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
-        'line-color': '#F8FAFC',
+        'line-color': '#0F172A',
         'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 4],
         'line-opacity': 0.72,
       },
@@ -3265,7 +3393,7 @@ function initStaticSources(map: maplibregl.Map) {
       },
       paint: {
         'text-color': '#E0F2FE',
-        'text-halo-color': 'rgba(8,9,11,0.98)',
+        'text-halo-color': 'rgba(255,255,255,0.98)',
         'text-halo-width': 2.5,
       },
     })

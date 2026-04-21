@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { subscribeWithSelector, persist } from 'zustand/middleware'
-import type { TrafficMode, MapLayerId, MapViewState, City, HeatmapMode, QuickFilterId } from '@/types'
+import type { TrafficMode, MapLayerId, MapViewState, City, HeatmapMode, QuickFilterId, SearchFocusTarget } from '@/types'
 import { CITIES, DEFAULT_CITY_ID } from '@/config/cities.config'
 import { platformConfig } from '@/config/platform.config'
 import type { GeocodingResult } from '@/lib/api/geocoding'
@@ -52,6 +52,8 @@ interface MapStore {
   viewState:    MapViewState
   setViewState: (vs: MapViewState) => void
   flyToCity:    (city: City) => void
+  searchFocus: SearchFocusTarget | null
+  setSearchFocus: (target: SearchFocusTarget | null) => void
 
   // Selection
   selectedSegmentId: string | null
@@ -179,6 +181,8 @@ export const useMapStore = create<MapStore>()(
             bearing:   0,
           },
         }),
+      searchFocus: null,
+      setSearchFocus: (target) => set({ searchFocus: target }),
 
       selectedSegmentId: null,
       selectSegment:     (id) => set({ selectedSegmentId: id, isPanelOpen: id !== null }),
