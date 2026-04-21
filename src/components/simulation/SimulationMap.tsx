@@ -83,12 +83,13 @@ export function SimulationMap() {
         center={[center.lat, center.lng]}
         zoom={13.8}
         className="absolute inset-0"
+        attributionControl={false}
         zoomControl
         preferCanvas
       >
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; CARTO'
+          attribution=""
         />
 
         <GraphLayer

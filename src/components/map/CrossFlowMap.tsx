@@ -148,7 +148,7 @@ const BASE_MAP_STYLE: maplibregl.StyleSpecification = {
       type: 'raster',
       tiles: ['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'],
       tileSize: 256,
-      attribution: '© OpenStreetMap contributors © CARTO',
+      attribution: '',
       maxzoom: 19,
     },
   },
@@ -826,6 +826,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       pitch:     0,
       bearing:   0,
       minZoom:   8,
+      attributionControl: false,
     })
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right')
