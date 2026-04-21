@@ -27,6 +27,7 @@ import {
 } from '@/lib/api/here'
 import { fetchWeather as fetchOpenMeteoWeather, fetchAirQuality } from '@/lib/api/openmeteo'
 import { fetchCityBoundary } from '@/lib/api/geocoding'
+import { useThemeStore } from '@/store/themeStore'
 import type { Incident, HeatmapMode } from '@/types'
 
 const TRAFFIC_SOURCE          = 'cf-traffic'
@@ -42,28 +43,32 @@ const ZONE_DRAFT_SOURCE       = 'cf-zone-draft'
 const POI_SOURCE              = 'cf-pois'
 const VEHICLES_SOURCE         = 'cf-vehicles'
 
-// CartoDB Voyager Dark — completely free, no key, beautiful dark style
-const CARTO_DARK_STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  glyphs:  'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
-  sources: {
-    'carto-dark': {
-      type:        'raster',
-      tiles:       ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'],
-      tileSize:    256,
-      attribution: '© OpenStreetMap contributors © CARTO',
-      maxzoom:     19,
+function makeCartoStyle(variant: 'dark_all' | 'light_all'): maplibregl.StyleSpecification {
+  return {
+    version: 8,
+    glyphs:  'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+    sources: {
+      'carto-base': {
+        type:        'raster',
+        tiles:       [`https://a.basemaps.cartocdn.com/${variant}/{z}/{x}/{y}{r}.png`],
+        tileSize:    256,
+        attribution: '© OpenStreetMap contributors © CARTO',
+        maxzoom:     19,
+      },
     },
-  },
-  layers: [
-    {
-      id:     'carto-base',
-      type:   'raster',
-      source: 'carto-dark',
-      paint:  { 'raster-opacity': 0.95 },
-    },
-  ],
+    layers: [
+      {
+        id:     'carto-base',
+        type:   'raster',
+        source: 'carto-base',
+        paint:  { 'raster-opacity': 0.95 },
+      },
+    ],
+  }
 }
+
+const CARTO_DARK_STYLE  = makeCartoStyle('dark_all')
+const CARTO_LIGHT_STYLE = makeCartoStyle('light_all')
 
 function computeRoadWidth(roadType: string | undefined, level: import('@/types').CongestionLevel): number {
   const base: Record<string, number> = {
@@ -108,6 +113,7 @@ export function CrossFlowMap() {
   const setDataSource         = useTrafficStore(s => s.setDataSource)
 
   const currentResult = useSimulationStore(s => s.currentResult)
+  const theme         = useThemeStore(s => s.theme)
 
   const useLiveData = hasKey()
 
@@ -129,9 +135,10 @@ export function CrossFlowMap() {
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
 
+    const isDark = (document.documentElement.dataset.theme ?? 'light') === 'dark'
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style:     CARTO_DARK_STYLE,
+      style:     isDark ? CARTO_DARK_STYLE : CARTO_LIGHT_STYLE,
       center:    [city.center.lng, city.center.lat],
       zoom:      city.zoom,
       pitch:     30,
@@ -153,6 +160,10 @@ export function CrossFlowMap() {
       if (useLiveData) {
         addTomTomLayers(map)
       }
+
+      // Apply theme-aware layer colors
+      const initDark = (document.documentElement.dataset.theme ?? 'light') === 'dark'
+      applyThemeToLayers(map, initDark)
 
       setMapLoaded(true)
       setMapReady(true)
@@ -216,21 +227,21 @@ export function CrossFlowMap() {
       popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '220px' })
         .setLngLat(e.lngLat)
         .setHTML(`
-          <div style="font-family:Inter,sans-serif;color:#F5F5F7;padding:12px">
+          <div style="font-family:Inter,sans-serif;color:var(--popup-text);padding:12px">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
               <div style="width:28px;height:28px;border-radius:8px;background:${p.color};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000">${(p.routeRef || '?').slice(0,3)}</div>
               <div>
-                <p style="margin:0;font-size:12px;font-weight:700;color:#F5F5F7">${typeLabel[p.routeType] ?? p.routeType} ${p.routeRef}</p>
-                <p style="margin:0;font-size:10px;color:#86868B">${p.routeName || ''}</p>
+                <p style="margin:0;font-size:12px;font-weight:700;color:var(--popup-text)">${typeLabel[p.routeType] ?? p.routeType} ${p.routeRef}</p>
+                <p style="margin:0;font-size:10px;color:var(--popup-secondary)">${p.routeName || ''}</p>
               </div>
             </div>
             <div style="display:flex;gap:8px">
-              <div style="flex:1;background:rgba(255,255,255,0.04);border-radius:8px;padding:6px;text-align:center">
-                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase">Vitesse</p>
-                <p style="margin:0;font-size:14px;font-weight:700">${p.speedKmh} <span style="font-size:9px">km/h</span></p>
+              <div style="flex:1;background:var(--popup-surface);border-radius:8px;padding:6px;text-align:center">
+                <p style="margin:0;font-size:9px;color:var(--popup-secondary);text-transform:uppercase">Vitesse</p>
+                <p style="margin:0;font-size:14px;font-weight:700;color:var(--popup-text)">${p.speedKmh} <span style="font-size:9px">km/h</span></p>
               </div>
-              <div style="flex:1;background:rgba(255,255,255,0.04);border-radius:8px;padding:6px;text-align:center">
-                <p style="margin:0;font-size:9px;color:#86868B;text-transform:uppercase">Type</p>
+              <div style="flex:1;background:var(--popup-surface);border-radius:8px;padding:6px;text-align:center">
+                <p style="margin:0;font-size:9px;color:var(--popup-secondary);text-transform:uppercase">Type</p>
                 <p style="margin:0;font-size:11px;font-weight:700">${typeLabel[p.routeType] ?? p.routeType}</p>
               </div>
             </div>
@@ -253,20 +264,20 @@ export function CrossFlowMap() {
       popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '240px', className: 'apple-popup' })
         .setLngLat(e.lngLat)
         .setHTML(`
-          <div class="glass" style="padding: 16px; border-radius: 20px; color: white; border: 1px solid rgba(34,197,94,0.2);">
+          <div class="glass" style="padding: 16px; border-radius: 20px; color: var(--popup-text); border: 1px solid rgba(34,197,94,0.2);">
             <p style="margin:0 0 4px 0; font-size:10px; font-weight:700; color:#22C55E; text-transform:uppercase; tracking:0.1em;">Périmètre Urbain</p>
             <h3 style="margin:0 0 12px 0; font-size:18px;">${city.name}</h3>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-              <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:12px;">
-                <p style="margin:0; font-size:9px; color:#86868B;">POPULATION</p>
+              <div style="background:var(--popup-surface); padding:8px; border-radius:12px;">
+                <p style="margin:0; font-size:9px; color:var(--popup-secondary);">POPULATION</p>
                 <p style="margin:0; font-size:13px; font-weight:600;">${city.population.toLocaleString()}</p>
               </div>
-              <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:12px;">
-                <p style="margin:0; font-size:9px; color:#86868B;">PAYS</p>
+              <div style="background:var(--popup-surface); padding:8px; border-radius:12px;">
+                <p style="margin:0; font-size:9px; color:var(--popup-secondary);">PAYS</p>
                 <p style="margin:0; font-size:13px; font-weight:600;">${city.country} ${city.flag}</p>
               </div>
             </div>
-            <p style="margin:12px 0 0 0; font-size:10px; color:#86868B; line-height:1.4;">
+            <p style="margin:12px 0 0 0; font-size:10px; color:var(--popup-secondary); line-height:1.4;">
               Analyse en temps réel du flux de mobilité sur l'ensemble de la zone métropolitaine.
             </p>
           </div>
@@ -285,8 +296,8 @@ export function CrossFlowMap() {
         .setHTML(`
           <div class="glass" style="padding:12px; border-radius:16px; min-width:140px; border:1px solid ${color}40;">
             <p style="margin:0; font-size:9px; font-weight:700; color:${color}; text-transform:uppercase;">Intensité ${mode}</p>
-            <p style="margin:4px 0 0 0; font-size:22px; font-weight:700; color:white;">
-              ${Math.round(intensity * 100)}<span style="font-size:12px; font-weight:500; color:#86868B; margin-left:4px;">${unit}</span>
+            <p style="margin:4px 0 0 0; font-size:22px; font-weight:700; color:var(--popup-text);">
+              ${Math.round(intensity * 100)}<span style="font-size:12px; font-weight:500; color:var(--popup-secondary); margin-left:4px;">${unit}</span>
             </p>
           </div>
         `)
@@ -317,11 +328,11 @@ export function CrossFlowMap() {
     popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '280px', className: 'apple-popup' })
       .setLngLat(lngLat)
       .setHTML(`
-        <div class="glass" style="padding: 16px; border-radius: 20px; font-family: Inter, -apple-system, sans-serif; color: #F5F5F7; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
+        <div class="glass" style="padding: 16px; border-radius: 20px; font-family: Inter, -apple-system, sans-serif; color: var(--popup-text); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 32px rgba(0,0,0,0.15);">
           <div style="display: flex; align-items: center; justify-between; margin-bottom: 12px; gap: 12px;">
              <div style="flex: 1;">
-                <p style="font-size: 10px; font-weight: 700; color: #86868B; text-transform: uppercase; tracking: 0.1em; margin: 0 0 4px 0;">Vitesse Actuelle</p>
-                <p style="font-size: 24px; font-weight: 700; color: white; margin: 0;">${flow.currentSpeed} <span style="font-size: 14px; font-weight: 500; color: #86868B;">km/h</span></p>
+                <p style="font-size: 10px; font-weight: 700; color: var(--popup-secondary); text-transform: uppercase; tracking: 0.1em; margin: 0 0 4px 0;">Vitesse Actuelle</p>
+                <p style="font-size: 24px; font-weight: 700; color: var(--popup-text); margin: 0;">${flow.currentSpeed} <span style="font-size: 14px; font-weight: 500; color: var(--popup-secondary);">km/h</span></p>
              </div>
              <div style="width: 44px; h-44px; border-radius: 12px; background: ${color}15; border: 1px solid ${color}30; display: flex; items-center; justify-center; height: 44px;">
                 <div style="width: 10px; height: 10px; border-radius: 50%; background: ${color}; box-shadow: 0 0 12px ${color};"></div>
@@ -329,26 +340,49 @@ export function CrossFlowMap() {
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-            <div style="background: rgba(255,255,255,0.03); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.05);">
-              <p style="color: #86868B; font-size: 9px; font-weight: 600; text-transform: uppercase; margin: 0 0 4px 0;">Trajet</p>
-              <p style="font-size: 15px; font-weight: 700; color: white; margin: 0;">${Math.round(flow.currentTravelTime / 60)} <span style="font-size: 11px; font-color: #86868B;">min</span></p>
+            <div style="background: var(--popup-surface); border-radius: 14px; padding: 10px; border: 1px solid rgba(128,128,128,0.1);">
+              <p style="color: var(--popup-secondary); font-size: 9px; font-weight: 600; text-transform: uppercase; margin: 0 0 4px 0;">Trajet</p>
+              <p style="font-size: 15px; font-weight: 700; color: var(--popup-text); margin: 0;">${Math.round(flow.currentTravelTime / 60)} <span style="font-size: 11px; color: var(--popup-secondary);">min</span></p>
             </div>
-            <div style="background: rgba(255,255,255,0.03); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.05);">
-              <p style="color: #86868B; font-size: 9px; font-weight: 600; text-transform: uppercase; margin: 0 0 4px 0;">Retard</p>
+            <div style="background: var(--popup-surface); border-radius: 14px; padding: 10px; border: 1px solid rgba(128,128,128,0.1);">
+              <p style="color: var(--popup-secondary); font-size: 9px; font-weight: 600; text-transform: uppercase; margin: 0 0 4px 0;">Retard</p>
               <p style="font-size: 15px; font-weight: 700; color: ${delay > 0 ? '#FF9F0A' : '#22C55E'}; margin: 0;">
                 ${delay > 0 ? '+' : ''}${Math.round(delay / 60)} <span style="font-size: 11px;">min</span>
               </p>
             </div>
           </div>
 
-          <div style="display: flex; justify-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); pt-12px; padding-top: 10px;">
-            <span style="font-size: 10px; font-weight: 500; color: #424245;">Fiabilité: ${Math.round(flow.confidence * 100)}%</span>
+          <div style="display: flex; justify-between; align-items: center; border-top: 1px solid rgba(128,128,128,0.1); padding-top: 10px;">
+            <span style="font-size: 10px; font-weight: 500; color: var(--popup-secondary);">Fiabilité: ${Math.round(flow.confidence * 100)}%</span>
             <span style="font-size: 10px; font-weight: 600; color: #22C55E; margin-left: auto;">TomTom Live</span>
           </div>
         </div>
       `)
       .addTo(map)
   }
+
+  // ─── Theme change → swap map tiles + layer colors ────────────────────
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapLoaded) return
+    const isDark = theme === 'dark'
+    const newStyle = isDark ? CARTO_DARK_STYLE : CARTO_LIGHT_STYLE
+
+    // setStyle destroys all sources/layers — re-add them after style loads
+    map.setStyle(newStyle)
+    map.once('style.load', () => {
+      initStaticSources(map)
+      initBoundaryLayers(map)
+      initHeatmapPassagesLayers(map)
+      initZoneLayers(map)
+      if (useLiveData) addTomTomLayers(map)
+      applyThemeToLayers(map, isDark)
+      // Re-apply layer visibility
+      setMapLoaded(false)
+      setMapLoaded(true)
+    })
+  }, [theme]) // eslint-disable-line
 
   // ─── Load boundary for initial city ──────────────────────────────────
 
@@ -1320,6 +1354,23 @@ function addTomTomLayers(map: maplibregl.Map) {
       paint:  { 'raster-opacity': 0.90 },
     })
   }
+}
+
+function applyThemeToLayers(map: maplibregl.Map, isDark: boolean) {
+  const textColor   = isDark ? '#F5F5F7' : '#111111'
+  const haloColor   = isDark ? 'rgba(8,9,11,0.85)' : 'rgba(255,255,255,0.92)'
+  const strokeColor = isDark ? '#08090B' : '#FFFFFF'
+  const tryPaint = (id: string, prop: string, val: string) => {
+    if (map.getLayer(id)) map.setPaintProperty(id, prop, val)
+  }
+  tryPaint(INCIDENT_SOURCE + '-labels',   'text-color',          textColor)
+  tryPaint(INCIDENT_SOURCE + '-labels',   'text-halo-color',     haloColor)
+  tryPaint(BOUNDARY_SOURCE + '-label',    'text-halo-color',     haloColor)
+  tryPaint(INCIDENT_SOURCE + '-circles',  'circle-stroke-color', strokeColor)
+  tryPaint(POI_SOURCE      + '-signals',  'circle-stroke-color', strokeColor)
+  tryPaint(POI_SOURCE      + '-bus-stops','circle-stroke-color', strokeColor)
+  tryPaint(POI_SOURCE      + '-subway',   'circle-stroke-color', strokeColor)
+  tryPaint(VEHICLES_SOURCE + '-layer',    'circle-stroke-color', strokeColor)
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

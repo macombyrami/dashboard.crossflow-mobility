@@ -118,7 +118,7 @@ function Metric({ icon: Icon, label, value, sub, color }: {
         <Icon className="w-3 h-3 text-text-muted" />
         <span className="text-[10px] text-text-muted uppercase tracking-wide">{label}</span>
       </div>
-      <p className="text-sm font-bold" style={{ color: color || '#F0F0FF' }}>{value}</p>
+      <p className="text-sm font-bold text-text-primary" style={color ? { color } : undefined}>{value}</p>
       {sub && <p className="text-[10px] text-text-muted">{sub}</p>}
     </div>
   )
