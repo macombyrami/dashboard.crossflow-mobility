@@ -54,24 +54,26 @@ export function LayerControls() {
   }
 
   return (
-    <div className="glass-card rounded-xl shadow-lg w-[232px] overflow-hidden">
+    <div className="glass-card rounded-xl shadow-lg w-[calc(100vw-24px)] max-w-[232px] sm:w-[232px] overflow-hidden">
+      {/* ── Header ── */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-bg-border">
-        <div className="flex items-center gap-2">
-          <Layers className="w-3.5 h-3.5 text-brand" />
-          <span className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.18em]">Calques</span>
-          <span className="min-w-[18px] h-4 px-1 rounded-full bg-brand/15 text-brand text-[10px] font-bold tabular-nums flex items-center justify-center">
+        <div className="flex items-center gap-2 min-w-0">
+          <Layers className="w-3.5 h-3.5 text-brand flex-shrink-0" />
+          <span className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.18em] truncate">Calques</span>
+          <span className="min-w-[18px] h-4 px-1 rounded-full bg-brand/15 text-brand text-[10px] font-bold tabular-nums flex items-center justify-center flex-shrink-0">
             {activeCount}
           </span>
         </div>
         <button
           onClick={() => setCollapsed(true)}
-          className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
+          className="p-1.5 -mr-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors flex-shrink-0"
           aria-label="Réduire"
         >
           <ChevronDown className="w-3.5 h-3.5" />
         </button>
       </div>
 
+      {/* ── Layer toggles ── */}
       <div className="p-2 space-y-0.5">
         {LAYERS.map(({ id, label, icon: Icon, hint, color }) => {
           const active = activeLayers.has(id)
@@ -81,10 +83,11 @@ export function LayerControls() {
               onClick={() => toggleLayer(id)}
               title={hint}
               className={cn(
-                'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all duration-150 group',
+                'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all duration-150 group min-h-[40px]',
                 active ? 'bg-bg-hover' : 'hover:bg-bg-subtle',
               )}
             >
+              {/* Checkbox */}
               <span
                 className={cn(
                   'w-4 h-4 rounded-[5px] border flex items-center justify-center flex-shrink-0 transition-all',
@@ -103,7 +106,7 @@ export function LayerControls() {
                 style={active ? { color } : undefined}
                 strokeWidth={2}
               />
-              <span className={cn('flex-1 text-[13px] font-medium tracking-tight', active ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary')}>
+              <span className={cn('flex-1 text-[13px] font-medium tracking-tight truncate', active ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary')}>
                 {label}
               </span>
             </button>
@@ -111,56 +114,57 @@ export function LayerControls() {
         })}
       </div>
 
+      {/* ── Heatmap mode selector (visible only when heatmap is active) ── */}
       {activeLayers.has('heatmap') && (
-        <div className="px-2.5 pb-2 pt-0.5">
-          <p className="text-[9px] font-bold text-text-muted uppercase tracking-[0.18em] mb-1.5 px-1">Mode heatmap</p>
+        <div className="px-2.5 pb-2 pt-0.5 border-t border-bg-border/60">
+          <p className="text-[9px] font-bold text-text-muted uppercase tracking-[0.18em] mb-1.5 mt-2 px-1">Mode heatmap</p>
           <div className="grid grid-cols-3 gap-1">
             {([
               { id: 'congestion' as HeatmapMode, label: 'Congestion', icon: Flame },
-              { id: 'passages' as HeatmapMode, label: 'Passages', icon: Users },
-              { id: 'co2' as HeatmapMode, label: 'CO₂', icon: Wind },
+              { id: 'passages'  as HeatmapMode, label: 'Passages',   icon: Users },
+              { id: 'co2'       as HeatmapMode, label: 'CO₂',        icon: Wind  },
             ]).map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => setHeatmapMode(id)}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-1 py-1.5 rounded-md text-[10px] font-semibold transition-all border',
+                  'flex flex-col items-center justify-center gap-1 py-2 rounded-md text-[10px] font-semibold transition-all border min-h-[48px]',
                   heatmapMode === id
                     ? 'bg-brand/15 text-brand border-brand/30'
                     : 'text-text-muted border-bg-border hover:text-text-secondary hover:border-text-muted',
                 )}
               >
-                <Icon className="w-3 h-3" />
-                {label}
+                <Icon className="w-3.5 h-3.5" />
+                <span className="leading-none">{label}</span>
               </button>
             ))}
           </div>
         </div>
       )}
 
+      {/* ── Zone drawing ── */}
       <div className="p-2 border-t border-bg-border">
         <button
           onClick={() => {
             if (zoneActive) clearZone()
-            else {
-              clearZone()
-              setZoneActive(true)
-            }
+            else { clearZone(); setZoneActive(true) }
           }}
           className={cn(
-            'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-all',
+            'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-all min-h-[40px]',
             zoneActive
               ? 'bg-yellow-400/15 text-yellow-500 border border-yellow-400/30'
               : 'text-text-secondary hover:text-text-primary hover:bg-bg-subtle border border-transparent',
           )}
         >
           <PenLine className="w-4 h-4 flex-shrink-0" />
-          <span className="flex-1 text-left">{zoneActive ? 'Cliquez sur la carte…' : 'Définir une zone'}</span>
+          <span className="flex-1 text-left truncate">
+            {zoneActive ? 'Cliquez sur la carte…' : 'Définir une zone'}
+          </span>
         </button>
         {zoneActive && zoneDraft.length >= 3 && (
           <button
             onClick={() => finalizeZone()}
-            className="w-full mt-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-yellow-400/20 text-yellow-500 hover:bg-yellow-400/30 transition-all"
+            className="w-full mt-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-[12px] font-semibold bg-yellow-400/20 text-yellow-500 hover:bg-yellow-400/30 transition-all min-h-[36px]"
           >
             ✓ Valider ({zoneDraft.length} pts)
           </button>
@@ -168,7 +172,7 @@ export function LayerControls() {
         {(zoneActive || zonePolygon) && (
           <button
             onClick={() => clearZone()}
-            className="w-full mt-1 flex items-center justify-center px-3 py-1 rounded-lg text-[11px] text-text-muted hover:text-text-secondary transition-all"
+            className="w-full mt-1 flex items-center justify-center px-3 py-1.5 rounded-lg text-[11px] text-text-muted hover:text-text-secondary transition-all"
           >
             Effacer
           </button>
