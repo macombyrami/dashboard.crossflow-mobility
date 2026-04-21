@@ -7,15 +7,16 @@ import { cn } from '@/lib/utils/cn'
 import {
   Map, LayoutDashboard, Activity,
   GitBranch, AlertTriangle, Settings, Zap,
-  LogOut, UserCircle
+  LogOut, UserCircle, BotMessageSquare,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { href: '/map',        icon: Map,             label: 'Carte',      description: 'Trafic temps reel' },
-  { href: '/dashboard',  icon: LayoutDashboard, label: 'Tableau',    description: 'Metriques & KPIs' },
-  { href: '/simulation', icon: GitBranch,       label: 'Simulation', description: 'Scenarios' },
-  { href: '/transport',  icon: Activity,        label: 'Transport',  description: 'Reseau TC' },
-  { href: '/incidents',  icon: AlertTriangle,   label: 'Incidents',  description: 'Alertes actives' },
+  { href: '/map',                     icon: Map,              label: 'Carte',      description: 'Trafic temps reel' },
+  { href: '/dashboard',               icon: LayoutDashboard,  label: 'Tableau',    description: 'Metriques & KPIs' },
+  { href: '/dashboard/consultant-ai', icon: BotMessageSquare, label: 'Agent IA',   description: 'Copilote intelligent' },
+  { href: '/simulation',              icon: GitBranch,        label: 'Simulation', description: 'Scenarios' },
+  { href: '/transport',               icon: Activity,         label: 'Transport',  description: 'Reseau TC' },
+  { href: '/incidents',               icon: AlertTriangle,    label: 'Incidents',  description: 'Alertes actives' },
 ]
 
 export function Sidebar() {

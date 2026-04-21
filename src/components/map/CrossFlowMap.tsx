@@ -3246,50 +3246,58 @@ function initStaticSources(map: maplibregl.Map) {
     })
   }
 
-  // 0. Traffic Halo (Maximum Contrast)
+  // 0. Traffic Halo — white outline behind colored line for contrast on light map
   if (!map.getLayer(TRAFFIC_SOURCE + '-halo')) {
     map.addLayer({
       id:     TRAFFIC_SOURCE + '-halo',
       type:   'line',
       source: TRAFFIC_SOURCE,
+      minzoom: 8,
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
-        'line-color': 'rgba(255,255,255,0.88)',
+        'line-color': 'rgba(255,255,255,0.92)',
         'line-width': ['interpolate', ['linear'], ['zoom'],
-          8, ['*', 1.3, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.2, 'trunk', 3.3, 'primary', 2.7, 'secondary', 2, 1.45]],
-          13, ['*', 1.45, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.2, 'trunk', 3.3, 'primary', 2.7, 'secondary', 2, 1.45]],
-          17, ['*', 1.8, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.2, 'trunk', 3.3, 'primary', 2.7, 'secondary', 2, 1.45]]
+          8,  ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 5.2, 'trunk', 4.0, 'primary', 3.2, 'secondary', 2.2, 1.2],
+          12, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 7.0, 'trunk', 5.6, 'primary', 4.6, 'secondary', 3.4, 2.2],
+          15, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 11,  'trunk', 8.5, 'primary', 6.8, 'secondary', 5.2, 3.6],
         ],
-        'line-opacity': 0.55,
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.45, 14, 0.60],
       }
     })
   }
 
-  // 1. Primary Traffic Lines
+  // 1. Primary Traffic Lines — Waze-like: warm (red/orange) → cold (green), visible from zoom 8
   if (!map.getLayer(TRAFFIC_SOURCE + '-lines')) {
     map.addLayer({
       id:     TRAFFIC_SOURCE + '-lines',
       type:   'line',
       source: TRAFFIC_SOURCE,
-      minzoom: 10,
+      minzoom: 8,   // visible from city overview level
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint:  {
+        // Warm → cold: critical red → orange → yellow → fluid green (Waze palette)
         'line-color': [
           'interpolate', ['linear'], ['coalesce', ['get', 'speedRatio'], 1],
-          0.24, '#E5484D',
-          0.48, '#FF8A00',
-          0.72, '#FFD24A',
-          1.00, '#2BD576',
+          0.00, '#C0392B',   // jam — deep red
+          0.25, '#E5484D',   // critical — red
+          0.45, '#FF6B00',   // slow — orange
+          0.65, '#FFD24A',   // moderate — amber
+          0.85, '#57E89C',   // good — light green
+          1.00, '#2BD576',   // fluid — green
         ],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 
-          8, ['*', 0.72, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.6, 'trunk', 3.7, 'primary', 2.9, 'secondary', 2.15, 1.35]],
-          13, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.6, 'trunk', 3.7, 'primary', 2.9, 'secondary', 2.15, 1.35],
-          17, ['*', 1.48, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.6, 'trunk', 3.7, 'primary', 2.9, 'secondary', 2.15, 1.35]]
+        // Road-type-aware width: motorways thick, local streets thin
+        'line-width': ['interpolate', ['linear'], ['zoom'],
+          8,  ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 3.2, 'trunk', 2.4, 'primary', 1.8, 'secondary', 1.2, 0.7],
+          12, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 5.0, 'trunk', 3.8, 'primary', 3.0, 'secondary', 2.2, 1.4],
+          15, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 8.0, 'trunk', 6.0, 'primary', 4.8, 'secondary', 3.5, 2.4],
+          18, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 14,  'trunk', 10,  'primary', 8,   'secondary', 6,   4],
         ],
+        // High opacity from the start — Waze always shows traffic clearly
         'line-opacity': [
           'interpolate', ['linear'], ['zoom'],
-          10, 0.54,
-          14, 0.94,
+          8,  0.72,
+          11, 0.88,
+          14, 0.96,
         ],
         'line-offset': ['case', ['==', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway_link'], 0.2, 0]
       },
