@@ -28,6 +28,13 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const supabase     = createClient()
 
+  // ─── Redirect already-authenticated users straight to /map ─────────────
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) window.location.href = '/map'
+    })
+  }, []) // eslint-disable-line
+
   // ─── Solution 1: TOKEN_REFRESH_FAILED loop breaker ─────────────────────
   useEffect(() => {
     const cleanup = installAuthSessionGuard(supabase)
