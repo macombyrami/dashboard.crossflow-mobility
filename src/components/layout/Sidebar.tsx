@@ -55,11 +55,6 @@ export function Sidebar() {
 
       <nav className="flex-1 py-2 overflow-y-auto">
         <div className="px-3">
-          <div className="px-3 pb-2 pt-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-text-muted">Mon Agent</p>
-            <p className="mt-1 text-[11px] text-text-muted">Acces direct aux vues operationnelles deja disponibles.</p>
-          </div>
-
           <div className="space-y-1">
           {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
             const active = pathname === href || (href !== '/' && pathname.startsWith(href))
