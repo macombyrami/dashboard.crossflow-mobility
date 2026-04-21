@@ -40,24 +40,20 @@ export default function MapPage() {
       <div className="flex-1 relative overflow-hidden">
         <CrossFlowMap />
 
-        {/* Global traffic banner — top center above mode selector */}
-        {mode !== 'simulate' && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none w-max max-w-[calc(100vw-280px)]">
-            <GlobalTrafficBanner />
-          </div>
-        )}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 w-[min(920px,calc(100vw-32px))] pointer-events-none">
+          <div className="flex flex-col items-center gap-2.5">
+            {mode !== 'simulate' && (
+              <div className="pointer-events-none w-max max-w-full">
+                <GlobalTrafficBanner />
+              </div>
+            )}
 
-        {/* Mode selector — below banner */}
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
-          <ModeSelector />
+            <div className="pointer-events-auto flex flex-col items-center gap-2">
+              <ModeSelector />
+              {mode === 'live' && <TrafficFilterBar />}
+            </div>
+          </div>
         </div>
-
-        {/* Filter bar — below mode selector */}
-        {mode === 'live' && (
-          <div className="absolute top-[108px] left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
-            <TrafficFilterBar />
-          </div>
-        )}
 
         {/* Data source badge — top right */}
         <div className="absolute top-3 right-3 z-10 pointer-events-auto">

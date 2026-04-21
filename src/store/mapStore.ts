@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { subscribeWithSelector, persist } from 'zustand/middleware'
-import type { TrafficMode, MapLayerId, MapViewState, City, HeatmapMode } from '@/types'
+import type { TrafficMode, MapLayerId, MapViewState, City, HeatmapMode, QuickFilterId } from '@/types'
 import { CITIES, DEFAULT_CITY_ID } from '@/config/cities.config'
 import { platformConfig } from '@/config/platform.config'
 import type { GeocodingResult } from '@/lib/api/geocoding'
@@ -91,8 +91,11 @@ interface MapStore {
   setLockedCity:   (id: string | null) => void
 
   // Filter mode (map layer quick-filter)
-  filterMode:    'all' | 'congestion' | 'incidents' | 'travaux' | 'flux'
-  setFilterMode: (mode: MapStore['filterMode']) => void
+  filterMode:    QuickFilterId
+  setFilterMode: (mode: QuickFilterId) => void
+  activeQuickFilters: Set<QuickFilterId>
+  toggleQuickFilter: (filter: Exclude<QuickFilterId, 'all'>) => void
+  resetQuickFilters: () => void
 
   // UI
   isPanelOpen:   boolean
@@ -213,7 +216,36 @@ export const useMapStore = create<MapStore>()(
       setLockedCity:  (id) => set({ lockedCityId: id }),
 
       filterMode:     'all',
-      setFilterMode:  (mode) => set({ filterMode: mode }),
+      activeQuickFilters: new Set<QuickFilterId>(['all']),
+      setFilterMode:  (mode) => set({
+        filterMode: mode,
+        activeQuickFilters: new Set<QuickFilterId>([mode]),
+      }),
+      toggleQuickFilter: (filter) =>
+        set((state) => {
+          const next = new Set(state.activeQuickFilters)
+          next.delete('all')
+          next.has(filter) ? next.delete(filter) : next.add(filter)
+
+          if (next.size === 0) {
+            return {
+              filterMode: 'all' as QuickFilterId,
+              activeQuickFilters: new Set<QuickFilterId>(['all']),
+            }
+          }
+
+          const nextFilterMode =
+            next.size === 1 ? Array.from(next)[0] : ('all' as QuickFilterId)
+
+          return {
+            filterMode: nextFilterMode,
+            activeQuickFilters: next,
+          }
+        }),
+      resetQuickFilters: () => set({
+        filterMode: 'all',
+        activeQuickFilters: new Set<QuickFilterId>(['all']),
+      }),
 
       isPanelOpen:    false,
       setPanelOpen:   (open) => set({ isPanelOpen: open }),
@@ -237,6 +269,11 @@ export const useMapStore = create<MapStore>()(
           if (data.state?.activeLayers) {
             data.state.activeLayers = new Set(data.state.activeLayers)
           }
+          if (data.state?.activeQuickFilters) {
+            data.state.activeQuickFilters = new Set(data.state.activeQuickFilters)
+          } else {
+            data.state.activeQuickFilters = new Set<QuickFilterId>(['all'])
+          }
           // Rehydrate city from persisted cityId
           if (data.state?.cityId) {
             const found = CITIES.find(c => c.id === data.state.cityId)
@@ -259,6 +296,9 @@ export const useMapStore = create<MapStore>()(
             if (data.state.activeLayers instanceof Set) {
               data.state.activeLayers = Array.from(data.state.activeLayers)
             }
+            if (data.state.activeQuickFilters instanceof Set) {
+              data.state.activeQuickFilters = Array.from(data.state.activeQuickFilters)
+            }
             // Persist only city ID — not the full object (~5KB → 20 bytes)
             if (data.state.city) {
               data.state.cityId = data.state.city.id
@@ -278,6 +318,7 @@ export const useMapStore = create<MapStore>()(
         city:         state.city,        // serialized as cityId by setItem above
         cityHistory:  state.cityHistory, // serialized as cityHistoryIds by setItem above
         activeLayers: state.activeLayers,
+        activeQuickFilters: state.activeQuickFilters,
         mode:         state.mode,
         lockedCityId: state.lockedCityId,
       } as MapStore),

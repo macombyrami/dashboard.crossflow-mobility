@@ -16,6 +16,8 @@ export type MapLayerId = 'traffic' | 'flow' | 'heatmap' | 'transport' | 'inciden
 
 export type HeatmapMode = 'congestion' | 'passages' | 'co2'
 
+export type QuickFilterId = 'all' | 'congestion' | 'incidents' | 'travaux' | 'flux'
+
 export type OrgPlan = 'starter' | 'pro' | 'enterprise'
 
 // ─── Geography ────────────────────────────────────────────────────────────────

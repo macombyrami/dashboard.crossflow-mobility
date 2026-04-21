@@ -66,7 +66,7 @@ import { fetchWeather as fetchOpenMeteoWeather, fetchAirQuality } from '@/lib/ap
 import { fetchCityBoundary, fetchCityDistricts } from '@/lib/api/geocoding'
 import type { AggregatedHeatFeatureCollection } from '@/lib/map/trafficHeatmap'
 import { useSocialStore } from '@/store/socialStore'
-import type { Incident, HeatmapMode, CongestionLevel, TrafficSnapshot, TrafficSegment, MapLayerId } from '@/types'
+import type { Incident, HeatmapMode, CongestionLevel, TrafficSnapshot, TrafficSegment, MapLayerId, QuickFilterId } from '@/types'
 
 const TRAFFIC_SOURCE          = 'cf-traffic'
 const TRAFFIC_PREDICTION_SOURCE = 'cf-traffic-prediction'
@@ -206,6 +206,27 @@ const buildCongestionHeatmapOpacity = (alpha: number) => {
 
 const heatmapStackLayerId = (sourceId: string, suffix: string) => `${sourceId}-${suffix}`
 
+const isQuickFilterSetNeutral = (filters: Set<QuickFilterId>) =>
+  filters.size === 0 || filters.has('all')
+
+function buildTrafficQuickFilter(filters: Set<QuickFilterId>) {
+  if (isQuickFilterSetNeutral(filters) || filters.has('flux')) return null
+  if (filters.has('congestion')) {
+    return ['<=', ['coalesce', ['get', 'speedRatio'], 1], 0.84] as any
+  }
+  return ['==', ['get', 'id'], '__none__'] as any
+}
+
+function buildIncidentQuickFilter(filters: Set<QuickFilterId>) {
+  if (isQuickFilterSetNeutral(filters)) return null
+  const hasIncidents = filters.has('incidents')
+  const hasTravaux = filters.has('travaux')
+  if (hasIncidents && hasTravaux) return null
+  if (hasTravaux) return ['==', ['get', 'type'], 'roadwork'] as any
+  if (hasIncidents) return ['!=', ['get', 'type'], 'roadwork'] as any
+  return ['==', ['get', 'id'], '__none__'] as any
+}
+
 const setCongestionHeatmapStackOpacity = (map: maplibregl.Map | null, sourceId: string, alpha: number) => {
   if (!map) return
   const safeAlpha = clampUnit(alpha)
@@ -307,6 +328,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   const cityBoundary    = useMapStore(s => s.cityBoundary)
   const setCityBoundary = useMapStore(s => s.setCityBoundary)
   const activeLayers    = useMapStore(s => s.activeLayers)
+  const activeQuickFilters = useMapStore(s => s.activeQuickFilters)
   const setMapReady     = useMapStore(s => s.setMapReady)
   const mode            = useMapStore(s => s.mode)
   const selectSegment   = useMapStore(s => s.selectSegment)
@@ -1988,14 +2010,15 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
           .map((s, i) => {
             const congestion = jamFactorToCongestion(s.jamFactor)
             const freeFlow   = s.freeFlow   > 0 ? s.freeFlow   : 50
-            const speed      = s.speed      > 0 ? s.speed      : freeFlow * (1 - congestion * 0.85)
+            const rawSpeed   = s.speed > 0 ? s.speed : freeFlow * (1 - congestion * 0.85)
+            const speed      = getCredibleSpeedKmh(rawSpeed, freeFlow, congestion)
             const roadType   = freeFlow > 100 ? 'motorway' : freeFlow > 80 ? 'trunk' : freeFlow > 55 ? 'primary' : freeFlow > 35 ? 'secondary' : 'tertiary'
             const length     = estimateSegmentLength(s.coords)
             return {
               id:               `here-${cityNow.id}-${i}`,
               roadType,
               coordinates:      s.coords,
-              speedKmh:         Math.round(speed),
+              speedKmh:         speed,
               freeFlowSpeedKmh: Math.round(freeFlow),
               congestionScore:  Math.round(congestion * 100) / 100,
               level:            scoreToCongestionLevel(congestion),
@@ -2169,7 +2192,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       const trafficGeo: GeoJSON.FeatureCollection = {
         type: 'FeatureCollection',
         features: snappedSnapshot.segments.map(seg => {
-          const speedRatio = getSpeedRatio(seg)
+          const credibleSpeed = getCredibleSpeedKmh(seg.speedKmh, seg.freeFlowSpeedKmh, seg.congestionScore)
+          const speedRatio = clamp01(credibleSpeed / Math.max(seg.freeFlowSpeedKmh, 1))
           const predictedRatio = clamp01(speedRatio + (seg.flowTrend === 'improving' ? 0.08 : seg.flowTrend === 'worsening' ? -0.08 : -0.03))
           const importance = clamp01(seg.priorityAxis ?? (seg.roadType === 'motorway' ? 1 : seg.roadType === 'trunk' ? 0.85 : seg.roadType === 'primary' ? 0.7 : seg.roadType === 'secondary' ? 0.55 : 0.35))
           return {
@@ -2182,7 +2206,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
               streetName: seg.streetName,
               axisName: seg.axisName,
               direction: seg.direction,
-              speedKmh: seg.speedKmh,
+              speedKmh: credibleSpeed,
               freeFlowSpeedKmh: seg.freeFlowSpeedKmh,
               speedRatio,
               predictedSpeedRatio: predictedRatio,
@@ -2522,13 +2546,20 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return
     const map = mapRef.current
-    const trafficVis = activeLayers.has('traffic') ? 'visible' : 'none'
-    const incidentsVis = activeLayers.has('incidents') ? 'visible' : 'none'
-    const flowVis = activeLayers.has('flow') ? 'visible' : 'none'
+    const quickFiltersNeutral = isQuickFilterSetNeutral(activeQuickFilters)
+    const trafficEnabledByQuickFilter =
+      quickFiltersNeutral || activeQuickFilters.has('congestion') || activeQuickFilters.has('flux')
+    const incidentsEnabledByQuickFilter =
+      quickFiltersNeutral || activeQuickFilters.has('incidents') || activeQuickFilters.has('travaux')
+    const flowEnabledByQuickFilter = quickFiltersNeutral || activeQuickFilters.has('flux')
+    const trafficVis = activeLayers.has('traffic') && trafficEnabledByQuickFilter ? 'visible' : 'none'
+    const incidentsVis = activeLayers.has('incidents') && incidentsEnabledByQuickFilter ? 'visible' : 'none'
+    const flowVis = activeLayers.has('flow') && flowEnabledByQuickFilter ? 'visible' : 'none'
     const boundaryVis = activeLayers.has('boundary') ? 'visible' : 'none'
     const heatVis = isDecisionMap ? 'visible' : (activeLayers.has('heatmap') ? 'visible' : 'none')
     const inactiveHeatSource = activeHeatSourceRef.current === HEATMAP_SOURCE ? HEATMAP_FADE_SOURCE : HEATMAP_SOURCE
 
+    safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-halo', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-lines', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-corridor-labels', 'visibility', trafficVis)
@@ -2669,6 +2700,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     if (process.env.NODE_ENV === 'development') {
       console.log('[MapFilters] apply', {
+        quickFilters: Array.from(activeQuickFilters),
         traffic: trafficVis,
         incidents: incidentsVis,
         flow: flowVis,
@@ -2678,7 +2710,41 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
         flowLayer: map.getLayoutProperty(TRAFFIC_FLOW_SOURCE + '-layer', 'visibility'),
       })
     }
-  }, [activeLayers, mapLoaded, useLiveData, isDecisionMap])
+  }, [activeLayers, activeQuickFilters, mapLoaded, useLiveData, isDecisionMap])
+
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return
+    const map = mapRef.current
+
+    const splitFilter = mode === 'predict'
+      ? ['<', ['get', 'midpoint_lng'], splitLngRef.current]
+      : null
+    const trafficQuickFilter = buildTrafficQuickFilter(activeQuickFilters)
+    const trafficFilter = splitFilter && trafficQuickFilter
+      ? ['all', splitFilter, trafficQuickFilter]
+      : splitFilter ?? trafficQuickFilter
+
+    safeSetFilter(map, TRAFFIC_SOURCE + '-halo', trafficFilter)
+    safeSetFilter(map, TRAFFIC_SOURCE + '-lines', trafficFilter)
+    safeSetFilter(map, TRAFFIC_SOURCE + '-glow', trafficFilter ? ['all', trafficFilter, ['any', ['<=', ['coalesce', ['get', 'speedRatio'], 1], 0.52], ['>=', ['coalesce', ['get', 'importance'], 0], 0.76]]] : ['any', ['<=', ['coalesce', ['get', 'speedRatio'], 1], 0.52], ['>=', ['coalesce', ['get', 'importance'], 0], 0.76]])
+    safeSetFilter(map, TRAFFIC_SOURCE + '-corridor-labels', trafficFilter ? ['all', trafficFilter, ['>=', ['get', 'importance'], 0.55], ['<=', ['get', 'speedRatio'], 0.68]] : ['all', ['>=', ['get', 'importance'], 0.55], ['<=', ['get', 'speedRatio'], 0.68]])
+
+    if (mode === 'predict') {
+      safeSetFilter(map, TRAFFIC_PREDICTION_SOURCE + '-lines', ['>', ['get', 'midpoint_lng'], splitLngRef.current] as any)
+    } else {
+      safeSetFilter(map, TRAFFIC_PREDICTION_SOURCE + '-lines', null)
+    }
+
+    const incidentQuickFilter = buildIncidentQuickFilter(activeQuickFilters)
+    safeSetFilter(map, INCIDENT_SOURCE + '-cluster', incidentQuickFilter)
+    safeSetFilter(map, INCIDENT_SOURCE + '-cluster-glow', incidentQuickFilter ? ['all', incidentQuickFilter, ['has', 'point_count']] : ['has', 'point_count'])
+    safeSetFilter(map, INCIDENT_SOURCE + '-count', incidentQuickFilter ? ['all', incidentQuickFilter, ['has', 'point_count']] : ['has', 'point_count'])
+    safeSetFilter(map, INCIDENT_SOURCE + '-unclustered', incidentQuickFilter ? ['all', incidentQuickFilter, ['!', ['has', 'point_count']]] : ['!', ['has', 'point_count']])
+    safeSetFilter(map, INCIDENT_SOURCE + '-label', incidentQuickFilter ? ['all', incidentQuickFilter, ['!', ['has', 'point_count']]] : ['!', ['has', 'point_count']])
+    safeSetFilter(map, INCIDENT_CRITICAL_SOURCE + '-glow', incidentQuickFilter)
+    safeSetFilter(map, INCIDENT_CRITICAL_SOURCE + '-dot', incidentQuickFilter)
+    safeSetFilter(map, INCIDENT_CRITICAL_SOURCE + '-label', incidentQuickFilter)
+  }, [activeQuickFilters, mapLoaded, mode, splitLng])
 
   // ─── Heatmap mode (shows/hides correct heatmap layer) ────────────────
 
@@ -3032,13 +3098,13 @@ function initStaticSources(map: maplibregl.Map) {
       source: TRAFFIC_SOURCE,
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
-        'line-color': '#000000',
+        'line-color': 'rgba(4,6,10,0.96)',
         'line-width': ['interpolate', ['linear'], ['zoom'], 
-          8, ['*', 1.2, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]],
-          13, ['*', 1.3, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]],
-          17, ['*', 1.6, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.5]]
+          8, ['*', 1.3, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.2, 'trunk', 3.3, 'primary', 2.7, 'secondary', 2, 1.45]],
+          13, ['*', 1.45, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.2, 'trunk', 3.3, 'primary', 2.7, 'secondary', 2, 1.45]],
+          17, ['*', 1.8, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.2, 'trunk', 3.3, 'primary', 2.7, 'secondary', 2, 1.45]]
         ],
-        'line-opacity': 0.6,
+        'line-opacity': 0.72,
       }
     })
   }
@@ -3054,22 +3120,22 @@ function initStaticSources(map: maplibregl.Map) {
       paint:  {
         'line-color': [
           'interpolate', ['linear'], ['coalesce', ['get', 'speedRatio'], 1],
-          0.25, '#EF4444',
-          0.45, '#FF9F0A',
-          0.70, '#FFD600',
-          1.00, '#22C55E',
+          0.24, '#E5484D',
+          0.48, '#FF8A00',
+          0.72, '#FFD24A',
+          1.00, '#2BD576',
         ],
         'line-width': ['interpolate', ['linear'], ['zoom'], 
-          8, ['*', 0.6, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.4]],
-          13, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.4],
-          17, ['*', 1.4, ['match', ['get', 'highway'], 'motorway', 4, 'trunk', 3, 'primary', 2.5, 1.4]]
+          8, ['*', 0.72, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.6, 'trunk', 3.7, 'primary', 2.9, 'secondary', 2.15, 1.35]],
+          13, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.6, 'trunk', 3.7, 'primary', 2.9, 'secondary', 2.15, 1.35],
+          17, ['*', 1.48, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 4.6, 'trunk', 3.7, 'primary', 2.9, 'secondary', 2.15, 1.35]]
         ],
         'line-opacity': [
           'interpolate', ['linear'], ['zoom'],
-          10, 0.46,
-          14, 0.9,
+          10, 0.54,
+          14, 0.94,
         ],
-        'line-dasharray': [4, 0.1]
+        'line-offset': ['case', ['==', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway_link'], 0.2, 0]
       },
     })
   }
@@ -3235,6 +3301,7 @@ function initStaticSources(map: maplibregl.Map) {
       id:     TRAFFIC_SOURCE + '-glow',
       type:   'line',
       source: TRAFFIC_SOURCE,
+      filter: ['any', ['<=', ['coalesce', ['get', 'speedRatio'], 1], 0.52], ['>=', ['coalesce', ['get', 'importance'], 0], 0.76]],
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint:  {
         'line-color': [
@@ -3246,14 +3313,14 @@ function initStaticSources(map: maplibregl.Map) {
           ],
           'transparent' 
         ],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 16, 12],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 5, 16, 14],
         'line-opacity': [
           'interpolate', ['linear'], ['zoom'],
-          10, 0.08,
-          12, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.72, 0.34],
-          17, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.72, 0.48]
+          10, 0.06,
+          12, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.58, 0.22],
+          17, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.68, 0.34]
         ],
-        'line-blur': ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 6, 3],
+        'line-blur': ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 7, 4],
       },
     }, TRAFFIC_SOURCE + '-lines')
   }
@@ -3319,21 +3386,27 @@ function initStaticSources(map: maplibregl.Map) {
       layout: {
         'symbol-placement': 'point',
         'text-field': '➤',
-        'text-size': ['interpolate', ['linear'], ['zoom'], 12, 8, 15, 12, 18, 15],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 12, 8, 15, 11, 18, 13],
         'text-rotate': ['get', 'bearing'],
         'text-allow-overlap': true,
         'text-ignore-placement': true,
       },
       paint: {
-        'text-color': '#F5F5F7',
+        'text-color': [
+          'interpolate', ['linear'], ['coalesce', ['get', 'speedRatio'], 1],
+          0.24, '#FF6B57',
+          0.48, '#FFB547',
+          0.72, '#FFE066',
+          1, '#CFFFE1',
+        ],
         'text-opacity': [
           'interpolate', ['linear'], ['get', 'speedRatio'],
-          0.2, 0.85,
-          0.6, 0.55,
-          1.0, 0.18,
+          0.2, 0.92,
+          0.6, 0.62,
+          1.0, 0.22,
         ],
-        'text-halo-color': 'rgba(8,9,11,0.8)',
-        'text-halo-width': 1.5,
+        'text-halo-color': 'rgba(8,9,11,0.95)',
+        'text-halo-width': 1.8,
       },
     })
   }
@@ -4519,6 +4592,17 @@ function clamp01(value: number): number {
 
 function getSpeedRatio(segment: Pick<TrafficSegment, 'speedKmh' | 'freeFlowSpeedKmh'>): number {
   return clamp01(segment.speedKmh / Math.max(segment.freeFlowSpeedKmh, 1))
+}
+
+function getCredibleSpeedKmh(speedKmh: number, freeFlowSpeedKmh: number, congestionScore: number): number {
+  const freeFlow = Math.max(18, freeFlowSpeedKmh || 18)
+  const floorRatio =
+    congestionScore >= 0.8 ? 0.16 :
+    congestionScore >= 0.6 ? 0.24 :
+    congestionScore >= 0.38 ? 0.4 :
+    0.58
+  const minSpeed = Math.max(8, freeFlow * floorRatio)
+  return Math.round(Math.max(speedKmh || 0, minSpeed))
 }
 
 function getSegmentBearing(coords: [number, number][]): number {

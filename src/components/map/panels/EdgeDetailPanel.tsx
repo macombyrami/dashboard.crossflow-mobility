@@ -23,10 +23,11 @@ export function EdgeDetailPanel() {
 
   if (!isPanelOpen || !segment) return null
 
-  const travelMin    = Math.round(segment.travelTimeSeconds / 60 * 10) / 10
-  const freeFlowTime = Math.round((segment.length / 1000) / segment.freeFlowSpeedKmh * 60 * 10) / 10
+  const displaySpeed = getCredibleDisplaySpeed(segment.speedKmh, segment.freeFlowSpeedKmh, segment.congestionScore)
+  const travelMin    = Math.round(Math.max(segment.travelTimeSeconds / 60, ((segment.length / 1000) / Math.max(displaySpeed, 8)) * 60) * 10) / 10
+  const freeFlowTime = Math.round((segment.length / 1000) / Math.max(segment.freeFlowSpeedKmh, 18) * 60 * 10) / 10
   const delayMin     = Math.max(0, travelMin - freeFlowTime)
-  const speedRatio   = segment.speedKmh / segment.freeFlowSpeedKmh
+  const speedRatio   = displaySpeed / Math.max(segment.freeFlowSpeedKmh, 1)
 
   // Use enriched trend or fallback to score-based
   const trend = segment.flowTrend || (segment.congestionScore > 0.6 ? 'worsening' : segment.congestionScore > 0.35 ? 'stable' : 'improving')
@@ -75,7 +76,7 @@ export function EdgeDetailPanel() {
 
       {/* Metrics */}
       <div className="p-4 grid grid-cols-2 gap-3 border-b border-bg-border">
-        <Metric icon={Gauge} label="Vitesse" value={`${Math.round(segment.speedKmh)} km/h`}
+        <Metric icon={Gauge} label="Vitesse" value={`${Math.round(displaySpeed)} km/h`}
           sub={`/ ${segment.freeFlowSpeedKmh} km/h`} color={congestionColor(segment.congestionScore)} />
         <Metric icon={Clock} label="Trajet" value={`${travelMin} min`}
           sub={delayMin > 0.5 ? `+${delayMin.toFixed(1)} min retard` : 'Fluide'} />
@@ -114,6 +115,16 @@ export function EdgeDetailPanel() {
       </div>
     </div>
   )
+}
+
+function getCredibleDisplaySpeed(speedKmh: number, freeFlowSpeedKmh: number, congestionScore: number) {
+  const freeFlow = Math.max(18, freeFlowSpeedKmh || 18)
+  const floorRatio =
+    congestionScore >= 0.8 ? 0.16 :
+    congestionScore >= 0.6 ? 0.24 :
+    congestionScore >= 0.38 ? 0.4 :
+    0.58
+  return Math.max(speedKmh || 0, freeFlow * floorRatio, 8)
 }
 
 function Metric({ icon: Icon, label, value, sub, color }: {
