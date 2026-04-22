@@ -30,12 +30,10 @@ import type { UserPosition } from '@/hooks/useGeolocation'
 import {
   generateTrafficSnapshot,
   generateIncidents,
-  generateTrafficFromOSMRoads,
   generateCityKPIs,
   generateTrafficFromIdfGeoJSON,
 } from '@/lib/engine/traffic.engine'
 import {
-  fetchRoads,
   fetchTrafficPOIs,
   fetchRouteGeometries,
   fetchMetroStations,
@@ -47,7 +45,7 @@ import {
   fetchAndInjectSytadinIncidents,
   isIdfCity,
 } from '@/lib/engine/sytadin.engine'
-import type { OSMRoad, OSMPOIPoint, OSMRouteGeometry, MetroStation } from '@/lib/api/overpass'
+import type { OSMPOIPoint, OSMRouteGeometry, MetroStation } from '@/lib/api/overpass'
 import { fetchAllTrafficStatus, LINE_COLORS } from '@/lib/api/ratp'
 import { simulateTransitVehicles, type TransitVehicle } from '@/lib/engine/transit.engine'
 import {
@@ -496,7 +494,6 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   const containerRef    = useRef<HTMLDivElement>(null)
   const popupRef        = useRef<maplibregl.Popup | null>(null)
   const searchMarkerRef = useRef<maplibregl.Marker | null>(null)
-  const osmRoadsRef     = useRef<Map<string, OSMRoad[]>>(new Map())
   const osmPoisRef      = useRef<Map<string, OSMPOIPoint[]>>(new Map())
   const osmRoutesRef    = useRef<Map<string, OSMRouteGeometry[]>>(new Map())
   const osmMetroRef       = useRef<Map<string, MetroStation[]>>(new Map())
@@ -507,7 +504,6 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   const previousSnapshotRef  = useRef<TrafficSnapshot | null>(null)
   const lastRefreshRef       = useRef<number>(0)
   const refreshRequestRef    = useRef(0)
-  const cityNetworkRef       = useRef<string | null>(null) // Track which city's network is loaded
   const liveVehiclesRef      = useRef<TransitVehicle[]>([])
   const pulseRef             = useRef<number>(0)
   const scanRef              = useRef<number>(0) // Phase 5: Radial Scan
@@ -1598,33 +1594,12 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     })
   }, [mapLoaded]) // eslint-disable-line
 
-  // ─── Fetch OSM roads for current city ────────────────────────────────
+  // ─── Load POIs (traffic signals, bus stops, subway entrances) ───────
 
   useEffect(() => {
     if (!mapLoaded) return
     const cityId = city.id
 
-    // Load OSM roads for real geometry
-    if (!osmRoadsRef.current.has(cityId)) {
-      fetchRoads(city.bbox, [
-        'motorway', 'motorway_link',
-        'trunk', 'trunk_link',
-        'primary', 'primary_link',
-        'secondary', 'secondary_link',
-        'tertiary', 'tertiary_link',
-        'residential', 'living_street', 'road', 'unclassified', 'service',
-      ])
-        .then(roads => {
-          if (cityRef.current.id !== cityId) return
-          if (roads.length > 0) {
-            const preloadLimit = isParisCity(cityRef.current) ? 8000 : isCompactCity(cityRef.current) ? 3500 : 5000
-            osmRoadsRef.current.set(cityId, roads.slice(0, preloadLimit))
-            refreshDataRef.current()
-          }
-        })
-    }
-
-    // Load POIs (traffic signals, bus stops, subway entrances) independently
     if (!osmPoisRef.current.has(cityId)) {
       fetchTrafficPOIs(city.bbox).then(pois => {
         if (cityRef.current.id !== cityId) return
@@ -2241,30 +2216,6 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     src.setData({ type: 'FeatureCollection', features: features.slice(0, 12) })
   }, [city, cityBoundary, mapLoaded, snapshot])
  
-  // ─── UCTN Initialization (Unified City Traffic Network) ──────────────
-  useEffect(() => {
-    if (!mapLoaded || !mapRef.current) return
-    const map = mapRef.current
-
-    const initNetwork = async () => {
-      const cityId = city.id
-      if (cityNetworkRef.current === cityId) return
-      
-      const { NetworkAggregator } = await import('@/lib/engine/NetworkAggregator')
-      const fc = await NetworkAggregator.getCityNetwork(city)
-      if (cityRef.current.id !== cityId) return
-      
-      const tSrc = safeGetSource(map, TRAFFIC_SOURCE) as maplibregl.GeoJSONSource | null
-      if (tSrc) {
-        tSrc.setData(fc)
-        cityNetworkRef.current = cityId
-        console.log(`[CrossFlow] UCTN Loaded for ${city.name}: ${fc.features.length} segments.`)
-      }
-    }
-
-    initNetwork()
-  }, [city, mapLoaded])
-
   // ─── Data refresh ─────────────────────────────────────────────────────
 
   const refreshData = useCallback(async () => {
@@ -2294,13 +2245,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       cityRef.current.id === cityNow.id &&
       mapRef.current === map
 
-    // ── 1. Determine base snapshot (road geometry only) ───────────────────
-    let snapshot = (() => {
-      const osmRoads = osmRoadsRef.current.get(cityNow.id)
-      return osmRoads && osmRoads.length > 0
-        ? generateTrafficFromOSMRoads(cityNow, osmRoads)
-        : generateTrafficSnapshot(cityNow)
-    })()
+    // ── 1. Determine base snapshot (never required for road rendering) ──
+    let snapshot = generateTrafficSnapshot(cityNow)
 
     // ── 2. Regional Scaling — Load real IDF network if applicable ────────
     if (isIdfCity(cityNow) && dataSourceRef.current === 'synthetic') {
@@ -2472,10 +2418,9 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     if (!snapshot) return
     if (!isRequestCurrent()) return
 
-    const { NetworkAggregator } = await import('@/lib/engine/NetworkAggregator')
-    const snappedSnapshot = NetworkAggregator.snapToNetwork(cityNow, snapshot)
+    const snappedSnapshot = snapshot
     if (!isRequestCurrent()) return
-    
+
     setSnapshot(snappedSnapshot)
     const incidentSplit = splitIncidents(incidents)
     setIncidents(incidents)
@@ -2516,8 +2461,6 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       const s2 = safeGetSource(map, TRAFFIC_PREDICTION_SOURCE) as maplibregl.GeoJSONSource | null
       if (s1) s1.setData(trafficGeo)
       if (s2) s2.setData(trafficGeo)
-      cityNetworkRef.current = cityNow.id
-
       // ─── A/B Split View Filtering ───
       if (modeRef.current === 'predict') {
         const filters: any = ['<', ['get', 'midpoint_lng'], splitLngRef.current]
@@ -3352,12 +3295,15 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
 function initStaticSources(map: maplibregl.Map) {
   if (!map.getSource(BASE_NETWORK_SOURCE)) {
+    const stadiaKey = process.env.NEXT_PUBLIC_STADIA_API_KEY
+    const vectorTiles = stadiaKey
+      ? [`https://tiles.stadiamaps.com/data/openmaptiles/{z}/{x}/{y}.pbf?api_key=${stadiaKey}`]
+      : ['https://tiles.openfreemap.org/planet/{z}/{x}/{y}.pbf']
+
     map.addSource(BASE_NETWORK_SOURCE, {
       type: 'vector',
-      tiles: [
-        `https://tiles.stadiamaps.com/data/openmaptiles/{z}/{x}/{y}.pbf?api_key=${process.env.NEXT_PUBLIC_STADIA_API_KEY}`
-      ],
-      maxzoom: 14,
+      tiles: vectorTiles,
+      maxzoom: 15,
       promoteId: 'id'
     })
   }
@@ -3418,8 +3364,8 @@ function initStaticSources(map: maplibregl.Map) {
         'line-color': '#E5E7EB',
         'line-width': [
           'interpolate', ['linear'], ['zoom'],
-          8, 0.8,
-          10, 1.2,
+          8, 0.7,
+          10, 1.1,
           12, 1.9,
           14, 3.2,
           17, 7.8,
@@ -3436,7 +3382,7 @@ function initStaticSources(map: maplibregl.Map) {
       type: 'line',
       source: BASE_NETWORK_SOURCE,
       'source-layer': 'road',
-      minzoom: 11,
+      minzoom: 8,
       filter: ['match', roadClassExpression(),
         [...ROAD_LOCAL_CLASSES],
         true,
@@ -3446,12 +3392,14 @@ function initStaticSources(map: maplibregl.Map) {
         'line-color': '#E5E7EB',
         'line-width': [
           'interpolate', ['linear'], ['zoom'],
-          11, 0.45,
-          13, 0.8,
-          15, 1.35,
+          8, 0.25,
+          10, 0.38,
+          12, 0.6,
+          14, 1.0,
+          16, 1.8,
           17, 2.8,
         ],
-        'line-opacity': 0.9,
+        'line-opacity': 0.88,
       },
       layout: { 'line-cap': 'round', 'line-join': 'round' }
     })
