@@ -1011,7 +1011,6 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     })
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right')
-    map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left')
 
     map.on('load', () => {
       console.log('[CrossFlow] Map loaded successfully')
@@ -2934,10 +2933,10 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     safeSetLayoutProperty(map, INCIDENT_SOURCE + '-cluster', 'visibility', incidentsVis)
     safeSetLayoutProperty(map, INCIDENT_SOURCE + '-count', 'visibility', incidentsVis)
     safeSetLayoutProperty(map, INCIDENT_SOURCE + '-unclustered', 'visibility', incidentsVis)
-    safeSetLayoutProperty(map, INCIDENT_SOURCE + '-label', 'visibility', incidentsVis)
+    safeSetLayoutProperty(map, INCIDENT_SOURCE + '-label', 'visibility', 'none')
     safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-glow', 'visibility', incidentsVis)
     safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-dot', 'visibility', incidentsVis)
-    safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-label', 'visibility', incidentsVis)
+    safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-label', 'visibility', 'none')
 
     if (isDecisionMap) {
       safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-lines', 'visibility', trafficVis)
@@ -2960,10 +2959,10 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       safeSetLayoutProperty(map, INCIDENT_SOURCE + '-cluster', 'visibility', incidentsVis)
       safeSetLayoutProperty(map, INCIDENT_SOURCE + '-count', 'visibility', incidentsVis)
       safeSetLayoutProperty(map, INCIDENT_SOURCE + '-unclustered', 'visibility', incidentsVis)
-      safeSetLayoutProperty(map, INCIDENT_SOURCE + '-label', 'visibility', incidentsVis)
+      safeSetLayoutProperty(map, INCIDENT_SOURCE + '-label', 'visibility', 'none')
       safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-glow', 'visibility', incidentsVis)
       safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-dot', 'visibility', incidentsVis)
-      safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-label', 'visibility', incidentsVis)
+      safeSetLayoutProperty(map, INCIDENT_CRITICAL_SOURCE + '-label', 'visibility', 'none')
     }
 
     // Boundary layers
@@ -2975,7 +2974,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-fill',  'visibility', districtsVis)
     safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-line',  'visibility', districtsVis)
-    safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-label', 'visibility', districtsVis)
+    safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-label', 'visibility', 'none')
     safeSetLayoutProperty(map, ENTRY_EXIT_SOURCE + '-halo', 'visibility', gatewaysVis)
     safeSetLayoutProperty(map, ENTRY_EXIT_SOURCE + '-circle', 'visibility', gatewaysVis)
     safeSetLayoutProperty(map, ENTRY_EXIT_SOURCE + '-label', 'visibility', 'none')
@@ -2988,7 +2987,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     safeSetLayoutProperty(map, VEHICLE_TRAILS_SOURCE + '-glow', 'visibility', transportVis)
     safeSetLayoutProperty(map, VEHICLE_TRAILS_SOURCE + '-line', 'visibility', transportVis)
     safeSetLayoutProperty(map, VEHICLES_SOURCE + '-layer', 'visibility', transportVis)
-    safeSetLayoutProperty(map, VEHICLES_SOURCE + '-label', 'visibility', transportVis)
+    safeSetLayoutProperty(map, VEHICLES_SOURCE + '-label', 'visibility', 'none')
     
     // Vehicle selection highlight visibility
     const selectedVehVis = (transportVis === 'visible' && selectedVehicleId !== null) ? 'visible' : 'none'
@@ -3003,8 +3002,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-glow',   'visibility', transportVis)
     safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-ring',   'visibility', transportVis)
     safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-dot',    'visibility', transportVis)
-    safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-lineref','visibility', transportVis)
-    safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-name',   'visibility', transportVis)
+    safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-lineref','visibility', 'none')
+    safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-name',   'visibility', 'none')
     safeSetLayoutProperty(map, METRO_STATIONS_SOURCE + '-alert',  'visibility', transportVis)
     if (isDecisionMap) {
       safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-glow-outer', 'visibility', 'none')
