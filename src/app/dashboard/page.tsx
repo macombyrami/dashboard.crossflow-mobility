@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useEffect, useMemo } from 'react'
 import {
   Activity,
@@ -11,7 +11,7 @@ import {
   ChevronRight,
   Clock3,
   CloudRain,
-  MapPinned,
+  Leaf,
   Siren,
   Wind,
 } from 'lucide-react'
@@ -21,10 +21,15 @@ import { useTrafficStore } from '@/store/trafficStore'
 import { useKPIHistoryStore } from '@/store/kpiHistoryStore'
 import { generateCityKPIs, generateIncidents, generatePrediction } from '@/lib/engine/traffic.engine'
 import { generateEventsForCity } from '@/lib/engine/events.engine'
-import { fetchWeather, fetchAirQuality } from '@/lib/api/openmeteo'
+import { fetchAirQuality, fetchWeather } from '@/lib/api/openmeteo'
 import { platformConfig } from '@/config/platform.config'
 import { pollutionLabel } from '@/lib/utils/congestion'
-import type { CityKPIs, TrafficSnapshot, Incident } from '@/types'
+import type { CityKPIs, Incident, TrafficSnapshot } from '@/types'
+
+const CrossFlowMap = dynamic(
+  () => import('@/components/map/CrossFlowMap').then(m => ({ default: m.CrossFlowMap })),
+  { ssr: false, loading: () => <MapSkeleton /> },
+)
 
 type DashboardState = 'fluid' | 'moderate' | 'critical'
 type ActionImpact = 'high' | 'medium' | 'low'
@@ -68,24 +73,24 @@ function stateMeta(state: DashboardState) {
   if (state === 'critical') {
     return {
       label: 'Critical',
-      color: '#DC2626',
-      tint: 'bg-red-50 border-red-200 text-red-700',
       chip: 'bg-red-100 text-red-700 border-red-200',
+      soft: 'bg-red-50 border-red-200',
+      accent: '#DC2626',
     }
   }
   if (state === 'moderate') {
     return {
       label: 'Moderate',
-      color: '#F59E0B',
-      tint: 'bg-amber-50 border-amber-200 text-amber-700',
       chip: 'bg-amber-100 text-amber-700 border-amber-200',
+      soft: 'bg-amber-50 border-amber-200',
+      accent: '#F59E0B',
     }
   }
   return {
     label: 'Fluid',
-    color: '#16A34A',
-    tint: 'bg-green-50 border-green-200 text-green-700',
     chip: 'bg-green-100 text-green-700 border-green-200',
+    soft: 'bg-green-50 border-green-200',
+    accent: '#16A34A',
   }
 }
 
@@ -126,7 +131,7 @@ function getPredictionLabel(now: DashboardState, p30: number, p60: number) {
   const state60 = getDashboardState(p60)
 
   if (now === 'critical' && state60 !== 'critical') return 'Recovery expected within 60 min'
-  if (state30 === 'critical' || state60 === 'critical') return 'Pressure likely to intensify within 30 min'
+  if (state30 === 'critical' || state60 === 'critical') return 'Peak expected within 1 hour'
   if (state30 === 'moderate' || state60 === 'moderate') return 'Moderate pressure expected for the next hour'
   return 'Stable for the next 60 min'
 }
@@ -149,10 +154,10 @@ function buildDecisionActions({
   if (topIncident && (topIncident.severity === 'critical' || topIncident.severity === 'high')) {
     actions.push({
       id: `incident-${topIncident.id}`,
-      title: 'Secure the incident zone',
+      title: 'Secure incident zone',
       impact: 'high',
       urgency: 'now',
-      action: `Deploy field response and route diversion around ${topIncident.address}.`,
+      action: `Deploy field response and rerouting around ${topIncident.address}.`,
     })
   }
 
@@ -162,14 +167,14 @@ function buildDecisionActions({
       title: 'Prepare event traffic plan',
       impact: topEvent.trafficIncrease >= 40 ? 'high' : 'medium',
       urgency: 'soon',
-      action: `Activate pre-event traffic control near ${topEvent.venue ?? topEvent.location.address} before ${formatTime(topEvent.startDate)}.`,
+      action: `Activate traffic control near ${topEvent.venue ?? topEvent.location.address} before ${formatTime(topEvent.startDate)}.`,
     })
   }
 
   if (weatherImpact && weatherImpact !== 'none') {
     actions.push({
       id: 'weather',
-      title: 'Adapt operations to weather drag',
+      title: 'Adapt to weather drag',
       impact: weatherImpact === 'severe' ? 'high' : 'medium',
       urgency: weatherImpact === 'severe' ? 'now' : 'soon',
       action: 'Reduce response latency on exposed corridors and update roadside guidance.',
@@ -178,31 +183,52 @@ function buildDecisionActions({
 
   actions.push({
     id: 'network',
-    title: state === 'critical' ? 'Arbitrate network capacity' : 'Maintain active monitoring',
+    title: state === 'critical' ? 'Prepare traffic rerouting' : state === 'moderate' ? 'Maintain active monitoring' : 'No action required',
     impact: state === 'critical' ? 'high' : state === 'moderate' ? 'medium' : 'low',
     urgency: state === 'critical' ? 'now' : state === 'moderate' ? 'soon' : 'watch',
     action: state === 'critical'
       ? `Prioritize signal control and dynamic rerouting across ${cityName}'s main corridors.`
       : state === 'moderate'
-        ? 'Keep the main corridors under adaptive control and watch for spillover.'
-        : 'Keep the simplified view active and preserve capacity for new incidents.',
+        ? 'Keep corridor regulation adaptive and watch for spillover.'
+        : 'Maintain monitoring and preserve response capacity.',
   })
 
   return actions.slice(0, 3)
 }
 
+function buildHeroAction({
+  state,
+  cause,
+  predictionLabel,
+  action,
+}: {
+  state: DashboardState
+  cause: { detail: string; area: string }
+  predictionLabel: string
+  action: DecisionAction | undefined
+}) {
+  const stateText =
+    state === 'critical'
+      ? 'Critical congestion detected'
+      : state === 'moderate'
+        ? 'Moderate congestion detected'
+        : 'Fluid traffic detected'
+
+  return `${stateText} in ${cause.area}. ${predictionLabel}. Action recommended: ${action?.title.toLowerCase() ?? 'maintain monitoring'}.`
+}
+
 function DashboardSkeleton() {
   return (
     <main className="min-h-0 flex-1 overflow-y-auto bg-[#FCFCFA]">
-      <div className="mx-auto w-full max-w-6xl px-6 py-10 md:px-10 md:py-14">
-        <div className="space-y-8">
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 md:px-8 md:py-8">
+        <div className="space-y-6">
           <div className="h-40 rounded-[32px] bg-stone-100 animate-pulse" />
           <div className="grid gap-4 md:grid-cols-3">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-28 rounded-[24px] bg-stone-100 animate-pulse" />
+            {[0, 1, 2].map(i => (
+              <div key={i} className="h-24 rounded-[24px] bg-stone-100 animate-pulse" />
             ))}
           </div>
-          <div className="h-72 rounded-[32px] bg-stone-100 animate-pulse" />
+          <div className="h-[480px] rounded-[32px] bg-stone-100 animate-pulse" />
         </div>
       </div>
     </main>
@@ -211,6 +237,8 @@ function DashboardSkeleton() {
 
 export default function DashboardPage() {
   const city = useMapStore(s => s.city)
+  const setMode = useMapStore(s => s.setMode)
+  const setLayer = useMapStore(s => s.setLayer)
   const kpis = useTrafficStore(s => s.kpis)
   const setKPIs = useTrafficStore(s => s.setKPIs)
   const setIncidents = useTrafficStore(s => s.setIncidents)
@@ -222,6 +250,14 @@ export default function DashboardPage() {
   const airQuality = useTrafficStore(s => s.airQuality)
   const setAirQuality = useTrafficStore(s => s.setAirQuality)
   const addSnapshot = useKPIHistoryStore(s => s.addSnapshot)
+
+  useEffect(() => {
+    setMode('live')
+    setLayer('traffic', true)
+    setLayer('heatmap', false)
+    setLayer('incidents', false)
+    setLayer('boundary', true)
+  }, [setLayer, setMode, city.id])
 
   useEffect(() => {
     if (dataSource === 'live') return
@@ -290,50 +326,32 @@ export default function DashboardPage() {
     weatherImpact: openMeteoWeather?.trafficImpact,
     cityName: city.name,
   })
-
-  const detailsCount = {
-    weather: openMeteoWeather ? 1 : 0,
-    events: events.length,
-    incidents: incidents.length,
-  }
+  const heroAction = buildHeroAction({ state, cause, predictionLabel, action: actions[0] })
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto bg-[#FCFCFA] text-stone-900">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8 md:gap-10 md:px-10 md:py-12">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-5 md:gap-8 md:px-8 md:py-8">
 
-        <section className="rounded-[34px] border border-stone-200 bg-white px-6 py-7 shadow-[0_24px_60px_rgba(15,23,42,0.05)] md:px-10 md:py-10">
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl space-y-6">
-              <div className="flex items-center gap-3">
-                <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em]', meta.chip)}>
-                  {meta.label}
-                </span>
-                <span className="text-[11px] uppercase tracking-[0.24em] text-stone-400">
-                  {city.name}
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-[12px] font-medium uppercase tracking-[0.24em] text-stone-400">
-                  City Status
-                </p>
-                <h1 className="max-w-2xl text-4xl font-semibold tracking-[-0.04em] text-stone-950 md:text-6xl">
-                  {state === 'critical'
-                    ? 'Immediate action needed.'
-                    : state === 'moderate'
-                      ? 'Watch the network closely.'
-                      : 'Network stable.'}
-                </h1>
-                <p className="max-w-2xl text-base leading-7 text-stone-500 md:text-lg">
-                  {cause.detail}. The most impacted area is <span className="font-semibold text-stone-800">{cause.area}</span>. {predictionLabel}.
-                </p>
-              </div>
+        <section className="rounded-[32px] border border-stone-200 bg-white px-5 py-5 shadow-[0_24px_60px_rgba(15,23,42,0.05)] md:px-8 md:py-7">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em]', meta.chip)}>
+                {meta.label}
+              </span>
+              <span className="text-[11px] uppercase tracking-[0.24em] text-stone-400">{city.name}</span>
+              <span className="text-[11px] uppercase tracking-[0.24em] text-stone-300">•</span>
+              <span className="text-[11px] uppercase tracking-[0.24em] text-stone-400">{dataSource === 'live' ? 'Live' : 'Synthetic'}</span>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:w-[320px] lg:grid-cols-1">
-              <HeroFact label="Main cause" value={cause.label} tone={state} />
-              <HeroFact label="Impacted area" value={cause.area} tone={state} />
-              <HeroFact label="Time outlook" value={predictionLabel} tone={state} />
+            <div className="space-y-3">
+              <h1 className="max-w-5xl text-3xl font-semibold tracking-[-0.05em] text-stone-950 md:text-5xl">
+                {heroAction}
+              </h1>
+              <div className="flex flex-wrap gap-2.5">
+                <HeroChip icon={AlertTriangle} label={cause.label} />
+                <HeroChip icon={CalendarClock} label={cause.area} />
+                <HeroChip icon={ChevronRight} label={predictionLabel} />
+              </div>
             </div>
           </div>
         </section>
@@ -358,153 +376,107 @@ export default function DashboardPage() {
             value={`${kpis.pollutionIndex.toFixed(1)} / 10`}
             sub={pollution.label}
             tone={kpis.pollutionIndex >= platformConfig.kpi.targets.pollution_index.critical ? 'critical' : kpis.pollutionIndex >= platformConfig.kpi.targets.pollution_index.warning ? 'moderate' : 'fluid'}
-            icon={Wind}
+            icon={Leaf}
           />
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-[32px] border border-stone-200 bg-white px-6 py-6 shadow-[0_24px_60px_rgba(15,23,42,0.04)] md:px-8 md:py-8">
-            <div className="mb-8 flex items-start justify-between gap-4">
-              <div className="space-y-2">
-                <p className="text-[12px] font-medium uppercase tracking-[0.24em] text-stone-400">
-                  AI Decision Panel
-                </p>
-                <h2 className="text-2xl font-semibold tracking-[-0.03em] text-stone-950">
-                  What should I do next?
-                </h2>
-                <p className="max-w-xl text-sm leading-6 text-stone-500">
-                  Only the next best actions are shown. Raw monitoring data stays hidden until needed.
-                </p>
+        <section className="grid gap-5 xl:grid-cols-[0.56fr_0.44fr]">
+          <div className="order-2 xl:order-1">
+            <div className="rounded-[32px] border border-stone-200 bg-white p-3 shadow-[0_24px_60px_rgba(15,23,42,0.04)] md:p-4">
+              <div className="mb-3 flex items-center justify-between px-2">
+                <div>
+                  <p className="text-[12px] font-medium uppercase tracking-[0.24em] text-stone-400">Live map</p>
+                  <p className="mt-1 text-sm text-stone-500">Roads and traffic always visible.</p>
+                </div>
               </div>
-              <BrainCircuit className="mt-1 h-5 w-5 text-stone-300" />
-            </div>
-
-            <div className="space-y-4">
-              {actions.map((action) => (
-                <ActionCard key={action.id} action={action} />
-              ))}
+              <div className="relative overflow-hidden rounded-[26px] border border-stone-200 bg-[#F8F8F5]">
+                <div className="h-[420px] md:h-[520px] xl:h-[640px]">
+                  <CrossFlowMap />
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-stone-200 bg-white px-6 py-6 shadow-[0_24px_60px_rgba(15,23,42,0.04)] md:px-8 md:py-8">
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <p className="text-[12px] font-medium uppercase tracking-[0.24em] text-stone-400">
-                  Map Context
-                </p>
-                <h2 className="text-2xl font-semibold tracking-[-0.03em] text-stone-950">
-                  Spatial preview
-                </h2>
-                <p className="text-sm leading-6 text-stone-500">
-                  Open the map only when spatial context is needed. The default dashboard stays simplified.
-                </p>
+          <div className="order-1 xl:order-2 flex flex-col gap-5">
+            <section className="rounded-[32px] border border-stone-200 bg-white px-5 py-5 shadow-[0_24px_60px_rgba(15,23,42,0.04)] md:px-6 md:py-6">
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <p className="text-[12px] font-medium uppercase tracking-[0.24em] text-stone-400">AI Decision Panel</p>
+                  <h2 className="text-2xl font-semibold tracking-[-0.03em] text-stone-950">What should I do now?</h2>
+                </div>
+                <BrainCircuit className="mt-1 h-5 w-5 text-stone-300" />
+              </div>
+              <div className="space-y-3">
+                {actions.map(action => (
+                  <ActionCard key={action.id} action={action} />
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[32px] border border-stone-200 bg-white px-5 py-5 shadow-[0_24px_60px_rgba(15,23,42,0.04)] md:px-6 md:py-6">
+              <div className="mb-5 space-y-2">
+                <p className="text-[12px] font-medium uppercase tracking-[0.24em] text-stone-400">Advanced context</p>
+                <h2 className="text-2xl font-semibold tracking-[-0.03em] text-stone-950">Details on demand</h2>
               </div>
 
-              <div className={cn('rounded-[28px] border px-5 py-5', meta.tint)}>
-                <div className="mb-5 flex items-center justify-between">
-                  <MapPinned className="h-5 w-5" />
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.22em]">
-                    {dataSource === 'live' ? 'Live' : 'Synthetic'}
-                  </span>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] opacity-70">Focus</p>
-                    <p className="mt-1 text-lg font-semibold text-stone-900">{cause.area}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] opacity-70">Current state</p>
-                    <p className="mt-1 text-sm leading-6 text-stone-700">{cause.detail}</p>
-                  </div>
-                </div>
+              <div className="space-y-3">
+                <DetailSection title="Weather" count={openMeteoWeather ? 1 : 0} icon={CloudRain}>
+                  {openMeteoWeather ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <DetailMetric label="Condition" value={`${openMeteoWeather.weatherEmoji} ${openMeteoWeather.weatherLabel}`} />
+                      <DetailMetric label="Temperature" value={`${openMeteoWeather.temp}°C`} />
+                      <DetailMetric label="Wind" value={`${openMeteoWeather.windSpeedKmh} km/h`} />
+                      <DetailMetric label="Visibility" value={`${Math.round(openMeteoWeather.visibilityM / 1000)} km`} />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-stone-500">Weather telemetry unavailable.</p>
+                  )}
+                </DetailSection>
+
+                <DetailSection title="Events" count={events.length} icon={CalendarClock}>
+                  {events.length > 0 ? (
+                    <div className="space-y-3">
+                      {events.slice(0, 3).map(event => (
+                        <ListRow
+                          key={event.id ?? event.title}
+                          title={event.title}
+                          subtitle={`${event.venue ?? event.location.address} · ${formatTime(event.startDate)}`}
+                          meta={`+${event.trafficIncrease ?? Math.round(event.trafficScore * 100)}%`}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-stone-500">No major event pressure detected.</p>
+                  )}
+                </DetailSection>
+
+                <DetailSection title="Incidents" count={incidents.length} icon={Siren}>
+                  {incidents.length > 0 ? (
+                    <div className="space-y-3">
+                      {incidents.slice(0, 4).map(incident => (
+                        <ListRow
+                          key={incident.id}
+                          title={incident.title}
+                          subtitle={incident.address}
+                          meta={incident.severity}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-stone-500">No active incident requiring review.</p>
+                  )}
+                </DetailSection>
+
+                {airQuality && (
+                  <DetailSection title="Air quality" count={1} icon={Wind}>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <DetailMetric label="AQI" value={`${airQuality.level} (${Math.round(airQuality.aqiEuropean)})`} />
+                      <DetailMetric label="Traffic impact" value={airQuality.trafficImpact > 0 ? `+${Math.round(airQuality.trafficImpact * 100)}% drag` : 'None'} />
+                    </div>
+                  </DetailSection>
+                )}
               </div>
-
-              <Link
-                href="/map"
-                className="inline-flex items-center gap-2 rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:border-stone-950 hover:text-stone-950"
-              >
-                Open decision map
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-[32px] border border-stone-200 bg-white px-6 py-6 shadow-[0_24px_60px_rgba(15,23,42,0.04)] md:px-8 md:py-8">
-          <div className="mb-6 space-y-2">
-            <p className="text-[12px] font-medium uppercase tracking-[0.24em] text-stone-400">
-              Details
-            </p>
-            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-stone-950">
-              Advanced context
-            </h2>
-            <p className="text-sm leading-6 text-stone-500">
-              Secondary information is available on demand to prevent overload in the default view.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <DetailSection
-              title="Weather"
-              count={detailsCount.weather}
-              icon={CloudRain}
-              defaultOpen={false}
-            >
-              {openMeteoWeather ? (
-                <div className="grid gap-4 md:grid-cols-4">
-                  <DetailMetric label="Condition" value={`${openMeteoWeather.weatherEmoji} ${openMeteoWeather.weatherLabel}`} />
-                  <DetailMetric label="Temperature" value={`${openMeteoWeather.temp}°C`} />
-                  <DetailMetric label="Wind" value={`${openMeteoWeather.windSpeedKmh} km/h`} />
-                  <DetailMetric label="Visibility" value={`${Math.round(openMeteoWeather.visibilityM / 1000)} km`} />
-                </div>
-              ) : (
-                <p className="text-sm text-stone-500">Weather telemetry unavailable.</p>
-              )}
-            </DetailSection>
-
-            <DetailSection
-              title="Events"
-              count={detailsCount.events}
-              icon={CalendarClock}
-              defaultOpen={false}
-            >
-              {events.length > 0 ? (
-                <div className="space-y-3">
-                  {events.slice(0, 3).map((event) => (
-                    <ListRow
-                      key={event.id ?? event.title}
-                      title={event.title}
-                      subtitle={`${event.venue ?? event.location.address} · ${formatTime(event.startDate)}`}
-                      meta={`+${event.trafficIncrease ?? Math.round(event.trafficScore * 100)}%`}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-stone-500">No major event pressure detected.</p>
-              )}
-            </DetailSection>
-
-            <DetailSection
-              title="Incidents"
-              count={detailsCount.incidents}
-              icon={Siren}
-              defaultOpen={false}
-            >
-              {incidents.length > 0 ? (
-                <div className="space-y-3">
-                  {incidents.slice(0, 4).map((incident) => (
-                    <ListRow
-                      key={incident.id}
-                      title={incident.title}
-                      subtitle={incident.address}
-                      meta={incident.severity}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-stone-500">No active incident requiring review.</p>
-              )}
-            </DetailSection>
+            </section>
           </div>
         </section>
       </div>
@@ -512,25 +484,16 @@ export default function DashboardPage() {
   )
 }
 
-function HeroFact({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: string
-  tone: DashboardState
-}) {
-  const meta = stateMeta(tone)
+function MapSkeleton() {
+  return <div className="h-full w-full bg-stone-100 animate-pulse" />
+}
 
+function HeroChip({ icon: Icon, label }: { icon: typeof AlertTriangle; label: string }) {
   return (
-    <div className="rounded-[22px] border border-stone-200 bg-stone-50 px-4 py-4">
-      <p className="text-[11px] uppercase tracking-[0.2em] text-stone-400">{label}</p>
-      <p className="mt-2 text-sm font-semibold leading-6 text-stone-900">{value}</p>
-      <div className="mt-4 h-1.5 rounded-full bg-stone-200">
-        <div className="h-full rounded-full" style={{ width: '100%', backgroundColor: meta.color }} />
-      </div>
-    </div>
+    <span className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-[12px] font-medium text-stone-700">
+      <Icon className="h-3.5 w-3.5 text-stone-400" />
+      {label}
+    </span>
   )
 }
 
@@ -567,18 +530,18 @@ function MetricCard({
 
 function ActionCard({ action }: { action: DecisionAction }) {
   return (
-    <div className="rounded-[26px] border border-stone-200 bg-stone-50 px-5 py-5">
+    <div className="rounded-[24px] border border-stone-200 bg-stone-50 px-4 py-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className={cn('rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]', actionTone(action.impact))}>
-          Impact {action.impact}
+          {action.impact}
         </span>
         <span className={cn('rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]', actionTone(action.urgency))}>
           {action.urgency}
         </span>
       </div>
-      <h3 className="mt-4 text-lg font-semibold tracking-[-0.02em] text-stone-950">{action.title}</h3>
-      <p className="mt-3 max-w-2xl text-sm leading-7 text-stone-600">{action.action}</p>
-      <div className="mt-5 flex items-center gap-2 text-sm font-medium text-stone-800">
+      <h3 className="mt-3 text-base font-semibold tracking-[-0.02em] text-stone-950">{action.title}</h3>
+      <p className="mt-2 text-sm leading-6 text-stone-600">{action.action}</p>
+      <div className="mt-3 flex items-center gap-2 text-sm font-medium text-stone-800">
         <ArrowRight className="h-4 w-4" />
         Recommended action
       </div>
@@ -591,19 +554,14 @@ function DetailSection({
   count,
   icon: Icon,
   children,
-  defaultOpen,
 }: {
   title: string
   count: number
   icon: typeof AlertTriangle
   children: React.ReactNode
-  defaultOpen?: boolean
 }) {
   return (
-    <details
-      open={defaultOpen}
-      className="group rounded-[24px] border border-stone-200 bg-stone-50 px-5 py-4"
-    >
+    <details className="group rounded-[24px] border border-stone-200 bg-stone-50 px-4 py-3">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="rounded-2xl border border-stone-200 bg-white p-2.5">
@@ -616,9 +574,7 @@ function DetailSection({
         </div>
         <ChevronRight className="h-4 w-4 text-stone-400 transition-transform group-open:rotate-90" />
       </summary>
-      <div className="pt-5">
-        {children}
-      </div>
+      <div className="pt-4">{children}</div>
     </details>
   )
 }
