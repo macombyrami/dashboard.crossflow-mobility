@@ -1,11 +1,13 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { ChevronUp, SlidersHorizontal } from 'lucide-react'
 import { MapSearchControl } from '@/components/map/controls/MapSearchControl'
 import { MapLegend } from '@/components/map/MapLegend'
 import { useMapStore } from '@/store/mapStore'
 import { useTranslation } from '@/lib/hooks/useTranslation'
+import type { MapLayerId } from '@/types'
 
 const CrossFlowMap = dynamic(
   () => import('@/components/map/CrossFlowMap').then(m => ({ default: m.CrossFlowMap })),
@@ -15,13 +17,15 @@ const CrossFlowMap = dynamic(
 export default function MapPage() {
   const setMode = useMapStore(s => s.setMode)
   const setLayer = useMapStore(s => s.setLayer)
+  const activeLayers = useMapStore(s => s.activeLayers)
   const setAIPanelOpen = useMapStore(s => s.setAIPanelOpen)
+  const [layersOpen, setLayersOpen] = useState(false)
 
   useEffect(() => {
     setMode('live')
     setLayer('traffic', true)
-    setLayer('transport', true)
-    setLayer('incidents', true)
+    setLayer('transport', false)
+    setLayer('incidents', false)
     setLayer('heatmap', false)
     setLayer('boundary', false)
     setAIPanelOpen(false)
@@ -39,8 +43,77 @@ export default function MapPage() {
         </div>
 
         <MapLegend />
+
+        <div className="pointer-events-auto absolute bottom-5 right-3 z-30 sm:right-4">
+          <button
+            onClick={() => setLayersOpen(value => !value)}
+            className="flex h-11 items-center gap-2 rounded-full border border-stone-200 bg-white/96 px-4 shadow-[0_14px_34px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-all hover:border-stone-300"
+            aria-label="Toggle map layers"
+          >
+            <SlidersHorizontal className="h-4 w-4 text-stone-700" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-stone-600">Layers</span>
+          </button>
+
+          {layersOpen && (
+            <div className="absolute bottom-14 right-0 w-[190px] overflow-hidden rounded-[22px] border border-stone-200 bg-white/98 shadow-[0_18px_48px_rgba(15,23,42,0.14)] backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
+                <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-stone-500">Layers</span>
+                <ChevronUp className={`h-4 w-4 text-stone-400 transition-transform ${layersOpen ? '' : 'rotate-180'}`} />
+              </div>
+              <div className="space-y-1 p-2">
+                <LayerToggle
+                  label="Traffic"
+                  checked={activeLayers.has('traffic')}
+                  onChange={(checked) => setLayer('traffic', checked)}
+                />
+                <LayerToggle
+                  label="Transport"
+                  checked={activeLayers.has('transport')}
+                  onChange={(checked) => setLayer('transport', checked)}
+                />
+                <LayerToggle
+                  label="Incidents"
+                  checked={activeLayers.has('incidents')}
+                  onChange={(checked) => setLayer('incidents', checked)}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
+  )
+}
+
+function LayerToggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      className={`flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left transition-all ${
+        checked ? 'bg-stone-100' : 'hover:bg-stone-50'
+      }`}
+    >
+      <span className="text-[13px] font-medium text-stone-800">{label}</span>
+      <span
+        className={`relative flex h-6 w-10 items-center rounded-full transition-colors ${
+          checked ? 'bg-stone-900' : 'bg-stone-200'
+        }`}
+      >
+        <span
+          className={`absolute h-4 w-4 rounded-full bg-white transition-transform ${
+            checked ? 'translate-x-5' : 'translate-x-1'
+          }`}
+        />
+      </span>
+    </button>
   )
 }
 

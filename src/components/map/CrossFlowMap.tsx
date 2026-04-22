@@ -15,7 +15,7 @@ import { predictiveApi } from '@/lib/api/predictive'
 import { platformConfig } from '@/config/platform.config'
 import { congestionColor, scoreToCongestionLevel } from '@/lib/utils/congestion'
 import { cn } from '@/lib/utils/cn'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Minus, Plus } from 'lucide-react'
 import { VehicleInfoCard } from '@/components/map/VehicleInfoCard'
 import { VehicleFilterPanel } from '@/components/map/VehicleFilterPanel'
 import { MapSplitSlider } from '@/components/map/MapSplitSlider'
@@ -1009,8 +1009,6 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       minZoom:   8,
       attributionControl: false,
     })
-
-    map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right')
 
     map.on('load', () => {
       console.log('[CrossFlow] Map loaded successfully')
@@ -3315,13 +3313,27 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       
       {/* HUD elements are now managed by MapPage for better orchestration with AIPanel */}
 
-      {/* ─── Geolocation Control ───────────────────────────────────── */}
+      {/* ─── Geolocation + Zoom Controls ───────────────────────────── */}
       {mapLoaded && (
-        <div className="absolute bottom-24 right-3 z-[400] sm:bottom-5 sm:right-4">
-          <GeolocationControl
-            onPositionChange={handleUserPosition}
-            onFlyTo={handleGeoFlyTo}
-          />
+        <div className="absolute bottom-20 right-3 z-[400] flex flex-col items-end gap-2 sm:bottom-5 sm:right-4">
+          <GeolocationControl onPositionChange={handleUserPosition} onFlyTo={handleGeoFlyTo} />
+          <div className="overflow-hidden rounded-[22px] border border-stone-200 bg-white/96 shadow-[0_14px_34px_rgba(15,23,42,0.14)] backdrop-blur-xl">
+            <button
+              onClick={() => mapRef.current?.zoomIn({ duration: 250 })}
+              className="flex h-10 w-10 items-center justify-center text-stone-700 transition-colors hover:bg-stone-50"
+              aria-label="Zoom in"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+            <div className="h-px bg-stone-200" />
+            <button
+              onClick={() => mapRef.current?.zoomOut({ duration: 250 })}
+              className="flex h-10 w-10 items-center justify-center text-stone-700 transition-colors hover:bg-stone-50"
+              aria-label="Zoom out"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       )}
 

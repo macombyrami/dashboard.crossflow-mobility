@@ -114,7 +114,7 @@ interface MapStore {
 
 const defaultCity = CITIES.find(c => c.id === DEFAULT_CITY_ID)!
 let latestBoundaryRequestId = 0
-const EXCLUSIVE_VISUAL_LAYERS = new Set<MapLayerId>(['traffic', 'heatmap', 'incidents'])
+const EXCLUSIVE_VISUAL_LAYERS = new Set<MapLayerId>(['heatmap'])
 
 export const useMapStore = create<MapStore>()(
   persist(
