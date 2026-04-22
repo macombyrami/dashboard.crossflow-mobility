@@ -90,6 +90,8 @@ export interface TrafficSegment {
   axisName?:        string   // e.g. "Boulevard Saint-Michel"
   flowTrend?:       'improving' | 'stable' | 'worsening'
   anomalyScore?:    number   // 0-1 (V4 Engine Delta)
+  observedTraffic?: boolean
+  estimatedTraffic?: boolean
 }
 
 export interface HeatmapPoint {

@@ -21,8 +21,8 @@ import { enrichSegmentWithStreetMetadata } from './StreetMapper'
 
 type ModalSplit = { car: number; metro: number; bus: number; bike: number; pedestrian: number }
 
-const MAX_NETWORK_SEGMENTS = 520
-const MAX_HEATMAP_POINTS = 420
+const MAX_NETWORK_SEGMENTS = 4200
+const MAX_HEATMAP_POINTS = 1800
 
 function normalizeModalSplit(raw: ModalSplit): ModalSplit {
   const total = raw.car + raw.metro + raw.bus + raw.bike + raw.pedestrian
@@ -217,6 +217,8 @@ function buildTrafficSegment(
     mode: 'car',
     lastUpdated: now.toISOString(),
     anomalyScore: enriched.anomalyScore,
+    observedTraffic: false,
+    estimatedTraffic: true,
   })
 }
 

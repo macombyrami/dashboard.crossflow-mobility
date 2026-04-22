@@ -424,6 +424,72 @@ function computeRoadWidth(roadType: string | undefined, level: CongestionLevel, 
   return Math.round(baseWidth * multiplier * zoomFactor * 10) / 10
 }
 
+function hasObservedTraffic(segment: TrafficSegment): boolean {
+  return segment.observedTraffic === true
+}
+
+function buildTrafficFeatureCollection(
+  segments: TrafficSegment[],
+  zoom: number,
+  isMobile: boolean,
+): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: segments.map((segment) => {
+      const credibleSpeed = getCredibleSpeedKmh(segment.speedKmh, segment.freeFlowSpeedKmh, segment.congestionScore)
+      const speedRatio = clamp01(credibleSpeed / Math.max(segment.freeFlowSpeedKmh, 1))
+      const hasObserved = hasObservedTraffic(segment)
+      const predictedRatio = hasObserved
+        ? clamp01(
+            speedRatio +
+              (segment.flowTrend === 'improving' ? 0.08 : segment.flowTrend === 'worsening' ? -0.08 : -0.03),
+          )
+        : speedRatio
+      const importance = clamp01(
+        segment.priorityAxis ??
+          (segment.roadType === 'motorway'
+            ? 1
+            : segment.roadType === 'trunk'
+              ? 0.85
+              : segment.roadType === 'primary'
+                ? 0.7
+                : segment.roadType === 'secondary'
+                  ? 0.55
+                  : 0.35),
+      )
+
+      return {
+        type: 'Feature' as const,
+        id: segment.id,
+        geometry: { type: 'LineString' as const, coordinates: segment.coordinates },
+        properties: {
+          id: segment.id,
+          roadType: segment.roadType,
+          highway: segment.roadType,
+          streetName: segment.streetName,
+          axisName: segment.axisName,
+          direction: segment.direction,
+          speedKmh: credibleSpeed,
+          freeFlowSpeedKmh: segment.freeFlowSpeedKmh,
+          speedRatio,
+          predictedSpeedRatio: predictedRatio,
+          congestion: segment.congestionScore,
+          importance,
+          width: computeRoadWidth(segment.roadType, segment.level, zoom, isMobile),
+          color: hasObserved ? getTrafficColor(speedRatio) : '#D1D5DB',
+          level: segment.level,
+          hasObservedTraffic: hasObserved,
+          isEstimatedTraffic: segment.estimatedTraffic === true,
+          midpoint_lng: segment.coordinates[Math.floor(segment.coordinates.length / 2)]?.[0] ?? 0,
+          corridorLabel: hasObserved
+            ? `${segment.streetName || segment.axisName || 'Urban corridor'}${predictedRatio < speedRatio - 0.04 ? ' · spike risk' : speedRatio < 0.55 ? ' · slowdown' : ''}`
+            : '',
+        },
+      }
+    }),
+  }
+}
+
 export const CrossFlowMap = memo(function CrossFlowMap() {
   const pathname        = usePathname()
   const mapRef          = useRef<maplibregl.Map | null>(null)
@@ -2290,6 +2356,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
               length,
               mode:             'car' as const,
               lastUpdated:      now,
+              observedTraffic:  true,
+              estimatedTraffic: false,
             }
           })
 
@@ -2417,14 +2485,12 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     // --- High Performance: UCTN Property Updates ---
     if (safeGetSource(map, TRAFFIC_SOURCE)) {
-      const activeIds = new Set(snappedSnapshot.segments.map(s => s.id))
-      
       // Update state for current live data
       snappedSnapshot.segments.forEach(seg => {
         safeSetFeatureState(map,
           { source: TRAFFIC_SOURCE, id: seg.id },
           { 
-            hasData: true, 
+            hasData: hasObservedTraffic(seg),
             levelCode: scoreToCongestionLevel(seg.congestionScore) === 'free' ? 0 : 
                       scoreToCongestionLevel(seg.congestionScore) === 'slow' ? 1 :
                       scoreToCongestionLevel(seg.congestionScore) === 'congested' ? 2 : 3,
@@ -2441,32 +2507,19 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
         const predictedScore = Math.min(1, currentScore + 0.15)
         safeSetFeatureState(map,
           { source: TRAFFIC_PREDICTION_SOURCE, id: seg.id },
-          { levelCode: scoreToCongestionLevel(predictedScore) === 'free' ? 0 : 
+          { hasData: hasObservedTraffic(seg),
+            levelCode: scoreToCongestionLevel(predictedScore) === 'free' ? 0 : 
                        scoreToCongestionLevel(predictedScore) === 'slow' ? 1 :
                        scoreToCongestionLevel(predictedScore) === 'congested' ? 2 : 3 }
         )
       })
 
-      // Sync geometries if city changed
-      if (cityNetworkRef.current !== cityNow.id) {
-        const geo: GeoJSON.FeatureCollection = {
-          type: 'FeatureCollection',
-          features: snappedSnapshot.segments.map(s => ({
-            type: 'Feature',
-            id: s.id,
-            geometry: { type: 'LineString', coordinates: s.coordinates },
-            properties: { 
-              highway: s.roadType,
-              midpoint_lng: s.coordinates[Math.floor(s.coordinates.length / 2)][0]
-            }
-          }))
-        }
-        const s1 = safeGetSource(map, TRAFFIC_SOURCE) as maplibregl.GeoJSONSource | null
-        const s2 = safeGetSource(map, TRAFFIC_PREDICTION_SOURCE) as maplibregl.GeoJSONSource | null
-        if (s1) s1.setData(geo)
-        if (s2) s2.setData(geo)
-        cityNetworkRef.current = cityNow.id
-      }
+      const trafficGeo = buildTrafficFeatureCollection(snappedSnapshot.segments, map.getZoom(), isMobile)
+      const s1 = safeGetSource(map, TRAFFIC_SOURCE) as maplibregl.GeoJSONSource | null
+      const s2 = safeGetSource(map, TRAFFIC_PREDICTION_SOURCE) as maplibregl.GeoJSONSource | null
+      if (s1) s1.setData(trafficGeo)
+      if (s2) s2.setData(trafficGeo)
+      cityNetworkRef.current = cityNow.id
 
       // ─── A/B Split View Filtering ───
       if (modeRef.current === 'predict') {
@@ -2505,35 +2558,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     if (bSrc && cityBoundary) bSrc.setData(cityBoundary)
 
     if (isDecisionMap) {
-      const trafficGeo: GeoJSON.FeatureCollection = {
-        type: 'FeatureCollection',
-        features: snappedSnapshot.segments.map(seg => {
-          const credibleSpeed = getCredibleSpeedKmh(seg.speedKmh, seg.freeFlowSpeedKmh, seg.congestionScore)
-          const speedRatio = clamp01(credibleSpeed / Math.max(seg.freeFlowSpeedKmh, 1))
-          const predictedRatio = clamp01(speedRatio + (seg.flowTrend === 'improving' ? 0.08 : seg.flowTrend === 'worsening' ? -0.08 : -0.03))
-          const importance = clamp01(seg.priorityAxis ?? (seg.roadType === 'motorway' ? 1 : seg.roadType === 'trunk' ? 0.85 : seg.roadType === 'primary' ? 0.7 : seg.roadType === 'secondary' ? 0.55 : 0.35))
-          return {
-            type: 'Feature' as const,
-            id: seg.id,
-            geometry: { type: 'LineString' as const, coordinates: seg.coordinates },
-            properties: {
-              id: seg.id,
-              roadType: seg.roadType,
-              streetName: seg.streetName,
-              axisName: seg.axisName,
-              direction: seg.direction,
-              speedKmh: credibleSpeed,
-              freeFlowSpeedKmh: seg.freeFlowSpeedKmh,
-              speedRatio,
-              predictedSpeedRatio: predictedRatio,
-              congestion: seg.congestionScore,
-              importance,
-              corridorLabel: `${seg.streetName || seg.axisName || 'Urban corridor'}${predictedRatio < speedRatio - 0.04 ? ' · spike risk' : speedRatio < 0.55 ? ' · slowdown' : ''}`,
-              width: computeRoadWidth(seg.roadType, seg.level, map.getZoom(), isMobile),
-            },
-          }
-        }),
-      }
+      const trafficGeo = buildTrafficFeatureCollection(snappedSnapshot.segments, map.getZoom(), isMobile)
 
       const flowGeo = {
         type: 'FeatureCollection' as const,
@@ -2668,22 +2693,35 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       features: snapshot.segments.map(seg => {
         const simCongestion = Math.max(0, Math.min(1, seg.congestionScore + congestionPct))
         const level = scoreToCongestionLevel(simCongestion)
+        const speedKmh = getCredibleSpeedKmh(seg.speedKmh, seg.freeFlowSpeedKmh, simCongestion)
+        const speedRatio = clamp01(speedKmh / Math.max(seg.freeFlowSpeedKmh, 1))
+        const hasObserved = hasObservedTraffic(seg)
         return {
           type:       'Feature' as const,
+          id:         seg.id,
           geometry:   { type: 'LineString' as const, coordinates: seg.coordinates },
-            properties: {
-              id:         seg.id,
-              congestion: simCongestion,
-              speed:      seg.speedKmh,
-              level,
-              color:      congestionColor(simCongestion),
-              width:      computeRoadWidth(seg.roadType, level, map.getZoom(), isMobile),
-              roadType:   seg.roadType,
-              streetName: seg.streetName,
-              axisName:   seg.axisName,
-              dist:       seg.arrondissement,
-              realData:   seg.id.startsWith('here-') || seg.id.includes('-osm-') || seg.id.includes('-seg-'),
-            },
+          properties: {
+            id: seg.id,
+            congestion: simCongestion,
+            speed: speedKmh,
+            speedKmh,
+            freeFlowSpeedKmh: seg.freeFlowSpeedKmh,
+            speedRatio,
+            predictedSpeedRatio: speedRatio,
+            level,
+            color: hasObserved ? congestionColor(simCongestion) : '#D1D5DB',
+            width: computeRoadWidth(seg.roadType, level, map.getZoom(), isMobile),
+            roadType: seg.roadType,
+            highway: seg.roadType,
+            streetName: seg.streetName,
+            axisName: seg.axisName,
+            dist: seg.arrondissement,
+            importance: clamp01(seg.priorityAxis ?? 0.35),
+            hasObservedTraffic: hasObserved,
+            isEstimatedTraffic: seg.estimatedTraffic === true,
+            midpoint_lng: seg.coordinates[Math.floor(seg.coordinates.length / 2)]?.[0] ?? 0,
+            corridorLabel: hasObserved ? (seg.streetName || seg.axisName || 'Urban corridor') : '',
+          },
           }
       }),
     }
@@ -2694,26 +2732,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       if (!mapRef.current) return
       const src = mapRef.current.getSource(TRAFFIC_SOURCE) as maplibregl.GeoJSONSource | undefined
       if (src && snapshot) {
-        const geo: GeoJSON.FeatureCollection = {
-          type: 'FeatureCollection',
-          features: snapshot.segments.map(seg => ({
-            type:       'Feature' as const,
-            geometry:   { type: 'LineString' as const, coordinates: seg.coordinates },
-            properties: {
-              id:         seg.id,
-              congestion: seg.congestionScore,
-              speed:      seg.speedKmh,
-              level:      seg.level,
-              color:      congestionColor(seg.congestionScore),
-              width:      computeRoadWidth(seg.roadType, seg.level, mapRef.current!.getZoom(), isMobile),
-              roadType:   seg.roadType,
-              streetName: seg.streetName,
-              axisName:   seg.axisName,
-              dist:       seg.arrondissement,
-              realData:   seg.id.startsWith('here-') || seg.id.includes('-osm-') || seg.id.includes('-seg-'),
-            },
-          })),
-        }
+        const geo = buildTrafficFeatureCollection(snapshot.segments, mapRef.current.getZoom(), isMobile)
         src.setData(geo)
       }
     }
@@ -3062,7 +3081,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     safeSetFilter(map, TRAFFIC_SOURCE + '-halo', trafficFilter)
     safeSetFilter(map, TRAFFIC_SOURCE + '-lines', trafficFilter)
     safeSetFilter(map, TRAFFIC_SOURCE + '-glow', trafficFilter ? ['all', trafficFilter, ['any', ['<=', ['coalesce', ['get', 'speedRatio'], 1], 0.52], ['>=', ['coalesce', ['get', 'importance'], 0], 0.76]]] : ['any', ['<=', ['coalesce', ['get', 'speedRatio'], 1], 0.52], ['>=', ['coalesce', ['get', 'importance'], 0], 0.76]])
-    safeSetFilter(map, TRAFFIC_SOURCE + '-corridor-labels', trafficFilter ? ['all', trafficFilter, ['>=', ['get', 'importance'], 0.55], ['<=', ['get', 'speedRatio'], 0.68]] : ['all', ['>=', ['get', 'importance'], 0.55], ['<=', ['get', 'speedRatio'], 0.68]])
+    safeSetFilter(map, TRAFFIC_SOURCE + '-corridor-labels', trafficFilter ? ['all', ['boolean', ['get', 'hasObservedTraffic'], false], trafficFilter, ['>=', ['get', 'importance'], 0.55], ['<=', ['get', 'speedRatio'], 0.68]] : ['all', ['boolean', ['get', 'hasObservedTraffic'], false], ['>=', ['get', 'importance'], 0.55], ['<=', ['get', 'speedRatio'], 0.68]])
 
     if (mode === 'predict') {
       safeSetFilter(map, TRAFFIC_PREDICTION_SOURCE + '-lines', ['>', ['get', 'midpoint_lng'], splitLngRef.current] as any)
@@ -3525,13 +3544,18 @@ function initStaticSources(map: maplibregl.Map) {
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint:  {
         'line-color': [
-          'interpolate', ['linear'], ['coalesce', ['get', 'speedRatio'], 1],
-          0.00, '#DC2626',
-          0.25, '#EF4444',
-          0.45, '#F97316',
-          0.65, '#FACC15',
-          0.85, '#22C55E',
-          1.00, '#16A34A',
+          'case',
+          ['boolean', ['get', 'hasObservedTraffic'], false],
+          [
+            'interpolate', ['linear'], ['coalesce', ['get', 'speedRatio'], 1],
+            0.00, '#DC2626',
+            0.25, '#EF4444',
+            0.45, '#F97316',
+            0.65, '#FACC15',
+            0.85, '#22C55E',
+            1.00, '#16A34A',
+          ],
+          '#D1D5DB',
         ],
         'line-width': ['interpolate', ['linear'], ['zoom'],
           8,  ['match', trafficRoadClassExpression(), 'motorway', 4.8, 'motorway_link', 4.1, 'trunk', 4.0, 'trunk_link', 3.6, 'primary', 3.4, 'primary_link', 3.0, 'secondary', 2.8, 'secondary_link', 2.4, 'tertiary', 2.0, 0.1],
@@ -3541,10 +3565,10 @@ function initStaticSources(map: maplibregl.Map) {
         ],
         'line-opacity': [
           'interpolate', ['linear'], ['zoom'],
-          8, ['case', ['match', trafficRoadClassExpression(), [...ROAD_MAIN_CLASSES], true, false], 0.9, 0],
-          11, ['case', ['match', trafficRoadClassExpression(), [...ROAD_MAIN_CLASSES], true, false], 0.9, 0.54],
-          13, 0.9,
-          16, 0.94,
+          8, ['case', ['match', trafficRoadClassExpression(), [...ROAD_MAIN_CLASSES], true, false], ['case', ['boolean', ['get', 'hasObservedTraffic'], false], 0.9, 0.72], 0],
+          11, ['case', ['match', trafficRoadClassExpression(), [...ROAD_MAIN_CLASSES], true, false], ['case', ['boolean', ['get', 'hasObservedTraffic'], false], 0.9, 0.66], ['case', ['boolean', ['get', 'hasObservedTraffic'], false], 0.54, 0.48]],
+          13, ['case', ['boolean', ['get', 'hasObservedTraffic'], false], 0.9, 0.62],
+          16, ['case', ['boolean', ['get', 'hasObservedTraffic'], false], 0.94, 0.68],
         ],
       },
     })
@@ -3556,7 +3580,7 @@ function initStaticSources(map: maplibregl.Map) {
       type: 'symbol',
       source: TRAFFIC_SOURCE,
       minzoom: 15,
-      filter: ['all', ['>=', ['get', 'importance'], 0.55], ['<=', ['get', 'speedRatio'], 0.68]],
+      filter: ['all', ['boolean', ['get', 'hasObservedTraffic'], false], ['>=', ['get', 'importance'], 0.55], ['<=', ['get', 'speedRatio'], 0.68]],
       layout: {
         'symbol-placement': 'line-center',
         'text-field': ['get', 'corridorLabel'],
@@ -3691,16 +3715,21 @@ function initStaticSources(map: maplibregl.Map) {
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
         'line-color': [
-          'interpolate', ['linear'], ['coalesce', ['get', 'predictedSpeedRatio'], 1],
-          0.25, '#EF4444',
-          0.45, '#FF9F0A',
-          0.70, '#FFD600',
-          1.00, '#22C55E',
+          'case',
+          ['boolean', ['get', 'hasObservedTraffic'], false],
+          [
+            'interpolate', ['linear'], ['coalesce', ['get', 'predictedSpeedRatio'], 1],
+            0.25, '#EF4444',
+            0.45, '#FF9F0A',
+            0.70, '#FFD600',
+            1.00, '#22C55E',
+          ],
+          '#D1D5DB',
         ],
         'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1, 16, 3],
         'line-dasharray': [1, 2],
-        'line-opacity': 0.35,
-        'line-offset': 4 
+        'line-opacity': ['case', ['boolean', ['get', 'hasObservedTraffic'], false], 0.35, 0.18],
+        'line-offset': 0
       }
     }, TRAFFIC_SOURCE + '-lines')
   }
