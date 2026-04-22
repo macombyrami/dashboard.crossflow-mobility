@@ -106,6 +106,9 @@ const BASE_ROADS_MAJOR_LAYER      = 'base-roads-major'
 const BASE_ROADS_LOCAL_LAYER      = 'base-roads-local'
 const ROAD_LABELS_LAYER           = 'road-labels'
 
+const ROAD_MAIN_CLASSES = ['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary'] as const
+const ROAD_LOCAL_CLASSES = ['residential', 'service', 'unclassified', 'minor', 'living_street', 'road'] as const
+
 
 // ─── Popup helpers ────────────────────────────────────────────────────────
 
@@ -187,8 +190,74 @@ const safeSetFeatureState = (map: maplibregl.Map | null, feat: { source: string,
   if (map && map.getSource(feat.source)) map.setFeatureState(feat, state)
 }
 
-function roadClassExpression() {
+function roadClassExpression(): any {
   return ['coalesce', ['get', 'class'], ['get', 'type'], ['get', 'highway']]
+}
+
+function trafficRoadClassExpression(): any {
+  return ['coalesce', ['get', 'roadType'], ['get', 'highway'], ['get', 'class']]
+}
+
+const safeMoveLayerToTop = (map: maplibregl.Map | null, id: string) => {
+  if (!map || !map.getLayer(id)) return
+  try {
+    map.moveLayer(id)
+  } catch {
+    // Ignore transient style ordering races during init.
+  }
+}
+
+function applyTrafficRenderingHierarchy(map: maplibregl.Map | null) {
+  if (!map) return
+
+  const orderedLayers = [
+    BASE_WATER_LAYER,
+    BASE_LANDUSE_LAYER,
+    BASE_BUILDINGS_LAYER,
+    heatmapStackLayerId(HEATMAP_SOURCE, 'clusters'),
+    heatmapStackLayerId(HEATMAP_SOURCE, 'cluster-count'),
+    heatmapStackLayerId(HEATMAP_SOURCE, 'layer'),
+    heatmapStackLayerId(HEATMAP_SOURCE, 'hotspots-glow'),
+    heatmapStackLayerId(HEATMAP_SOURCE, 'hotspots'),
+    heatmapStackLayerId(HEATMAP_SOURCE, 'labels'),
+    heatmapStackLayerId(HEATMAP_SOURCE, 'circles'),
+    heatmapStackLayerId(HEATMAP_FADE_SOURCE, 'clusters'),
+    heatmapStackLayerId(HEATMAP_FADE_SOURCE, 'cluster-count'),
+    heatmapStackLayerId(HEATMAP_FADE_SOURCE, 'layer'),
+    heatmapStackLayerId(HEATMAP_FADE_SOURCE, 'hotspots-glow'),
+    heatmapStackLayerId(HEATMAP_FADE_SOURCE, 'hotspots'),
+    heatmapStackLayerId(HEATMAP_FADE_SOURCE, 'labels'),
+    heatmapStackLayerId(HEATMAP_FADE_SOURCE, 'circles'),
+    HEATMAP_PASSAGES_SOURCE + '-layer',
+    HEATMAP_PASSAGES_SOURCE + '-circles',
+    HEATMAP_CO2_SOURCE + '-layer',
+    HEATMAP_CO2_SOURCE + '-circles',
+    BASE_ROADS_MAJOR_LAYER,
+    BASE_ROADS_LOCAL_LAYER,
+    'cf-idf-roads-lines',
+    ROAD_LABELS_LAYER,
+    TRAFFIC_SOURCE + '-halo',
+    TRAFFIC_SOURCE + '-lines',
+    TRAFFIC_PREDICTION_SOURCE + '-lines',
+    TRAFFIC_HOVER_SOURCE + '-glow',
+    TRAFFIC_HOVER_SOURCE + '-line',
+    TRAFFIC_FOCUS_SOURCE + '-glow',
+    TRAFFIC_FOCUS_SOURCE + '-line',
+    TRAFFIC_SELECTION_SOURCE + '-glow',
+    TRAFFIC_SELECTION_SOURCE + '-line',
+    TRAFFIC_SELECTION_SOURCE + '-label',
+    TRAFFIC_FLOW_SOURCE + '-layer',
+    INCIDENT_SOURCE + '-cluster-glow',
+    INCIDENT_SOURCE + '-cluster',
+    INCIDENT_SOURCE + '-count',
+    INCIDENT_SOURCE + '-unclustered',
+    INCIDENT_SOURCE + '-label',
+    INCIDENT_CRITICAL_SOURCE + '-glow',
+    INCIDENT_CRITICAL_SOURCE + '-dot',
+    INCIDENT_CRITICAL_SOURCE + '-label',
+  ]
+
+  orderedLayers.forEach((layerId) => safeMoveLayerToTop(map, layerId))
 }
 
 function applyMapTheme(map: maplibregl.Map | null, theme: 'light' | 'dark') {
@@ -200,15 +269,15 @@ function applyMapTheme(map: maplibregl.Map | null, theme: 'light' | 'dark') {
   safeSetPaintProperty(map, BASE_LANDUSE_LAYER, 'fill-color', isLight ? '#EEF3E6' : '#0D1C16')
   safeSetPaintProperty(map, BASE_BUILDINGS_LAYER, 'fill-color', isLight ? '#E6EAEE' : '#111C26')
   safeSetPaintProperty(map, BASE_BUILDINGS_LAYER, 'fill-opacity', isLight ? 0.72 : 0.42)
-  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-color', isLight ? '#C4CBD8' : '#304255')
-  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-opacity', isLight ? 0.5 : 0.98)
-  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-color', isLight ? '#D0D7E0' : '#1A2834')
-  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-opacity', isLight ? 0.4 : 0.96)
+  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-color', isLight ? '#E5E7EB' : '#334155')
+  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-opacity', isLight ? 0.96 : 0.92)
+  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-color', isLight ? '#E5E7EB' : '#1E293B')
+  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-opacity', isLight ? 0.9 : 0.86)
   safeSetPaintProperty(map, ROAD_LABELS_LAYER, 'text-color', isLight ? '#4B5563' : '#C7D2DA')
   safeSetPaintProperty(map, ROAD_LABELS_LAYER, 'text-halo-color', isLight ? 'rgba(255,255,255,0.95)' : 'rgba(7,16,24,0.94)')
 
-  safeSetPaintProperty(map, TRAFFIC_SOURCE + '-halo', 'line-color', isLight ? 'rgba(255,255,255,0.88)' : 'rgba(4,6,10,0.96)')
-  safeSetPaintProperty(map, TRAFFIC_SOURCE + '-halo', 'line-opacity', isLight ? 0.55 : 0.72)
+  safeSetPaintProperty(map, TRAFFIC_SOURCE + '-halo', 'line-color', isLight ? 'rgba(255,255,255,0.92)' : 'rgba(4,6,10,0.96)')
+  safeSetPaintProperty(map, TRAFFIC_SOURCE + '-halo', 'line-opacity', isLight ? 0.42 : 0.56)
   safeSetPaintProperty(map, TRAFFIC_SELECTION_SOURCE + '-label', 'text-halo-color', isLight ? 'rgba(255,255,255,0.98)' : 'rgba(8,9,11,0.98)')
   safeSetPaintProperty(map, TRAFFIC_HOVER_SOURCE + '-line', 'line-color', isLight ? '#0F172A' : '#F8FAFC')
   safeSetPaintProperty(map, TRAFFIC_HOVER_SOURCE + '-glow', 'line-color', isLight ? '#38BDF8' : '#FFFFFF')
@@ -226,8 +295,8 @@ const buildCongestionHeatmapOpacity = (alpha: number) => {
   return ([
   'interpolate', ['linear'], ['zoom'],
   7, 0,
-  8, 0.22 * safeAlpha,
-  11, 0.48 * safeAlpha,
+  8, 0.1 * safeAlpha,
+  11, 0.18 * safeAlpha,
   14, 0.24 * safeAlpha,
 ] as any)
 }
@@ -258,12 +327,12 @@ function buildIncidentQuickFilter(filters: Set<QuickFilterId>) {
 const setCongestionHeatmapStackOpacity = (map: maplibregl.Map | null, sourceId: string, alpha: number) => {
   if (!map) return
   const safeAlpha = clampUnit(alpha)
-  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'clusters'), 'circle-opacity', clampUnit(0.8 * safeAlpha))
-  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'cluster-count'), 'text-opacity', clampUnit(0.72 * safeAlpha))
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'clusters'), 'circle-opacity', clampUnit(0.42 * safeAlpha))
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'cluster-count'), 'text-opacity', clampUnit(0.56 * safeAlpha))
   safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'layer'), 'heatmap-opacity', buildCongestionHeatmapOpacity(safeAlpha))
-  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'hotspots-glow'), 'circle-opacity', clampUnit(0.16 * safeAlpha))
-  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'hotspots'), 'circle-opacity', clampUnit(0.92 * safeAlpha))
-  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'labels'), 'text-opacity', clampUnit(0.88 * safeAlpha))
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'hotspots-glow'), 'circle-opacity', clampUnit(0.08 * safeAlpha))
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'hotspots'), 'circle-opacity', clampUnit(0.38 * safeAlpha))
+  safeSetPaintProperty(map, heatmapStackLayerId(sourceId, 'labels'), 'text-opacity', clampUnit(0.44 * safeAlpha))
 }
 
 const setCongestionHeatmapStackVisibility = (
@@ -841,11 +910,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       initHeatmapPassagesLayers(map)
       initZoneLayers(map)
       initSocialLayers(map)
-
-      // Add TomTom tile layers if key available
-      if (useLiveData) {
-        addTomTomLayers(map)
-      }
+      applyTrafficRenderingHierarchy(map)
 
       setMapLoaded(true)
       setMapReady(true)
@@ -2090,9 +2155,12 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     // ── 3. Overlay real-time HERE traffic if available ────────────────────
     if (useHere) {
-      const hereFlow = await fetchHereFlow(cityNow.bbox)
-      if (!isRequestCurrent()) return
-      if (hereFlow.length > 0) {
+      console.log('[DataSource] HERE Flow request started for bbox:', cityNow.bbox)
+      try {
+        const hereFlow = await fetchHereFlow(cityNow.bbox)
+        console.log('[DataSource] HERE Flow response:', hereFlow.length, 'segments')
+        if (!isRequestCurrent()) return
+        if (hereFlow.length > 0) {
         const now = new Date().toISOString()
         const hereSegments: TrafficSegment[] = hereFlow
           .filter(s => s.coords.length >= 2)
@@ -2121,7 +2189,11 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
         const heatmap         = hereSegments.map(s => ({ lng: s.coordinates[0][0], lat: s.coordinates[0][1], intensity: s.congestionScore }))
         snapshot = { cityId: cityNow.id, segments: hereSegments, heatmap, heatmapPassages: [], heatmapCo2: [], fetchedAt: now }
+        console.log('[DataSource] HERE Flow applied to snapshot, setting to live mode')
         setDataSource('live')
+      }
+      } catch (err) {
+        console.error('[DataSource] HERE Flow request failed:', err instanceof Error ? err.message : String(err))
       }
     }
 
@@ -2134,10 +2206,13 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     // ── 4. Fetch TomTom incidents ONLY if not in resilience/synthetic mode ──
     if (useTomTom) {
       // Fetch real TomTom incidents for current viewport
-      const tomtomIncs = await fetchTomTomIncidents(viewportBbox)
-      if (!isRequestCurrent()) return
-      if (tomtomIncs.length > 0) {
-        incidents = tomtomIncs.map(inc => ({
+      console.log('[DataSource] TomTom Incidents request started for bbox:', viewportBbox)
+      try {
+        const tomtomIncs = await fetchTomTomIncidents(viewportBbox)
+        console.log('[DataSource] TomTom Incidents response:', tomtomIncs.length, 'incidents')
+        if (!isRequestCurrent()) return
+        if (tomtomIncs.length > 0) {
+          incidents = tomtomIncs.map(inc => ({
           id:          inc.id,
           type:        mapIncidentType(inc.iconCategory),
           severity:    tomtomSeverityToLocal(inc.magnitudeOfDelay),
@@ -2150,32 +2225,78 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
           source:      'CrossFlow Intelligence Engine',
           iconColor:   getSeverityColor(tomtomSeverityToLocal(inc.magnitudeOfDelay)),
         }))
+            console.log('[DataSource] TomTom Incidents applied, setting to live mode')
+            setDataSource('live')
+          }
+        } catch (err) {
+          console.error('[DataSource] TomTom Incidents request failed:', err instanceof Error ? err.message : String(err))
+          // Fall back to HERE incidents
+          if (useHere) {
+            console.log('[DataSource] Falling back to HERE Incidents')
+            try {
+              const hereIncs = await fetchHereIncidents(viewportBbox)
+              if (!isRequestCurrent()) return
+              if (hereIncs.length > 0) {
+                incidents = hereIncs.map(inc => ({
+                  id:          inc.incidentId,
+                  type:        (inc.type.toLowerCase().includes('accident') ? 'accident' :
+                                inc.type.toLowerCase().includes('work')     ? 'roadwork' : 'congestion') as Incident['type'],
+                  severity:    (inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium') as Incident['severity'],
+                  title:       inc.description,
+                  description: `${inc.location.description} — ${inc.type}`,
+                  location:    { lat: inc.location.lat, lng: inc.location.lng },
+                  address:     inc.location.description || cityNow.name,
+                  startedAt:   inc.startTime,
+                  resolvedAt:  inc.endTime,
+                  source:      'CrossFlow Intelligence Engine',
+                  iconColor:   getSeverityColor(inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium'),
+                }))
+                console.log('[DataSource] HERE Incidents applied, setting to live mode')
+              }
+              setDataSource('live')
+            } catch (hereErr) {
+              console.error('[DataSource] HERE Incidents fallback also failed:', hereErr instanceof Error ? hereErr.message : String(hereErr))
+              console.log('[DataSource] Using synthetic incidents')
+              setDataSource('synthetic')
+            }
+          } else {
+            console.log('[DataSource] No HERE fallback available, using synthetic incidents')
+            setDataSource('synthetic')
+          }
+        }
+      } else if (useHere) {
+        // HERE incidents as fallback for current viewport (when TomTom is not enabled)
+        console.log('[DataSource] TomTom disabled, fetching HERE Incidents as primary source')
+        try {
+          const hereIncs = await fetchHereIncidents(viewportBbox)
+          if (!isRequestCurrent()) return
+          if (hereIncs.length > 0) {
+            incidents = hereIncs.map(inc => ({
+              id:          inc.incidentId,
+              type:        (inc.type.toLowerCase().includes('accident') ? 'accident' :
+                            inc.type.toLowerCase().includes('work')     ? 'roadwork' : 'congestion') as Incident['type'],
+              severity:    (inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium') as Incident['severity'],
+              title:       inc.description,
+              description: `${inc.location.description} — ${inc.type}`,
+              location:    { lat: inc.location.lat, lng: inc.location.lng },
+              address:     inc.location.description || cityNow.name,
+              startedAt:   inc.startTime,
+              resolvedAt:  inc.endTime,
+              source:      'CrossFlow Intelligence Engine',
+              iconColor:   getSeverityColor(inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium'),
+            }))
+            console.log('[DataSource] HERE Incidents applied, setting to live mode')
+          }
+          setDataSource('live')
+        } catch (err) {
+          console.error('[DataSource] HERE Incidents request failed:', err instanceof Error ? err.message : String(err))
+          console.log('[DataSource] Using synthetic incidents')
+          setDataSource('synthetic')
+        }
+      } else {
+        console.log('[DataSource] No live data sources available, using synthetic incidents')
+        setDataSource('synthetic')
       }
-      setDataSource('live')
-    } else if (useHere) {
-      // HERE incidents as fallback for current viewport
-      const hereIncs = await fetchHereIncidents(viewportBbox)
-      if (!isRequestCurrent()) return
-      if (hereIncs.length > 0) {
-        incidents = hereIncs.map(inc => ({
-          id:          inc.incidentId,
-          type:        (inc.type.toLowerCase().includes('accident') ? 'accident' :
-                        inc.type.toLowerCase().includes('work')     ? 'roadwork' : 'congestion') as Incident['type'],
-          severity:    (inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium') as Incident['severity'],
-          title:       inc.description,
-          description: `${inc.location.description} — ${inc.type}`,
-          location:    { lat: inc.location.lat, lng: inc.location.lng },
-          address:     inc.location.description || cityNow.name,
-          startedAt:   inc.startTime,
-          resolvedAt:  inc.endTime,
-          source:      'CrossFlow Intelligence Engine',
-          iconColor:   getSeverityColor(inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium'),
-        }))
-      }
-      setDataSource('live')
-    } else {
-      setDataSource('synthetic')
-    }
 
     if (!snapshot) return
     if (!isRequestCurrent()) return
@@ -2573,6 +2694,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
               'text-opacity': 0.7,
             },
           })
+          applyTrafficRenderingHierarchy(map)
         }
       })
       .catch(() => {})
@@ -2643,15 +2765,24 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     const flowEnabledByQuickFilter = quickFiltersNeutral || activeQuickFilters.has('flux')
     const trafficVis = activeLayers.has('traffic') && trafficEnabledByQuickFilter ? 'visible' : 'none'
     const incidentsVis = activeLayers.has('incidents') && incidentsEnabledByQuickFilter ? 'visible' : 'none'
-    const flowVis = activeLayers.has('flow') && flowEnabledByQuickFilter ? 'visible' : 'none'
+    const flowVis = activeLayers.has('flow') && flowEnabledByQuickFilter && !activeLayers.has('traffic') ? 'visible' : 'none'
     const boundaryVis = activeLayers.has('boundary') ? 'visible' : 'none'
     const heatVis = isDecisionMap ? 'visible' : (activeLayers.has('heatmap') ? 'visible' : 'none')
     const inactiveHeatSource = activeHeatSourceRef.current === HEATMAP_SOURCE ? HEATMAP_FADE_SOURCE : HEATMAP_SOURCE
+    const trafficPaintOpacity = activeLayers.has('traffic')
+      ? (activeLayers.has('heatmap') ? 0.72 : 0.9)
+      : 0
+    const trafficHaloOpacity = activeLayers.has('traffic')
+      ? (activeLayers.has('heatmap') ? 0.22 : 0.34)
+      : 0
+    const heatmapAlpha = activeLayers.has('heatmap')
+      ? (activeLayers.has('traffic') ? 0.72 : 1)
+      : 0
 
     safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-halo', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-lines', 'visibility', trafficVis)
-    safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', trafficVis)
-    safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-corridor-labels', 'visibility', trafficVis)
+    safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', 'none')
+    safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-corridor-labels', 'visibility', 'none')
     safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', isDecisionMap ? 'none' : trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-glow', 'visibility', trafficVis)
     safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-line', 'visibility', trafficVis)
@@ -2663,7 +2794,11 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-fill', 'visibility', 'none')
     safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-line', 'visibility', 'none')
     safeSetLayoutProperty(map, 'cf-idf-roads-lines', 'visibility', trafficVis)
-    safeSetLayoutProperty(map, 'cf-idf-roads-labels', 'visibility', trafficVis)
+    safeSetLayoutProperty(map, 'cf-idf-roads-labels', 'visibility', 'none')
+    safeSetPaintProperty(map, TRAFFIC_SOURCE + '-lines', 'line-opacity', trafficPaintOpacity)
+    safeSetPaintProperty(map, TRAFFIC_SOURCE + '-halo', 'line-opacity', trafficHaloOpacity)
+    setCongestionHeatmapStackOpacity(map, activeHeatSourceRef.current, heatmapAlpha)
+    setCongestionHeatmapStackOpacity(map, inactiveHeatSource, heatmapAlpha * 0.4)
     setCongestionHeatmapStackVisibility(map, activeHeatSourceRef.current, heatVis, heatVis)
     setCongestionHeatmapStackVisibility(map, inactiveHeatSource, heatVis, 'none')
     safeSetLayoutProperty(map, TRAFFIC_FLOW_SOURCE + '-layer', 'visibility', flowVis)
@@ -2679,8 +2814,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     if (isDecisionMap) {
       safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-lines', 'visibility', trafficVis)
-      safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', trafficVis)
-      safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-corridor-labels', 'visibility', trafficVis)
+      safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-glow', 'visibility', 'none')
+      safeSetLayoutProperty(map, TRAFFIC_SOURCE + '-corridor-labels', 'visibility', 'none')
       safeSetLayoutProperty(map, TRAFFIC_PREDICTION_SOURCE + '-lines', 'visibility', 'none')
       safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-glow', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_HOVER_SOURCE + '-line', 'visibility', trafficVis)
@@ -2692,7 +2827,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-fill', 'visibility', trafficVis)
       safeSetLayoutProperty(map, TRAFFIC_ZONE_SOURCE + '-line', 'visibility', trafficVis)
       safeSetLayoutProperty(map, 'cf-idf-roads-lines', 'visibility', trafficVis)
-      safeSetLayoutProperty(map, 'cf-idf-roads-labels', 'visibility', trafficVis)
+      safeSetLayoutProperty(map, 'cf-idf-roads-labels', 'visibility', 'none')
       safeSetLayoutProperty(map, TRAFFIC_FLOW_SOURCE + '-layer', 'visibility', flowVis)
       safeSetLayoutProperty(map, INCIDENT_SOURCE + '-cluster-glow', 'visibility', incidentsVis)
       safeSetLayoutProperty(map, INCIDENT_SOURCE + '-cluster', 'visibility', incidentsVis)
@@ -2716,11 +2851,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-line',  'visibility', boundaryVis)
     safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-label', 'visibility', boundaryVis)
 
-    // TomTom live tiles
-    if (useLiveData) {
-      safeSetLayoutProperty(map, TOMTOM_FLOW + '-layer', 'visibility', activeLayers.has('traffic') ? 'visible' : 'none')
-      safeSetLayoutProperty(map, TOMTOM_INC  + '-layer', 'visibility', activeLayers.has('incidents') ? 'visible' : 'none')
-    }
+    safeSetLayoutProperty(map, TOMTOM_FLOW + '-layer', 'visibility', 'none')
+    safeSetLayoutProperty(map, TOMTOM_INC  + '-layer', 'visibility', 'none')
 
     const transportVis = activeLayers.has('transport') ? 'visible' : 'none'
     safeSetLayoutProperty(map, VEHICLES_SOURCE + '-glow',  'visibility', transportVis)
@@ -2799,6 +2931,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
         flowLayer: map.getLayoutProperty(TRAFFIC_FLOW_SOURCE + '-layer', 'visibility'),
       })
     }
+    applyTrafficRenderingHierarchy(map)
   }, [activeLayers, activeQuickFilters, mapLoaded, useLiveData, isDecisionMap])
 
   useEffect(() => {
@@ -3134,20 +3267,21 @@ function initStaticSources(map: maplibregl.Map) {
       source: BASE_NETWORK_SOURCE,
       'source-layer': 'road',
       filter: ['match', roadClassExpression(),
-        ['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary'],
+        [...ROAD_MAIN_CLASSES],
         true,
         false,
       ] as any,
       paint: {
-        'line-color': '#C4CBD8',
+        'line-color': '#E5E7EB',
         'line-width': [
           'interpolate', ['linear'], ['zoom'],
-          8, 0.9,
-          11, 1.8,
-          14, 4.2,
-          17, 10,
+          8, 0.8,
+          10, 1.2,
+          12, 1.9,
+          14, 3.2,
+          17, 7.8,
         ],
-        'line-opacity': 0.5,  // semi-transparent — CartoDB roads show through
+        'line-opacity': 0.96,
       },
       layout: { 'line-cap': 'round', 'line-join': 'round' }
     })
@@ -3159,21 +3293,22 @@ function initStaticSources(map: maplibregl.Map) {
       type: 'line',
       source: BASE_NETWORK_SOURCE,
       'source-layer': 'road',
-      minzoom: 13,
+      minzoom: 11,
       filter: ['match', roadClassExpression(),
-        ['residential', 'service', 'unclassified', 'minor', 'living_street', 'road'],
+        [...ROAD_LOCAL_CLASSES],
         true,
         false,
       ] as any,
       paint: {
-        'line-color': '#D0D7E0',
+        'line-color': '#E5E7EB',
         'line-width': [
           'interpolate', ['linear'], ['zoom'],
-          13, 0.7,
-          15, 1.5,
-          17, 3.6,
+          11, 0.45,
+          13, 0.8,
+          15, 1.35,
+          17, 2.8,
         ],
-        'line-opacity': 0.4,
+        'line-opacity': 0.9,
       },
       layout: { 'line-cap': 'round', 'line-join': 'round' }
     })
@@ -3258,11 +3393,11 @@ function initStaticSources(map: maplibregl.Map) {
       paint: {
         'line-color': 'rgba(255,255,255,0.92)',
         'line-width': ['interpolate', ['linear'], ['zoom'],
-          8,  ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 5.2, 'trunk', 4.0, 'primary', 3.2, 'secondary', 2.2, 1.2],
-          12, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 7.0, 'trunk', 5.6, 'primary', 4.6, 'secondary', 3.4, 2.2],
-          15, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 11,  'trunk', 8.5, 'primary', 6.8, 'secondary', 5.2, 3.6],
+          8,  ['match', trafficRoadClassExpression(), 'motorway', 4.2, 'motorway_link', 3.8, 'trunk', 3.4, 'trunk_link', 3.0, 'primary', 2.8, 'primary_link', 2.5, 'secondary', 2.2, 'secondary_link', 2.0, 'tertiary', 1.8, 1.4],
+          12, ['match', trafficRoadClassExpression(), 'motorway', 5.6, 'motorway_link', 5.0, 'trunk', 4.6, 'trunk_link', 4.0, 'primary', 3.8, 'primary_link', 3.4, 'secondary', 3.0, 'secondary_link', 2.6, 'tertiary', 2.3, 1.9],
+          15, ['match', trafficRoadClassExpression(), 'motorway', 8.6, 'motorway_link', 7.8, 'trunk', 7.2, 'trunk_link', 6.2, 'primary', 5.4, 'primary_link', 4.8, 'secondary', 4.2, 'secondary_link', 3.8, 'tertiary', 3.2, 2.8],
         ],
-        'line-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.45, 14, 0.60],
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.2, 12, 0.3, 16, 0.42],
       }
     })
   }
@@ -3276,33 +3411,28 @@ function initStaticSources(map: maplibregl.Map) {
       minzoom: 8,   // visible from city overview level
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint:  {
-        // Warm → cold: critical red → orange → yellow → fluid green (Waze palette)
         'line-color': [
           'interpolate', ['linear'], ['coalesce', ['get', 'speedRatio'], 1],
-          0.00, '#C0392B',   // jam — deep red
-          0.25, '#E5484D',   // critical — red
-          0.45, '#FF6B00',   // slow — orange
-          0.65, '#FFD24A',   // moderate — amber
-          0.85, '#57E89C',   // good — light green
-          1.00, '#2BD576',   // fluid — green
+          0.00, '#DC2626',
+          0.25, '#EF4444',
+          0.45, '#F97316',
+          0.65, '#FACC15',
+          0.85, '#22C55E',
+          1.00, '#16A34A',
         ],
-        // Road-type-aware width: every road visible (Waze-like)
         'line-width': ['interpolate', ['linear'], ['zoom'],
-          7,  ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 5.0, 'trunk', 4.0, 'primary', 3.0, 'secondary', 2.2, 1.4],
-          8,  ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 6.0, 'trunk', 4.8, 'primary', 3.8, 'secondary', 2.8, 1.8],
-          11, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 8.0, 'trunk', 6.0, 'primary', 4.8, 'secondary', 3.6, 2.4],
-          14, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 12, 'trunk', 9,  'primary', 7,   'secondary', 5.2, 3.4],
-          17, ['match', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway', 16, 'trunk', 12, 'primary', 10,  'secondary', 7.5, 5],
+          8,  ['match', trafficRoadClassExpression(), 'motorway', 4.8, 'motorway_link', 4.1, 'trunk', 4.0, 'trunk_link', 3.6, 'primary', 3.4, 'primary_link', 3.0, 'secondary', 2.8, 'secondary_link', 2.4, 'tertiary', 2.0, 0.1],
+          11, ['match', trafficRoadClassExpression(), 'motorway', 6.4, 'motorway_link', 5.8, 'trunk', 5.4, 'trunk_link', 4.9, 'primary', 4.4, 'primary_link', 4.0, 'secondary', 3.6, 'secondary_link', 3.1, 'tertiary', 2.6, 0.4],
+          14, ['match', trafficRoadClassExpression(), 'motorway', 8.4, 'motorway_link', 7.4, 'trunk', 7.0, 'trunk_link', 6.2, 'primary', 5.4, 'primary_link', 4.8, 'secondary', 4.3, 'secondary_link', 3.8, 'tertiary', 3.2, 2.2],
+          17, ['match', trafficRoadClassExpression(), 'motorway', 12.2, 'motorway_link', 10.8, 'trunk', 10.0, 'trunk_link', 8.8, 'primary', 7.4, 'primary_link', 6.6, 'secondary', 5.6, 'secondary_link', 5.0, 'tertiary', 4.2, 3.1],
         ],
-        // Ultra-high opacity for day mode readability (Waze visibility on light background)
         'line-opacity': [
           'interpolate', ['linear'], ['zoom'],
-          7,  0.85,
-          9,  0.92,
-          12, 0.96,
-          14, 0.98,
+          8, ['case', ['match', trafficRoadClassExpression(), [...ROAD_MAIN_CLASSES], true, false], 0.9, 0],
+          11, ['case', ['match', trafficRoadClassExpression(), [...ROAD_MAIN_CLASSES], true, false], 0.9, 0.54],
+          13, 0.9,
+          16, 0.94,
         ],
-        'line-offset': ['case', ['==', ['coalesce', ['get', 'roadType'], ['get', 'highway']], 'motorway_link'], 0.2, 0]
       },
     })
   }
@@ -3312,7 +3442,7 @@ function initStaticSources(map: maplibregl.Map) {
       id: TRAFFIC_SOURCE + '-corridor-labels',
       type: 'symbol',
       source: TRAFFIC_SOURCE,
-      minzoom: 13,
+      minzoom: 15,
       filter: ['all', ['>=', ['get', 'importance'], 0.55], ['<=', ['get', 'speedRatio'], 0.68]],
       layout: {
         'symbol-placement': 'line-center',
@@ -3483,9 +3613,9 @@ function initStaticSources(map: maplibregl.Map) {
         'line-width': ['interpolate', ['linear'], ['zoom'], 11, 5, 16, 14],
         'line-opacity': [
           'interpolate', ['linear'], ['zoom'],
-          10, 0.06,
-          12, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.58, 0.22],
-          17, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.68, 0.34]
+          10, 0.02,
+          12, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.22, 0.08],
+          17, ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 0.3, 0.12]
         ],
         'line-blur': ['case', ['>=', ['feature-state', 'anomaly'], 0.6], 7, 4],
       },
@@ -3510,12 +3640,7 @@ function initStaticSources(map: maplibregl.Map) {
           0.7, '#FFD600',
           1.0, '#22C55E',
         ],
-      'fill-opacity': [
-        'interpolate', ['linear'], ['get', 'segmentCount'],
-        1, 0.24,
-        4, 0.36,
-        10, 0.5,
-      ],
+      'fill-opacity': 0.16,
     },
   })
   }
@@ -3535,7 +3660,7 @@ function initStaticSources(map: maplibregl.Map) {
           1.0, '#22C55E',
         ],
         'line-width': 1,
-        'line-opacity': 0.18,
+        'line-opacity': 0.12,
       },
     })
   }
@@ -3737,7 +3862,7 @@ function initStaticSources(map: maplibregl.Map) {
       'circle-color':  ['get', 'color'],
       'circle-opacity': 0.95,
       'circle-stroke-width': 2,
-      'circle-stroke-color': '#08090B',
+      'circle-stroke-color': '#FFFFFF',
     },
   })
 
@@ -4324,10 +4449,10 @@ function addCongestionHeatmapStack(
       ],
       'circle-color': [
         'interpolate', ['linear'], ['get', 'point_count'],
-        1, 'rgba(52, 211, 153, 0.22)',
-        12, 'rgba(250, 204, 21, 0.28)',
-        36, 'rgba(249, 115, 22, 0.34)',
-        96, 'rgba(255, 107, 87, 0.46)',
+        1, 'rgba(34, 197, 94, 0.12)',
+        12, 'rgba(250, 204, 21, 0.14)',
+        36, 'rgba(249, 115, 22, 0.18)',
+        96, 'rgba(239, 68, 68, 0.22)',
       ],
       'circle-opacity': 0,
       'circle-blur': 0.42,
@@ -4379,20 +4504,20 @@ function addCongestionHeatmapStack(
       ],
       'heatmap-radius': [
         'interpolate', ['linear'], ['zoom'],
-        7, 18,
-        10, 30,
-        13, 42,
-        14, 52,
+        7, 16,
+        10, 24,
+        13, 34,
+        14, 42,
       ],
       'heatmap-opacity': buildCongestionHeatmapOpacity(1),
       'heatmap-color': [
         'interpolate', ['linear'], ['heatmap-density'],
         0.0, 'rgba(0,0,0,0)',
-        0.18, 'rgba(52, 211, 153, 0.12)',
-        0.42, 'rgba(250, 204, 21, 0.18)',
-        0.64, 'rgba(249, 115, 22, 0.28)',
-        0.84, 'rgba(255, 107, 87, 0.34)',
-        1.0, 'rgba(255, 107, 87, 0.46)',
+        0.18, 'rgba(34, 197, 94, 0.06)',
+        0.42, 'rgba(250, 204, 21, 0.1)',
+        0.64, 'rgba(249, 115, 22, 0.16)',
+        0.84, 'rgba(239, 68, 68, 0.2)',
+        1.0, 'rgba(239, 68, 68, 0.24)',
       ],
     },
   })
@@ -4429,10 +4554,10 @@ function addCongestionHeatmapStack(
         12, 6,
         16, 14,
       ],
-      'circle-color': '#FF6B57',
+      'circle-color': '#EF4444',
       'circle-opacity': 0,
-      'circle-stroke-width': 2,
-      'circle-stroke-color': 'rgba(255,255,255,0.16)',
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': 'rgba(255,255,255,0.42)',
     },
   })
 
@@ -4453,8 +4578,8 @@ function addCongestionHeatmapStack(
     },
     paint: {
       'text-color': '#F9FAFB',
-      'text-halo-color': 'rgba(8,9,11,0.92)',
-      'text-halo-width': 1.5,
+      'text-halo-color': 'rgba(8,9,11,0.78)',
+      'text-halo-width': 1.2,
       'text-opacity': 0,
     },
   })
