@@ -98,11 +98,13 @@ const SIM_LOCATION_SOURCE        = 'cf-sim-location'
 const SOCIAL_SOURCE              = 'cf-social'
 const WORLD_MASK_SOURCE           = 'cf-world-mask'
 const BASE_NETWORK_SOURCE         = 'base-network'
+const BASE_ROADS_FALLBACK_SOURCE  = 'base-roads-fallback'
 const BASE_WATER_LAYER            = 'base-water'
 const BASE_LANDUSE_LAYER          = 'base-landuse'
 const BASE_BUILDINGS_LAYER        = 'base-buildings'
 const BASE_ROADS_MAJOR_LAYER      = 'base-roads-major'
 const BASE_ROADS_LOCAL_LAYER      = 'base-roads-local'
+const BASE_ROADS_FALLBACK_LAYER   = 'base-roads-fallback-line'
 const ROAD_LABELS_LAYER           = 'road-labels'
 
 const ROAD_MAIN_CLASSES = ['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary'] as const
@@ -265,6 +267,7 @@ function applyTrafficRenderingHierarchy(map: maplibregl.Map | null) {
     HEATMAP_PASSAGES_SOURCE + '-circles',
     HEATMAP_CO2_SOURCE + '-layer',
     HEATMAP_CO2_SOURCE + '-circles',
+    BASE_ROADS_FALLBACK_LAYER,
     BASE_ROADS_MAJOR_LAYER,
     BASE_ROADS_LOCAL_LAYER,
     'cf-idf-roads-lines',
@@ -313,6 +316,8 @@ function applyMapTheme(map: maplibregl.Map | null, theme: 'light' | 'dark') {
   safeSetPaintProperty(map, BASE_LANDUSE_LAYER, 'fill-color', isLight ? '#EEF3E6' : '#0D1C16')
   safeSetPaintProperty(map, BASE_BUILDINGS_LAYER, 'fill-color', isLight ? '#E6EAEE' : '#111C26')
   safeSetPaintProperty(map, BASE_BUILDINGS_LAYER, 'fill-opacity', isLight ? 0.72 : 0.42)
+  safeSetPaintProperty(map, BASE_ROADS_FALLBACK_LAYER, 'line-color', isLight ? '#CBD5E1' : '#334155')
+  safeSetPaintProperty(map, BASE_ROADS_FALLBACK_LAYER, 'line-opacity', isLight ? 0.92 : 0.84)
   safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-color', isLight ? '#E5E7EB' : '#334155')
   safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-opacity', isLight ? 0.96 : 0.92)
   safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-color', isLight ? '#E5E7EB' : '#1E293B')
@@ -486,6 +491,33 @@ function buildTrafficFeatureCollection(
       }
     }),
   }
+}
+
+function buildBaseRoadFallbackFeatureCollection(
+  segments: TrafficSegment[],
+  zoom: number,
+  isMobile: boolean,
+): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: segments.map((segment) => ({
+      type: 'Feature',
+      id: segment.id,
+      geometry: {
+        type: 'LineString',
+        coordinates: segment.coordinates,
+      },
+      properties: {
+        id: segment.id,
+        roadType: segment.roadType,
+        width: Math.max(0.4, computeRoadWidth(segment.roadType, segment.level, zoom, isMobile) * 0.72),
+      },
+    })),
+  }
+}
+
+function setBaseRoadFallbackVisibility(map: maplibregl.Map | null, visible: boolean) {
+  safeSetLayoutProperty(map, BASE_ROADS_FALLBACK_LAYER, 'visibility', visible ? 'visible' : 'none')
 }
 
 export const CrossFlowMap = memo(function CrossFlowMap() {
@@ -1006,6 +1038,26 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       attributionControl: false,
     })
 
+    let baseRoadVectorReady = false
+    let baseRoadFallbackTimer: ReturnType<typeof setTimeout> | null = null
+
+    const onBaseRoadSourceData = (event: any) => {
+      if (event?.sourceId !== BASE_NETWORK_SOURCE || baseRoadVectorReady) return
+      if (event?.isSourceLoaded || map.isSourceLoaded(BASE_NETWORK_SOURCE)) {
+        baseRoadVectorReady = true
+        setBaseRoadFallbackVisibility(map, false)
+        console.log('[CrossFlow] Base road vector source ready', {
+          source: BASE_NETWORK_SOURCE,
+          majorLayer: Boolean(map.getLayer(BASE_ROADS_MAJOR_LAYER)),
+          localLayer: Boolean(map.getLayer(BASE_ROADS_LOCAL_LAYER)),
+        })
+        if (baseRoadFallbackTimer) {
+          clearTimeout(baseRoadFallbackTimer)
+          baseRoadFallbackTimer = null
+        }
+      }
+    }
+
     map.on('load', () => {
       console.log('[CrossFlow] Map loaded successfully')
       initStaticSources(map)
@@ -1016,6 +1068,23 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       initZoneLayers(map)
       initSocialLayers(map)
       applyTrafficRenderingHierarchy(map)
+      setBaseRoadFallbackVisibility(map, true)
+
+      console.log('[CrossFlow] Base road layers initialized', {
+        source: BASE_NETWORK_SOURCE,
+        fallbackSource: BASE_ROADS_FALLBACK_SOURCE,
+        majorLayer: Boolean(map.getLayer(BASE_ROADS_MAJOR_LAYER)),
+        localLayer: Boolean(map.getLayer(BASE_ROADS_LOCAL_LAYER)),
+        fallbackLayer: Boolean(map.getLayer(BASE_ROADS_FALLBACK_LAYER)),
+      })
+
+      map.on('sourcedata', onBaseRoadSourceData)
+      baseRoadFallbackTimer = setTimeout(() => {
+        if (!baseRoadVectorReady) {
+          console.warn('[CrossFlow] Base road vector source not ready, keeping fallback roads visible')
+          setBaseRoadFallbackVisibility(map, true)
+        }
+      }, 2500)
 
       setMapLoaded(true)
       setMapReady(true)
@@ -1516,6 +1585,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     mapRef.current = map
     return () => {
+      map.off('sourcedata', onBaseRoadSourceData)
+      if (baseRoadFallbackTimer) clearTimeout(baseRoadFallbackTimer)
       popupRef.current?.remove()
       searchMarkerRef.current?.remove()
       map.remove()
@@ -2247,6 +2318,11 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     // ── 1. Determine base snapshot (never required for road rendering) ──
     let snapshot = generateTrafficSnapshot(cityNow)
+    console.log('[CrossFlow] Base snapshot generated', {
+      city: cityNow.id,
+      segments: snapshot.segments.length,
+      dataSource: dataSourceRef.current,
+    })
 
     // ── 2. Regional Scaling — Load real IDF network if applicable ────────
     if (isIdfCity(cityNow) && dataSourceRef.current === 'synthetic') {
@@ -2425,6 +2501,10 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     const incidentSplit = splitIncidents(incidents)
     setIncidents(incidents)
 
+    const fallbackRoadGeo = buildBaseRoadFallbackFeatureCollection(snappedSnapshot.segments, map.getZoom(), isMobile)
+    const fallbackRoadSrc = safeGetSource(map, BASE_ROADS_FALLBACK_SOURCE) as maplibregl.GeoJSONSource | null
+    if (fallbackRoadSrc) fallbackRoadSrc.setData(fallbackRoadGeo)
+
     // --- High Performance: UCTN Property Updates ---
     if (safeGetSource(map, TRAFFIC_SOURCE)) {
       // Update state for current live data
@@ -2461,6 +2541,12 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       const s2 = safeGetSource(map, TRAFFIC_PREDICTION_SOURCE) as maplibregl.GeoJSONSource | null
       if (s1) s1.setData(trafficGeo)
       if (s2) s2.setData(trafficGeo)
+      console.log('[CrossFlow] Traffic layer state', {
+        segments: snappedSnapshot.segments.length,
+        observed: snappedSnapshot.segments.filter(hasObservedTraffic).length,
+        estimated: snappedSnapshot.segments.filter(seg => seg.estimatedTraffic === true).length,
+        trafficVisible: activeLayersNow.has('traffic'),
+      })
       // ─── A/B Split View Filtering ───
       if (modeRef.current === 'predict') {
         const filters: any = ['<', ['get', 'midpoint_lng'], splitLngRef.current]
@@ -2492,6 +2578,11 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     }
     const iSrc = safeGetSource(map, INCIDENT_SOURCE) as maplibregl.GeoJSONSource | null
     if (iSrc) iSrc.setData(incGeo)
+    console.log('[CrossFlow] Incident layer state', {
+      incidents: incidents.length,
+      active: activeLayersNow.has('incidents'),
+      tomtomEnabled: useTomTom,
+    })
 
     // Boundary
     const bSrc = safeGetSource(map, BOUNDARY_SOURCE) as maplibregl.GeoJSONSource | null
@@ -3308,6 +3399,15 @@ function initStaticSources(map: maplibregl.Map) {
     })
   }
 
+  if (!map.getSource(BASE_ROADS_FALLBACK_SOURCE)) {
+    map.addSource(BASE_ROADS_FALLBACK_SOURCE, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+      lineMetrics: true,
+      promoteId: 'id',
+    })
+  }
+
   if (!map.getLayer(BASE_WATER_LAYER)) {
     map.addLayer({
       id: BASE_WATER_LAYER,
@@ -3402,6 +3502,20 @@ function initStaticSources(map: maplibregl.Map) {
         'line-opacity': 0.88,
       },
       layout: { 'line-cap': 'round', 'line-join': 'round' }
+    })
+  }
+
+  if (!map.getLayer(BASE_ROADS_FALLBACK_LAYER)) {
+    map.addLayer({
+      id: BASE_ROADS_FALLBACK_LAYER,
+      type: 'line',
+      source: BASE_ROADS_FALLBACK_SOURCE,
+      layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'visible' },
+      paint: {
+        'line-color': '#CBD5E1',
+        'line-width': ['coalesce', ['get', 'width'], 1.1],
+        'line-opacity': 0.92,
+      }
     })
   }
 
