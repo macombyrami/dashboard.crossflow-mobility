@@ -2952,14 +2952,14 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-glow',       'visibility', boundaryVis)
     safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-fill',       'visibility', boundaryVis)
     safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-line',       'visibility', boundaryVis)
-    safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-label',      'visibility', boundaryVis)
+    safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-label',      'visibility', 'none')
 
     safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-fill',  'visibility', districtsVis)
     safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-line',  'visibility', districtsVis)
     safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-label', 'visibility', districtsVis)
     safeSetLayoutProperty(map, ENTRY_EXIT_SOURCE + '-halo', 'visibility', gatewaysVis)
     safeSetLayoutProperty(map, ENTRY_EXIT_SOURCE + '-circle', 'visibility', gatewaysVis)
-    safeSetLayoutProperty(map, ENTRY_EXIT_SOURCE + '-label', 'visibility', gatewaysVis)
+    safeSetLayoutProperty(map, ENTRY_EXIT_SOURCE + '-label', 'visibility', 'none')
 
     safeSetLayoutProperty(map, TOMTOM_FLOW + '-layer', 'visibility', 'none')
     safeSetLayoutProperty(map, TOMTOM_INC  + '-layer', 'visibility', 'none')
@@ -3299,7 +3299,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
       {/* ─── Geolocation Control ───────────────────────────────────── */}
       {mapLoaded && (
-        <div className="absolute bottom-24 right-3 z-[400]">
+        <div className="absolute right-3 top-[112px] z-[400] sm:right-4 sm:top-[124px]">
           <GeolocationControl
             onPositionChange={handleUserPosition}
             onFlyTo={handleGeoFlyTo}
