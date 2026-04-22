@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle, Car, ChevronDown, Flame, Layers, MapPinned, PenLine, Users, Wind } from 'lucide-react'
+import { AlertTriangle, Car, ChevronDown, Flame, Layers, MapPinned, PenLine, TrainFront, Users, Wind } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
 import { cn } from '@/lib/utils/cn'
 import type { HeatmapMode, MapLayerId } from '@/types'
@@ -17,6 +17,7 @@ type LayerDef = {
 const LAYERS: LayerDef[] = [
   { id: 'traffic', label: 'Traffic', icon: Car, hint: 'Road traffic overlay', color: '#16A34A' },
   { id: 'heatmap', label: 'Heatmap', icon: Flame, hint: 'Background pressure map', color: '#F59E0B' },
+  { id: 'transport', label: 'Transport', icon: TrainFront, hint: 'Animated transit activity', color: '#0EA5E9' },
   { id: 'incidents', label: 'Incidents', icon: AlertTriangle, hint: 'Incidents and roadworks', color: '#DC2626' },
   { id: 'boundary', label: 'Boundaries', icon: MapPinned, hint: 'City boundaries and entry points', color: '#22C55E' },
 ]
@@ -76,7 +77,7 @@ export function LayerControls() {
 
       <div className="border-b border-stone-200 px-4 py-3">
         <p className="text-[11px] leading-5 text-stone-500">
-          Default mode stays clean. Traffic, heatmap, and incidents are mutually exclusive to avoid visual overload.
+          Advanced controls only. The smart modes decide the main view; heavy overlays stay mutually exclusive to keep the map readable.
         </p>
         <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-400">
           {isParis ? 'Paris mode: arrondissements + dense network' : isCompactCity ? 'Compact city mode: boundary flows first' : 'Standard city mode'}

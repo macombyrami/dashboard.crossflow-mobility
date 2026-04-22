@@ -3318,7 +3318,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
       {/* ─── Geolocation Control ───────────────────────────────────── */}
       {mapLoaded && (
-        <div className="absolute right-3 top-[112px] z-[400] sm:right-4 sm:top-[124px]">
+        <div className="absolute bottom-24 right-3 z-[400] sm:bottom-5 sm:right-4">
           <GeolocationControl
             onPositionChange={handleUserPosition}
             onFlyTo={handleGeoFlyTo}

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Crosshair, LocateFixed, AlertCircle, X, Navigation } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { AlertCircle, Crosshair, LocateFixed, Navigation, X } from 'lucide-react'
 import { useGeolocation, type UserPosition } from '@/hooks/useGeolocation'
 import { cn } from '@/lib/utils/cn'
 
@@ -22,55 +22,58 @@ export function GeolocationControl({ onPositionChange, onFlyTo, className }: Geo
 
   const { position, error, isLocating, isTracking, locate, stopTracking, clearPosition } = useGeolocation({
     enableHighAccuracy: true,
-    watchMode: true,         // continuous tracking for real-time updates
+    watchMode: true,
     timeout: 10_000,
     maximumAge: 3_000,
   })
 
-  // Sync geo state machine
   useEffect(() => {
-    if (isLocating)           { setGeoState('locating'); return }
+    if (isLocating) {
+      setGeoState('locating')
+      return
+    }
     if (error) {
-      if (error.code === 1)   setErrorMsg('Permission GPS refusée. Activez la localisation dans vos paramètres.')
-      else if (error.code === 2) setErrorMsg('Signal GPS indisponible. Vérifiez votre connexion.')
-      else                   setErrorMsg('Délai de localisation dépassé. Réessayez.')
+      if (error.code === 1) setErrorMsg('Permission GPS refusee. Activez la localisation dans vos parametres.')
+      else if (error.code === 2) setErrorMsg('Signal GPS indisponible. Verifiez votre connexion.')
+      else setErrorMsg('Delai de localisation depasse. Reessayez.')
       setGeoState('error')
       return
     }
-    if (position && isTracking) { setGeoState('tracking'); return }
-    if (position)               { setGeoState('active');   return }
+    if (position && isTracking) {
+      setGeoState('tracking')
+      return
+    }
+    if (position) {
+      setGeoState('active')
+      return
+    }
     setGeoState('idle')
-  }, [isLocating, error, position, isTracking])
+  }, [error, isLocating, isTracking, position])
 
-  // Notify parent of position changes
   useEffect(() => {
     if (position === prevPositionRef.current) return
     prevPositionRef.current = position
     onPositionChange(position)
 
-    // Auto-fly on first fix
     if (position && !hasFlown) {
       onFlyTo(position.lat, position.lng)
       setHasFlown(true)
     }
-  }, [position, hasFlown, onPositionChange, onFlyTo])
+  }, [hasFlown, onFlyTo, onPositionChange, position])
 
   const handleClick = () => {
     if (geoState === 'idle' || geoState === 'error') {
       setHasFlown(false)
       setErrorMsg(null)
       locate()
-    } else if (geoState === 'active') {
-      // Already have position, fly back to it
-      if (position) onFlyTo(position.lat, position.lng)
-    } else if (geoState === 'tracking') {
-      // Re-center on current position
-      if (position) onFlyTo(position.lat, position.lng)
+      return
     }
+
+    if (position) onFlyTo(position.lat, position.lng)
   }
 
-  const handleStop = (e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleStop = (event: React.MouseEvent) => {
+    event.stopPropagation()
     stopTracking()
     clearPosition()
     setErrorMsg(null)
@@ -78,11 +81,11 @@ export function GeolocationControl({ onPositionChange, onFlyTo, className }: Geo
   }
 
   const stateConfig = {
-    idle:     { icon: Crosshair,   color: 'text-white/60',        bg: 'bg-black/60',        label: 'Me localiser',     pulse: false },
-    locating: { icon: LocateFixed,  color: 'text-brand',           bg: 'bg-brand/10',        label: 'Localisation…',    pulse: true  },
-    active:   { icon: LocateFixed,  color: 'text-brand',           bg: 'bg-brand/15',        label: 'Centrer',          pulse: false },
-    tracking: { icon: Navigation,   color: 'text-[#00FF9D]',      bg: 'bg-[#00FF9D]/15',   label: 'Suivi actif',      pulse: true  },
-    error:    { icon: AlertCircle,  color: 'text-red-400',         bg: 'bg-red-500/10',      label: 'Réessayer',        pulse: false },
+    idle: { icon: Crosshair, color: 'text-stone-700', bg: 'bg-white/96', label: 'Me localiser', pulse: false },
+    locating: { icon: LocateFixed, color: 'text-brand', bg: 'bg-white/96', label: 'Localisation...', pulse: true },
+    active: { icon: LocateFixed, color: 'text-brand', bg: 'bg-white/96', label: 'Centrer', pulse: false },
+    tracking: { icon: Navigation, color: 'text-[#00FF9D]', bg: 'bg-[#00FF9D]/15', label: 'Suivi actif', pulse: true },
+    error: { icon: AlertCircle, color: 'text-red-500', bg: 'bg-white/96', label: 'Reessayer', pulse: false },
   } as const
 
   const cfg = stateConfig[geoState]
@@ -90,81 +93,72 @@ export function GeolocationControl({ onPositionChange, onFlyTo, className }: Geo
 
   return (
     <div className={cn('relative flex flex-col items-end gap-2', className)}>
-      {/* Error toast */}
       <AnimatePresence>
         {errorMsg && (
           <motion.div
-            initial={{ opacity: 0, x: 20, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 20, scale: 0.95 }}
-            className="absolute right-[52px] top-0 w-64 glass-card p-3 rounded-xl text-xs text-red-300 shadow-lg"
+            initial={{ opacity: 0, y: 10, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.96 }}
+            className="absolute bottom-[52px] right-0 w-64 rounded-2xl border border-red-200 bg-white/96 p-3 text-xs text-red-500 shadow-[0_18px_48px_rgba(15,23,42,0.14)] backdrop-blur-xl"
           >
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
               <p className="leading-relaxed">{errorMsg}</p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Live accuracy badge */}
       <AnimatePresence>
         {position && geoState !== 'idle' && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="absolute right-[52px] top-0 flex items-center gap-1.5 bg-black/70 backdrop-blur-md border border-white/10 rounded-full px-2.5 py-1 pointer-events-none whitespace-nowrap"
+            initial={{ opacity: 0, y: 8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+            className="absolute bottom-[52px] right-0 flex items-center gap-1.5 whitespace-nowrap rounded-full border border-stone-200 bg-white/96 px-2.5 py-1 text-stone-600 shadow-[0_14px_34px_rgba(15,23,42,0.12)] backdrop-blur-xl pointer-events-none"
           >
-            <div className={cn(
-              'w-1.5 h-1.5 rounded-full',
-              geoState === 'tracking' ? 'bg-[#00FF9D] animate-pulse' : 'bg-brand/60'
-            )} />
-            <span className="text-[9px] font-bold uppercase tracking-wider text-white/70">
-              {geoState === 'tracking' ? 'Suivi GPS' : 'Localisé'} · ±{Math.round(position.accuracy)}m
+            <div className={cn('h-1.5 w-1.5 rounded-full', geoState === 'tracking' ? 'bg-[#00FF9D] animate-pulse' : 'bg-brand/60')} />
+            <span className="text-[9px] font-bold uppercase tracking-wider text-stone-500">
+              {geoState === 'tracking' ? 'Suivi GPS' : 'Localise'} · ±{Math.round(position.accuracy)}m
             </span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Main button */}
-      <div className="flex items-center gap-1">
-        {/* Stop button (only when tracking) */}
+      <div className="flex items-center gap-2">
         <AnimatePresence>
           {(geoState === 'tracking' || geoState === 'active') && (
             <motion.button
-              initial={{ opacity: 0, scale: 0, x: 10 }}
+              initial={{ opacity: 0, scale: 0.9, x: 8 }}
               animate={{ opacity: 1, scale: 1, x: 0 }}
-              exit={{ opacity: 0, scale: 0, x: 10 }}
+              exit={{ opacity: 0, scale: 0.9, x: 8 }}
               onClick={handleStop}
-              className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-red-500/20 hover:border-red-400/30 transition-all group"
-              title="Arrêter le suivi"
+              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-stone-200 bg-white/96 backdrop-blur-xl transition-all group hover:border-red-200 hover:bg-red-50"
+              title="Arreter le suivi"
             >
-              <X className="w-3.5 h-3.5 text-white/40 group-hover:text-red-400 transition-colors" />
+              <X className="h-4 w-4 text-stone-400 transition-colors group-hover:text-red-500" />
             </motion.button>
           )}
         </AnimatePresence>
 
-        {/* Geo button */}
         <motion.button
           onClick={handleClick}
-          whileTap={{ scale: 0.92 }}
+          whileTap={{ scale: 0.94 }}
           title={cfg.label}
           className={cn(
-            'relative w-10 h-10 rounded-full backdrop-blur-md border transition-all duration-300 flex items-center justify-center shadow-lg',
+            'relative flex h-10 w-10 items-center justify-center rounded-2xl border bg-white/96 shadow-[0_14px_34px_rgba(15,23,42,0.14)] backdrop-blur-xl transition-all duration-300',
             cfg.bg,
             geoState === 'tracking' ? 'border-[#00FF9D]/40 shadow-[0_0_20px_-5px_rgba(0,255,157,0.4)]' :
-            geoState === 'active'   ? 'border-brand/30' :
-            geoState === 'error'    ? 'border-red-400/20' :
-                                       'border-white/10 hover:border-white/20'
+            geoState === 'active' ? 'border-brand/30' :
+            geoState === 'error' ? 'border-red-200' :
+            'border-stone-200 hover:border-stone-300',
           )}
         >
-          {/* Pulse ring for tracking */}
           {cfg.pulse && geoState === 'tracking' && (
-            <span className="absolute inset-0 rounded-full border border-[#00FF9D]/40 animate-ping" />
+            <span className="absolute inset-0 rounded-2xl border border-[#00FF9D]/40 animate-ping" />
           )}
-          
-          <Icon className={cn('w-4.5 h-4.5 transition-colors', cfg.color, isLocating && 'animate-spin')} style={{ width: 18, height: 18 }} />
+
+          <Icon className={cn('transition-colors', cfg.color, isLocating && 'animate-spin')} style={{ width: 18, height: 18 }} />
         </motion.button>
       </div>
     </div>

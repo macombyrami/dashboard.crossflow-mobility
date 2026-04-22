@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle, Car, ChevronUp, Flame, MapPinned } from 'lucide-react'
+import { ChevronUp } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
 import { cn } from '@/lib/utils/cn'
 
@@ -17,32 +17,22 @@ export function MapLegend() {
   const activeLayers = useMapStore(s => s.activeLayers)
   const heatmapMode = useMapStore(s => s.heatmapMode)
 
-  const items = [
-    activeLayers.has('traffic') ? { key: 'traffic', label: 'Traffic', icon: Car } : null,
-    activeLayers.has('heatmap') ? { key: 'heatmap', label: heatmapMode === 'congestion' ? 'Heatmap' : heatmapMode === 'passages' ? 'Flow heatmap' : 'CO2 heatmap', icon: Flame } : null,
-    activeLayers.has('incidents') ? { key: 'incidents', label: 'Incidents', icon: AlertTriangle } : null,
-    activeLayers.has('boundary') ? { key: 'boundary', label: 'Boundaries', icon: MapPinned } : null,
-  ].filter(Boolean) as Array<{ key: string; label: string; icon: typeof Car }>
+  const hasVisualLegend = activeLayers.has('traffic') || activeLayers.has('heatmap') || activeLayers.has('incidents') || activeLayers.has('boundary') || activeLayers.has('transport')
 
-  if (items.length === 0) return null
+  if (!hasVisualLegend) return null
 
   return (
-    <div className="pointer-events-auto absolute bottom-5 right-4 z-10">
+    <div className="pointer-events-auto absolute bottom-5 left-4 z-20">
       <button
         onClick={() => setExpanded(value => !value)}
         className={cn(
-          'group overflow-hidden rounded-[22px] border border-stone-200 bg-white/95 shadow-[0_16px_38px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all',
-          expanded ? 'w-[220px]' : 'w-auto',
+          'group overflow-hidden rounded-[20px] border border-stone-200 bg-white/96 shadow-[0_16px_38px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all',
+          expanded ? 'w-[230px]' : 'w-auto',
         )}
         aria-label="Toggle map legend"
       >
-        <div className="flex items-center gap-2 px-3 py-2.5">
-          {items.map(({ key, icon: Icon }) => (
-            <span key={key} className="rounded-xl bg-stone-100 p-2 text-stone-700">
-              <Icon className="h-3.5 w-3.5" />
-            </span>
-          ))}
-          <span className="ml-1 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">
+        <div className="flex items-center gap-3 px-3 py-2.5">
+          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-stone-500">
             Legend
           </span>
           <ChevronUp className={cn('ml-auto h-4 w-4 text-stone-400 transition-transform', expanded && 'rotate-180')} />
@@ -59,6 +49,10 @@ export function MapLegend() {
                     <span className="text-[11px] font-medium text-stone-600">{label}</span>
                   </div>
                 ))}
+                <div className="flex items-center gap-2.5">
+                  <div className="h-1.5 w-9 rounded-full bg-[#D1D5DB]" />
+                  <span className="text-[11px] font-medium text-stone-600">Estimated / no live data</span>
+                </div>
               </div>
             )}
 
@@ -79,6 +73,13 @@ export function MapLegend() {
               <div className="mt-3 flex items-center gap-2.5">
                 <div className="h-2 w-2 rounded-full bg-red-500" />
                 <span className="text-[11px] font-medium text-stone-600">Incident markers</span>
+              </div>
+            )}
+
+            {activeLayers.has('transport') && (
+              <div className="mt-3 flex items-center gap-2.5">
+                <div className="h-2 w-2 rounded-full bg-sky-500" />
+                <span className="text-[11px] font-medium text-stone-600">Animated transit activity</span>
               </div>
             )}
 
