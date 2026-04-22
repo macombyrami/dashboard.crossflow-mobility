@@ -1,90 +1,96 @@
 'use client'
 
+import { useState } from 'react'
+import { AlertTriangle, Car, ChevronUp, Flame, MapPinned } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
+import { cn } from '@/lib/utils/cn'
 
 const TRAFFIC_LEVELS = [
-  { label: 'Fluid', color: '#2BD576' },
-  { label: 'Moderate', color: '#FFD24A' },
-  { label: 'Dense', color: '#FF8A00' },
-  { label: 'Critical', color: '#E5484D' },
-]
-
-const TRANSPORT_ITEMS = [
-  { label: 'Bus corridors', color: '#3B82F6' },
-  { label: 'Metro network', color: '#A855F7' },
-  { label: 'Critical event', color: '#FF5A5F' },
+  { label: 'Fluid', color: '#16A34A' },
+  { label: 'Moderate', color: '#FACC15' },
+  { label: 'Dense', color: '#F97316' },
+  { label: 'Critical', color: '#DC2626' },
 ]
 
 export function MapLegend() {
+  const [expanded, setExpanded] = useState(false)
   const activeLayers = useMapStore(s => s.activeLayers)
   const heatmapMode = useMapStore(s => s.heatmapMode)
 
-  const isTraffic = activeLayers.has('traffic')
-  const isHeatmap = activeLayers.has('heatmap')
-  const isTransport = activeLayers.has('transport')
-  const isIncidents = activeLayers.has('incidents')
+  const items = [
+    activeLayers.has('traffic') ? { key: 'traffic', label: 'Traffic', icon: Car } : null,
+    activeLayers.has('heatmap') ? { key: 'heatmap', label: heatmapMode === 'congestion' ? 'Heatmap' : heatmapMode === 'passages' ? 'Flow heatmap' : 'CO2 heatmap', icon: Flame } : null,
+    activeLayers.has('incidents') ? { key: 'incidents', label: 'Incidents', icon: AlertTriangle } : null,
+    activeLayers.has('boundary') ? { key: 'boundary', label: 'Boundaries', icon: MapPinned } : null,
+  ].filter(Boolean) as Array<{ key: string; label: string; icon: typeof Car }>
 
-  if (!isTraffic && !isHeatmap && !isTransport && !isIncidents) return null
+  if (items.length === 0) return null
 
   return (
-    <div className="absolute bottom-5 left-4 z-10 pointer-events-none">
-      <div className="min-w-[160px] rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.10)] space-y-2.5 dark:bg-[rgba(12,15,22,0.82)] dark:border-white/10">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Trafic</span>
-          <span className="text-[9px] font-medium text-text-muted/60">Live</span>
+    <div className="pointer-events-auto absolute bottom-5 right-4 z-10">
+      <button
+        onClick={() => setExpanded(value => !value)}
+        className={cn(
+          'group overflow-hidden rounded-[22px] border border-stone-200 bg-white/95 shadow-[0_16px_38px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all',
+          expanded ? 'w-[220px]' : 'w-auto',
+        )}
+        aria-label="Toggle map legend"
+      >
+        <div className="flex items-center gap-2 px-3 py-2.5">
+          {items.map(({ key, icon: Icon }) => (
+            <span key={key} className="rounded-xl bg-stone-100 p-2 text-stone-700">
+              <Icon className="h-3.5 w-3.5" />
+            </span>
+          ))}
+          <span className="ml-1 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">
+            Legend
+          </span>
+          <ChevronUp className={cn('ml-auto h-4 w-4 text-stone-400 transition-transform', expanded && 'rotate-180')} />
         </div>
 
-        {isTraffic && (
-          <div className="space-y-2">
-            {TRAFFIC_LEVELS.map(({ label, color }) => (
-              <div key={label} className="flex items-center gap-2.5">
-                <div
-                  className="h-1.5 w-9 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: color, boxShadow: `0 0 12px ${color}50` }}
-                />
-                <span className="text-[11px] font-medium text-text-secondary">{label}</span>
+        {expanded && (
+          <div className="border-t border-stone-200 px-3 py-3 text-left">
+            {activeLayers.has('traffic') && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">Traffic</p>
+                {TRAFFIC_LEVELS.map(({ label, color }) => (
+                  <div key={label} className="flex items-center gap-2.5">
+                    <div className="h-1.5 w-9 rounded-full" style={{ backgroundColor: color }} />
+                    <span className="text-[11px] font-medium text-stone-600">{label}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        {isHeatmap && (
-          <div className="space-y-1.5">
-            {(isTraffic || isTransport || isIncidents) && <div className="h-px bg-white/10" />}
-            <p className="text-[9px] font-bold text-text-muted uppercase tracking-wider">
-              {heatmapMode === 'congestion' ? 'Road pressure'
-               : heatmapMode === 'passages' ? 'Flow density'
-               : 'Emission load'}
-            </p>
-            <div
-              className="h-2 rounded-full w-full"
-              style={{ background: 'linear-gradient(to right, rgba(43,213,118,0.12), rgba(255,210,74,0.65), rgba(229,72,77,0.92))' }}
-            />
-            <div className="flex justify-between text-[9px] text-text-muted">
-              <span>Low</span>
-              <span>High</span>
-            </div>
-          </div>
-        )}
-
-        {(isTransport || isIncidents) && (
-          <div className="space-y-1.5">
-            {(isTraffic || isHeatmap) && <div className="h-px bg-white/10" />}
-            {isTransport && TRANSPORT_ITEMS.slice(0, 2).map(({ label, color }) => (
-              <div key={label} className="flex items-center gap-2.5">
-                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                <span className="text-[10px] font-medium text-text-secondary">{label}</span>
+            {activeLayers.has('heatmap') && (
+              <div className="mt-3 space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">
+                  {heatmapMode === 'congestion' ? 'Road pressure' : heatmapMode === 'passages' ? 'Flow density' : 'Emission load'}
+                </p>
+                <div className="h-2 rounded-full bg-[linear-gradient(to_right,rgba(34,197,94,0.12),rgba(250,204,21,0.28),rgba(239,68,68,0.38))]" />
+                <div className="flex justify-between text-[9px] text-stone-400">
+                  <span>Low</span>
+                  <span>High</span>
+                </div>
               </div>
-            ))}
-            {isIncidents && (
-              <div className="flex items-center gap-2.5">
-                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#FF5A5F' }} />
-                <span className="text-[10px] font-medium text-text-secondary">Incident intelligence</span>
+            )}
+
+            {activeLayers.has('incidents') && (
+              <div className="mt-3 flex items-center gap-2.5">
+                <div className="h-2 w-2 rounded-full bg-red-500" />
+                <span className="text-[11px] font-medium text-stone-600">Incident markers</span>
+              </div>
+            )}
+
+            {activeLayers.has('boundary') && (
+              <div className="mt-3 flex items-center gap-2.5">
+                <div className="h-2 w-2 rounded-full bg-green-500" />
+                <span className="text-[11px] font-medium text-stone-600">City boundaries and gateways</span>
               </div>
             )}
           </div>
         )}
-      </div>
+      </button>
     </div>
   )
 }

@@ -67,7 +67,7 @@ import { fetchWeather as fetchOpenMeteoWeather, fetchAirQuality } from '@/lib/ap
 import { fetchCityBoundary, fetchCityDistricts } from '@/lib/api/geocoding'
 import type { AggregatedHeatFeatureCollection } from '@/lib/map/trafficHeatmap'
 import { useSocialStore } from '@/store/socialStore'
-import type { Incident, HeatmapMode, CongestionLevel, TrafficSnapshot, TrafficSegment, MapLayerId, QuickFilterId } from '@/types'
+import type { Incident, HeatmapMode, CongestionLevel, TrafficSnapshot, TrafficSegment, MapLayerId, QuickFilterId, City } from '@/types'
 
 const TRAFFIC_SOURCE          = 'cf-traffic'
 const TRAFFIC_PREDICTION_SOURCE = 'cf-traffic-prediction'
@@ -86,6 +86,7 @@ const TOMTOM_FLOW             = 'tomtom-flow'
 const TOMTOM_INC              = 'tomtom-incidents'
 const BOUNDARY_SOURCE         = 'city-boundary'
 const DISTRICTS_SOURCE        = 'city-districts'
+const ENTRY_EXIT_SOURCE       = 'city-entry-exit'
 const ZONE_SOURCE             = 'cf-zone'
 const ZONE_DRAFT_SOURCE       = 'cf-zone-draft'
 const POI_SOURCE              = 'cf-pois'
@@ -107,7 +108,7 @@ const BASE_ROADS_LOCAL_LAYER      = 'base-roads-local'
 const ROAD_LABELS_LAYER           = 'road-labels'
 
 const ROAD_MAIN_CLASSES = ['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary'] as const
-const ROAD_LOCAL_CLASSES = ['residential', 'service', 'unclassified', 'minor', 'living_street', 'road'] as const
+const ROAD_LOCAL_CLASSES = ['residential', 'service', 'unclassified', 'minor', 'living_street', 'road', 'track'] as const
 
 
 // ─── Popup helpers ────────────────────────────────────────────────────────
@@ -198,6 +199,40 @@ function trafficRoadClassExpression(): any {
   return ['coalesce', ['get', 'roadType'], ['get', 'highway'], ['get', 'class']]
 }
 
+function isParisCity(city: City) {
+  return city.id === 'paris' || city.name.toLowerCase() === 'paris'
+}
+
+function isCompactCity(city: City) {
+  return !isParisCity(city) && city.population > 0 && city.population < 300000
+}
+
+function pointInRing(point: [number, number], ring: [number, number][]) {
+  const [x, y] = point
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]
+    const [xj, yj] = ring[j]
+    const intersect = ((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-9) + xi)
+    if (intersect) inside = !inside
+  }
+  return inside
+}
+
+function pointInBoundary(point: [number, number], geometry: GeoJSON.Geometry | null | undefined) {
+  if (!geometry) return false
+  if (geometry.type === 'Polygon') {
+    const [outerRing, ...holes] = geometry.coordinates as [number, number][][]
+    return pointInRing(point, outerRing) && !holes.some(hole => pointInRing(point, hole))
+  }
+  if (geometry.type === 'MultiPolygon') {
+    return (geometry.coordinates as [number, number][][][]).some(([outerRing, ...holes]) =>
+      pointInRing(point, outerRing) && !holes.some(hole => pointInRing(point, hole))
+    )
+  }
+  return false
+}
+
 const safeMoveLayerToTop = (map: maplibregl.Map | null, id: string) => {
   if (!map || !map.getLayer(id)) return
   try {
@@ -247,10 +282,21 @@ function applyTrafficRenderingHierarchy(map: maplibregl.Map | null) {
     TRAFFIC_SELECTION_SOURCE + '-line',
     TRAFFIC_SELECTION_SOURCE + '-label',
     TRAFFIC_FLOW_SOURCE + '-layer',
+    DISTRICTS_SOURCE + '-fill',
+    DISTRICTS_SOURCE + '-line',
+    BOUNDARY_SOURCE + '-glow-outer',
+    BOUNDARY_SOURCE + '-glow',
+    BOUNDARY_SOURCE + '-fill',
+    BOUNDARY_SOURCE + '-line',
+    ENTRY_EXIT_SOURCE + '-halo',
+    ENTRY_EXIT_SOURCE + '-circle',
+    ENTRY_EXIT_SOURCE + '-label',
     INCIDENT_SOURCE + '-cluster-glow',
     INCIDENT_SOURCE + '-cluster',
     INCIDENT_SOURCE + '-count',
     INCIDENT_SOURCE + '-unclustered',
+    DISTRICTS_SOURCE + '-label',
+    BOUNDARY_SOURCE + '-label',
     INCIDENT_SOURCE + '-label',
     INCIDENT_CRITICAL_SOURCE + '-glow',
     INCIDENT_CRITICAL_SOURCE + '-dot',
@@ -1497,11 +1543,19 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     // Load OSM roads for real geometry
     if (!osmRoadsRef.current.has(cityId)) {
-      fetchRoads(city.bbox, ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'residential', 'unclassified', 'service'])
+      fetchRoads(city.bbox, [
+        'motorway', 'motorway_link',
+        'trunk', 'trunk_link',
+        'primary', 'primary_link',
+        'secondary', 'secondary_link',
+        'tertiary', 'tertiary_link',
+        'residential', 'living_street', 'road', 'unclassified', 'service',
+      ])
         .then(roads => {
           if (cityRef.current.id !== cityId) return
           if (roads.length > 0) {
-            osmRoadsRef.current.set(cityId, roads.slice(0, 1200))
+            const preloadLimit = isParisCity(cityRef.current) ? 8000 : isCompactCity(cityRef.current) ? 3500 : 5000
+            osmRoadsRef.current.set(cityId, roads.slice(0, preloadLimit))
             refreshDataRef.current()
           }
         })
@@ -2038,7 +2092,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     if (!src) return
 
     src.setData({ type: 'FeatureCollection', features: [] }) // clear while loading
-    if (!city.bbox) return
+    if (!city.bbox || !isParisCity(city)) return
     const cityId = city.id
 
     fetchCityDistricts(city.center.lat, city.center.lng).then((districts: any[]) => {
@@ -2071,6 +2125,58 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       }
     })
   }, [city, mapLoaded]) // eslint-disable-line
+
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return
+    const map = mapRef.current
+    const src = map.getSource(ENTRY_EXIT_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (!src) return
+
+    const shouldShowGateways = !!cityBoundary && isCompactCity(city)
+    if (!shouldShowGateways || !snapshot?.segments?.length) {
+      src.setData({ type: 'FeatureCollection', features: [] })
+      return
+    }
+
+    const seen = new Set<string>()
+    const features: GeoJSON.Feature[] = []
+
+    snapshot.segments.forEach((segment) => {
+      if (!['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link'].includes(segment.roadType ?? '')) {
+        return
+      }
+
+      for (let index = 1; index < segment.coordinates.length; index += 1) {
+        const previous = segment.coordinates[index - 1]
+        const current = segment.coordinates[index]
+        const previousInside = pointInBoundary(previous, cityBoundary?.geometry)
+        const currentInside = pointInBoundary(current, cityBoundary?.geometry)
+
+        if (previousInside === currentInside) continue
+
+        const gateway: [number, number] = [
+          Number(((previous[0] + current[0]) / 2).toFixed(5)),
+          Number(((previous[1] + current[1]) / 2).toFixed(5)),
+        ]
+        const key = gateway.join(':')
+        if (seen.has(key)) continue
+        seen.add(key)
+
+        features.push({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: gateway },
+          properties: {
+            id: `${segment.id}-${index}`,
+            label: segment.streetName || segment.axisName || 'Gateway',
+            direction: previousInside ? 'Outbound' : 'Inbound',
+          },
+        })
+        break
+      }
+    })
+
+    src.setData({ type: 'FeatureCollection', features: features.slice(0, 12) })
+  }, [city, cityBoundary, mapLoaded, snapshot])
  
   // ─── UCTN Initialization (Unified City Traffic Network) ──────────────
   useEffect(() => {
@@ -2767,6 +2873,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     const incidentsVis = activeLayers.has('incidents') && incidentsEnabledByQuickFilter ? 'visible' : 'none'
     const flowVis = activeLayers.has('flow') && flowEnabledByQuickFilter && !activeLayers.has('traffic') ? 'visible' : 'none'
     const boundaryVis = activeLayers.has('boundary') ? 'visible' : 'none'
+    const districtsVis = activeLayers.has('boundary') && isParisCity(city) ? 'visible' : 'none'
+    const gatewaysVis = activeLayers.has('boundary') && isCompactCity(city) ? 'visible' : 'none'
     const heatVis = isDecisionMap ? 'visible' : (activeLayers.has('heatmap') ? 'visible' : 'none')
     const inactiveHeatSource = activeHeatSourceRef.current === HEATMAP_SOURCE ? HEATMAP_FADE_SOURCE : HEATMAP_SOURCE
     const trafficPaintOpacity = activeLayers.has('traffic')
@@ -2846,10 +2954,12 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-line',       'visibility', boundaryVis)
     safeSetLayoutProperty(map, BOUNDARY_SOURCE + '-label',      'visibility', boundaryVis)
 
-    // District choropleth
-    safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-fill',  'visibility', boundaryVis)
-    safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-line',  'visibility', boundaryVis)
-    safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-label', 'visibility', boundaryVis)
+    safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-fill',  'visibility', districtsVis)
+    safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-line',  'visibility', districtsVis)
+    safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-label', 'visibility', districtsVis)
+    safeSetLayoutProperty(map, ENTRY_EXIT_SOURCE + '-halo', 'visibility', gatewaysVis)
+    safeSetLayoutProperty(map, ENTRY_EXIT_SOURCE + '-circle', 'visibility', gatewaysVis)
+    safeSetLayoutProperty(map, ENTRY_EXIT_SOURCE + '-label', 'visibility', gatewaysVis)
 
     safeSetLayoutProperty(map, TOMTOM_FLOW + '-layer', 'visibility', 'none')
     safeSetLayoutProperty(map, TOMTOM_INC  + '-layer', 'visibility', 'none')
@@ -2886,6 +2996,9 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-fill', 'visibility', 'none')
       safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-line', 'visibility', 'none')
       safeSetLayoutProperty(map, DISTRICTS_SOURCE + '-label', 'visibility', 'none')
+      safeSetLayoutProperty(map, ENTRY_EXIT_SOURCE + '-halo', 'visibility', 'none')
+      safeSetLayoutProperty(map, ENTRY_EXIT_SOURCE + '-circle', 'visibility', 'none')
+      safeSetLayoutProperty(map, ENTRY_EXIT_SOURCE + '-label', 'visibility', 'none')
       safeSetLayoutProperty(map, VEHICLES_SOURCE + '-glow', 'visibility', 'none')
       safeSetLayoutProperty(map, VEHICLE_TRAILS_SOURCE + '-glow', 'visibility', 'none')
       safeSetLayoutProperty(map, VEHICLE_TRAILS_SOURCE + '-line', 'visibility', 'none')
@@ -2932,7 +3045,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       })
     }
     applyTrafficRenderingHierarchy(map)
-  }, [activeLayers, activeQuickFilters, mapLoaded, useLiveData, isDecisionMap])
+  }, [activeLayers, activeQuickFilters, city, mapLoaded, useLiveData, isDecisionMap])
 
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return
@@ -4278,7 +4391,6 @@ function initDistrictsLayers(map: maplibregl.Map) {
   const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
   map.addSource(DISTRICTS_SOURCE, { type: 'geojson', data: emptyFC })
 
-  // Choropleth fill — color driven by `density` property (0-1)
   map.addLayer({
     id:     DISTRICTS_SOURCE + '-fill',
     type:   'fill',
@@ -4286,28 +4398,27 @@ function initDistrictsLayers(map: maplibregl.Map) {
     paint:  {
       'fill-color': [
         'interpolate', ['linear'], ['get', 'density'],
-        0,    'rgba(34, 197, 94, 0.30)',
-        0.33, 'rgba(255, 214, 0, 0.35)',
-        0.66, 'rgba(255, 159, 10, 0.40)',
-        1,    'rgba(255, 59, 48, 0.45)',
+        0,    'rgba(34, 197, 94, 0.03)',
+        0.33, 'rgba(34, 197, 94, 0.05)',
+        0.66, 'rgba(34, 197, 94, 0.07)',
+        1,    'rgba(34, 197, 94, 0.09)',
       ],
       'fill-opacity': 1,
       'fill-outline-color': 'rgba(0,0,0,0)',
     },
   })
 
-  // District borders
   map.addLayer({
     id:     DISTRICTS_SOURCE + '-line',
     type:   'line',
     source: DISTRICTS_SOURCE,
     paint:  {
-      'line-color':   'rgba(255,255,255,0.12)',
+      'line-color':   'rgba(15,23,42,0.16)',
       'line-width':   0.8,
+      'line-dasharray': [2, 2],
     },
   })
 
-  // District name labels (visible from zoom 12)
   map.addLayer({
     id:     DISTRICTS_SOURCE + '-label',
     type:   'symbol',
@@ -4322,9 +4433,9 @@ function initDistrictsLayers(map: maplibregl.Map) {
       'text-allow-overlap': false,
     },
     paint: {
-      'text-color':      'rgba(255,255,255,0.85)',
-      'text-halo-color': 'rgba(0,0,0,0.7)',
-      'text-halo-width': 2,
+      'text-color':      'rgba(15,23,42,0.72)',
+      'text-halo-color': 'rgba(255,255,255,0.9)',
+      'text-halo-width': 1.6,
     },
   })
 }
@@ -4334,57 +4445,52 @@ function initBoundaryLayers(map: maplibregl.Map) {
 
   map.addSource(BOUNDARY_SOURCE, { type: 'geojson', data: emptyFC })
 
-  // 1. Very wide outer glow (Neon effect)
   map.addLayer({
     id:     BOUNDARY_SOURCE + '-glow-outer',
     type:   'line',
     source: BOUNDARY_SOURCE,
     paint:  {
-      'line-color':   '#00FF9D',
-      'line-width':   40,
+      'line-color':   '#16A34A',
+      'line-width':   18,
       'line-opacity': 0.05,
-      'line-blur':    25,
+      'line-blur':    10,
     },
   })
 
-  // 2. Focused mid glow
   map.addLayer({
     id:     BOUNDARY_SOURCE + '-glow',
     type:   'line',
     source: BOUNDARY_SOURCE,
     paint:  {
-      'line-color':   '#00FF9D',
-      'line-width':   12,
-      'line-opacity': 0.2,
-      'line-blur':    8,
+      'line-color':   '#16A34A',
+      'line-width':   6,
+      'line-opacity': 0.12,
+      'line-blur':    3,
     },
   })
 
-  // 3. Fill — removed (map must remain fully visible, outline handles boundary)
   map.addLayer({
     id:     BOUNDARY_SOURCE + '-fill',
     type:   'fill',
     source: BOUNDARY_SOURCE,
     paint:  {
-      'fill-color':   '#22C55E',
-      'fill-opacity': 0,
+      'fill-color':   '#16A34A',
+      'fill-opacity': 0.02,
     },
   })
 
-  // 4. Crisp high-tech border line
   map.addLayer({
     id:     BOUNDARY_SOURCE + '-line',
     type:   'line',
     source: BOUNDARY_SOURCE,
     paint:  {
-      'line-color':        '#22C55E',
-      'line-width':        1.5,
-      'line-opacity':      0.9,
-      'line-dasharray':    [4, 4],
+      'line-color':        '#16A34A',
+      'line-width':        2,
+      'line-opacity':      0.8,
+      'line-dasharray':    [3, 3],
     },
   })
 
-  // 5. City name label at centroid (symbol layer)
   map.addLayer({
     id:     BOUNDARY_SOURCE + '-label',
     type:   'symbol',
@@ -4398,15 +4504,14 @@ function initBoundaryLayers(map: maplibregl.Map) {
       'symbol-placement': 'point',
     },
     paint: {
-      'text-color':      'rgba(34,197,94,0.9)',
-      'text-halo-color': 'rgba(8,9,11,0.8)',
-      'text-halo-width': 3,
+      'text-color':      'rgba(15,23,42,0.72)',
+      'text-halo-color': 'rgba(255,255,255,0.92)',
+      'text-halo-width': 2,
     },
     minzoom: 8,
     maxzoom: 13,
   })
 
-  // 6. WORLD MASK — kept as source only (no visual mask, full map stays visible)
   map.addSource(WORLD_MASK_SOURCE, { type: 'geojson', data: emptyFC })
   map.addLayer({
     id:     WORLD_MASK_SOURCE + '-fill',
@@ -4417,6 +4522,48 @@ function initBoundaryLayers(map: maplibregl.Map) {
       'fill-opacity': 0,  // invisible — city boundary line handles the visual
     },
   }, BOUNDARY_SOURCE + '-glow-outer')
+
+  map.addSource(ENTRY_EXIT_SOURCE, { type: 'geojson', data: emptyFC })
+  map.addLayer({
+    id: ENTRY_EXIT_SOURCE + '-halo',
+    type: 'circle',
+    source: ENTRY_EXIT_SOURCE,
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 8, 15, 16],
+      'circle-color': 'rgba(22,163,74,0.14)',
+      'circle-opacity': 1,
+      'circle-stroke-width': 0,
+    },
+  })
+  map.addLayer({
+    id: ENTRY_EXIT_SOURCE + '-circle',
+    type: 'circle',
+    source: ENTRY_EXIT_SOURCE,
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 4, 15, 7],
+      'circle-color': '#16A34A',
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#FFFFFF',
+    },
+  })
+  map.addLayer({
+    id: ENTRY_EXIT_SOURCE + '-label',
+    type: 'symbol',
+    source: ENTRY_EXIT_SOURCE,
+    minzoom: 12,
+    layout: {
+      'text-field': ['coalesce', ['get', 'direction'], 'Gateway'],
+      'text-font': ['Open Sans Bold'],
+      'text-size': 10,
+      'text-offset': [0, 1.3],
+      'text-anchor': 'top',
+    },
+    paint: {
+      'text-color': 'rgba(15,23,42,0.72)',
+      'text-halo-color': 'rgba(255,255,255,0.92)',
+      'text-halo-width': 1.5,
+    },
+  })
 }
 
 function addCongestionHeatmapStack(

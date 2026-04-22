@@ -114,6 +114,7 @@ interface MapStore {
 
 const defaultCity = CITIES.find(c => c.id === DEFAULT_CITY_ID)!
 let latestBoundaryRequestId = 0
+const EXCLUSIVE_VISUAL_LAYERS = new Set<MapLayerId>(['traffic', 'heatmap', 'incidents'])
 
 export const useMapStore = create<MapStore>()(
   persist(
@@ -149,17 +150,31 @@ export const useMapStore = create<MapStore>()(
       mode:    'live',
       setMode: (mode) => set({ mode, selectedSegmentId: null }),
 
-      activeLayers: new Set<MapLayerId>(['traffic', 'incidents', 'boundary']),
+      activeLayers: new Set<MapLayerId>(['boundary']),
       toggleLayer: (layer) =>
         set(s => {
           const next = new Set(s.activeLayers)
-          next.has(layer) ? next.delete(layer) : next.add(layer)
+          if (next.has(layer)) {
+            next.delete(layer)
+          } else {
+            if (EXCLUSIVE_VISUAL_LAYERS.has(layer)) {
+              EXCLUSIVE_VISUAL_LAYERS.forEach(exclusiveLayer => next.delete(exclusiveLayer))
+            }
+            next.add(layer)
+          }
           return { activeLayers: next }
         }),
       setLayer: (layer, active) =>
         set(s => {
           const next = new Set(s.activeLayers)
-          active ? next.add(layer) : next.delete(layer)
+          if (active) {
+            if (EXCLUSIVE_VISUAL_LAYERS.has(layer)) {
+              EXCLUSIVE_VISUAL_LAYERS.forEach(exclusiveLayer => next.delete(exclusiveLayer))
+            }
+            next.add(layer)
+          } else {
+            next.delete(layer)
+          }
           return { activeLayers: next }
         }),
 

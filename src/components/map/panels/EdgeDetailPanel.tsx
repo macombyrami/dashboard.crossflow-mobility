@@ -34,7 +34,7 @@ export function EdgeDetailPanel() {
   const predicted = Math.max(0, Math.min(1, segment.congestionScore + (trend === 'improving' ? -0.12 : trend === 'worsening' ? +0.10 : 0)))
 
   return (
-    <div className="absolute top-16 right-3 w-72 bg-bg-elevated border border-bg-border rounded-2xl shadow-panel z-20 animate-slide-in overflow-hidden">
+    <div className="absolute right-3 top-[112px] z-20 max-h-[calc(100vh-160px)] w-[calc(100vw-24px)] overflow-y-auto rounded-[24px] border border-stone-200 bg-white/96 shadow-[0_20px_48px_rgba(15,23,42,0.12)] backdrop-blur-xl animate-slide-in sm:right-4 sm:w-80">
       {/* Header */}
       <div className="p-4 border-b border-bg-border flex items-start justify-between gap-2 bg-gradient-to-br from-bg-elevated to-bg-surface">
         <div className="min-w-0 flex-1">
