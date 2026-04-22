@@ -1,309 +1,180 @@
 'use client'
-import { useEffect, useState, useMemo } from 'react'
-import { AlertTriangle, RefreshCw, MapPin, Clock, Zap, Download, TrendingUp, TrendingDown, Minus, Route } from 'lucide-react'
-import { SeverityPill } from '@/components/ui/SeverityPill'
-import { useMapStore } from '@/store/mapStore'
-import { useTrafficStore } from '@/store/trafficStore'
-import { generateIncidents, generateCityKPIs } from '@/lib/engine/traffic.engine'
-import { generateSytadinKPIs, generateSytadinTravelTimes, injectSytadinIncidents } from '@/lib/engine/sytadin.engine'
-import { exportToCsv } from '@/lib/utils/export'
+
+import { useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, Clock3, MapPin, RefreshCw } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { fr } from 'date-fns/locale'
-import { cn } from '@/lib/utils/cn'
-import type { IncidentSeverity, IncidentType } from '@/types'
+import { useMapStore } from '@/store/mapStore'
+import type { IncidentSeverity } from '@/types'
+import type { IncidentIntelligenceRecord } from '@/lib/incidents/intelligence'
 
-const SEVERITY_ORDER: Record<IncidentSeverity, number> = { critical: 0, high: 1, medium: 2, low: 3 }
-const TYPE_LABELS: Record<IncidentType, string> = {
-  accident:   'Accident',
-  roadwork:   'Travaux',
-  congestion: 'Congestion',
-  anomaly:    'Anomalie IA',
-  event:      'Événement',
+const FILTERS: Array<{ id: IncidentSeverity | 'all'; label: string }> = [
+  { id: 'all', label: 'All' },
+  { id: 'critical', label: 'Critical' },
+  { id: 'high', label: 'High' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'low', label: 'Low' },
+]
+
+const SEVERITY_STYLES: Record<IncidentSeverity, string> = {
+  critical: 'bg-red-500 text-white',
+  high: 'bg-orange-500 text-white',
+  medium: 'bg-amber-400 text-stone-950',
+  low: 'bg-yellow-200 text-stone-900',
+}
+
+const SEVERITY_BORDER: Record<IncidentSeverity, string> = {
+  critical: 'border-red-200',
+  high: 'border-orange-200',
+  medium: 'border-amber-200',
+  low: 'border-yellow-200',
 }
 
 export default function IncidentsPage() {
-  const city        = useMapStore(s => s.city)
-  const incidents   = useTrafficStore(s => s.incidents)
-  const dataSource  = useTrafficStore(s => s.dataSource)
-  const setIncidents = useTrafficStore(s => s.setIncidents)
-  const setKPIs     = useTrafficStore(s => s.setKPIs)
-  
+  const city = useMapStore(s => s.city)
   const [filter, setFilter] = useState<IncidentSeverity | 'all'>('all')
-  const [lastRefresh, setLastRefresh] = useState(new Date())
-  const [mounted, setMounted] = useState(false)
+  const [incidents, setIncidents] = useState<IncidentIntelligenceRecord[]>([])
+  const [fetchedAt, setFetchedAt] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  // Sytadin state (for Paris only)
-  const [sytadinData, setSytadinData] = useState<any>(null)
-  const [travelTimes, setTravelTimes] = useState<any[]>([])
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  const refresh = () => {
-    if (city.id === 'paris') {
-      const sytadinKpi = generateSytadinKPIs(city)
-      setSytadinData(sytadinKpi)
-      setTravelTimes(generateSytadinTravelTimes())
-      
-      const baseIncidents = dataSource === 'live' ? incidents : generateIncidents(city)
-      setIncidents(injectSytadinIncidents(city, baseIncidents))
-    } else {
-      setSytadinData(null)
-      setTravelTimes([])
-      if (dataSource !== 'live') {
-        setIncidents(generateIncidents(city))
-      }
+  const refresh = async () => {
+    setLoading(true)
+    try {
+      const bbox = city.bbox.join(',')
+      const response = await fetch(`/api/incidents/intelligence?bbox=${bbox}`, { cache: 'no-store' })
+      const data = await response.json()
+      setIncidents(Array.isArray(data.incidents) ? data.incidents : [])
+      setFetchedAt(data.meta?.fetchedAt ?? new Date().toISOString())
+    } catch {
+      setIncidents([])
+      setFetchedAt(new Date().toISOString())
+    } finally {
+      setLoading(false)
     }
-    
-    if (dataSource !== 'live') {
-      setKPIs(generateCityKPIs(city))
-    }
-    setLastRefresh(new Date())
   }
 
   useEffect(() => {
     refresh()
-    const interval = setInterval(refresh, 60_000)
-    return () => clearInterval(interval)
-  }, [city.id, dataSource]) // eslint-disable-line
+    const interval = window.setInterval(refresh, 60_000)
+    return () => window.clearInterval(interval)
+  }, [city.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = useMemo(() => {
-    return [...incidents]
-      .filter(i => filter === 'all' || i.severity === filter)
-      .sort((a, b) => {
-        if (a.source === 'Sytadin' && b.source !== 'Sytadin') return -1
-        if (a.source !== 'Sytadin' && b.source === 'Sytadin') return 1
-        return SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
-      })
-  }, [incidents, filter])
+  const counts = useMemo(
+    () => ({
+      all: incidents.length,
+      critical: incidents.filter(item => item.severity === 'critical').length,
+      high: incidents.filter(item => item.severity === 'high').length,
+      medium: incidents.filter(item => item.severity === 'medium').length,
+      low: incidents.filter(item => item.severity === 'low').length,
+    }),
+    [incidents],
+  )
 
-  const counts = {
-    all:      incidents.length,
-    critical: incidents.filter(i => i.severity === 'critical').length,
-    high:     incidents.filter(i => i.severity === 'high').length,
-    medium:   incidents.filter(i => i.severity === 'medium').length,
-    low:      incidents.filter(i => i.severity === 'low').length,
-  }
-
-  const FILTERS: { id: IncidentSeverity | 'all'; label: string }[] = [
-    { id: 'all',      label: `Tous (${counts.all})` },
-    { id: 'critical', label: `Critique (${counts.critical})` },
-    { id: 'high',     label: `Élevé (${counts.high})` },
-    { id: 'medium',   label: `Moyen (${counts.medium})` },
-    { id: 'low',      label: `Faible (${counts.low})` },
-  ]
+  const filtered = useMemo(
+    () => incidents.filter(item => filter === 'all' || item.severity === filter),
+    [filter, incidents],
+  )
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-5xl mx-auto custom-scrollbar">
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-slide-up">
+    <main className="mx-auto flex min-h-0 max-w-5xl flex-1 flex-col gap-6 overflow-y-auto p-4 sm:p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary flex items-center gap-3">
-            <AlertTriangle className="w-6 h-6 text-brand" />
-            Alertes & Incidents
-            <span className="text-text-muted font-medium ml-1">— {city.flag} {city.name}</span>
-          </h1>
-          <p className="text-sm text-text-muted mt-1 font-medium">
-            Dernière mise à jour {mounted ? formatDistanceToNow(lastRefresh, { locale: fr, addSuffix: true }) : '...'}
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-stone-400">
+            <AlertTriangle className="h-4 w-4" />
+            <span>Incident Intelligence</span>
+          </div>
+          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-stone-950">{city.name}</h1>
+          <p className="mt-1 text-sm text-stone-500">
+            {fetchedAt ? `Updated ${formatDistanceToNow(new Date(fetchedAt), { addSuffix: true, locale: fr })}` : 'Syncing incident feeds...'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => exportToCsv(
-              `incidents-${city.id}-${new Date().toISOString().slice(0, 10)}`,
-              ['ID', 'Type', 'Sévérité', 'Titre', 'Adresse', 'Source', 'Début'],
-              incidents.map(i => [i.id, i.type, i.severity, i.title, i.address, i.source, i.startedAt]),
-            )}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-bg-subtle border border-bg-border hover:border-brand/40 transition-all text-sm font-semibold text-text-secondary hover:text-text-primary group"
-          >
-            <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
-            Exporter CSV
-          </button>
-          <button
-            onClick={refresh}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-brand/10 border border-brand/20 hover:border-brand/50 transition-all text-sm font-bold text-brand group"
-          >
-            <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
-            Rafraîchir
-          </button>
-        </div>
+
+        <button
+          onClick={refresh}
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-700 shadow-[0_12px_28px_rgba(15,23,42,0.06)] transition-all hover:border-stone-300 hover:text-stone-950"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
-      {/* Sytadin Dashboard (Paris Only) */}
-      {city.id === 'paris' && sytadinData && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-          {/* Main KPI */}
-          <div className="lg:col-span-1 glass-card p-6 flex flex-col justify-between relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Zap className="w-16 h-16 text-brand" />
-            </div>
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-[11px] font-bold text-brand uppercase tracking-[0.2em]">Sytadin — IDF</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-bold text-text-primary tabular-nums">{sytadinData.totalCongestionKm}</span>
-                <span className="text-lg font-bold text-text-muted">km</span>
-              </div>
-              <p className="text-sm font-semibold text-text-secondary mt-1">Cumul de bouchons actuel</p>
-            </div>
-            <div className={cn(
-              "flex items-center gap-2 mt-6 font-bold text-[13px]",
-              sytadinData.trend === 'increasing' ? "text-red-500" : sytadinData.trend === 'decreasing' ? "text-brand" : "text-text-muted"
-            )}>
-              {sytadinData.trend === 'increasing' ? <TrendingUp className="w-4 h-4" /> : sytadinData.trend === 'decreasing' ? <TrendingDown className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
-              {sytadinData.trend === 'increasing' ? "En forte augmentation" : sytadinData.trend === 'decreasing' ? "Tendance à la baisse" : "Trafic stable"}
-            </div>
-          </div>
-
-          {/* Travel Times Table */}
-          <div className="lg:col-span-2 glass-card overflow-hidden flex flex-col">
-            <div className="px-6 py-4 border-b border-bg-border flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Route className="w-4 h-4 text-text-muted" />
-                <span className="text-[12px] font-bold text-text-secondary uppercase tracking-widest">Temps de parcours — Axes Majeurs</span>
-              </div>
-            </div>
-            <div className="flex-1 overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-bg-border bg-bg-subtle/40">
-                    <th className="px-6 py-3 text-[10px] font-bold text-text-muted uppercase tracking-wider">Axe</th>
-                    <th className="px-6 py-3 text-[10px] font-bold text-text-muted uppercase tracking-wider">Parcours</th>
-                    <th className="px-6 py-3 text-[10px] font-bold text-text-muted uppercase tracking-wider text-right">Temps</th>
-                    <th className="px-6 py-3 text-[10px] font-bold text-text-muted uppercase tracking-wider text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {travelTimes.map((tt, i) => (
-                    <tr key={i} className="hover:bg-bg-subtle/60 transition-colors group">
-                      <td className="px-6 py-3">
-                        <span className="px-2 py-0.5 rounded-md bg-bg-subtle border border-bg-border text-[11px] font-bold text-text-primary group-hover:border-brand/40 transition-colors">
-                          {tt.axis}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3">
-                        <div className="text-[12px] text-text-secondary truncate max-w-[200px]">
-                          {tt.from} <span className="text-text-muted mx-1">→</span> {tt.to}
-                        </div>
-                      </td>
-                      <td className="px-6 py-3 text-right">
-                        <div className="flex flex-col items-end">
-                          <span className={cn(
-                            "text-[13px] font-bold tabular-nums",
-                            tt.timeMin > tt.normalTimeMin * 1.5 ? "text-red-500" : "text-text-primary"
-                          )}>{tt.timeMin} min</span>
-                          <span className="text-[10px] text-text-muted font-medium">Hab: {tt.normalTimeMin} min</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-3 text-right">
-                         <span className={cn(
-                           "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                           tt.status === 'saturated' ? "text-red-500 border-red-500/20 bg-red-500/10" :
-                           tt.status === 'dense' ? "text-orange-500 border-orange-500/20 bg-orange-500/10" :
-                           "text-brand border-brand/20 bg-brand/10"
-                         )}>
-                           {tt.status === 'saturated' ? "Saturé" : tt.status === 'dense' ? "Dense" : "Fluide"}
-                         </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Filter tabs */}
-      <div className="flex items-center gap-2 flex-wrap animate-slide-up" style={{ animationDelay: '0.2s' }}>
-        {FILTERS.map(f => (
+      <div className="flex flex-wrap gap-2">
+        {FILTERS.map(item => (
           <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            className={cn(
-              'px-4 py-2 rounded-xl text-[12px] font-bold transition-all border shadow-sm',
-              filter === f.id
-                ? 'bg-brand text-black border-brand scale-105'
-                : 'bg-bg-subtle text-text-secondary border-bg-border hover:border-bg-hover hover:text-text-primary',
-            )}
+            key={item.id}
+            onClick={() => setFilter(item.id)}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
+              filter === item.id
+                ? 'border-stone-950 bg-stone-950 text-white'
+                : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:text-stone-950'
+            }`}
           >
-            {f.label}
+            {item.label} ({counts[item.id]})
           </button>
         ))}
       </div>
 
-      {/* Incident list */}
-      <div className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
-        {filtered.length === 0 ? (
-          <div className="glass-card p-16 text-center">
-            <div className="w-16 h-16 rounded-3xl bg-brand/10 flex items-center justify-center mx-auto mb-4 border border-brand/20">
-              <Zap className="w-8 h-8 text-brand" />
-            </div>
-            <h3 className="text-text-primary font-bold mb-1">Tout est fluide</h3>
-            <p className="text-text-muted text-sm">Aucun incident critique détecté pour le moment.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-3">
-            {filtered.map(inc => (
-              <div
-                key={inc.id}
-                className={cn(
-                  'glass-card p-5 group transition-all duration-300 relative overflow-hidden',
-                  inc.severity === 'critical' ? 'border-red-500/20' :
-                  inc.severity === 'high'     ? 'border-orange-500/20' :
-                                                'border-bg-border',
-                )}
-              >
-                {/* Visual accent for Sytadin sources */}
-                {inc.source === 'Sytadin' && (
-                  <div className="absolute top-0 right-0 px-3 py-1 bg-brand text-black text-[9px] font-bold uppercase tracking-widest rounded-bl-xl shadow-lg z-20">
-                    Sytadin Direct
-                  </div>
-                )}
-
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="mt-1 flex-shrink-0">
-                      <div 
-                        className="w-10 h-10 rounded-[14px] flex items-center justify-center text-lg shadow-sm border" 
-                        style={{ backgroundColor: `${inc.iconColor}14`, borderColor: `${inc.iconColor}25` }}
-                      >
-                         <AlertTriangle className="w-5 h-5" style={{ color: inc.iconColor }} />
-                      </div>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-[15px] font-bold text-text-primary group-hover:text-brand transition-colors truncate">{inc.title}</h3>
-                        <SeverityPill severity={inc.severity} size="sm" />
-                      </div>
-                      <p className="text-[13px] font-medium text-text-secondary line-clamp-2 lg:line-clamp-1">{inc.description}</p>
-                    </div>
+      {filtered.length === 0 ? (
+        <div className="rounded-[28px] border border-stone-200 bg-white p-10 text-center shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
+          <p className="text-base font-semibold text-stone-900">No active incident in this filter.</p>
+          <p className="mt-2 text-sm text-stone-500">Road network monitoring remains active across Sytadin and TomTom.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(incident => (
+            <article
+              key={incident.id}
+              className={`rounded-[28px] border bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)] ${SEVERITY_BORDER[incident.severity]}`}
+            >
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-sm font-bold text-stone-900">
+                      {incident.road}
+                    </span>
+                    <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] ${SEVERITY_STYLES[incident.severity]}`}>
+                      {incident.severity}
+                    </span>
+                    <span className="rounded-full border border-stone-200 px-3 py-1 text-xs font-semibold text-stone-500">
+                      {incident.sourceLabel}
+                    </span>
+                    <span className="rounded-full border border-stone-200 px-3 py-1 text-xs font-semibold text-stone-500">
+                      {incident.confidence} confidence
+                    </span>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 lg:pl-4 lg:border-l lg:border-bg-border">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-text-muted">
-                      <MapPin className="w-3.5 h-3.5" />
-                      {inc.address}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-text-muted">
-                      <Clock className="w-3.5 h-3.5" />
-                      {mounted ? formatDistanceToNow(new Date(inc.startedAt), { locale: fr, addSuffix: true }) : '...'}
-                    </div>
-                    <div className="ml-auto lg:ml-0 flex items-center gap-2">
-                       <span className="text-[10px] font-bold text-text-muted px-2 py-0.5 rounded-lg bg-bg-subtle border border-bg-border uppercase tracking-widest">
-                         {inc.source}
-                       </span>
-                    </div>
+                  <p className="mt-3 text-base font-semibold text-stone-950">
+                    {incident.description}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-stone-500">
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin className="h-4 w-4" />
+                      {incident.location || incident.direction || 'Location pending'}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock3 className="h-4 w-4" />
+                      {formatDistanceToNow(new Date(incident.timestamp), { addSuffix: true, locale: fr })}
+                    </span>
+                    <span>{incident.status === 'active' ? 'Active' : 'Finished'}</span>
                   </div>
                 </div>
+
+                <div className="flex flex-wrap items-center gap-2 lg:max-w-[220px] lg:justify-end">
+                  {incident.sources.map(source => (
+                    <span
+                      key={`${incident.id}-${source}`}
+                      className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-semibold text-stone-500"
+                    >
+                      {source}
+                    </span>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </article>
+          ))}
+        </div>
+      )}
     </main>
   )
 }
