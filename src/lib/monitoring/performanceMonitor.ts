@@ -1,7 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 
 export class PerformanceMonitor {
-  private supabase = createClient()
+  private supabasePromise: ReturnType<typeof createClient> | null = null
+
+  private async getSupabase() {
+    if (!this.supabasePromise) {
+      this.supabasePromise = createClient()
+    }
+    return this.supabasePromise
+  }
 
   async logAPICall(
     apiName: string,
@@ -13,7 +20,7 @@ export class PerformanceMonitor {
     cityId?: string,
     errorMessage?: string
   ) {
-    const supabase = await this.supabase
+    const supabase = await this.getSupabase()
     await supabase.from('api_performance_log').insert({
       api_name: apiName,
       endpoint,
@@ -28,7 +35,7 @@ export class PerformanceMonitor {
   }
 
   async getPerformanceStats(apiName: string, hours: number = 24) {
-    const supabase = await this.supabase
+    const supabase = await this.getSupabase()
     const { data } = await supabase
       .from('api_performance_log')
       .select('*')
@@ -50,7 +57,7 @@ export class PerformanceMonitor {
   }
 
   async getAllStats(hours: number = 24) {
-    const supabase = await this.supabase
+    const supabase = await this.getSupabase()
     const { data } = await supabase
       .from('api_performance_log')
       .select('api_name, success, cache_hit, response_time_ms')
@@ -83,7 +90,7 @@ export class PerformanceMonitor {
   }
 
   async trackUserVisit(userId: string, cityId: string) {
-    const supabase = await this.supabase
+    const supabase = await this.getSupabase()
     await supabase.from('user_city_visits').upsert(
       {
         user_id: userId,

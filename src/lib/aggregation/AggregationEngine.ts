@@ -107,11 +107,18 @@ export interface EnvironmentalData {
 }
 
 export class AggregationEngine {
-  private supabase = createClient()
+  private supabasePromise: ReturnType<typeof createClient> | null = null
   private readonly SNAPSHOT_TTL = 600 // 10 minutes
   private readonly TRAFFIC_TTL = 300 // 5 minutes
   private readonly WEATHER_TTL = 3600 // 1 hour
   private readonly POI_TTL = 86400 // 24 hours
+
+  private async getSupabase() {
+    if (!this.supabasePromise) {
+      this.supabasePromise = createClient()
+    }
+    return this.supabasePromise
+  }
 
   /**
    * Get or fetch snapshot for a city
@@ -469,7 +476,7 @@ export class AggregationEngine {
   }
 
   private async getFromDatabase(cityId: string): Promise<CitySnapshot | null> {
-    const supabase = await this.supabase
+    const supabase = await this.getSupabase()
     const { data } = await supabase
       .from('city_snapshots')
       .select('aggregated_data')
@@ -483,7 +490,7 @@ export class AggregationEngine {
   }
 
   private async storeSnapshot(snapshot: CitySnapshot, aggregationTime: number) {
-    const supabase = await this.supabase
+    const supabase = await this.getSupabase()
     await supabase.from('city_snapshots').insert({
       city_id: snapshot.city_id,
       city_name: snapshot.city_name,
@@ -506,7 +513,7 @@ export class AggregationEngine {
     success: boolean,
     cacheHit: boolean
   ) {
-    const supabase = await this.supabase
+    const supabase = await this.getSupabase()
     await supabase.from('api_performance_log').insert({
       api_name: source,
       city_id: cityId,

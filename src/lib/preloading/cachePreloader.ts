@@ -2,7 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { aggregationEngine } from '@/lib/aggregation/AggregationEngine'
 
 export class CachePreloader {
-  private supabase = createClient()
+  private supabasePromise: ReturnType<typeof createClient> | null = null
+
+  private async getSupabase() {
+    if (!this.supabasePromise) {
+      this.supabasePromise = createClient()
+    }
+    return this.supabasePromise
+  }
 
   /**
    * Preload snapshots for most visited cities
@@ -13,7 +20,7 @@ export class CachePreloader {
 
     try {
       // Get top 10 visited cities
-      const supabase = await this.supabase
+      const supabase = await this.getSupabase()
       const { data: topCities } = await supabase
         .from('user_city_visits')
         .select('city_id, visit_count')
@@ -52,7 +59,7 @@ export class CachePreloader {
    */
   async preloadForUser(userId: string) {
     try {
-      const supabase = await this.supabase
+      const supabase = await this.getSupabase()
       const { data: userCities } = await supabase
         .from('user_city_visits')
         .select('city_id')
@@ -78,7 +85,7 @@ export class CachePreloader {
    */
   async trackVisit(userId: string, cityId: string) {
     try {
-      const supabase = await this.supabase
+      const supabase = await this.getSupabase()
       const { data: existing } = await supabase
         .from('user_city_visits')
         .select('visit_count')
