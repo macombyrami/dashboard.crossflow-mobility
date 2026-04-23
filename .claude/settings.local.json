@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx --yes tsc --noEmit -p tsconfig.json)",
+      "Bash(npx tsc *)",
+      "Bash(git rebase *)",
+      "Bash(git stash *)",
+      "Bash(git checkout *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --base main --head claude/zealous-sammet-6fac46 --title 'feat: light/dark theming, light-mode default, full SaaS UI/UX scale' --body ' *)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(npm run *)",
+      "Bash(grep -r \"await this\\\\.supabase\\\\s*$\" /c/Users/Administrateur/crossflow-mobility/dashboard.crossflow-mobility/src --include=\"*.ts\" --include=\"*.tsx\" -n)",
+      "Bash(npm install *)",
+      "Bash(npm list *)",
+      "Bash(npm ls *)",
+      "Bash(npx skills *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'PHASE 2: Dashboard Component Refactoring - New composable components *)"
+    ]
+  }
+}
