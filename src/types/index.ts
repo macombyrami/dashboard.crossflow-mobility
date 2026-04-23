@@ -254,3 +254,39 @@ export interface SearchFocusTarget {
   bbox?: [number, number, number, number] | null
   kind?: string
 }
+
+// ─── Sytadin Incident Pipeline ────────────────────────────────────────────────
+
+export interface RawTweet {
+  id: string
+  text: string
+  created_at: string
+}
+
+export interface ParsedIncident {
+  type: 'accident' | 'closure' | 'roadwork' | 'congestion' | 'blockage' | 'weather' | 'other'
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  road: string | null
+  direction: string | null
+  from_city: string | null
+  to_city: string | null
+  event: string
+  confidence_parse: 'high' | 'medium' | 'low'
+}
+
+export interface Coordinates {
+  lat: number
+  lng: number
+}
+
+export interface GeocodedIncident extends ParsedIncident {
+  from_coords: Coordinates | null
+  to_coords: Coordinates | null
+  geometry_type: 'Point' | 'LineString'
+}
+
+export interface MatchedIncident extends GeocodedIncident {
+  geometry: GeoJSON.Geometry
+  matched: boolean
+  match_confidence: 'high' | 'medium' | 'low'
+}

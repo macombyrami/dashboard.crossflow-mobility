@@ -48,6 +48,7 @@ import {
 import { fetchCityBoundary, fetchCityDistricts } from '@/lib/api/geocoding'
 import type { AggregatedHeatFeatureCollection } from '@/lib/map/trafficHeatmap'
 import { useSocialStore } from '@/store/socialStore'
+import { setupSytadinLayers, updateSytadinData, setSytadinLayerVisibility } from '@/lib/map/sytadin-layers'
 import type { Incident, HeatmapMode, CongestionLevel, TrafficSnapshot, TrafficSegment, MapLayerId, QuickFilterId, City } from '@/types'
 
 const TRAFFIC_SOURCE          = 'cf-traffic'
@@ -288,6 +289,8 @@ function applyTrafficRenderingHierarchy(map: maplibregl.Map | null) {
     ENTRY_EXIT_SOURCE + '-halo',
     ENTRY_EXIT_SOURCE + '-circle',
     ENTRY_EXIT_SOURCE + '-label',
+    'sytadin-incidents-line',
+    'sytadin-incidents-point',
     INCIDENT_SOURCE + '-cluster-glow',
     INCIDENT_SOURCE + '-cluster',
     INCIDENT_SOURCE + '-count',
@@ -1529,6 +1532,89 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
       if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
     })
 
+    // Click on Sytadin Incidents (Points)
+    map.on('click', 'sytadin-incidents-point', (e) => {
+      if (zoneActiveRef.current) return
+      const feat = e.features?.[0]
+      if (!feat) return
+      const p = feat.properties as any
+      const severityMap: Record<string, { color: string; label: string }> = {
+        critical: { color: '#DC2626', label: 'CRITIQUE' },
+        high: { color: '#F97316', label: 'ÉLEVÉ' },
+        medium: { color: '#EAB308', label: 'MOYEN' },
+        low: { color: '#22C55E', label: 'FAIBLE' },
+      }
+      const severity = severityMap[p.severity] || severityMap.medium
+      popupRef.current?.remove()
+      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '280px', className: 'apple-popup' })
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div class="glass" style="padding:16px; border-radius:18px; color:white; border:1px solid ${severity.color}40;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <div style="width:8px; height:8px; border-radius:50%; background:${severity.color}; box-shadow:0 0 8px ${severity.color};"></div>
+              <span style="font-size:10px; font-weight:700; color:${severity.color}; text-transform:uppercase; tracking:0.1em;">${severity.label}</span>
+            </div>
+            <h3 style="margin:0 0 6px 0; font-size:15px; font-weight:700;">${p.type?.toUpperCase() || 'INCIDENT'}</h3>
+            <p style="margin:0 0 8px 0; font-size:11px; color:var(--popup-secondary); line-height:1.4;">${p.description || ''}</p>
+            <div style="padding:8px; background:rgba(255,255,255,0.05); border-radius:8px; margin-bottom:8px; font-size:10px;">
+              <div>📍 <strong>${p.road || 'Route'}</strong> ${p.direction || ''}</div>
+              <div style="margin-top:4px; color:#9CA3AF;">Vers: ${p.to_city || 'N/A'}</div>
+            </div>
+            <p style="margin:0; font-size:9px; color:#6B7280;">Source: Sytadin (${new Date().toLocaleTimeString('fr-FR')})</p>
+          </div>
+        `)
+        .addTo(map)
+    })
+
+    map.on('mouseenter', 'sytadin-incidents-point', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = 'pointer'
+    })
+    map.on('mouseleave', 'sytadin-incidents-point', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
+    })
+
+    // Click on Sytadin Incidents (Lines)
+    map.on('click', 'sytadin-incidents-line', (e) => {
+      if (zoneActiveRef.current) return
+      const feat = e.features?.[0]
+      if (!feat) return
+      const p = feat.properties as any
+      const severityMap: Record<string, { color: string; label: string }> = {
+        critical: { color: '#DC2626', label: 'CRITIQUE' },
+        high: { color: '#F97316', label: 'ÉLEVÉ' },
+        medium: { color: '#EAB308', label: 'MOYEN' },
+        low: { color: '#22C55E', label: 'FAIBLE' },
+      }
+      const severity = severityMap[p.severity] || severityMap.medium
+      const center = e.lngLat
+      popupRef.current?.remove()
+      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '280px', className: 'apple-popup' })
+        .setLngLat(center)
+        .setHTML(`
+          <div class="glass" style="padding:16px; border-radius:18px; color:white; border:1px solid ${severity.color}40;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <div style="width:8px; height:8px; border-radius:50%; background:${severity.color}; box-shadow:0 0 8px ${severity.color};"></div>
+              <span style="font-size:10px; font-weight:700; color:${severity.color}; text-transform:uppercase; tracking:0.1em;">${severity.label}</span>
+            </div>
+            <h3 style="margin:0 0 6px 0; font-size:15px; font-weight:700;">${p.type?.toUpperCase() || 'INCIDENT'}</h3>
+            <p style="margin:0 0 8px 0; font-size:11px; color:var(--popup-secondary); line-height:1.4;">${p.description || ''}</p>
+            <div style="padding:8px; background:rgba(255,255,255,0.05); border-radius:8px; margin-bottom:8px; font-size:10px;">
+              <div>📍 <strong>${p.road || 'Route'}</strong> ${p.direction || ''}</div>
+              <div style="margin-top:4px; color:#9CA3AF;">De: ${p.from_city || 'N/A'} → Vers: ${p.to_city || 'N/A'}</div>
+            </div>
+            <p style="margin:0; font-size:9px; color:#6B7280;">Source: Sytadin (${new Date().toLocaleTimeString('fr-FR')})</p>
+          </div>
+        `)
+        .addTo(map)
+    })
+
+    map.on('mouseenter', 'sytadin-incidents-line', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = 'pointer'
+    })
+    map.on('mouseleave', 'sytadin-incidents-line', () => {
+      if (!zoneActiveRef.current) map.getCanvas().style.cursor = ''
+    })
+
     // Click on Heatmap Points (using the points rendered as transparent circles for interaction)
     const handleHeatmapClick = (mode: HeatmapMode, color: string, unit: string) => (e: any) => {
       const feat = e.features?.[0]
@@ -2488,6 +2574,39 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
     }
   }, [mapLoaded, refreshData])
 
+  // ─── Sytadin Real-Time Incidents Polling (60s interval) ────────────────
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+
+    const fetchSytadinIncidents = async () => {
+      try {
+        const response = await fetch('/api/incidents/sytadin/geojson', {
+          cache: 'no-store',
+        })
+        if (!response.ok) {
+          console.warn('[Sytadin] Failed to fetch incidents:', response.status)
+          return
+        }
+        const geojson = await response.json() as GeoJSON.FeatureCollection
+        const sytadinSource = mapRef.current?.getSource('sytadin-incidents') as maplibregl.GeoJSONSource | undefined
+        if (sytadinSource) {
+          sytadinSource.setData(geojson)
+          console.log('[Sytadin] Updated map with', geojson.features.length, 'incidents')
+        }
+      } catch (error) {
+        console.warn('[Sytadin] Fetch error:', error)
+      }
+    }
+
+    // Fetch immediately on mount
+    fetchSytadinIncidents()
+
+    // Then poll every 60 seconds
+    const interval = setInterval(fetchSytadinIncidents, 60000)
+
+    return () => clearInterval(interval)
+  }, [mapLoaded])
+
   // ─── 10-Minute Persistence Sampler (Staff Engineer Architecture) ───────
   useEffect(() => {
     if (!mapLoadedRef.current || mode !== 'live') return
@@ -3371,6 +3490,19 @@ function initStaticSources(map: maplibregl.Map) {
       promoteId: 'id',
     })
   }
+
+  // Sytadin incidents source
+  const SYTADIN_SOURCE = 'sytadin-incidents'
+  if (!map.getSource(SYTADIN_SOURCE)) {
+    map.addSource(SYTADIN_SOURCE, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+      promoteId: 'id',
+    })
+  }
+
+  // Setup Sytadin layers (lines and points with severity color-coding)
+  setupSytadinLayers(map)
 
   // 0. Traffic Halo — white outline behind colored line for contrast on light map
   if (!map.getLayer(TRAFFIC_SOURCE + '-halo')) {

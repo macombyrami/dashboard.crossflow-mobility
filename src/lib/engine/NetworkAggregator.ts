@@ -233,7 +233,9 @@ export class NetworkAggregator {
   private static estimateLengthMeters(coords: [number, number][]): number {
     if (coords.length < 2) return 0
     try {
-      return Math.max(25, Math.round(turf.length(turf.lineString(coords), { units: 'kilometers' }) * 1000))
+      const line = turf.lineString(coords)
+      const len = (turf as any).length(line, { units: 'kilometers' })
+      return Math.max(25, Math.round(len * 1000))
     } catch {
       return 0
     }
