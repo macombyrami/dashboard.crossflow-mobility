@@ -20,6 +20,10 @@ import {
 } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
 import { cn } from '@/lib/utils/cn'
+import { GlobalTrafficBannerNew } from '@/components/dashboard/GlobalTrafficBannerNew'
+import { KPIGridNew } from '@/components/dashboard/KPIGridNew'
+import { IncidentFeedNew } from '@/components/dashboard/IncidentFeedNew'
+import { SkeletonLoader } from '@/components/ui/SkeletonLoader'
 
 const CrossFlowMap = dynamic(
   () => import('@/components/map/CrossFlowMap').then(m => ({ default: m.CrossFlowMap })),
@@ -368,8 +372,59 @@ export default function DashboardPage() {
   }, [setLayer])
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto bg-[#F7F8FA] text-stone-900">
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-3 py-3 sm:px-4 sm:py-4">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg-base text-text-primary page-scroll">
+      <div className="page-container">
+        {/* New Global Traffic Banner */}
+        {!loading && (
+          <GlobalTrafficBannerNew
+            status={networkStatus as 'NORMAL' | 'TENSE' | 'CRITICAL'}
+            avgLoadPct={avgLoadPct}
+            incidentCount={incidentCount}
+            trendLabel={trend.label}
+            trendTone={trend.tone}
+            cityName={city.name}
+          />
+        )}
+
+        {/* New KPI Grid */}
+        <div className="mb-6">
+          {loading ? (
+            <SkeletonLoader type="card" count={4} />
+          ) : (
+            <KPIGridNew
+              avgTravelTime={snapshot?.traffic?.average_speed ? Math.round(((snapshot.traffic.average_speed / 50) * 60)) : 24}
+              congestionRate={congestionPercent(snapshot?.traffic?.congestion_level) / 100}
+              activeIncidents={incidentCount}
+              networkEfficiency={0.88}
+            />
+          )}
+        </div>
+
+        {/* Incidents Feed */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-text-primary mb-4">Active Incidents</h2>
+          {loading ? (
+            <SkeletonLoader type="card" count={4} />
+          ) : (
+            <IncidentFeedNew
+              incidents={incidents.map(i => ({
+                id: i.id,
+                road: i.road,
+                direction: i.direction,
+                type: i.type,
+                severity: i.severity as 'critical' | 'high' | 'medium' | 'low',
+                description: i.description,
+                timestamp: i.timestamp,
+                location: i.location,
+              }))}
+              onIncidentClick={goToMapFocus}
+              isLoading={loading}
+              maxItems={10}
+            />
+          )}
+        </div>
+
+        {/* Legacy sections below */}
         <section className="rounded-3xl border border-stone-200 bg-white px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2">

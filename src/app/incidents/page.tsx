@@ -1,40 +1,24 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Clock3, MapPin, RefreshCw } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
-import { fr } from 'date-fns/locale'
+import { AlertTriangle, RefreshCw, MapPin, Clock } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
+import { Card } from '@/components/ui/Card'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { BottomSheet } from '@/components/ui/BottomSheet'
+import { SkeletonLoader } from '@/components/ui/SkeletonLoader'
+import { EmptyState } from '@/components/ui/EmptyState'
 import type { IncidentSeverity } from '@/types'
 import type { IncidentIntelligenceRecord } from '@/lib/incidents/intelligence'
+import { cn } from '@/lib/utils'
 
-const FILTERS: Array<{ id: IncidentSeverity | 'all'; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'critical', label: 'Critical' },
-  { id: 'high', label: 'High' },
-  { id: 'medium', label: 'Medium' },
-  { id: 'low', label: 'Low' },
-]
+const SEVERITY_FILTERS = ['all', 'critical', 'high', 'medium', 'low'] as const
 
-const SEVERITY_STYLES: Record<IncidentSeverity, string> = {
-  critical: 'bg-red-500 text-white',
-  high: 'bg-orange-500 text-white',
-  medium: 'bg-amber-400 text-stone-950',
-  low: 'bg-yellow-200 text-stone-900',
-}
-
-const SEVERITY_BORDER: Record<IncidentSeverity, string> = {
-  critical: 'border-red-200',
-  high: 'border-orange-200',
-  medium: 'border-amber-200',
-  low: 'border-yellow-200',
-}
-
-export default function IncidentsPage() {
+export default function IncidentsPageNew() {
   const city = useMapStore(s => s.city)
   const [filter, setFilter] = useState<IncidentSeverity | 'all'>('all')
   const [incidents, setIncidents] = useState<IncidentIntelligenceRecord[]>([])
-  const [fetchedAt, setFetchedAt] = useState<string | null>(null)
+  const [selectedIncident, setSelectedIncident] = useState<IncidentIntelligenceRecord | null>(null)
   const [loading, setLoading] = useState(true)
 
   const refresh = async () => {
@@ -44,10 +28,8 @@ export default function IncidentsPage() {
       const response = await fetch(`/api/incidents/intelligence?bbox=${bbox}`, { cache: 'no-store' })
       const data = await response.json()
       setIncidents(Array.isArray(data.incidents) ? data.incidents : [])
-      setFetchedAt(data.meta?.fetchedAt ?? new Date().toISOString())
     } catch {
       setIncidents([])
-      setFetchedAt(new Date().toISOString())
     } finally {
       setLoading(false)
     }
@@ -57,124 +39,227 @@ export default function IncidentsPage() {
     refresh()
     const interval = window.setInterval(refresh, 60_000)
     return () => window.clearInterval(interval)
-  }, [city.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [city.id])
 
   const counts = useMemo(
     () => ({
       all: incidents.length,
-      critical: incidents.filter(item => item.severity === 'critical').length,
-      high: incidents.filter(item => item.severity === 'high').length,
-      medium: incidents.filter(item => item.severity === 'medium').length,
-      low: incidents.filter(item => item.severity === 'low').length,
+      critical: incidents.filter(i => i.severity === 'critical').length,
+      high: incidents.filter(i => i.severity === 'high').length,
+      medium: incidents.filter(i => i.severity === 'medium').length,
+      low: incidents.filter(i => i.severity === 'low').length,
     }),
     [incidents],
   )
 
   const filtered = useMemo(
-    () => incidents.filter(item => filter === 'all' || item.severity === filter),
+    () => incidents.filter(i => filter === 'all' || i.severity === filter),
     [filter, incidents],
   )
 
+  const severityColor = (severity: IncidentSeverity) => {
+    switch (severity) {
+      case 'critical':
+        return 'red'
+      case 'high':
+        return 'orange'
+      case 'medium':
+        return 'orange'
+      default:
+        return 'green'
+    }
+  }
+
   return (
-    <main className="mx-auto flex min-h-0 max-w-5xl flex-1 flex-col gap-6 overflow-y-auto p-4 sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-stone-400">
-            <AlertTriangle className="h-4 w-4" />
-            <span>Incident Intelligence</span>
-          </div>
-          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-stone-950">{city.name}</h1>
-          <p className="mt-1 text-sm text-stone-500">
-            {fetchedAt ? `Updated ${formatDistanceToNow(new Date(fetchedAt), { addSuffix: true, locale: fr })}` : 'Syncing incident feeds...'}
+    <main className="page-scroll">
+      <div className="page-container">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-text-primary mb-2">Active Incidents</h1>
+          <p className="text-text-secondary">
+            {city.name} • {filtered.length} incident{filtered.length !== 1 ? 's' : ''} found
           </p>
         </div>
 
-        <button
-          onClick={refresh}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-700 shadow-[0_12px_28px_rgba(15,23,42,0.06)] transition-all hover:border-stone-300 hover:text-stone-950"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map(item => (
-          <button
-            key={item.id}
-            onClick={() => setFilter(item.id)}
-            className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
-              filter === item.id
-                ? 'border-stone-950 bg-stone-950 text-white'
-                : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:text-stone-950'
-            }`}
-          >
-            {item.label} ({counts[item.id]})
-          </button>
-        ))}
-      </div>
-
-      {filtered.length === 0 ? (
-        <div className="rounded-[28px] border border-stone-200 bg-white p-10 text-center shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
-          <p className="text-base font-semibold text-stone-900">No active incident in this filter.</p>
-          <p className="mt-2 text-sm text-stone-500">Road network monitoring remains active across Sytadin and TomTom.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map(incident => (
-            <article
-              key={incident.id}
-              className={`rounded-[28px] border bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)] ${SEVERITY_BORDER[incident.severity]}`}
+        {/* Filters */}
+        <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
+          {SEVERITY_FILTERS.map(sev => (
+            <button
+              key={sev}
+              onClick={() => setFilter(sev as IncidentSeverity | 'all')}
+              className={cn(
+                'px-4 py-2 rounded-lg font-semibold text-sm transition-all whitespace-nowrap',
+                filter === sev
+                  ? 'bg-status-info text-white'
+                  : 'bg-bg-elevated text-text-secondary hover:bg-bg-hover'
+              )}
             >
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-sm font-bold text-stone-900">
+              {sev === 'all' ? 'All' : sev.charAt(0).toUpperCase() + sev.slice(1)}
+              <span className="ml-2 text-xs opacity-70">({counts[sev as keyof typeof counts]})</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Refresh button */}
+        <div className="mb-6">
+          <button
+            onClick={refresh}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-bg-elevated hover:bg-bg-hover text-text-primary font-semibold transition-all disabled:opacity-50"
+          >
+            <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
+            Refresh
+          </button>
+        </div>
+
+        {/* Incidents Grid */}
+        {loading ? (
+          <SkeletonLoader type="card" count={6} />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon="✓"
+            title="No Incidents"
+            description="All systems operating normally in this area"
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {filtered.map(incident => (
+              <Card
+                key={incident.id}
+                variant="glass"
+                padding="md"
+                interactive
+                accent={severityColor(incident.severity) as any}
+                onClick={() => setSelectedIncident(incident)}
+                className="cursor-pointer"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h3 className="font-semibold text-text-primary flex-1">
                       {incident.road}
-                    </span>
-                    <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] ${SEVERITY_STYLES[incident.severity]}`}>
-                      {incident.severity}
-                    </span>
-                    <span className="rounded-full border border-stone-200 px-3 py-1 text-xs font-semibold text-stone-500">
-                      {incident.sourceLabel}
-                    </span>
-                    <span className="rounded-full border border-stone-200 px-3 py-1 text-xs font-semibold text-stone-500">
-                      {incident.confidence} confidence
-                    </span>
+                    </h3>
+                    <StatusBadge
+                      status={
+                        incident.severity === 'critical'
+                          ? 'critical'
+                          : incident.severity === 'high'
+                          ? 'warning'
+                          : incident.severity === 'medium'
+                          ? 'caution'
+                          : 'normal'
+                      }
+                      label={incident.severity}
+                      size="sm"
+                    />
                   </div>
 
-                  <p className="mt-3 text-base font-semibold text-stone-950">
+                  <p className="text-sm text-text-secondary mb-3 line-clamp-2">
                     {incident.description}
                   </p>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-stone-500">
-                    <span className="inline-flex items-center gap-1.5">
-                      <MapPin className="h-4 w-4" />
-                      {incident.location || incident.direction || 'Location pending'}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Clock3 className="h-4 w-4" />
-                      {formatDistanceToNow(new Date(incident.timestamp), { addSuffix: true, locale: fr })}
-                    </span>
-                    <span>{incident.status === 'active' ? 'Active' : 'Finished'}</span>
+                  <div className="space-y-2 text-xs text-text-muted">
+                    {incident.direction && (
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-3 h-3" />
+                        <span>{incident.direction}</span>
+                      </div>
+                    )}
+                    {incident.location && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-3 h-3" />
+                        <span>{incident.location}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-3 h-3" />
+                      <span>
+                        {new Date(incident.timestamp).toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
                   </div>
                 </div>
+              </Card>
+            ))}
+          </div>
+        )}
 
-                <div className="flex flex-wrap items-center gap-2 lg:max-w-[220px] lg:justify-end">
-                  {incident.sources.map(source => (
-                    <span
-                      key={`${incident.id}-${source}`}
-                      className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-semibold text-stone-500"
-                    >
-                      {source}
-                    </span>
-                  ))}
+        {/* Bottom Sheet Detail View (Mobile) */}
+        <BottomSheet
+          isOpen={!!selectedIncident && window.innerWidth < 1024}
+          title={selectedIncident?.road}
+          onClose={() => setSelectedIncident(null)}
+        >
+          {selectedIncident && (
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-semibold text-text-primary mb-2">Details</h4>
+                <p className="text-text-secondary text-sm">{selectedIncident.description}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-text-muted uppercase mb-1">Type</p>
+                  <p className="font-semibold text-text-primary">{selectedIncident.type}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-text-muted uppercase mb-1">Severity</p>
+                  <StatusBadge
+                    status={
+                      selectedIncident.severity === 'critical'
+                        ? 'critical'
+                        : selectedIncident.severity === 'high'
+                        ? 'warning'
+                        : selectedIncident.severity === 'medium'
+                        ? 'caution'
+                        : 'normal'
+                    }
+                    label={selectedIncident.severity}
+                  />
                 </div>
               </div>
-            </article>
-          ))}
-        </div>
-      )}
+
+              {selectedIncident.location && (
+                <div>
+                  <p className="text-xs text-text-muted uppercase mb-1">Location</p>
+                  <p className="font-semibold text-text-primary">{selectedIncident.location}</p>
+                </div>
+              )}
+
+              {selectedIncident.direction && (
+                <div>
+                  <p className="text-xs text-text-muted uppercase mb-1">Direction</p>
+                  <p className="font-semibold text-text-primary">{selectedIncident.direction}</p>
+                </div>
+              )}
+
+              <button
+                onClick={() => window.dispatchEvent(
+                  new CustomEvent('cf:incident-selected', {
+                    detail: {
+                      id: selectedIncident.id,
+                      title: selectedIncident.road,
+                      description: selectedIncident.description,
+                      severity: selectedIncident.severity,
+                      type: selectedIncident.type,
+                      source: selectedIncident.source,
+                      address: selectedIncident.location || selectedIncident.direction || '',
+                      startedAt: selectedIncident.timestamp,
+                      lng: selectedIncident.lng,
+                      lat: selectedIncident.lat,
+                    },
+                  })
+                )}
+                className="w-full px-4 py-2 bg-status-info text-white font-semibold rounded-lg hover:opacity-90 transition-opacity"
+              >
+                Show on Map
+              </button>
+            </div>
+          )}
+        </BottomSheet>
+      </div>
     </main>
   )
 }
