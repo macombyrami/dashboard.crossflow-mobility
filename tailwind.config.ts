@@ -42,6 +42,12 @@ const config: Config = {
           warn:     '#FACD15',
           critical: '#EF4444',
           info:     '#0A84FF',
+          // Semantic status colors
+          normal:   '#22C55E',
+          warning:  '#F97316',
+          caution:  '#EAB308',
+          critical_semantic: '#DC2626',
+          info_semantic: '#06B6D4',
         },
         // Apple system colors
         apple: {

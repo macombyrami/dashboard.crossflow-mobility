@@ -31,7 +31,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Sidebar />
         <div className="main-content">
           <Header />
-          <div className="flex-1 overflow-hidden relative flex flex-col min-h-0">
+          <div className="page-scroll">
             <SwipeNavigation>
               {children}
             </SwipeNavigation>
