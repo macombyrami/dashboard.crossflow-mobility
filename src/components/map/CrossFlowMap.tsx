@@ -26,14 +26,11 @@ import { saveSnapshot } from '@/lib/api/snapshots'
 import { toast } from 'sonner'
 import { GeolocationControl } from '@/components/map/controls/GeolocationControl'
 import type { UserPosition } from '@/hooks/useGeolocation'
-import parisBundledNetwork from '@/lib/data/paris_network.json'
 
 import {
   generateTrafficSnapshot,
-  generateTrafficFromOSMRoads,
   generateIncidents,
   generateCityKPIs,
-  generateTrafficFromIdfGeoJSON,
 } from '@/lib/engine/traffic.engine'
 import {
   fetchTrafficPOIs,
@@ -45,9 +42,8 @@ import {
   generateSytadinKPIs,
   generateSytadinTravelTimes,
   fetchAndInjectSytadinIncidents,
-  isIdfCity,
 } from '@/lib/engine/sytadin.engine'
-import type { OSMPOIPoint, OSMRoad, OSMRouteGeometry, MetroStation } from '@/lib/api/overpass'
+import type { OSMPOIPoint, OSMRouteGeometry, MetroStation } from '@/lib/api/overpass'
 import { fetchAllTrafficStatus, LINE_COLORS } from '@/lib/api/ratp'
 import { simulateTransitVehicles, type TransitVehicle } from '@/lib/engine/transit.engine'
 import {
@@ -57,12 +53,6 @@ import {
   fetchIncidents as fetchTomTomIncidents,
   tomtomSeverityToLocal,
 } from '@/lib/api/tomtom'
-import {
-  fetchHereFlow,
-  fetchHereIncidents,
-  hasKey as hereHasKey,
-  jamFactorToCongestion,
-} from '@/lib/api/here'
 import { fetchWeather as fetchOpenMeteoWeather, fetchAirQuality } from '@/lib/api/openmeteo'
 import { fetchCityBoundary, fetchCityDistricts } from '@/lib/api/geocoding'
 import type { AggregatedHeatFeatureCollection } from '@/lib/map/trafficHeatmap'
@@ -99,30 +89,15 @@ const PREDICTIVE_EVENTS_SOURCE   = 'cf-pred-events'
 const SIM_LOCATION_SOURCE        = 'cf-sim-location'
 const SOCIAL_SOURCE              = 'cf-social'
 const WORLD_MASK_SOURCE           = 'cf-world-mask'
-const BASE_NETWORK_SOURCE         = 'base-network'
-const BASE_ROADS_FALLBACK_SOURCE  = 'fallback-roads'
+const BASE_NETWORK_SOURCE         = 'mapbox-streets'
 const BASE_WATER_LAYER            = 'base-water'
 const BASE_LANDUSE_LAYER          = 'base-landuse'
 const BASE_BUILDINGS_LAYER        = 'base-buildings'
-const BASE_ROADS_MAJOR_LAYER      = 'base-roads-major'
-const BASE_ROADS_LOCAL_LAYER      = 'base-roads-local'
-const BASE_ROADS_FALLBACK_LAYER   = 'road-base'
+const FULL_ROAD_LAYER             = 'road-full'
 const ROAD_LABELS_LAYER           = 'road-labels'
-const GUARANTEED_PARIS_BBOX: [number, number, number, number] = [2.2241, 48.8156, 2.4699, 48.9022]
 const DEBUG_ROAD_COLOR = '#22C55E'
-
 const ROAD_MAIN_CLASSES = ['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary'] as const
-const ROAD_LOCAL_CLASSES = ['residential', 'service', 'unclassified', 'minor', 'living_street', 'road', 'track'] as const
-
-type BundledRoadEntry = {
-  id: string | number
-  name?: string
-  type?: string
-  coords?: [number, number][]
-}
-
-const bundledParisRoadEntries = parisBundledNetwork as unknown as BundledRoadEntry[]
-const guaranteedRoadNetworkCache = new Map<string, OSMRoad[]>()
+const FULL_ROAD_CLASSES = ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'street', 'street_limited', 'service', 'residential', 'living_street'] as const
 
 
 // ─── Popup helpers ────────────────────────────────────────────────────────
@@ -247,53 +222,6 @@ function pointInBoundary(point: [number, number], geometry: GeoJSON.Geometry | n
   return false
 }
 
-function bboxIntersects(a: [number, number, number, number], b: [number, number, number, number]) {
-  return !(a[2] < b[0] || a[0] > b[2] || a[3] < b[1] || a[1] > b[3])
-}
-
-function pointInBBox(coord: [number, number], bbox: [number, number, number, number]) {
-  return coord[0] >= bbox[0] && coord[0] <= bbox[2] && coord[1] >= bbox[1] && coord[1] <= bbox[3]
-}
-
-function getGuaranteedRoadNetwork(city: City): OSMRoad[] {
-  const bbox = city.bbox ?? GUARANTEED_PARIS_BBOX
-  const cacheKey = `${city.id}:${bbox.join(',')}`
-  const cached = guaranteedRoadNetworkCache.get(cacheKey)
-  if (cached) return cached
-
-  if (!isParisCity(city) || !bboxIntersects(bbox, GUARANTEED_PARIS_BBOX)) {
-    guaranteedRoadNetworkCache.set(cacheKey, [])
-    return []
-  }
-
-  const roads = bundledParisRoadEntries
-    .filter((road): road is BundledRoadEntry & { coords: [number, number][] } =>
-      Array.isArray(road.coords) &&
-      road.coords.length >= 2 &&
-      road.coords.every(
-        (coord): coord is [number, number] =>
-          Array.isArray(coord) &&
-          coord.length >= 2 &&
-          Number.isFinite(coord[0]) &&
-          Number.isFinite(coord[1]),
-      ),
-    )
-    .filter(road => road.coords.some(coord => pointInBBox(coord, bbox)))
-    .map((road): OSMRoad => ({
-      id: Number(road.id),
-      name: road.name ?? '',
-      highway: road.type ?? 'residential',
-      maxspeed: 50,
-      oneway: false,
-      lanes: 1,
-      coords: road.coords,
-      length: 0,
-    }))
-
-  guaranteedRoadNetworkCache.set(cacheKey, roads)
-  return roads
-}
-
 const safeMoveLayerToTop = (map: maplibregl.Map | null, id: string) => {
   if (!map || !map.getLayer(id)) return
   try {
@@ -328,9 +256,7 @@ function applyTrafficRenderingHierarchy(map: maplibregl.Map | null) {
     HEATMAP_PASSAGES_SOURCE + '-circles',
     HEATMAP_CO2_SOURCE + '-layer',
     HEATMAP_CO2_SOURCE + '-circles',
-    BASE_ROADS_FALLBACK_LAYER,
-    BASE_ROADS_MAJOR_LAYER,
-    BASE_ROADS_LOCAL_LAYER,
+    FULL_ROAD_LAYER,
     'cf-idf-roads-lines',
     ROAD_LABELS_LAYER,
     TRAFFIC_SOURCE + '-halo',
@@ -377,12 +303,8 @@ function applyMapTheme(map: maplibregl.Map | null, theme: 'light' | 'dark') {
   safeSetPaintProperty(map, BASE_LANDUSE_LAYER, 'fill-color', isLight ? '#EEF3E6' : '#0D1C16')
   safeSetPaintProperty(map, BASE_BUILDINGS_LAYER, 'fill-color', isLight ? '#E6EAEE' : '#111C26')
   safeSetPaintProperty(map, BASE_BUILDINGS_LAYER, 'fill-opacity', isLight ? 0.72 : 0.42)
-  safeSetPaintProperty(map, BASE_ROADS_FALLBACK_LAYER, 'line-color', DEBUG_ROAD_COLOR)
-  safeSetPaintProperty(map, BASE_ROADS_FALLBACK_LAYER, 'line-opacity', 1)
-  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-color', DEBUG_ROAD_COLOR)
-  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-opacity', 1)
-  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-color', DEBUG_ROAD_COLOR)
-  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-opacity', 1)
+  safeSetPaintProperty(map, FULL_ROAD_LAYER, 'line-color', DEBUG_ROAD_COLOR)
+  safeSetPaintProperty(map, FULL_ROAD_LAYER, 'line-opacity', 1)
   safeSetPaintProperty(map, ROAD_LABELS_LAYER, 'text-color', isLight ? '#4B5563' : '#C7D2DA')
   safeSetPaintProperty(map, ROAD_LABELS_LAYER, 'text-halo-color', isLight ? 'rgba(255,255,255,0.95)' : 'rgba(7,16,24,0.94)')
 
@@ -554,90 +476,13 @@ function buildTrafficFeatureCollection(
   }
 }
 
-function buildBaseRoadFallbackFeatureCollection(
-  segments: TrafficSegment[],
-  zoom: number,
-  isMobile: boolean,
-): GeoJSON.FeatureCollection {
-  return {
-    type: 'FeatureCollection',
-    features: segments.map((segment) => ({
-      type: 'Feature',
-      id: segment.id,
-      geometry: {
-        type: 'LineString',
-        coordinates: segment.coordinates,
-      },
-      properties: {
-        id: segment.id,
-        roadType: segment.roadType,
-        width: Math.max(0.4, computeRoadWidth(segment.roadType, segment.level, zoom, isMobile) * 0.72),
-      },
-    })),
+function countRenderedRoadFeatures(map: maplibregl.Map | null) {
+  if (!map || !map.getLayer(FULL_ROAD_LAYER)) return 0
+  try {
+    return map.queryRenderedFeatures(undefined, { layers: [FULL_ROAD_LAYER] }).length
+  } catch {
+    return 0
   }
-}
-
-function setBaseRoadFallbackVisibility(map: maplibregl.Map | null, visible: boolean) {
-  safeSetLayoutProperty(map, BASE_ROADS_FALLBACK_LAYER, 'visibility', visible ? 'visible' : 'none')
-}
-
-function buildGuaranteedRoadFeatureCollection(
-  roads: OSMRoad[],
-  zoom: number,
-  isMobile: boolean,
-): GeoJSON.FeatureCollection {
-  return {
-    type: 'FeatureCollection',
-    features: roads.map((road, index) => {
-      const roadType = road.highway || 'residential'
-      return {
-        type: 'Feature',
-        id: road.id || `road-${index}`,
-        geometry: {
-          type: 'LineString',
-          coordinates: road.coords,
-        },
-        properties: {
-          id: road.id || `road-${index}`,
-          roadType,
-          width: Math.max(1.2, computeRoadWidth(roadType, 'free', zoom, isMobile)),
-          color: DEBUG_ROAD_COLOR,
-        },
-      }
-    }),
-  }
-}
-
-function ensureGuaranteedRoadFallback(
-  map: maplibregl.Map,
-  city: City,
-  zoom: number,
-  isMobile: boolean,
-  snapshotSegments?: TrafficSegment[],
-) {
-  const guaranteedRoads = getGuaranteedRoadNetwork(city)
-  const source = safeGetSource(map, BASE_ROADS_FALLBACK_SOURCE) as maplibregl.GeoJSONSource | null
-  if (!source) return guaranteedRoads
-
-  const featureCollection = guaranteedRoads.length > 0
-    ? buildGuaranteedRoadFeatureCollection(guaranteedRoads, zoom, isMobile)
-    : buildBaseRoadFallbackFeatureCollection(snapshotSegments ?? [], zoom, isMobile)
-
-  source.setData(featureCollection)
-  setBaseRoadFallbackVisibility(map, true)
-
-  const featureCount = Array.isArray(featureCollection.features) ? featureCollection.features.length : 0
-  const layerCount = map.getStyle()?.layers?.length ?? 0
-  console.log('ROAD LAYER COUNT:', featureCount)
-  console.log('MAP LAYERS:', layerCount)
-
-  if (layerCount < 5) {
-    console.error('MAP VISUALLY EMPTY - FORCING FALLBACK')
-    setBaseRoadFallbackVisibility(map, true)
-    source.setData(featureCollection)
-  }
-
-  return guaranteedRoads
 }
 
 export const CrossFlowMap = memo(function CrossFlowMap() {
@@ -1151,14 +996,14 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       container: containerRef.current,
       style:     BASE_MAP_STYLE,
       center:    [city.center.lng, city.center.lat],
-      zoom:      city.zoom,
+      zoom:      Math.max(city.zoom, 12),
       pitch:     0,
       bearing:   0,
       minZoom:   8,
       attributionControl: false,
     })
 
-    let baseRoadFallbackTimer: ReturnType<typeof setTimeout> | null = null
+    let roadVisualCheckTimer: ReturnType<typeof setTimeout> | null = null
 
     map.on('load', () => {
       console.log('[CrossFlow] Map loaded successfully')
@@ -1170,18 +1015,19 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       initZoneLayers(map)
       initSocialLayers(map)
       applyTrafficRenderingHierarchy(map)
-      ensureGuaranteedRoadFallback(map, cityRef.current, map.getZoom(), isMobile)
 
       console.log('[CrossFlow] Base road layers initialized', {
         source: BASE_NETWORK_SOURCE,
-        fallbackSource: BASE_ROADS_FALLBACK_SOURCE,
-        majorLayer: Boolean(map.getLayer(BASE_ROADS_MAJOR_LAYER)),
-        localLayer: Boolean(map.getLayer(BASE_ROADS_LOCAL_LAYER)),
-        fallbackLayer: Boolean(map.getLayer(BASE_ROADS_FALLBACK_LAYER)),
+        roadLayer: Boolean(map.getLayer(FULL_ROAD_LAYER)),
       })
 
-      baseRoadFallbackTimer = setTimeout(() => {
-        ensureGuaranteedRoadFallback(map, cityRef.current, map.getZoom(), isMobile)
+      roadVisualCheckTimer = setTimeout(() => {
+        const visibleRoadFeatures = countRenderedRoadFeatures(map)
+        console.log('VISIBLE ROAD FEATURES:', visibleRoadFeatures)
+        console.log('MAP LAYERS:', map.getStyle()?.layers?.length ?? 0)
+        if (visibleRoadFeatures < 10000) {
+          console.error('MAP VISUALLY EMPTY - vector road density below expected threshold')
+        }
       }, 2500)
 
       setMapLoaded(true)
@@ -1683,7 +1529,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     mapRef.current = map
     return () => {
-      if (baseRoadFallbackTimer) clearTimeout(baseRoadFallbackTimer)
+      if (roadVisualCheckTimer) clearTimeout(roadVisualCheckTimer)
       popupRef.current?.remove()
       searchMarkerRef.current?.remove()
       map.remove()
@@ -2137,11 +1983,6 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   }, [city.id, mapLoaded]) // eslint-disable-line
 
   useEffect(() => {
-    if (!mapRef.current || !mapLoaded) return
-    ensureGuaranteedRoadFallback(mapRef.current, city, mapRef.current.getZoom(), isMobile, snapshot?.segments)
-  }, [city.id, isMobile, mapLoaded, snapshot?.segments])
-
-  useEffect(() => {
     if (!mapRef.current || !mapLoaded || !searchFocus) return
 
     const map = mapRef.current
@@ -2418,15 +2259,11 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       mapRef.current === map
 
     // ── 1. Determine base snapshot (never required for road rendering) ──
-    const guaranteedRoads = getGuaranteedRoadNetwork(cityNow)
-    let snapshot = guaranteedRoads.length > 0
-      ? generateTrafficFromOSMRoads(cityNow, guaranteedRoads)
-      : generateTrafficSnapshot(cityNow)
+    const snapshot = generateTrafficSnapshot(cityNow)
     console.log('[CrossFlow] Base snapshot generated', {
       city: cityNow.id,
       segments: snapshot.segments.length,
       dataSource: dataSourceRef.current,
-      guaranteedRoads: guaranteedRoads.length,
     })
 
     const synthetic = generateIncidents(cityNow)
@@ -2479,8 +2316,6 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     setSnapshot(snappedSnapshot)
     const incidentSplit = splitIncidents(incidents)
     setIncidents(incidents)
-
-    ensureGuaranteedRoadFallback(map, cityNow, map.getZoom(), isMobile, snappedSnapshot.segments)
 
     // --- High Performance: UCTN Property Updates ---
     if (safeGetSource(map, TRAFFIC_SOURCE)) {
@@ -3376,15 +3211,6 @@ function initStaticSources(map: maplibregl.Map) {
     })
   }
 
-  if (!map.getSource(BASE_ROADS_FALLBACK_SOURCE)) {
-    map.addSource(BASE_ROADS_FALLBACK_SOURCE, {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: [] },
-      lineMetrics: true,
-      promoteId: 'id',
-    })
-  }
-
   if (!map.getLayer(BASE_WATER_LAYER)) {
     map.addLayer({
       id: BASE_WATER_LAYER,
@@ -3426,73 +3252,25 @@ function initStaticSources(map: maplibregl.Map) {
     })
   }
 
-  if (!map.getLayer(BASE_ROADS_MAJOR_LAYER)) {
+  if (!map.getLayer(FULL_ROAD_LAYER)) {
     map.addLayer({
-      id: BASE_ROADS_MAJOR_LAYER,
+      id: FULL_ROAD_LAYER,
       type: 'line',
       source: BASE_NETWORK_SOURCE,
       'source-layer': 'road',
-      filter: ['match', roadClassExpression(),
-        [...ROAD_MAIN_CLASSES],
-        true,
-        false,
-      ] as any,
-      paint: {
-        'line-color': '#E5E7EB',
-        'line-width': [
-          'interpolate', ['linear'], ['zoom'],
-          8, 0.7,
-          10, 1.1,
-          12, 1.9,
-          14, 3.2,
-          17, 7.8,
-        ],
-        'line-opacity': 0.96,
-      },
-      layout: { 'line-cap': 'round', 'line-join': 'round' }
-    })
-  }
-
-  if (!map.getLayer(BASE_ROADS_LOCAL_LAYER)) {
-    map.addLayer({
-      id: BASE_ROADS_LOCAL_LAYER,
-      type: 'line',
-      source: BASE_NETWORK_SOURCE,
-      'source-layer': 'road',
-      minzoom: 8,
-      filter: ['match', roadClassExpression(),
-        [...ROAD_LOCAL_CLASSES],
-        true,
-        false,
-      ] as any,
-      paint: {
-        'line-color': '#E5E7EB',
-        'line-width': [
-          'interpolate', ['linear'], ['zoom'],
-          8, 0.25,
-          10, 0.38,
-          12, 0.6,
-          14, 1.0,
-          16, 1.8,
-          17, 2.8,
-        ],
-        'line-opacity': 0.88,
-      },
-      layout: { 'line-cap': 'round', 'line-join': 'round' }
-    })
-  }
-
-  if (!map.getLayer(BASE_ROADS_FALLBACK_LAYER)) {
-    map.addLayer({
-      id: BASE_ROADS_FALLBACK_LAYER,
-      type: 'line',
-      source: BASE_ROADS_FALLBACK_SOURCE,
-      layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'visible' },
+      filter: ['in', ['coalesce', ['get', 'class'], ['get', 'type'], ['get', 'highway']], ['literal', [...FULL_ROAD_CLASSES]]] as any,
       paint: {
         'line-color': DEBUG_ROAD_COLOR,
-        'line-width': ['coalesce', ['get', 'width'], 2],
+        'line-width': [
+          'interpolate', ['linear'], ['zoom'],
+          10, 0.5,
+          13, 1,
+          16, 2,
+          18, 4,
+        ],
         'line-opacity': 1,
-      }
+      },
+      layout: { 'line-cap': 'round', 'line-join': 'round' }
     })
   }
 
