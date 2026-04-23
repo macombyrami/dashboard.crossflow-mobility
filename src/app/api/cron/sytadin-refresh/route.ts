@@ -29,6 +29,7 @@ const IDF_ROADS = [
 ]
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic' // Dynamic server rendering to use cookies in request context
 
 export async function POST(req: NextRequest) {
   // Verify CRON_SECRET from header
