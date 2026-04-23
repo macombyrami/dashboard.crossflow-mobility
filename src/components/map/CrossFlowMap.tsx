@@ -26,9 +26,11 @@ import { saveSnapshot } from '@/lib/api/snapshots'
 import { toast } from 'sonner'
 import { GeolocationControl } from '@/components/map/controls/GeolocationControl'
 import type { UserPosition } from '@/hooks/useGeolocation'
+import parisBundledNetwork from '@/lib/data/paris_network.json'
 
 import {
   generateTrafficSnapshot,
+  generateTrafficFromOSMRoads,
   generateIncidents,
   generateCityKPIs,
   generateTrafficFromIdfGeoJSON,
@@ -45,7 +47,7 @@ import {
   fetchAndInjectSytadinIncidents,
   isIdfCity,
 } from '@/lib/engine/sytadin.engine'
-import type { OSMPOIPoint, OSMRouteGeometry, MetroStation } from '@/lib/api/overpass'
+import type { OSMPOIPoint, OSMRoad, OSMRouteGeometry, MetroStation } from '@/lib/api/overpass'
 import { fetchAllTrafficStatus, LINE_COLORS } from '@/lib/api/ratp'
 import { simulateTransitVehicles, type TransitVehicle } from '@/lib/engine/transit.engine'
 import {
@@ -98,17 +100,29 @@ const SIM_LOCATION_SOURCE        = 'cf-sim-location'
 const SOCIAL_SOURCE              = 'cf-social'
 const WORLD_MASK_SOURCE           = 'cf-world-mask'
 const BASE_NETWORK_SOURCE         = 'base-network'
-const BASE_ROADS_FALLBACK_SOURCE  = 'base-roads-fallback'
+const BASE_ROADS_FALLBACK_SOURCE  = 'fallback-roads'
 const BASE_WATER_LAYER            = 'base-water'
 const BASE_LANDUSE_LAYER          = 'base-landuse'
 const BASE_BUILDINGS_LAYER        = 'base-buildings'
 const BASE_ROADS_MAJOR_LAYER      = 'base-roads-major'
 const BASE_ROADS_LOCAL_LAYER      = 'base-roads-local'
-const BASE_ROADS_FALLBACK_LAYER   = 'base-roads-fallback-line'
+const BASE_ROADS_FALLBACK_LAYER   = 'road-base'
 const ROAD_LABELS_LAYER           = 'road-labels'
+const GUARANTEED_PARIS_BBOX: [number, number, number, number] = [2.2241, 48.8156, 2.4699, 48.9022]
+const DEBUG_ROAD_COLOR = '#22C55E'
 
 const ROAD_MAIN_CLASSES = ['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary'] as const
 const ROAD_LOCAL_CLASSES = ['residential', 'service', 'unclassified', 'minor', 'living_street', 'road', 'track'] as const
+
+type BundledRoadEntry = {
+  id: string | number
+  name?: string
+  type?: string
+  coords?: [number, number][]
+}
+
+const bundledParisRoadEntries = parisBundledNetwork as unknown as BundledRoadEntry[]
+const guaranteedRoadNetworkCache = new Map<string, OSMRoad[]>()
 
 
 // ─── Popup helpers ────────────────────────────────────────────────────────
@@ -233,6 +247,53 @@ function pointInBoundary(point: [number, number], geometry: GeoJSON.Geometry | n
   return false
 }
 
+function bboxIntersects(a: [number, number, number, number], b: [number, number, number, number]) {
+  return !(a[2] < b[0] || a[0] > b[2] || a[3] < b[1] || a[1] > b[3])
+}
+
+function pointInBBox(coord: [number, number], bbox: [number, number, number, number]) {
+  return coord[0] >= bbox[0] && coord[0] <= bbox[2] && coord[1] >= bbox[1] && coord[1] <= bbox[3]
+}
+
+function getGuaranteedRoadNetwork(city: City): OSMRoad[] {
+  const bbox = city.bbox ?? GUARANTEED_PARIS_BBOX
+  const cacheKey = `${city.id}:${bbox.join(',')}`
+  const cached = guaranteedRoadNetworkCache.get(cacheKey)
+  if (cached) return cached
+
+  if (!isParisCity(city) || !bboxIntersects(bbox, GUARANTEED_PARIS_BBOX)) {
+    guaranteedRoadNetworkCache.set(cacheKey, [])
+    return []
+  }
+
+  const roads = bundledParisRoadEntries
+    .filter((road): road is BundledRoadEntry & { coords: [number, number][] } =>
+      Array.isArray(road.coords) &&
+      road.coords.length >= 2 &&
+      road.coords.every(
+        (coord): coord is [number, number] =>
+          Array.isArray(coord) &&
+          coord.length >= 2 &&
+          Number.isFinite(coord[0]) &&
+          Number.isFinite(coord[1]),
+      ),
+    )
+    .filter(road => road.coords.some(coord => pointInBBox(coord, bbox)))
+    .map((road): OSMRoad => ({
+      id: Number(road.id),
+      name: road.name ?? '',
+      highway: road.type ?? 'residential',
+      maxspeed: 50,
+      oneway: false,
+      lanes: 1,
+      coords: road.coords,
+      length: 0,
+    }))
+
+  guaranteedRoadNetworkCache.set(cacheKey, roads)
+  return roads
+}
+
 const safeMoveLayerToTop = (map: maplibregl.Map | null, id: string) => {
   if (!map || !map.getLayer(id)) return
   try {
@@ -316,12 +377,12 @@ function applyMapTheme(map: maplibregl.Map | null, theme: 'light' | 'dark') {
   safeSetPaintProperty(map, BASE_LANDUSE_LAYER, 'fill-color', isLight ? '#EEF3E6' : '#0D1C16')
   safeSetPaintProperty(map, BASE_BUILDINGS_LAYER, 'fill-color', isLight ? '#E6EAEE' : '#111C26')
   safeSetPaintProperty(map, BASE_BUILDINGS_LAYER, 'fill-opacity', isLight ? 0.72 : 0.42)
-  safeSetPaintProperty(map, BASE_ROADS_FALLBACK_LAYER, 'line-color', isLight ? '#CBD5E1' : '#334155')
-  safeSetPaintProperty(map, BASE_ROADS_FALLBACK_LAYER, 'line-opacity', isLight ? 0.92 : 0.84)
-  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-color', isLight ? '#E5E7EB' : '#334155')
-  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-opacity', isLight ? 0.96 : 0.92)
-  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-color', isLight ? '#E5E7EB' : '#1E293B')
-  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-opacity', isLight ? 0.9 : 0.86)
+  safeSetPaintProperty(map, BASE_ROADS_FALLBACK_LAYER, 'line-color', DEBUG_ROAD_COLOR)
+  safeSetPaintProperty(map, BASE_ROADS_FALLBACK_LAYER, 'line-opacity', 1)
+  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-color', DEBUG_ROAD_COLOR)
+  safeSetPaintProperty(map, BASE_ROADS_MAJOR_LAYER, 'line-opacity', 1)
+  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-color', DEBUG_ROAD_COLOR)
+  safeSetPaintProperty(map, BASE_ROADS_LOCAL_LAYER, 'line-opacity', 1)
   safeSetPaintProperty(map, ROAD_LABELS_LAYER, 'text-color', isLight ? '#4B5563' : '#C7D2DA')
   safeSetPaintProperty(map, ROAD_LABELS_LAYER, 'text-halo-color', isLight ? 'rgba(255,255,255,0.95)' : 'rgba(7,16,24,0.94)')
 
@@ -518,6 +579,65 @@ function buildBaseRoadFallbackFeatureCollection(
 
 function setBaseRoadFallbackVisibility(map: maplibregl.Map | null, visible: boolean) {
   safeSetLayoutProperty(map, BASE_ROADS_FALLBACK_LAYER, 'visibility', visible ? 'visible' : 'none')
+}
+
+function buildGuaranteedRoadFeatureCollection(
+  roads: OSMRoad[],
+  zoom: number,
+  isMobile: boolean,
+): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: roads.map((road, index) => {
+      const roadType = road.highway || 'residential'
+      return {
+        type: 'Feature',
+        id: road.id || `road-${index}`,
+        geometry: {
+          type: 'LineString',
+          coordinates: road.coords,
+        },
+        properties: {
+          id: road.id || `road-${index}`,
+          roadType,
+          width: Math.max(1.2, computeRoadWidth(roadType, 'free', zoom, isMobile)),
+          color: DEBUG_ROAD_COLOR,
+        },
+      }
+    }),
+  }
+}
+
+function ensureGuaranteedRoadFallback(
+  map: maplibregl.Map,
+  city: City,
+  zoom: number,
+  isMobile: boolean,
+  snapshotSegments?: TrafficSegment[],
+) {
+  const guaranteedRoads = getGuaranteedRoadNetwork(city)
+  const source = safeGetSource(map, BASE_ROADS_FALLBACK_SOURCE) as maplibregl.GeoJSONSource | null
+  if (!source) return guaranteedRoads
+
+  const featureCollection = guaranteedRoads.length > 0
+    ? buildGuaranteedRoadFeatureCollection(guaranteedRoads, zoom, isMobile)
+    : buildBaseRoadFallbackFeatureCollection(snapshotSegments ?? [], zoom, isMobile)
+
+  source.setData(featureCollection)
+  setBaseRoadFallbackVisibility(map, true)
+
+  const featureCount = Array.isArray(featureCollection.features) ? featureCollection.features.length : 0
+  const layerCount = map.getStyle()?.layers?.length ?? 0
+  console.log('ROAD LAYER COUNT:', featureCount)
+  console.log('MAP LAYERS:', layerCount)
+
+  if (layerCount < 5) {
+    console.error('MAP VISUALLY EMPTY - FORCING FALLBACK')
+    setBaseRoadFallbackVisibility(map, true)
+    source.setData(featureCollection)
+  }
+
+  return guaranteedRoads
 }
 
 export const CrossFlowMap = memo(function CrossFlowMap() {
@@ -1038,25 +1158,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       attributionControl: false,
     })
 
-    let baseRoadVectorReady = false
     let baseRoadFallbackTimer: ReturnType<typeof setTimeout> | null = null
-
-    const onBaseRoadSourceData = (event: any) => {
-      if (event?.sourceId !== BASE_NETWORK_SOURCE || baseRoadVectorReady) return
-      if (event?.isSourceLoaded || map.isSourceLoaded(BASE_NETWORK_SOURCE)) {
-        baseRoadVectorReady = true
-        setBaseRoadFallbackVisibility(map, false)
-        console.log('[CrossFlow] Base road vector source ready', {
-          source: BASE_NETWORK_SOURCE,
-          majorLayer: Boolean(map.getLayer(BASE_ROADS_MAJOR_LAYER)),
-          localLayer: Boolean(map.getLayer(BASE_ROADS_LOCAL_LAYER)),
-        })
-        if (baseRoadFallbackTimer) {
-          clearTimeout(baseRoadFallbackTimer)
-          baseRoadFallbackTimer = null
-        }
-      }
-    }
 
     map.on('load', () => {
       console.log('[CrossFlow] Map loaded successfully')
@@ -1068,7 +1170,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       initZoneLayers(map)
       initSocialLayers(map)
       applyTrafficRenderingHierarchy(map)
-      setBaseRoadFallbackVisibility(map, true)
+      ensureGuaranteedRoadFallback(map, cityRef.current, map.getZoom(), isMobile)
 
       console.log('[CrossFlow] Base road layers initialized', {
         source: BASE_NETWORK_SOURCE,
@@ -1078,12 +1180,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
         fallbackLayer: Boolean(map.getLayer(BASE_ROADS_FALLBACK_LAYER)),
       })
 
-      map.on('sourcedata', onBaseRoadSourceData)
       baseRoadFallbackTimer = setTimeout(() => {
-        if (!baseRoadVectorReady) {
-          console.warn('[CrossFlow] Base road vector source not ready, keeping fallback roads visible')
-          setBaseRoadFallbackVisibility(map, true)
-        }
+        ensureGuaranteedRoadFallback(map, cityRef.current, map.getZoom(), isMobile)
       }, 2500)
 
       setMapLoaded(true)
@@ -1585,7 +1683,6 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     mapRef.current = map
     return () => {
-      map.off('sourcedata', onBaseRoadSourceData)
       if (baseRoadFallbackTimer) clearTimeout(baseRoadFallbackTimer)
       popupRef.current?.remove()
       searchMarkerRef.current?.remove()
@@ -2040,6 +2137,11 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
   }, [city.id, mapLoaded]) // eslint-disable-line
 
   useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return
+    ensureGuaranteedRoadFallback(mapRef.current, city, mapRef.current.getZoom(), isMobile, snapshot?.segments)
+  }, [city.id, isMobile, mapLoaded, snapshot?.segments])
+
+  useEffect(() => {
     if (!mapRef.current || !mapLoaded || !searchFocus) return
 
     const map = mapRef.current
@@ -2309,7 +2411,6 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     const cityNow = cityRef.current
     const activeLayersNow = activeLayersRef.current
-    const useHere    = hereHasKey()
     const useTomTom  = useLiveData
     const isRequestCurrent = () =>
       refreshRequestRef.current === requestId &&
@@ -2317,78 +2418,16 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       mapRef.current === map
 
     // ── 1. Determine base snapshot (never required for road rendering) ──
-    let snapshot = generateTrafficSnapshot(cityNow)
+    const guaranteedRoads = getGuaranteedRoadNetwork(cityNow)
+    let snapshot = guaranteedRoads.length > 0
+      ? generateTrafficFromOSMRoads(cityNow, guaranteedRoads)
+      : generateTrafficSnapshot(cityNow)
     console.log('[CrossFlow] Base snapshot generated', {
       city: cityNow.id,
       segments: snapshot.segments.length,
       dataSource: dataSourceRef.current,
+      guaranteedRoads: guaranteedRoads.length,
     })
-
-    // ── 2. Regional Scaling — Load real IDF network if applicable ────────
-    if (isIdfCity(cityNow) && dataSourceRef.current === 'synthetic') {
-      try {
-        const bounds = map.getBounds()
-        const bboxStr = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
-          .map(v => Math.round(v * 1000) / 1000).join(',')
-        
-        const res = await fetch(`/api/idf-roads?bbox=${bboxStr}&limit=400&frc=1,2,3,4`)
-        if (res.ok) {
-          const idfGeojson = await res.json()
-          if (!isRequestCurrent()) return
-          if (idfGeojson.features?.length > 0) {
-            snapshot = generateTrafficFromIdfGeoJSON(cityNow, idfGeojson)
-          }
-        }
-      } catch (err) {
-        console.warn('[CrossFlowMap] Failed to scale IDF network, keeping road-aligned snapshot only.', err)
-      }
-    }
-
-    // ── 3. Overlay real-time HERE traffic if available ────────────────────
-    if (useHere) {
-      console.log('[DataSource] HERE Flow request started for bbox:', cityNow.bbox)
-      try {
-        const hereFlow = await fetchHereFlow(cityNow.bbox)
-        console.log('[DataSource] HERE Flow response:', hereFlow.length, 'segments')
-        if (!isRequestCurrent()) return
-        if (hereFlow.length > 0) {
-        const now = new Date().toISOString()
-        const hereSegments: TrafficSegment[] = hereFlow
-          .filter(s => s.coords.length >= 2)
-          .map((s, i) => {
-            const congestion = jamFactorToCongestion(s.jamFactor)
-            const freeFlow   = s.freeFlow   > 0 ? s.freeFlow   : 50
-            const rawSpeed   = s.speed > 0 ? s.speed : freeFlow * (1 - congestion * 0.85)
-            const speed      = getCredibleSpeedKmh(rawSpeed, freeFlow, congestion)
-            const roadType   = freeFlow > 100 ? 'motorway' : freeFlow > 80 ? 'trunk' : freeFlow > 55 ? 'primary' : freeFlow > 35 ? 'secondary' : 'tertiary'
-            const length     = estimateSegmentLength(s.coords)
-            return {
-              id:               `here-${cityNow.id}-${i}`,
-              roadType,
-              coordinates:      s.coords,
-              speedKmh:         speed,
-              freeFlowSpeedKmh: Math.round(freeFlow),
-              congestionScore:  Math.round(congestion * 100) / 100,
-              level:            scoreToCongestionLevel(congestion),
-              flowVehiclesPerHour: Math.round((1 - congestion) * 1800 + 200),
-              travelTimeSeconds:   length > 0 ? Math.round((length / 1000) / speed * 3600) : 60,
-              length,
-              mode:             'car' as const,
-              lastUpdated:      now,
-              observedTraffic:  true,
-              estimatedTraffic: false,
-            }
-          })
-
-        const heatmap         = hereSegments.map(s => ({ lng: s.coordinates[0][0], lat: s.coordinates[0][1], intensity: s.congestionScore }))
-        snapshot = { cityId: cityNow.id, segments: hereSegments, heatmap, heatmapPassages: [], heatmapCo2: [], fetchedAt: now }
-        console.log('[DataSource] HERE Flow applied to snapshot, setting to live mode')
-        setDataSource('live')
-      }
-      } catch (err) {
-        console.error('[DataSource] HERE Flow request failed:', err instanceof Error ? err.message : String(err))
-      }
-    }
 
     const synthetic = generateIncidents(cityNow)
     if (!isRequestCurrent()) return
@@ -2396,7 +2435,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     let incidents: Incident[] = synthetic
 
-    // ── 4. Fetch TomTom incidents ONLY if not in resilience/synthetic mode ──
+    // ── 2. Fetch incidents only. Road geometry is now always local/synchronous. ──
     if (useTomTom) {
       // Fetch real TomTom incidents for current viewport
       console.log('[DataSource] TomTom Incidents request started for bbox:', viewportBbox)
@@ -2423,71 +2462,11 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
           }
         } catch (err) {
           console.error('[DataSource] TomTom Incidents request failed:', err instanceof Error ? err.message : String(err))
-          // Fall back to HERE incidents
-          if (useHere) {
-            console.log('[DataSource] Falling back to HERE Incidents')
-            try {
-              const hereIncs = await fetchHereIncidents(viewportBbox)
-              if (!isRequestCurrent()) return
-              if (hereIncs.length > 0) {
-                incidents = hereIncs.map(inc => ({
-                  id:          inc.incidentId,
-                  type:        (inc.type.toLowerCase().includes('accident') ? 'accident' :
-                                inc.type.toLowerCase().includes('work')     ? 'roadwork' : 'congestion') as Incident['type'],
-                  severity:    (inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium') as Incident['severity'],
-                  title:       inc.description,
-                  description: `${inc.location.description} — ${inc.type}`,
-                  location:    { lat: inc.location.lat, lng: inc.location.lng },
-                  address:     inc.location.description || cityNow.name,
-                  startedAt:   inc.startTime,
-                  resolvedAt:  inc.endTime,
-                  source:      'CrossFlow Intelligence Engine',
-                  iconColor:   getSeverityColor(inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium'),
-                }))
-                console.log('[DataSource] HERE Incidents applied, setting to live mode')
-              }
-              setDataSource('live')
-            } catch (hereErr) {
-              console.error('[DataSource] HERE Incidents fallback also failed:', hereErr instanceof Error ? hereErr.message : String(hereErr))
-              console.log('[DataSource] Using synthetic incidents')
-              setDataSource('synthetic')
-            }
-          } else {
-            console.log('[DataSource] No HERE fallback available, using synthetic incidents')
-            setDataSource('synthetic')
-          }
-        }
-      } else if (useHere) {
-        // HERE incidents as fallback for current viewport (when TomTom is not enabled)
-        console.log('[DataSource] TomTom disabled, fetching HERE Incidents as primary source')
-        try {
-          const hereIncs = await fetchHereIncidents(viewportBbox)
-          if (!isRequestCurrent()) return
-          if (hereIncs.length > 0) {
-            incidents = hereIncs.map(inc => ({
-              id:          inc.incidentId,
-              type:        (inc.type.toLowerCase().includes('accident') ? 'accident' :
-                            inc.type.toLowerCase().includes('work')     ? 'roadwork' : 'congestion') as Incident['type'],
-              severity:    (inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium') as Incident['severity'],
-              title:       inc.description,
-              description: `${inc.location.description} — ${inc.type}`,
-              location:    { lat: inc.location.lat, lng: inc.location.lng },
-              address:     inc.location.description || cityNow.name,
-              startedAt:   inc.startTime,
-              resolvedAt:  inc.endTime,
-              source:      'CrossFlow Intelligence Engine',
-              iconColor:   getSeverityColor(inc.criticality === 'critical' ? 'critical' : inc.criticality === 'major' ? 'high' : 'medium'),
-            }))
-            console.log('[DataSource] HERE Incidents applied, setting to live mode')
-          }
-          setDataSource('live')
-        } catch (err) {
-          console.error('[DataSource] HERE Incidents request failed:', err instanceof Error ? err.message : String(err))
           console.log('[DataSource] Using synthetic incidents')
           setDataSource('synthetic')
         }
       } else {
-        console.log('[DataSource] No live data sources available, using synthetic incidents')
+        console.log('[DataSource] No incident provider enabled, using synthetic incidents')
         setDataSource('synthetic')
       }
 
@@ -2501,9 +2480,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     const incidentSplit = splitIncidents(incidents)
     setIncidents(incidents)
 
-    const fallbackRoadGeo = buildBaseRoadFallbackFeatureCollection(snappedSnapshot.segments, map.getZoom(), isMobile)
-    const fallbackRoadSrc = safeGetSource(map, BASE_ROADS_FALLBACK_SOURCE) as maplibregl.GeoJSONSource | null
-    if (fallbackRoadSrc) fallbackRoadSrc.setData(fallbackRoadGeo)
+    ensureGuaranteedRoadFallback(map, cityNow, map.getZoom(), isMobile, snappedSnapshot.segments)
 
     // --- High Performance: UCTN Property Updates ---
     if (safeGetSource(map, TRAFFIC_SOURCE)) {
@@ -3512,9 +3489,9 @@ function initStaticSources(map: maplibregl.Map) {
       source: BASE_ROADS_FALLBACK_SOURCE,
       layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'visible' },
       paint: {
-        'line-color': '#CBD5E1',
-        'line-width': ['coalesce', ['get', 'width'], 1.1],
-        'line-opacity': 0.92,
+        'line-color': DEBUG_ROAD_COLOR,
+        'line-width': ['coalesce', ['get', 'width'], 2],
+        'line-opacity': 1,
       }
     })
   }
