@@ -469,7 +469,8 @@ export class AggregationEngine {
   }
 
   private async getFromDatabase(cityId: string): Promise<CitySnapshot | null> {
-    const { data } = await this.supabase
+    const supabase = await this.supabase
+    const { data } = await supabase
       .from('city_snapshots')
       .select('aggregated_data')
       .eq('city_id', cityId)
@@ -482,7 +483,8 @@ export class AggregationEngine {
   }
 
   private async storeSnapshot(snapshot: CitySnapshot, aggregationTime: number) {
-    await this.supabase.from('city_snapshots').insert({
+    const supabase = await this.supabase
+    await supabase.from('city_snapshots').insert({
       city_id: snapshot.city_id,
       city_name: snapshot.city_name,
       country: snapshot.country,
@@ -504,7 +506,8 @@ export class AggregationEngine {
     success: boolean,
     cacheHit: boolean
   ) {
-    await this.supabase.from('api_performance_log').insert({
+    const supabase = await this.supabase
+    await supabase.from('api_performance_log').insert({
       api_name: source,
       city_id: cityId,
       endpoint: `/snapshot`,
