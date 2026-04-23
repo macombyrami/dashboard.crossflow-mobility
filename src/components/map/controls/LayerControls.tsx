@@ -1,52 +1,55 @@
 'use client'
+
 import { useState } from 'react'
-import { Car, Flame, Train, AlertTriangle, BrainCircuit, Layers, MapPinned, Users, Wind, PenLine, X, ChevronDown } from 'lucide-react'
+import { AlertTriangle, Car, ChevronDown, Flame, Layers, MapPinned, PenLine, TrainFront, Users, Wind } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
 import { cn } from '@/lib/utils/cn'
-import type { MapLayerId, HeatmapMode } from '@/types'
+import type { HeatmapMode, MapLayerId } from '@/types'
 
 type LayerDef = {
-  id:    MapLayerId
+  id: MapLayerId
   label: string
-  icon:  typeof Car
-  hint:  string
+  icon: typeof Car
+  hint: string
   color: string
 }
 
 const LAYERS: LayerDef[] = [
-  { id: 'traffic',    label: 'Trafic',        icon: Car,          hint: 'Flux en temps réel',          color: '#22C55E' },
-  { id: 'heatmap',    label: 'Heatmap',       icon: Flame,        hint: 'Densité thermique',           color: '#FF6D00' },
-  { id: 'transport',  label: 'Transport',     icon: Train,        hint: 'Bus, métro, tramway',         color: '#3B82F6' },
-  { id: 'incidents',  label: 'Incidents',     icon: AlertTriangle,hint: 'Accidents & travaux',         color: '#FF3B30' },
-  { id: 'prediction', label: 'Prédiction',    icon: BrainCircuit, hint: 'Projection IA +30 min',       color: '#A78BFA' },
-  { id: 'boundary',   label: 'Contour ville', icon: MapPinned,    hint: 'Périmètre administratif',     color: '#22C55E' },
+  { id: 'traffic', label: 'Traffic', icon: Car, hint: 'Road traffic overlay', color: '#16A34A' },
+  { id: 'heatmap', label: 'Heatmap', icon: Flame, hint: 'Background pressure map', color: '#F59E0B' },
+  { id: 'transport', label: 'Transport', icon: TrainFront, hint: 'Animated transit activity', color: '#0EA5E9' },
+  { id: 'incidents', label: 'Incidents', icon: AlertTriangle, hint: 'Incidents and roadworks', color: '#DC2626' },
+  { id: 'boundary', label: 'Boundaries', icon: MapPinned, hint: 'City boundaries and entry points', color: '#22C55E' },
 ]
 
 export function LayerControls() {
-  const [collapsed, setCollapsed] = useState(false)
-  const activeLayers   = useMapStore(s => s.activeLayers)
-  const toggleLayer    = useMapStore(s => s.toggleLayer)
-  const heatmapMode    = useMapStore(s => s.heatmapMode)
+  const [collapsed, setCollapsed] = useState(true)
+  const city = useMapStore(s => s.city)
+  const activeLayers = useMapStore(s => s.activeLayers)
+  const toggleLayer = useMapStore(s => s.toggleLayer)
+  const heatmapMode = useMapStore(s => s.heatmapMode)
   const setHeatmapMode = useMapStore(s => s.setHeatmapMode)
-  const zoneActive     = useMapStore(s => s.zoneActive)
-  const setZoneActive  = useMapStore(s => s.setZoneActive)
-  const zoneDraft      = useMapStore(s => s.zoneDraft)
-  const zonePolygon    = useMapStore(s => s.zonePolygon)
-  const finalizeZone   = useMapStore(s => s.finalizeZone)
-  const clearZone      = useMapStore(s => s.clearZone)
+  const zoneActive = useMapStore(s => s.zoneActive)
+  const setZoneActive = useMapStore(s => s.setZoneActive)
+  const zoneDraft = useMapStore(s => s.zoneDraft)
+  const zonePolygon = useMapStore(s => s.zonePolygon)
+  const finalizeZone = useMapStore(s => s.finalizeZone)
+  const clearZone = useMapStore(s => s.clearZone)
 
   const activeCount = activeLayers.size
+  const isParis = city.id === 'paris' || city.name.toLowerCase() === 'paris'
+  const isCompactCity = !isParis && city.population > 0 && city.population < 300000
 
   if (collapsed) {
     return (
       <button
         onClick={() => setCollapsed(false)}
-        className="glass-card flex items-center gap-2 px-3 h-11 rounded-xl text-text-primary hover:border-brand/40 transition-all"
-        title="Afficher les calques"
+        className="flex h-11 items-center gap-2 rounded-2xl border border-stone-200 bg-white/95 px-3 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md transition-all hover:border-stone-300"
+        title="Open layers"
       >
-        <Layers className="w-4 h-4 text-brand" />
-        <span className="text-[13px] font-semibold">Calques</span>
-        <span className="ml-1 min-w-[20px] h-5 px-1.5 rounded-full bg-brand/15 text-brand text-[11px] font-bold tabular-nums flex items-center justify-center">
+        <Layers className="h-4 w-4 text-stone-700" />
+        <span className="text-[13px] font-semibold text-stone-900">Layers</span>
+        <span className="ml-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-stone-100 px-1.5 text-[11px] font-bold tabular-nums text-stone-700">
           {activeCount}
         </span>
       </button>
@@ -54,45 +57,51 @@ export function LayerControls() {
   }
 
   return (
-    <div className="glass-card rounded-xl shadow-lg w-[232px] overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-bg-border">
-        <div className="flex items-center gap-2">
-          <Layers className="w-3.5 h-3.5 text-brand" />
-          <span className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.18em]">Calques</span>
-          <span className="min-w-[18px] h-4 px-1 rounded-full bg-brand/15 text-brand text-[10px] font-bold tabular-nums flex items-center justify-center">
+    <div className="w-[calc(100vw-48px)] max-w-[260px] overflow-hidden rounded-[24px] border border-stone-200 bg-white/96 shadow-[0_18px_48px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:w-[260px]">
+      <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Layers className="h-3.5 w-3.5 flex-shrink-0 text-stone-700" />
+          <span className="truncate text-[11px] font-bold uppercase tracking-[0.18em] text-stone-500">Map Layers</span>
+          <span className="flex h-4 min-w-[18px] flex-shrink-0 items-center justify-center rounded-full bg-stone-100 px-1 text-[10px] font-bold tabular-nums text-stone-700">
             {activeCount}
           </span>
         </div>
         <button
           onClick={() => setCollapsed(true)}
-          className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
-          aria-label="Réduire"
+          className="-mr-1 flex-shrink-0 rounded-md p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
+          aria-label="Close layers"
         >
-          <ChevronDown className="w-3.5 h-3.5" />
+          <ChevronDown className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      {/* Layer list */}
-      <div className="p-2 space-y-0.5">
+      <div className="border-b border-stone-200 px-4 py-3">
+        <p className="text-[11px] leading-5 text-stone-500">
+          Advanced controls only. The smart modes decide the main view; heavy overlays stay mutually exclusive to keep the map readable.
+        </p>
+        <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-400">
+          {isParis ? 'Paris mode: arrondissements + dense network' : isCompactCity ? 'Compact city mode: boundary flows first' : 'Standard city mode'}
+        </p>
+      </div>
+
+      <div className="space-y-1 p-2">
         {LAYERS.map(({ id, label, icon: Icon, hint, color }) => {
           const active = activeLayers.has(id)
+
           return (
             <button
               key={id}
               onClick={() => toggleLayer(id)}
               title={hint}
               className={cn(
-                'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all duration-150 group',
-                active
-                  ? 'bg-bg-hover'
-                  : 'hover:bg-bg-subtle',
+                'group flex min-h-[42px] w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left transition-all duration-150',
+                active ? 'bg-stone-100' : 'hover:bg-stone-50',
               )}
             >
               <span
                 className={cn(
-                  'w-4 h-4 rounded-[5px] border flex items-center justify-center flex-shrink-0 transition-all',
-                  active ? 'border-transparent' : 'border-bg-border group-hover:border-text-muted',
+                  'flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-[5px] border transition-all',
+                  active ? 'border-transparent' : 'border-stone-200 group-hover:border-stone-400',
                 )}
                 style={active ? { background: color, boxShadow: `0 0 10px ${color}66` } : undefined}
               >
@@ -103,11 +112,11 @@ export function LayerControls() {
                 )}
               </span>
               <Icon
-                className={cn('w-4 h-4 flex-shrink-0 transition-colors', active ? '' : 'text-text-muted group-hover:text-text-secondary')}
+                className={cn('h-4 w-4 flex-shrink-0 transition-colors', active ? '' : 'text-stone-400 group-hover:text-stone-600')}
                 style={active ? { color } : undefined}
                 strokeWidth={2}
               />
-              <span className={cn('flex-1 text-[13px] font-medium tracking-tight', active ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary')}>
+              <span className={cn('flex-1 truncate text-[13px] font-medium tracking-tight', active ? 'text-stone-950' : 'text-stone-600 group-hover:text-stone-900')}>
                 {label}
               </span>
             </button>
@@ -115,65 +124,70 @@ export function LayerControls() {
         })}
       </div>
 
-      {/* Heatmap submode */}
       {activeLayers.has('heatmap') && (
-        <div className="px-2.5 pb-2 pt-0.5">
-          <p className="text-[9px] font-bold text-text-muted uppercase tracking-[0.18em] mb-1.5 px-1">Mode heatmap</p>
+        <div className="border-t border-stone-200 px-3 pb-3 pt-2">
+          <p className="mb-1.5 mt-2 px-1 text-[9px] font-bold uppercase tracking-[0.18em] text-stone-400">Heatmap mode</p>
           <div className="grid grid-cols-3 gap-1">
             {([
               { id: 'congestion' as HeatmapMode, label: 'Congestion', icon: Flame },
-              { id: 'passages'   as HeatmapMode, label: 'Passages',   icon: Users },
-              { id: 'co2'        as HeatmapMode, label: 'CO₂',        icon: Wind  },
+              { id: 'passages' as HeatmapMode, label: 'Flow', icon: Users },
+              { id: 'co2' as HeatmapMode, label: 'CO2', icon: Wind },
             ]).map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => setHeatmapMode(id)}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-1 py-1.5 rounded-md text-[10px] font-semibold transition-all border',
+                  'flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-xl border py-2 text-[10px] font-semibold transition-all',
                   heatmapMode === id
-                    ? 'bg-brand/15 text-brand border-brand/30'
-                    : 'text-text-muted border-bg-border hover:text-text-secondary hover:border-text-muted',
+                    ? 'border-amber-200 bg-amber-50 text-amber-700'
+                    : 'border-stone-200 text-stone-500 hover:border-stone-300 hover:text-stone-700',
                 )}
               >
-                <Icon className="w-3 h-3" />
-                {label}
+                <Icon className="h-3.5 w-3.5" />
+                <span className="leading-none">{label}</span>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Zone drawing */}
-      <div className="p-2 border-t border-bg-border">
+      <div className="border-t border-stone-200 p-2">
         <button
           onClick={() => {
             if (zoneActive) clearZone()
-            else { clearZone(); setZoneActive(true) }
+            else {
+              clearZone()
+              setZoneActive(true)
+            }
           }}
           className={cn(
-            'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-all',
+            'flex min-h-[40px] w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-[13px] font-medium transition-all',
             zoneActive
-              ? 'bg-yellow-400/15 text-yellow-500 border border-yellow-400/30'
-              : 'text-text-secondary hover:text-text-primary hover:bg-bg-subtle border border-transparent',
+              ? 'border border-amber-200 bg-amber-50 text-amber-700'
+              : 'border border-transparent text-stone-600 hover:bg-stone-50 hover:text-stone-900',
           )}
         >
-          <PenLine className="w-4 h-4 flex-shrink-0" />
-          <span className="flex-1 text-left">{zoneActive ? 'Cliquez sur la carte…' : 'Définir une zone'}</span>
+          <PenLine className="h-4 w-4 flex-shrink-0" />
+          <span className="flex-1 truncate text-left">
+            {zoneActive ? 'Click the map to draw a zone' : 'Define analysis zone'}
+          </span>
         </button>
+
         {zoneActive && zoneDraft.length >= 3 && (
           <button
             onClick={() => finalizeZone()}
-            className="w-full mt-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-yellow-400/20 text-yellow-500 hover:bg-yellow-400/30 transition-all"
+            className="mt-1 flex min-h-[36px] w-full items-center justify-center gap-2 rounded-2xl bg-amber-100 px-3 py-2 text-[12px] font-semibold text-amber-700 transition-all hover:bg-amber-200"
           >
-            ✓ Valider ({zoneDraft.length} pts)
+            Confirm ({zoneDraft.length} pts)
           </button>
         )}
+
         {(zoneActive || zonePolygon) && (
           <button
             onClick={() => clearZone()}
-            className="w-full mt-1 flex items-center justify-center px-3 py-1 rounded-lg text-[11px] text-text-muted hover:text-text-secondary transition-all"
+            className="mt-1 flex w-full items-center justify-center rounded-lg px-3 py-1.5 text-[11px] text-stone-400 transition-all hover:text-stone-700"
           >
-            Effacer
+            Clear
           </button>
         )}
       </div>

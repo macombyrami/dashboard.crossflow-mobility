@@ -1,0 +1,235 @@
+/**
+ * /api/ratp-traffic
+ * Proxy serveur pour le trafic RATP/IDFM.
+ * - Source 1: api-ratp.pierre-grimaud.fr (non-officielle, aucune clé)
+ * - Source 2: prim.iledefrance-mobilites.fr (officielle, IDFM_API_KEY)
+ * Cache 60 s.
+ */
+
+import { NextResponse } from 'next/server'
+import { fetchWithRetry } from '@/lib/retry'
+
+const PG_BASE   = 'https://api-ratp.pierre-grimaud.fr/v3'
+const PRIM_BASE = 'https://prim.iledefrance-mobilites.fr/marketplace'
+const UA        = 'Mozilla/5.0 (compatible; CrossFlow/1.0; +https://crossflow-mobility.com)'
+
+// ─── STIF Line ID → RATP slug mapping ────────────────────────────────────────
+// Source: IDFM référentiel-des-lignes open data
+const STIF_TO_SLUG: Record<string, string> = {
+  C01742: '1',  C01743: '2',  C01744: '3',  C01745: '3b',
+  C01746: '4',  C01747: '5',  C01748: '6',  C01749: '7',
+  C01750: '7b', C01751: '8',  C01752: '9',  C01753: '10',
+  C01754: '11', C01755: '12', C01756: '13', C01757: '14',
+  C01758: '15', C01759: '16', C01760: '17', C01761: '18',
+  // RER
+  C01727: 'A',  C01728: 'B',  C01729: 'C',  C01730: 'D',  C01731: 'E',
+  // Tram
+  C01714: 'T1', C01715: 'T2', C01716: 'T3a', C01717: 'T3b',
+  C01719: 'T4', C01720: 'T5', C01721: 'T6',  C01722: 'T7',
+  C01718: 'T8', C01723: 'T9', C01724: 'T10', C01725: 'T11',
+  C01726: 'T12',C01712: 'T13',
+}
+
+// ─── Default network list (if Pierre Grimaud API fails) ──────────────────────
+const BASE_NETWORK: { slug: string; type: 'metros' | 'rers' | 'tramways' }[] = [
+  { slug: '1',  type: 'metros' }, { slug: '2',  type: 'metros' }, { slug: '3',  type: 'metros' }, 
+  { slug: '3b', type: 'metros' }, { slug: '4',  type: 'metros' }, { slug: '5',  type: 'metros' },
+  { slug: '6',  type: 'metros' }, { slug: '7',  type: 'metros' }, { slug: '7b', type: 'metros' },
+  { slug: '8',  type: 'metros' }, { slug: '9',  type: 'metros' }, { slug: '10', type: 'metros' },
+  { slug: '11', type: 'metros' }, { slug: '12', type: 'metros' }, { slug: '13', type: 'metros' }, 
+  { slug: '14', type: 'metros' },
+  { slug: 'A',  type: 'rers' },   { slug: 'B',  type: 'rers' },   { slug: 'C',  type: 'rers' }, 
+  { slug: 'D',  type: 'rers' },   { slug: 'E',  type: 'rers' },
+  { slug: 'T1', type: 'tramways' },{ slug: 'T2', type: 'tramways' },{ slug: 'T3a',type: 'tramways' },
+  { slug: 'T3b',type: 'tramways' },{ slug: 'T4', type: 'tramways' },{ slug: 'T5', type: 'tramways' },
+  { slug: 'T6', type: 'tramways' },{ slug: 'T7', type: 'tramways' },{ slug: 'T8', type: 'tramways' },
+  { slug: 'T9', type: 'tramways' },{ slug: 'T10',type: 'tramways' },{ slug: 'T11',type: 'tramways' },
+  { slug: 'T12',type: 'tramways' },{ slug: 'T13',type: 'tramways' },
+]
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface RatpTrafficLine {
+  slug:    string
+  type:    'metros' | 'rers' | 'tramways'
+  title:   string
+  message: string
+}
+
+interface PrimInfoMessage {
+  InfoChannelRef?: { value: string }
+  ValidUntilTime?: string
+  Content?: {
+    Message?: { MessageType: string; MessageText: { value: string } }[]
+    LineRef?:  { value: string }[]
+  }
+}
+
+// ─── Pierre Grimaud fetch ─────────────────────────────────────────────────────
+
+async function fetchPierreGrimaud(): Promise<RatpTrafficLine[]> {
+  const types = ['metros', 'rers', 'tramways'] as const
+  const lines: RatpTrafficLine[] = []
+
+  await Promise.allSettled(
+    types.map(async (type) => {
+      try {
+        const res = await fetchWithRetry(
+          `${PG_BASE}/traffic/${type}`,
+          {
+            headers: {
+              'User-Agent': UA,
+              'Accept':     'application/json',
+              'Origin':     'https://crossflow-mobility.com',
+            },
+            signal: AbortSignal.timeout(6000),
+          },
+          { attempts: 2, baseMs: 400 },
+        )
+        if (!res.ok) return
+
+        const data = await res.json()
+        const raw: { line?: string; slug?: string; title?: string; message?: string }[] =
+          data?.result?.[type] ?? []
+
+        for (const l of raw) {
+          const slug = (l.line ?? l.slug ?? '').toUpperCase()
+          if (!slug) continue
+          lines.push({
+            slug,
+            type,
+            title:   l.title   ?? 'Trafic normal',
+            message: l.message ?? '',
+          })
+        }
+      } catch {
+        // API non-officielle — echec silencieux
+      }
+    }),
+  )
+
+  return lines
+}
+
+// ─── PRIM IDFM — single fetch, dual parse ─────────────────────────────────────
+// Previously called general-message TWICE (once per function). Now one call,
+// two result maps derived from the same response.
+
+async function fetchPrimData(apiKey: string): Promise<{
+  disruptions: Map<string, string>
+  status:      Map<string, 'normal' | 'perturbé' | 'interrompu'>
+}> {
+  const disruptions = new Map<string, string>()
+  const status      = new Map<string, 'normal' | 'perturbé' | 'interrompu'>()
+  try {
+    const res = await fetch(`${PRIM_BASE}/general-message`, {
+      headers: { 'apikey': apiKey, 'Accept': 'application/json' },
+      signal:  AbortSignal.timeout(8_000),
+    })
+    if (!res.ok) return { disruptions, status }
+
+    const data     = await res.json()
+    const messages: PrimInfoMessage[] =
+      data?.Siri?.ServiceDelivery?.GeneralMessageDelivery?.[0]?.InfoMessage ?? []
+    const now = new Date()
+
+    for (const msg of messages) {
+      const validUntil = msg.ValidUntilTime ? new Date(msg.ValidUntilTime) : null
+      if (validUntil && validUntil < now) continue // expired
+
+      const text     = msg.Content?.Message?.find(m =>
+        m.MessageType === 'shortMessage' || m.MessageType === 'longMessage',
+      )?.MessageText?.value ?? ''
+      const channel  = msg.InfoChannelRef?.value?.toLowerCase() ?? ''
+      const lineRefs = msg.Content?.LineRef ?? []
+
+      for (const ref of lineRefs) {
+        const stifId = ref.value?.match(/::([^:]+):/)?.[1] ?? ''
+        const slug   = STIF_TO_SLUG[stifId]
+        if (!slug) continue
+
+        // Disruption text map
+        if (text) disruptions.set(slug, text)
+
+        // Status map (don't downgrade interrompu)
+        const current = status.get(slug)
+        if (current === 'interrompu') continue
+        if (channel.includes('interru') || channel.includes('susp')) {
+          status.set(slug, 'interrompu')
+        } else if (channel.includes('perturbation') || channel.includes('incident') || text) {
+          status.set(slug, 'perturbé')
+        } else if (!current) {
+          status.set(slug, 'perturbé')
+        }
+      }
+    }
+  } catch {
+    // PRIM indisponible — pas bloquant
+  }
+  return { disruptions, status }
+}
+
+// ─── Handler ──────────────────────────────────────────────────────────────────
+
+export async function GET() {
+  const primKey = process.env.IDFM_API_KEY ?? ''
+
+  // Single PRIM call + Pierre-Grimaud in parallel (was 3 calls: PG + 2×PRIM)
+  const [pgLines, prim] = await Promise.all([
+    fetchPierreGrimaud(),
+    primKey ? fetchPrimData(primKey) : Promise.resolve({
+      disruptions: new Map<string, string>(),
+      status:      new Map<string, 'normal' | 'perturbé' | 'interrompu'>(),
+    }),
+  ])
+  const { disruptions: primDisruptions, status: primStatus } = prim
+ 
+  // 1. Determine base source (PG or Baseline fallback)
+  const sourceLines = pgLines.length > 0 
+    ? pgLines 
+    : BASE_NETWORK.map(b => ({ ...b, title: 'Trafic normal', message: '' }))
+
+  // 2. Merge PRIM data into source lines
+  const merged = sourceLines.map(line => {
+    const slugKey    = line.slug.toLowerCase()
+    const primMsg    = primDisruptions.get(line.slug) ?? primDisruptions.get(slugKey)
+    const primSt     = primStatus.get(line.slug)      ?? primStatus.get(slugKey)
+ 
+    return {
+      ...line,
+      // Prefer PRIM message if available (more detailed/official)
+      message: primMsg ?? line.message,
+      // Prefer PRIM status if Pierre Grimaud / Fallback says "normal" but PRIM has a disruption
+      title: primSt && line.title.toLowerCase().includes('normal')
+        ? primSt === 'interrompu' ? 'Trafic interrompu' : 'Trafic perturbé'
+        : line.title,
+      source: primMsg ? (pgLines.length > 0 ? 'prim+pg' : 'prim+base') : (pgLines.length > 0 ? 'pg' : 'baseline'),
+    }
+  })
+ 
+  // 3. Add any PRIM-only disruptions that aren't in our source list (e.g. specific RER branches or Noctiliens)
+  for (const [slug, message] of primDisruptions) {
+    if (!merged.find(m => m.slug.toLowerCase() === slug.toLowerCase())) {
+      const st = primStatus.get(slug) ?? 'perturbé'
+      merged.push({
+        slug:    slug.toUpperCase(),
+        type:    slug.length <= 2 && !slug.startsWith('T')
+          ? slug.match(/^[A-E]$/) ? 'rers' : 'metros'
+          : 'tramways',
+        title:   st === 'interrompu' ? 'Trafic interrompu' : 'Trafic perturbé',
+        message,
+        source: 'prim',
+      })
+    }
+  }
+
+  return NextResponse.json(
+    {
+      lines:      merged,
+      hasPrim:    Boolean(primKey),
+      fetchedAt:  new Date().toISOString(),
+      lineCount:  merged.length,
+    },
+    { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30' } },
+  )
+}

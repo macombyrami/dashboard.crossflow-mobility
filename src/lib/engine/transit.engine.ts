@@ -17,6 +17,7 @@ export interface TransitVehicle {
   lng:       number
   bearing:   number          // 0-360 degrees
   speedKmh:  number
+  trailCoords: [number, number][]
 }
 
 // ─── Speeds (km/h) by route type ──────────────────────────────────────────
@@ -93,6 +94,54 @@ function positionAt(
   return { lat: coords[0][1], lng: coords[0][0], bearing: 0 }
 }
 
+function trailAround(
+  coords: [number, number][],
+  totalLen: number,
+  t: number,
+  lookBehindM: number,
+): [number, number][] {
+  if (coords.length < 2) return coords
+
+  const target = (((t % 1) + 1) % 1) * totalLen
+  const startTarget = Math.max(0, target - lookBehindM)
+  let walked = 0
+  const trail: [number, number][] = []
+
+  for (let i = 1; i < coords.length; i++) {
+    const from = coords[i - 1]
+    const to = coords[i]
+    const seg = geoDistM(from, to)
+    const segStart = walked
+    const segEnd = walked + seg
+
+    if (segEnd < startTarget) {
+      walked = segEnd
+      continue
+    }
+    if (segStart > target) break
+
+    const localStart = Math.max(0, startTarget - segStart)
+    const localEnd = Math.min(seg, target - segStart)
+    const startFrac = seg > 0 ? localStart / seg : 0
+    const endFrac = seg > 0 ? localEnd / seg : 0
+
+    const startPoint: [number, number] = [
+      from[0] + (to[0] - from[0]) * startFrac,
+      from[1] + (to[1] - from[1]) * startFrac,
+    ]
+    const endPoint: [number, number] = [
+      from[0] + (to[0] - from[0]) * endFrac,
+      from[1] + (to[1] - from[1]) * endFrac,
+    ]
+
+    if (!trail.length) trail.push(startPoint)
+    trail.push(endPoint)
+    walked = segEnd
+  }
+
+  return trail.length >= 2 ? trail : coords.slice(0, Math.min(2, coords.length))
+}
+
 // ─── Main simulation function ─────────────────────────────────────────────
 
 /**
@@ -137,6 +186,7 @@ export function simulateTransitVehicles(
         lng:       pos.lng,
         bearing:   pos.bearing,
         speedKmh:  speed,
+        trailCoords: trailAround(route.coords, totalLen, t, Math.max(140, stepM * 8)),
       })
     }
   }

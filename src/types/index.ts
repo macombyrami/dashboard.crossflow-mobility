@@ -12,9 +12,11 @@ export type IncidentType = 'accident' | 'roadwork' | 'congestion' | 'anomaly' | 
 
 export type TransportMode = 'car' | 'pedestrian' | 'metro' | 'bus' | 'bike' | 'tram'
 
-export type MapLayerId = 'traffic' | 'heatmap' | 'transport' | 'incidents' | 'prediction' | 'boundary'
+export type MapLayerId = 'traffic' | 'flow' | 'heatmap' | 'transport' | 'incidents' | 'prediction' | 'boundary'
 
 export type HeatmapMode = 'congestion' | 'passages' | 'co2'
+
+export type QuickFilterId = 'all' | 'congestion' | 'incidents' | 'travaux' | 'flux'
 
 export type OrgPlan = 'starter' | 'pro' | 'enterprise'
 
@@ -33,6 +35,8 @@ export interface Bounds {
 export interface City {
   id:         string
   name:       string
+  fullName?:  string // e.g. "Paris, France"
+  state?:     string // e.g. "Île-de-France"
   country:    string
   countryCode:string
   center:     LatLng
@@ -45,10 +49,27 @@ export interface City {
 
 // ─── Traffic ──────────────────────────────────────────────────────────────────
 
+export interface ContextFactors {
+  weatherImpact:  'none' | 'minor' | 'moderate' | 'severe'
+  eventIntensity: number // 0 (none) to 1 (major)
+  hourOfDay:      number
+  isWeekend:      boolean
+  publicTransportLoad: number // 0-1
+  socialPulse:    number // 0-1
+}
+
+export interface IntelligenceResult {
+  score:       number
+  level:       CongestionLevel
+  anomalyScore:number // 0-1
+  multipliers: Record<string, number>
+}
+
 export interface TrafficSegment {
   id:               string
   name?:            string
-  roadType?:        string   // motorway | trunk | primary | secondary | tertiary
+  streetName?:      string
+  roadType?:        string   // motorway | trunk | primary | secondary | tertiary | residential
   coordinates:      [number, number][] // [lng, lat][]
   speedKmh:         number
   freeFlowSpeedKmh: number
@@ -59,6 +80,18 @@ export interface TrafficSegment {
   length:           number // meters
   mode:             TransportMode
   lastUpdated:      string // ISO
+
+  // Detailed GIS Enrichment
+  arrondissement?:  string   // e.g. "1er arrondissement"
+  direction?:       string   // Cardinal: N, S, E, W, NE, etc.
+  isIntersection?:  boolean
+  hasTrafficLight?: boolean
+  priorityAxis?:    number   // 0-1 (importance score)
+  axisName?:        string   // e.g. "Boulevard Saint-Michel"
+  flowTrend?:       'improving' | 'stable' | 'worsening'
+  anomalyScore?:    number   // 0-1 (V4 Engine Delta)
+  observedTraffic?: boolean
+  estimatedTraffic?: boolean
 }
 
 export interface HeatmapPoint {
@@ -74,6 +107,18 @@ export interface TrafficSnapshot {
   heatmapPassages: HeatmapPoint[]   // vehicle count intensity
   heatmapCo2:      HeatmapPoint[]   // CO2 emission intensity
   fetchedAt:       string
+}
+
+export interface TrafficSummary {
+  segmentCount: number
+  avgCongestion: number // 0-1
+  alertCount: number
+  trafficStatus: 'fluid' | 'moderate' | 'critical'
+  trafficLabel: string
+  predictionLabel: string
+  predictionDeltaPct: number
+  updatedAt: string
+  hasData: boolean
 }
 
 // ─── Incidents ────────────────────────────────────────────────────────────────
@@ -155,6 +200,12 @@ export interface SimulationResult {
   }
   alternativePaths: number
   completedAt?: string
+  /** Route comparison from the FastAPI predictive backend (optional) */
+  predictive?: {
+    normal:    { total_distance_m: number; total_time_s: number }
+    simulated: { total_distance_m: number; total_time_s: number }
+    delta:     { distance_m: number; time_s: number; avoided_edges: string[]; added_edges: string[] }
+  }
 }
 
 // ─── KPIs ─────────────────────────────────────────────────────────────────────
@@ -193,4 +244,49 @@ export interface MapViewState {
   zoom:      number
   pitch:     number
   bearing:   number
+}
+
+export interface SearchFocusTarget {
+  id: string
+  label: string
+  latitude: number
+  longitude: number
+  bbox?: [number, number, number, number] | null
+  kind?: string
+}
+
+// ─── Sytadin Incident Pipeline ────────────────────────────────────────────────
+
+export interface RawTweet {
+  id: string
+  text: string
+  created_at: string
+}
+
+export interface ParsedIncident {
+  type: 'accident' | 'closure' | 'roadwork' | 'congestion' | 'blockage' | 'weather' | 'other'
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  road: string | null
+  direction: string | null
+  from_city: string | null
+  to_city: string | null
+  event: string
+  confidence_parse: 'high' | 'medium' | 'low'
+}
+
+export interface Coordinates {
+  lat: number
+  lng: number
+}
+
+export interface GeocodedIncident extends ParsedIncident {
+  from_coords: Coordinates | null
+  to_coords: Coordinates | null
+  geometry_type: 'Point' | 'LineString'
+}
+
+export interface MatchedIncident extends GeocodedIncident {
+  geometry: GeoJSON.Geometry
+  matched: boolean
+  match_confidence: 'high' | 'medium' | 'low'
 }

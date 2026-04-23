@@ -15,7 +15,21 @@ const TYPE_LABELS: Record<Incident['type'], string> = {
   event:     'Événement',
 }
 
-export function IncidentFeed({ maxItems = 5 }: { maxItems?: number }) {
+interface IncidentFeedProps {
+  maxItems?: number
+  title?: string
+  subtitle?: string
+  ctaLabel?: string
+  onCtaClick?: () => void
+}
+
+export function IncidentFeed({
+  maxItems = 5,
+  title = 'Incidents Actifs',
+  subtitle,
+  ctaLabel,
+  onCtaClick,
+}: IncidentFeedProps) {
   const incidents = useTrafficStore(s => s.incidents)
   const sorted    = [...incidents]
     .sort((a, b) => {
@@ -34,9 +48,21 @@ export function IncidentFeed({ maxItems = 5 }: { maxItems?: number }) {
       <div className="px-6 py-5 border-b border-bg-border flex items-center justify-between bg-bg-subtle/40">
         <div className="flex items-center gap-3">
           <AlertTriangle className="w-4 h-4 text-[#FF9F0A]" />
-          <span className="text-[13px] font-bold text-text-primary uppercase tracking-[0.15em]">Incidents Actifs</span>
+          <div>
+            <span className="text-[13px] font-bold text-text-primary uppercase tracking-[0.15em]">{title}</span>
+            {subtitle ? <p className="mt-1 text-[11px] text-text-muted normal-case tracking-normal">{subtitle}</p> : null}
+          </div>
         </div>
         <div className="flex items-center gap-2">
+          {ctaLabel && onCtaClick ? (
+            <button
+              type="button"
+              onClick={onCtaClick}
+              className="text-[10px] font-bold uppercase tracking-wider text-brand hover:text-brand/80 transition-colors"
+            >
+              {ctaLabel}
+            </button>
+          ) : null}
           <div className="w-2 h-2 rounded-full bg-brand shadow-glow animate-pulse" />
           <span className="text-[11px] font-bold text-text-muted bg-bg-subtle px-2.5 py-1 rounded-full border border-bg-border">
             {incidents.length}

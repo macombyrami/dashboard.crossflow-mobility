@@ -1,341 +1,761 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { Activity, Clock, Wind, AlertTriangle, Zap, Download } from 'lucide-react'
-import { KPICard } from '@/components/dashboard/KPICard'
-import { cn } from '@/lib/utils/cn'
-import { TrafficChart } from '@/components/dashboard/TrafficChart'
-import { IncidentFeed } from '@/components/dashboard/IncidentFeed'
-import { ModalSplitChart } from '@/components/dashboard/ModalSplitChart'
-import { WeatherCard } from '@/components/dashboard/WeatherCard'
-import { AirQualityCard } from '@/components/dashboard/AirQualityCard'
-import { EventsWidget } from '@/components/dashboard/EventsWidget'
-import { GlobalTrafficBanner } from '@/components/dashboard/GlobalTrafficBanner'
-import { TrafficIndexWidget } from '@/components/dashboard/TrafficIndexWidget'
-import { useMapStore } from '@/store/mapStore'
-import { useTrafficStore } from '@/store/trafficStore'
-import { useKPIHistoryStore } from '@/store/kpiHistoryStore'
-import { useTranslation } from '@/lib/hooks/useTranslation'
-import { generateCityKPIs, generateIncidents } from '@/lib/engine/traffic.engine'
-import { fetchWeather, fetchAirQuality } from '@/lib/api/openmeteo'
-import { exportToPdf } from '@/lib/utils/export'
-import { platformConfig } from '@/config/platform.config'
-import { pollutionLabel } from '@/lib/utils/congestion'
-import type { CityKPIs, TrafficSnapshot } from '@/types'
 
-function kpisFromSnapshot(cityId: string, snapshot: TrafficSnapshot, incidentCount: number, base: CityKPIs): CityKPIs {
-  const segs = snapshot.segments
-  if (!segs.length) return base
-  const congestionRate     = segs.reduce((a, s) => a + s.congestionScore, 0) / segs.length
-  const avgTravelMin       = Math.max(5, 10 + congestionRate * 40)
-  const pollutionIndex     = Math.min(10, Math.max(0.5, congestionRate * 8 + 0.5))
-  const networkEfficiency  = Math.max(0.1, 1 - congestionRate * 0.85)
-  return {
-    ...base,
-    cityId,
-    congestionRate,
-    avgTravelMin,
-    pollutionIndex,
-    activeIncidents:  incidentCount,
-    networkEfficiency,
-    capturedAt: snapshot.fetchedAt,
+import dynamic from 'next/dynamic'
+import Link from 'next/link'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Activity,
+  AlertTriangle,
+  ArrowUpRight,
+  BrainCircuit,
+  ChartLine,
+  Clock3,
+  Flame,
+  Layers,
+  MapPinned,
+  Radar,
+  Sparkles,
+  X,
+  Zap,
+} from 'lucide-react'
+import { useMapStore } from '@/store/mapStore'
+import { cn } from '@/lib/utils/cn'
+import { GlobalTrafficBannerNew } from '@/components/dashboard/GlobalTrafficBannerNew'
+import { KPIGridNew } from '@/components/dashboard/KPIGridNew'
+import { IncidentFeedNew } from '@/components/dashboard/IncidentFeedNew'
+import { SkeletonLoader } from '@/components/ui/SkeletonLoader'
+
+const CrossFlowMap = dynamic(
+  () => import('@/components/map/CrossFlowMap').then(m => ({ default: m.CrossFlowMap })),
+  { ssr: false, loading: () => <MapSkeleton /> },
+)
+
+type OperatorMode = 'dashboard' | 'control'
+type TransitTab = 'metros' | 'rers' | 'tramways'
+type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical'
+type IncidentKind = 'accident' | 'roadwork' | 'congestion' | 'anomaly' | 'event'
+
+type AggregatedCityPayload = {
+  city_id?: string
+  timestamp?: string
+  traffic?: {
+    average_speed?: number
+    congestion_level?: 'free' | 'slow' | 'congested' | 'critical'
+    incident_count?: number
+    segments?: Array<{
+      id?: string
+      axisName?: string
+      streetName?: string
+      roadType?: string
+      congestionScore?: number
+      flowVehiclesPerHour?: number
+      speedKmh?: number
+      freeFlowSpeedKmh?: number
+    }>
   }
 }
 
-function DashboardSkeleton() {
-  return (
-    <main className="flex-1 min-h-0 overflow-y-auto page-scroll">
-      <div className="page-container space-y-6 sm:space-y-8">
-        <div className="h-10 bg-bg-subtle rounded-2xl animate-pulse" />
-        <div className="h-8 w-48 bg-bg-subtle rounded-xl animate-pulse" />
-        <div className="kpi-grid">
-          {[0, 1, 2, 3].map(i => (
-            <div key={i} className="glass-card p-6 rounded-[22px] h-36 animate-pulse" />
-          ))}
-        </div>
-        <div className="h-64 bg-bg-subtle rounded-[22px] animate-pulse" />
-      </div>
-    </main>
-  )
+type IntelligenceIncident = {
+  id: string
+  road: string
+  direction: string
+  location: string
+  type: IncidentKind
+  severity: IncidentSeverity
+  timestamp: string
+  source: string
+  sourceLabel: string
+  status: 'active' | 'finished'
+  description: string
+  confidence: 'high' | 'medium' | 'low'
+  sources: string[]
+  lat: number
+  lng: number
+}
+
+type IncidentSelection = {
+  id: string
+  title: string
+  description: string
+  severity: IncidentSeverity
+  type: string
+  source: string
+  address: string
+  startedAt: string
+  lng: number
+  lat: number
+}
+
+type TransitLine = {
+  slug: string
+  type: TransitTab
+  title: string
+  message: string
+  source?: string
+}
+
+type PriorityItem =
+  | {
+      id: string
+      kind: 'incident'
+      severity: IncidentSeverity
+      title: string
+      subtitle: string
+      impact: string
+      lat: number
+      lng: number
+      timestamp: string
+    }
+  | {
+      id: string
+      kind: 'line'
+      severity: IncidentSeverity
+      title: string
+      subtitle: string
+      impact: string
+      lineType: TransitTab
+    }
+
+const TAB_LABEL: Record<TransitTab, string> = {
+  metros: 'Metro',
+  rers: 'RER',
+  tramways: 'Tram',
+}
+
+const SEVERITY_STYLE: Record<IncidentSeverity, { dot: string; badge: string; text: string }> = {
+  critical: { dot: 'bg-red-600', badge: 'bg-red-100 text-red-700', text: 'Critical' },
+  high: { dot: 'bg-orange-500', badge: 'bg-orange-100 text-orange-700', text: 'High' },
+  medium: { dot: 'bg-amber-400', badge: 'bg-amber-100 text-amber-700', text: 'Medium' },
+  low: { dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700', text: 'Low' },
+}
+
+function MapSkeleton() {
+  return <div className="h-full w-full animate-pulse bg-stone-100" />
+}
+
+function severityRank(value: IncidentSeverity) {
+  return value === 'critical' ? 4 : value === 'high' ? 3 : value === 'medium' ? 2 : 1
+}
+
+function asSeverityFromTransitTitle(title: string, message: string): IncidentSeverity {
+  const t = `${title} ${message}`.toLowerCase()
+  if (t.includes('interrompu') || t.includes('suspendu')) return 'critical'
+  if (t.includes('perturb')) return 'high'
+  if (t.includes('ralenti') || t.includes('incident')) return 'medium'
+  return 'low'
+}
+
+function lineLoadIndex(line: TransitLine): number {
+  const base = asSeverityFromTransitTitle(line.title, line.message)
+  if (base === 'critical') return 95
+  if (base === 'high') return 82
+  if (base === 'medium') return 68
+  return 38
+}
+
+function congestionPercent(level?: 'free' | 'slow' | 'congested' | 'critical') {
+  if (level === 'critical') return 86
+  if (level === 'congested') return 68
+  if (level === 'slow') return 46
+  return 24
+}
+
+function networkStatusFromMetrics(avgLoadPct: number, criticalCount: number) {
+  if (criticalCount >= 3 || avgLoadPct >= 78) return 'CRITICAL'
+  if (criticalCount >= 1 || avgLoadPct >= 55) return 'TENSE'
+  return 'NORMAL'
+}
+
+function trendLabel(current: number, previous: number | null) {
+  if (previous == null) return { label: 'stable', tone: 'text-stone-500' }
+  const delta = current - previous
+  if (delta > 4) return { label: 'rising', tone: 'text-red-600' }
+  if (delta < -4) return { label: 'falling', tone: 'text-emerald-600' }
+  return { label: 'stable', tone: 'text-stone-500' }
+}
+
+function formatAge(iso: string) {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  if (!Number.isFinite(diffMs) || diffMs < 0) return 'just now'
+  const min = Math.floor(diffMs / 60000)
+  if (min < 1) return 'just now'
+  if (min < 60) return `${min} min ago`
+  const h = Math.floor(min / 60)
+  return `${h} h ago`
 }
 
 export default function DashboardPage() {
-  const { t } = useTranslation()
-  const city                = useMapStore(s => s.city)
-  const kpis                = useTrafficStore(s => s.kpis)
-  const setKPIs             = useTrafficStore(s => s.setKPIs)
-  const setIncidents        = useTrafficStore(s => s.setIncidents)
-  const snapshot            = useTrafficStore(s => s.snapshot)
-  const incidents           = useTrafficStore(s => s.incidents)
-  const dataSource          = useTrafficStore(s => s.dataSource)
-  const openMeteoWeather    = useTrafficStore(s => s.openMeteoWeather)
-  const setOpenMeteoWeather = useTrafficStore(s => s.setOpenMeteoWeather)
-  const airQuality          = useTrafficStore(s => s.airQuality)
-  const setAirQuality       = useTrafficStore(s => s.setAirQuality)
-  const addSnapshot  = useKPIHistoryStore(s => s.addSnapshot)
-  const [mounted, setMounted] = useState(false)
+  const city = useMapStore(s => s.city)
+  const setLayer = useMapStore(s => s.setLayer)
+  const setMode = useMapStore(s => s.setMode)
+  const setSearchFocus = useMapStore(s => s.setSearchFocus)
+  const selectSegment = useMapStore(s => s.selectSegment)
 
-  useEffect(() => { setMounted(true) }, [])
+  const [operatorMode, setOperatorMode] = useState<OperatorMode>('dashboard')
+  const [tab, setTab] = useState<TransitTab>('metros')
+  const [snapshot, setSnapshot] = useState<AggregatedCityPayload | null>(null)
+  const [incidents, setIncidents] = useState<IntelligenceIncident[]>([])
+  const [lines, setLines] = useState<TransitLine[]>([])
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null)
+  const [selectedIncident, setSelectedIncident] = useState<IncidentSelection | null>(null)
+  const [loading, setLoading] = useState(true)
+  const lastLoadRef = useRef<number | null>(null)
+  const mapAreaRef = useRef<HTMLDivElement | null>(null)
+  const controllerRef = useRef<AbortController | null>(null)
 
-  // Synthetic KPIs + incidents baseline (only when no live data)
-  useEffect(() => {
-    if (dataSource === 'live') return
-    setKPIs(generateCityKPIs(city))
-    setIncidents(generateIncidents(city))
-    const interval = setInterval(() => {
-      setKPIs(generateCityKPIs(city))
-      setIncidents(generateIncidents(city))
-    }, platformConfig.kpi.dashboardRefreshMs)
-    return () => clearInterval(interval)
-  }, [city, dataSource, setKPIs, setIncidents])
+  const refreshRealtime = useCallback(async () => {
+    controllerRef.current?.abort()
+    const ctrl = new AbortController()
+    controllerRef.current = ctrl
 
-  // Real KPIs derived from HERE live snapshot
-  useEffect(() => {
-    if (!snapshot || dataSource !== 'live') return
-    const base = generateCityKPIs(city)
-    setKPIs(kpisFromSnapshot(city.id, snapshot, incidents.length, base))
-  }, [snapshot, dataSource, city, incidents.length, setKPIs])
-
-  // Record KPI snapshot to history store (30-min buckets)
-  useEffect(() => {
-    if (kpis) addSnapshot(kpis)
-  }, [kpis, addSnapshot])
-
-  // Real weather from OpenMeteo (free, no key)
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      const [w, a] = await Promise.all([
-        fetchWeather(city.center.lat, city.center.lng),
-        fetchAirQuality(city.center.lat, city.center.lng),
+    try {
+      const bbox = city.bbox.join(',')
+      const [aggRes, incRes, lineRes] = await Promise.all([
+        fetch(`/api/aggregation/city?city_id=${encodeURIComponent(city.id)}&bbox=${encodeURIComponent(bbox)}`, { cache: 'no-store', signal: ctrl.signal }),
+        fetch(`/api/incidents/intelligence?bbox=${encodeURIComponent(bbox)}`, { cache: 'no-store', signal: ctrl.signal }),
+        fetch('/api/ratp-traffic', { cache: 'no-store', signal: ctrl.signal }),
       ])
-      if (!cancelled) {
-        setOpenMeteoWeather(w)
-        setAirQuality(a)
+
+      const [aggJson, incJson, lineJson] = await Promise.all([
+        aggRes.ok ? aggRes.json() : null,
+        incRes.ok ? incRes.json() : null,
+        lineRes.ok ? lineRes.json() : null,
+      ])
+
+      if (ctrl.signal.aborted) return
+
+      setSnapshot((aggJson ?? null) as AggregatedCityPayload | null)
+      setIncidents(Array.isArray(incJson?.incidents) ? (incJson.incidents as IntelligenceIncident[]) : [])
+      setLines(Array.isArray(lineJson?.lines) ? (lineJson.lines as TransitLine[]) : [])
+      setUpdatedAt(new Date().toISOString())
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') {
+        console.error('[dashboard] realtime fetch failed', error)
       }
+    } finally {
+      if (!ctrl.signal.aborted) setLoading(false)
     }
-    load()
-    const interval = setInterval(load, 5 * 60 * 1000)
-    return () => { cancelled = true; clearInterval(interval) }
-  }, [city.center.lat, city.center.lng, setOpenMeteoWeather, setAirQuality])
+  }, [city.bbox, city.id])
 
-  if (!kpis) return <DashboardSkeleton />
+  useEffect(() => {
+    setMode('live')
+    setLayer('traffic', true)
+    setLayer('incidents', true)
+    setLayer('transport', true)
+    setLayer('heatmap', false)
+    refreshRealtime()
+    const interval = window.setInterval(refreshRealtime, 60_000)
+    return () => {
+      window.clearInterval(interval)
+      controllerRef.current?.abort()
+    }
+  }, [refreshRealtime, setLayer, setMode])
 
-  const congPct    = Math.round(kpis.congestionRate * 100)
-  const targets    = platformConfig.kpi.targets
-  const congWarn   = kpis.congestionRate >= targets.congestion_rate.warning
-  const congCrit   = kpis.congestionRate >= targets.congestion_rate.critical
-  const travelWarn = kpis.avgTravelMin   >= targets.avg_travel_time_min.warning
-  const pollWarn   = kpis.pollutionIndex >= targets.pollution_index.warning
-  const pollColor  = pollutionLabel(kpis.pollutionIndex).color
+  useEffect(() => {
+    if (operatorMode === 'control') {
+      setMode('live')
+      setLayer('traffic', true)
+      setLayer('incidents', true)
+      setLayer('transport', true)
+    }
+  }, [operatorMode, setLayer, setMode])
 
-  // Stable deltas (seeded by city + minute, only after mount to avoid hydration mismatch)
-  const seed = mounted ? (city.id.charCodeAt(0) + new Date().getMinutes()) : city.id.charCodeAt(0)
-  const congDelta   = ((seed % 21) - 10) / 10
-  const travelDelta = ((seed % 11) - 5)  / 10
-  const pollDelta   = ((seed % 31) - 15) / 10
+  const avgLoadPct = useMemo(() => {
+    if (lines.length > 0) {
+      const sum = lines.reduce((acc, line) => acc + lineLoadIndex(line), 0)
+      return Math.round(sum / Math.max(lines.length, 1))
+    }
+    return congestionPercent(snapshot?.traffic?.congestion_level)
+  }, [lines, snapshot?.traffic?.congestion_level])
+
+  const incidentCount = incidents.filter(item => item.status === 'active').length
+  const criticalCount = incidents.filter(item => item.status === 'active' && (item.severity === 'critical' || item.severity === 'high')).length
+  const networkStatus = networkStatusFromMetrics(avgLoadPct, criticalCount)
+  const trend = trendLabel(avgLoadPct, lastLoadRef.current)
+
+  useEffect(() => {
+    lastLoadRef.current = avgLoadPct
+  }, [avgLoadPct])
+
+  const priorityItems = useMemo<PriorityItem[]>(() => {
+    const incidentItems: PriorityItem[] = incidents
+      .filter(item => item.status === 'active')
+      .sort((a, b) => severityRank(b.severity) - severityRank(a.severity))
+      .slice(0, 5)
+      .map(item => ({
+        id: item.id,
+        kind: 'incident',
+        severity: item.severity,
+        title: `${item.road} ${item.direction ? `- ${item.direction}` : ''}`.trim(),
+        subtitle: item.description,
+        impact: `${item.confidence} confidence`,
+        lat: item.lat,
+        lng: item.lng,
+        timestamp: item.timestamp,
+      }))
+
+    const lineItems: PriorityItem[] = lines
+      .filter(item => asSeverityFromTransitTitle(item.title, item.message) !== 'low')
+      .slice(0, 4)
+      .map(item => ({
+        id: `line-${item.slug}`,
+        kind: 'line',
+        severity: asSeverityFromTransitTitle(item.title, item.message),
+        title: `${TAB_LABEL[item.type]} ${item.slug}`,
+        subtitle: item.message || item.title,
+        impact: item.title,
+        lineType: item.type,
+      }))
+
+    return [...incidentItems, ...lineItems]
+      .sort((a, b) => severityRank(b.severity) - severityRank(a.severity))
+      .slice(0, 5)
+  }, [incidents, lines])
+
+  const tabLines = useMemo(() => {
+    return lines
+      .filter(item => item.type === tab)
+      .sort((a, b) => lineLoadIndex(b) - lineLoadIndex(a))
+      .slice(0, 5)
+  }, [lines, tab])
+
+  const insight = useMemo(() => {
+    const topIncident = incidents
+      .filter(item => item.status === 'active')
+      .sort((a, b) => severityRank(b.severity) - severityRank(a.severity))[0]
+
+    if (topIncident) {
+      return `${topIncident.road} under ${SEVERITY_STYLE[topIncident.severity].text.toLowerCase()} pressure. Recommended: activate rerouting on ${topIncident.location || 'adjacent corridors'} within 15 minutes.`
+    }
+
+    if (networkStatus === 'TENSE' || networkStatus === 'CRITICAL') {
+      return `Network load is ${avgLoadPct}%. Activate preventive flow regulation on top 3 constrained lines before the next peak.`
+    }
+
+    return 'Network remains stable. Keep control mode on standby and monitor incident confidence updates.'
+  }, [avgLoadPct, incidents, networkStatus])
+
+  const goToMapFocus = useCallback((incident: IntelligenceIncident) => {
+    setSelectedIncident({
+      id: incident.id,
+      title: incident.road,
+      description: incident.description,
+      severity: incident.severity,
+      type: incident.type,
+      source: incident.sourceLabel,
+      address: incident.location || incident.direction || '',
+      startedAt: incident.timestamp,
+      lng: incident.lng,
+      lat: incident.lat,
+    })
+    setSearchFocus({
+      id: `incident-${incident.id}`,
+      label: incident.description,
+      latitude: incident.lat,
+      longitude: incident.lng,
+      kind: 'incident',
+    })
+    setLayer('incidents', true)
+    setLayer('traffic', true)
+  }, [setLayer, setSearchFocus])
+
+  const handleIncidentFeedClick = useCallback((incident: { id: string }) => {
+    const matched = incidents.find(item => item.id === incident.id)
+    if (!matched) return
+    goToMapFocus(matched)
+  }, [goToMapFocus, incidents])
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const custom = event as CustomEvent<IncidentSelection>
+      if (!custom.detail?.id) return
+      setSelectedIncident(custom.detail)
+      setLayer('incidents', true)
+    }
+
+    window.addEventListener('cf:incident-selected', handler as EventListener)
+    return () => window.removeEventListener('cf:incident-selected', handler as EventListener)
+  }, [setLayer])
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto page-scroll">
-      <div className="page-container space-y-6 sm:space-y-8 2xl:space-y-10">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg-base text-text-primary page-scroll">
+      <div className="page-container">
+        {/* New Global Traffic Banner */}
+        {!loading && (
+          <GlobalTrafficBannerNew
+            status={networkStatus as 'NORMAL' | 'TENSE' | 'CRITICAL'}
+            avgLoadPct={avgLoadPct}
+            incidentCount={incidentCount}
+            trendLabel={trend.label}
+            trendTone={trend.tone}
+            cityName={city.name}
+          />
+        )}
 
-        {/* Bandeau état global — 3 secondes */}
-        <GlobalTrafficBanner className="animate-slide-up" />
+        {/* New KPI Grid */}
+        <div className="mb-6">
+          {loading ? (
+            <SkeletonLoader type="card" count={4} />
+          ) : (
+            <KPIGridNew
+              avgTravelTime={snapshot?.traffic?.average_speed ? Math.round(((snapshot.traffic.average_speed / 50) * 60)) : 24}
+              congestionRate={congestionPercent(snapshot?.traffic?.congestion_level) / 100}
+              activeIncidents={incidentCount}
+              networkEfficiency={0.88}
+            />
+          )}
+        </div>
 
-        {/* Title & Stats Summary */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6">
-          <div>
-            <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2 animate-slide-up">
-              <div className="w-1.5 h-6 sm:w-2 sm:h-7 bg-brand rounded-full shadow-glow" />
-              <h1 className="heading-fluid-1 text-text-primary tracking-tight">
-                {city.flag} {city.name}
-              </h1>
+        {/* Incidents Feed */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-text-primary mb-4">Active Incidents</h2>
+          {loading ? (
+            <SkeletonLoader type="card" count={4} />
+          ) : (
+            <IncidentFeedNew
+              incidents={incidents.map(i => ({
+                id: i.id,
+                road: i.road,
+                direction: i.direction,
+                type: i.type,
+                severity: i.severity as 'critical' | 'high' | 'medium' | 'low',
+                description: i.description,
+                timestamp: i.timestamp,
+                location: i.location,
+              }))}
+              onIncidentClick={handleIncidentFeedClick}
+              isLoading={loading}
+              maxItems={10}
+            />
+          )}
+        </div>
+
+        {/* Legacy sections below */}
+        <section className="rounded-3xl border border-stone-200 bg-white px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusPill status={networkStatus} />
+              <TopMetric icon={AlertTriangle} label="Active incidents" value={String(incidentCount)} />
+              <TopMetric icon={Activity} label="Average load" value={`${avgLoadPct}%`} />
+              <TopMetric icon={ChartLine} label="Flow trend" value={trend.label} tone={trend.tone} />
+              <TopMetric icon={Clock3} label="Updated" value={updatedAt ? formatAge(updatedAt) : 'syncing'} />
             </div>
-            <p className="text-[12px] sm:text-[14px] font-medium text-text-secondary flex flex-wrap items-center gap-2 animate-slide-up [animation-delay:100ms]">
-              {t('dashboard.title')} · <span className="text-text-muted">{t('dashboard.updated')}</span>
-              {dataSource === 'live' && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-brand/10 border border-brand/30 text-brand text-[9px] font-bold uppercase tracking-wider">
-                  <Zap className="w-2 h-2" />Live
-                </span>
-              )}
-            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => mapAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                className="inline-flex h-10 items-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-700 transition-colors hover:border-stone-300 hover:text-stone-950"
+              >
+                <MapPinned className="h-4 w-4" />
+                View On Map
+              </button>
+              <button
+                onClick={() => setMode('simulate')}
+                className="inline-flex h-10 items-center gap-2 rounded-2xl bg-stone-950 px-4 text-sm font-semibold text-white transition-colors hover:bg-stone-800"
+              >
+                <Flame className="h-4 w-4" />
+                Activate Simulation
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-3 sm:gap-4">
+        </section>
+
+        <section className="rounded-3xl border border-stone-200 bg-white p-1 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+          <div className="grid w-full grid-cols-2 gap-1">
             <button
-              onClick={() => exportToPdf(`CrossFlow — ${city.name} Dashboard`)}
-              className="print-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-bg-border hover:border-text-muted transition-colors text-xs text-text-secondary hover:text-text-primary"
+              onClick={() => setOperatorMode('dashboard')}
+              className={cn(
+                'h-10 rounded-2xl text-sm font-semibold transition-all',
+                operatorMode === 'dashboard' ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100',
+              )}
             >
-              <Download className="w-3.5 h-3.5" />
-              PDF
+              Dashboard Mode
             </button>
-            {openMeteoWeather && (
-              <div className="glass-light px-4 py-2 rounded-xl flex items-center gap-2.5">
-                <span className="text-xl">{openMeteoWeather.weatherEmoji}</span>
-                <div className="flex flex-col">
-                  <span className="text-[13px] font-bold text-text-primary leading-none">{openMeteoWeather.temp}°C</span>
-                  <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider mt-1">{openMeteoWeather.weatherLabel}</span>
+            <button
+              onClick={() => setOperatorMode('control')}
+              className={cn(
+                'h-10 rounded-2xl text-sm font-semibold transition-all',
+                operatorMode === 'control' ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100',
+              )}
+            >
+              Control Mode
+            </button>
+          </div>
+        </section>
+
+        <section className={cn('grid gap-4', operatorMode === 'control' ? 'grid-cols-1' : 'grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)]')}>
+          {operatorMode !== 'control' && (
+            <aside className="flex min-h-[620px] flex-col gap-4 rounded-3xl border border-stone-200 bg-white p-4 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+              <div className="rounded-2xl border border-red-100 bg-red-50/60 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-700">Critical Situation</p>
+                  <Radar className="h-4 w-4 text-red-500" />
+                </div>
+                <div className="space-y-2">
+                  {priorityItems.length === 0 && (
+                    <p className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-500">
+                      No critical signal currently active.
+                    </p>
+                  )}
+                  {priorityItems.map(item => (
+                    <button
+                      key={item.id}
+                      onMouseEnter={() => {
+                        if (item.kind === 'incident') {
+                          setSearchFocus({
+                            id: `hover-${item.id}`,
+                            label: item.subtitle,
+                            latitude: item.lat,
+                            longitude: item.lng,
+                            kind: 'incident',
+                          })
+                        }
+                      }}
+                      onMouseLeave={() => setSearchFocus(null)}
+                      onClick={() => {
+                        if (item.kind === 'incident') {
+                          setSearchFocus({
+                            id: `focus-${item.id}`,
+                            label: item.subtitle,
+                            latitude: item.lat,
+                            longitude: item.lng,
+                            kind: 'incident',
+                          })
+                          setLayer('incidents', true)
+                        } else {
+                          setLayer('transport', true)
+                        }
+                      }}
+                      className="w-full rounded-2xl border border-stone-200 bg-white p-3 text-left transition-all hover:border-stone-300 hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)]"
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="inline-flex items-center gap-2">
+                          <span className={cn('h-2.5 w-2.5 rounded-full', SEVERITY_STYLE[item.severity].dot)} />
+                          <span className="text-sm font-semibold text-stone-900">{item.title}</span>
+                        </div>
+                        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-bold uppercase', SEVERITY_STYLE[item.severity].badge)}>
+                          {SEVERITY_STYLE[item.severity].text}
+                        </span>
+                      </div>
+                      <p className="line-clamp-2 text-sm text-stone-600">{item.subtitle}</p>
+                      <div className="mt-2 flex items-center justify-between text-xs text-stone-500">
+                        <span>{item.impact}</span>
+                        <span>{item.kind === 'incident' ? formatAge(item.timestamp) : 'live'}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <BrainCircuit className="h-4 w-4 text-stone-600" />
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-stone-600">Smart Insights</p>
+                </div>
+                <p className="text-sm leading-relaxed text-stone-700">{insight}</p>
+              </div>
+
+              <div className="rounded-2xl border border-stone-200 bg-white p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-stone-600">Network Overview</p>
+                  <Link href="/map" className="text-xs font-semibold text-stone-500 hover:text-stone-900">
+                    View Full Network
+                  </Link>
+                </div>
+
+                <div className="mb-3 grid grid-cols-3 gap-1 rounded-xl bg-stone-100 p-1">
+                  {(['metros', 'rers', 'tramways'] as TransitTab[]).map(item => (
+                    <button
+                      key={item}
+                      onClick={() => setTab(item)}
+                      className={cn(
+                        'h-9 rounded-lg text-xs font-bold uppercase tracking-[0.08em] transition-colors',
+                        tab === item ? 'bg-white text-stone-900 shadow-[0_1px_2px_rgba(0,0,0,0.08)]' : 'text-stone-500 hover:text-stone-800',
+                      )}
+                    >
+                      {TAB_LABEL[item]}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  {tabLines.length === 0 && (
+                    <p className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-500">
+                      No line telemetry available for this tab.
+                    </p>
+                  )}
+                  {tabLines.map(line => {
+                    const load = lineLoadIndex(line)
+                    const severity = asSeverityFromTransitTitle(line.title, line.message)
+                    return (
+                      <button
+                        key={`${line.type}-${line.slug}`}
+                        onMouseEnter={() => selectSegment(null)}
+                        className="w-full rounded-2xl border border-stone-200 bg-white p-3 text-left transition-all hover:border-stone-300"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="inline-flex items-center gap-2">
+                            <span className={cn('h-2.5 w-2.5 rounded-full', SEVERITY_STYLE[severity].dot)} />
+                            <span className="text-sm font-bold text-stone-900">{line.slug}</span>
+                            <span className="rounded-full border border-stone-200 px-2 py-0.5 text-[10px] font-semibold uppercase text-stone-500">
+                              {TAB_LABEL[line.type]}
+                            </span>
+                          </div>
+                          <span className="text-sm font-semibold text-stone-800">{load}%</span>
+                        </div>
+                        <p className="mt-1 text-sm text-stone-600">{line.title}</p>
+                        <p className="mt-1 line-clamp-1 text-xs text-stone-500">{line.message || 'No additional disruption details.'}</p>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-100">
+                          <div
+                            className={cn(
+                              'h-full rounded-full',
+                              severity === 'critical' ? 'bg-red-600' : severity === 'high' ? 'bg-orange-500' : severity === 'medium' ? 'bg-amber-400' : 'bg-emerald-500',
+                            )}
+                            style={{ width: `${load}%` }}
+                          />
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-stone-200 bg-white p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-stone-600" />
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-stone-600">Incident Map Fusion</p>
+                </div>
+                <div className="space-y-2">
+                  {incidents.slice(0, 5).map(incident => (
+                    <button
+                      key={incident.id}
+                      onClick={() => goToMapFocus(incident)}
+                      className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-left transition-colors hover:bg-stone-100"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-stone-900">{incident.road}</span>
+                        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-bold uppercase', SEVERITY_STYLE[incident.severity].badge)}>
+                          {incident.severity}
+                        </span>
+                      </div>
+                      <p className="mt-1 line-clamp-1 text-xs text-stone-600">{incident.description}</p>
+                      <div className="mt-1 flex items-center justify-between text-[11px] text-stone-500">
+                        <span>{incident.sourceLabel}</span>
+                        <span>{incident.confidence} confidence</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <Link href="/incidents" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-stone-600 hover:text-stone-900">
+                  Open incident intelligence
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </aside>
+          )}
+
+          <div ref={mapAreaRef} className={cn('relative overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.08)]', operatorMode === 'control' ? 'h-[calc(100vh-220px)]' : 'h-[780px]')}>
+            <div className="flex h-full flex-col">
+              <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
+                <div className="inline-flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-stone-700" />
+                  <p className="text-sm font-semibold text-stone-900">Real-Time Urban Map</p>
+                </div>
+                <div className="inline-flex items-center gap-2 text-xs text-stone-500">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {loading ? 'Syncing live layers...' : `${incidentCount} incidents live`}
+                </div>
+              </div>
+              <div className="min-h-0 flex-1">
+                <CrossFlowMap />
+              </div>
+            </div>
+            {selectedIncident && (
+              <div className="pointer-events-none absolute bottom-4 right-4 z-20 w-[min(400px,calc(100%-2rem))]">
+                <div className="pointer-events-auto rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
+                  <div className="mb-2 flex items-start justify-between gap-3">
+                    <div>
+                      <div className="inline-flex items-center gap-2">
+                        <span className={cn('h-2.5 w-2.5 rounded-full', SEVERITY_STYLE[selectedIncident.severity].dot)} />
+                        <p className="text-sm font-bold text-stone-900">{selectedIncident.title}</p>
+                      </div>
+                      <p className="mt-1 text-xs text-stone-500">{selectedIncident.type} • {selectedIncident.source}</p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedIncident(null)}
+                      className="rounded-lg border border-stone-200 p-1 text-stone-500 transition-colors hover:text-stone-900"
+                      aria-label="Close incident details"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="text-sm text-stone-700">{selectedIncident.description}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-stone-500">
+                    {selectedIncident.address && <span className="rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5">{selectedIncident.address}</span>}
+                    <span className="rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5">{SEVERITY_STYLE[selectedIncident.severity].text}</span>
+                    <span className="rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5">{formatAge(selectedIncident.startedAt)}</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      onClick={() =>
+                        setSearchFocus({
+                          id: `selected-${selectedIncident.id}`,
+                          label: selectedIncident.description,
+                          latitude: selectedIncident.lat,
+                          longitude: selectedIncident.lng,
+                          kind: 'incident',
+                        })
+                      }
+                      className="inline-flex h-9 items-center gap-1 rounded-xl border border-stone-200 bg-stone-50 px-3 text-xs font-semibold text-stone-700 hover:bg-stone-100"
+                    >
+                      <MapPinned className="h-3.5 w-3.5" />
+                      Focus On Map
+                    </button>
+                    <Link href="/incidents" className="inline-flex h-9 items-center gap-1 rounded-xl border border-stone-200 px-3 text-xs font-semibold text-stone-700 hover:bg-stone-50">
+                      Open Incident Page
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             )}
           </div>
-        </div>
-
-        {/* Network status banner */}
-        <div className={cn(
-          "relative overflow-hidden p-[1px] rounded-[22px] group animate-slide-up [animation-delay:200ms]",
-          congCrit ? "bg-gradient-to-r from-red-500/30 to-transparent" :
-          congWarn ? "bg-gradient-to-r from-orange-500/30 to-transparent" :
-                    "bg-gradient-to-r from-brand/30 to-transparent"
-        )}>
-          <div className="glass px-5 sm:px-7 py-4 sm:py-5 rounded-[21px] flex items-center gap-4">
-            <div className="relative">
-              <div className={cn(
-                "w-3 h-3 rounded-full shadow-glow animate-pulse",
-                congCrit ? "bg-red-500" : congWarn ? "bg-orange-500" : "bg-brand"
-              )} />
-              <div className={cn(
-                "absolute inset-0 w-3 h-3 rounded-full blur-sm",
-                congCrit ? "bg-red-500" : congWarn ? "bg-orange-500" : "bg-brand"
-              )} />
-            </div>
-
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <span className="text-[14px] font-bold text-text-primary tracking-tight uppercase">
-                  {t('dashboard.performance')}
-                </span>
-                <span className={cn(
-                  "text-[10px] font-bold px-2 py-0.5 rounded-full border tracking-widest uppercase",
-                  congCrit ? "text-red-500 border-red-500/20 bg-red-500/10" :
-                  congWarn ? "text-orange-500 border-orange-500/20 bg-orange-500/10" :
-                            "text-brand border-brand/20 bg-brand/10"
-                )}>
-                  {congCrit ? 'Critique' : congWarn ? 'Attention' : 'Optimal'}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 sm:gap-8 pr-1 sm:pr-2">
-              <div className="flex flex-col items-end">
-                <p className="text-[8px] sm:text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Efficacité</p>
-                <p className="text-[13px] sm:text-[15px] font-bold text-text-primary tabular-nums">{Math.round(kpis.networkEfficiency * 100)}%</p>
-              </div>
-              <div className="w-[1px] h-6 sm:h-8 bg-bg-border hidden xs:block" />
-              <div className="flex-col items-end hidden xs:flex">
-                <p className="text-[8px] sm:text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] mb-1">Impact Météo</p>
-                <p className={cn("text-[11px] sm:text-[13px] font-bold tabular-nums", openMeteoWeather?.trafficImpact === 'none' ? 'text-brand' : 'text-orange-500')}>
-                  {openMeteoWeather
-                    ? openMeteoWeather.trafficImpact === 'none' ? 'Aucun impact'
-                      : openMeteoWeather.trafficImpact === 'minor' ? 'Impact mineur'
-                      : openMeteoWeather.trafficImpact === 'moderate' ? 'Impact modéré'
-                      : 'Impact sévère'
-                    : 'Aucun impact'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Indice global de trafic */}
-        <TrafficIndexWidget />
-
-        {/* KPI grid */}
-        <div className="kpi-grid">
-          <KPICard
-            label={t('dashboard.congestion')}
-            value={congPct}
-            unit="%"
-            delta={congDelta}
-            inverse
-            icon={Activity}
-            color={congCrit ? '#FF1744' : congWarn ? '#FF6D00' : '#00E676'}
-            warning={congWarn}
-            critical={congCrit}
-            sub={`Seuil : ${Math.round(targets.congestion_rate.warning * 100)}%`}
-          />
-          <KPICard
-            label={t('dashboard.travel_time')}
-            value={kpis.avgTravelMin.toFixed(0)}
-            unit="min"
-            delta={travelDelta}
-            deltaUnit=" min"
-            inverse
-            icon={Clock}
-            color={travelWarn ? '#FF6D00' : '#2979FF'}
-            warning={travelWarn}
-            sub="Durée moyenne de trajet"
-          />
-          <KPICard
-            label={t('dashboard.pollution')}
-            value={kpis.pollutionIndex.toFixed(1)}
-            unit="/ 10"
-            delta={pollDelta}
-            deltaUnit=" pt"
-            inverse
-            icon={Wind}
-            color={pollColor}
-            warning={pollWarn}
-            sub={pollutionLabel(kpis.pollutionIndex).label}
-          />
-          <KPICard
-            label={t('dashboard.active_incidents')}
-            value={kpis.activeIncidents}
-            icon={AlertTriangle}
-            color={kpis.activeIncidents > 5 ? '#FF6D00' : '#FFD600'}
-            sub="Incidents actifs"
-          />
-        </div>
-
-        {/* Charts + real data row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2">
-            <TrafficChart />
-          </div>
-          <div className="space-y-4">
-            <ModalSplitChart />
-            <div className="glass-card rounded-[22px] p-6 shadow-sm group animate-scale-in [animation-delay:600ms]">
-              <div className="flex items-center gap-2.5 mb-5">
-                <div className="w-1.5 h-4.5 bg-brand rounded-full shadow-glow" />
-                <p className="text-[11px] font-bold text-text-muted uppercase tracking-[0.18em]">{t('dashboard.performance')}</p>
-              </div>
-              <EfficiencyBar label="Axes principaux"    value={kpis.networkEfficiency * 0.9 + 0.1} />
-              <EfficiencyBar label="Transports publics" value={0.78}  color="#0A84FF" />
-              <EfficiencyBar label="Réseau cyclable"    value={0.85}  color="#30D158" />
-              <EfficiencyBar label="Zones piétonnes"    value={0.92}  color="#AF52DE" />
-            </div>
-          </div>
-        </div>
-
-        {/* Real weather + air quality (OpenMeteo, no key) */}
-        {(openMeteoWeather || airQuality) && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {openMeteoWeather && <WeatherCard weather={openMeteoWeather} />}
-            {airQuality       && <AirQualityCard aq={airQuality} />}
-          </div>
-        )}
-
-        {/* Événements & incidents */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <EventsWidget lat={city.center.lat} lng={city.center.lng} radiusKm={15} maxItems={5} />
-          <IncidentFeed maxItems={5} />
-        </div>
+        </section>
       </div>
     </main>
   )
 }
 
-function EfficiencyBar({ label, value, color = '#22C55E' }: { label: string; value: number; color?: string }) {
+function StatusPill({ status }: { status: 'NORMAL' | 'TENSE' | 'CRITICAL' }) {
+  const style =
+    status === 'CRITICAL'
+      ? 'bg-red-100 text-red-700'
+      : status === 'TENSE'
+        ? 'bg-amber-100 text-amber-700'
+        : 'bg-emerald-100 text-emerald-700'
+
   return (
-    <div className="space-y-2 mb-4 group">
-      <div className="flex justify-between items-end">
-        <span className="text-[10px] sm:text-[11px] font-bold text-text-muted uppercase tracking-[0.1em]">{label}</span>
-        <span className="text-[12px] sm:text-[13px] font-bold tabular-nums" style={{ color }}>{Math.round(value * 100)}%</span>
-      </div>
-      <div className="h-2 rounded-full bg-bg-subtle overflow-hidden shadow-inner">
-        <div
-          className="h-full rounded-full transition-all duration-1000 ease-out"
-          style={{ width: `${value * 100}%`, backgroundColor: color, boxShadow: `0 0 12px ${color}40` }}
-        />
-      </div>
-    </div>
+    <span className={cn('rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.16em]', style)}>
+      {status}
+    </span>
+  )
+}
+
+function TopMetric({
+  icon: Icon,
+  label,
+  value,
+  tone = 'text-stone-900',
+}: {
+  icon: typeof Activity
+  label: string
+  value: string
+  tone?: string
+}) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-3 py-1">
+      <Icon className="h-3.5 w-3.5 text-stone-500" />
+      <span className="text-xs text-stone-500">{label}</span>
+      <span className={cn('text-xs font-semibold', tone)}>{value}</span>
+    </span>
   )
 }

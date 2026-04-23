@@ -1,5 +1,5 @@
 'use client'
-import { X, Gauge, Clock, Car, TrendingDown, TrendingUp, Minus, BrainCircuit } from 'lucide-react'
+import { X, Gauge, Clock, Car, TrendingDown, TrendingUp, Minus, BrainCircuit, Zap } from 'lucide-react'
 import { useMapStore } from '@/store/mapStore'
 import { useTrafficStore } from '@/store/trafficStore'
 import { CongestionBadge } from '@/components/ui/CongestionBadge'
@@ -23,25 +23,37 @@ export function EdgeDetailPanel() {
 
   if (!isPanelOpen || !segment) return null
 
-  const travelMin    = Math.round(segment.travelTimeSeconds / 60 * 10) / 10
-  const freeFlowTime = Math.round((segment.length / 1000) / segment.freeFlowSpeedKmh * 60 * 10) / 10
+  const displaySpeed = getCredibleDisplaySpeed(segment.speedKmh, segment.freeFlowSpeedKmh, segment.congestionScore)
+  const travelMin    = Math.round(Math.max(segment.travelTimeSeconds / 60, ((segment.length / 1000) / Math.max(displaySpeed, 8)) * 60) * 10) / 10
+  const freeFlowTime = Math.round((segment.length / 1000) / Math.max(segment.freeFlowSpeedKmh, 18) * 60 * 10) / 10
   const delayMin     = Math.max(0, travelMin - freeFlowTime)
-  const speedRatio   = segment.speedKmh / segment.freeFlowSpeedKmh
+  const speedRatio   = displaySpeed / Math.max(segment.freeFlowSpeedKmh, 1)
 
-  // Fake prediction trend
-  const trend  = segment.congestionScore > 0.6 ? 'worsening' : segment.congestionScore > 0.35 ? 'stable' : 'improving'
+  // Use enriched trend or fallback to score-based
+  const trend = segment.flowTrend || (segment.congestionScore > 0.6 ? 'worsening' : segment.congestionScore > 0.35 ? 'stable' : 'improving')
   const predicted = Math.max(0, Math.min(1, segment.congestionScore + (trend === 'improving' ? -0.12 : trend === 'worsening' ? +0.10 : 0)))
 
   return (
-    <div className="absolute top-16 right-3 w-72 bg-bg-elevated border border-bg-border rounded-2xl shadow-panel z-20 animate-slide-in overflow-hidden">
+    <div className="absolute right-3 top-[112px] z-20 max-h-[calc(100vh-160px)] w-[calc(100vw-24px)] overflow-y-auto rounded-[24px] border border-stone-200 bg-white/96 shadow-[0_20px_48px_rgba(15,23,42,0.12)] backdrop-blur-xl animate-slide-in sm:right-4 sm:w-80">
       {/* Header */}
-      <div className="p-4 border-b border-bg-border flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs text-text-muted mb-1 uppercase tracking-widest">Segment sélectionné</p>
-          <p className="text-sm font-semibold text-text-primary truncate font-mono">{segment.id.split('-').slice(-2).join('-').toUpperCase()}</p>
+      <div className="p-4 border-b border-bg-border flex items-start justify-between gap-2 bg-gradient-to-br from-bg-elevated to-bg-surface">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] text-brand-green font-bold mb-1 uppercase tracking-widest flex items-center gap-1.5">
+            {segment.priorityAxis && segment.priorityAxis > 0.7 && <Zap className="w-3 h-3 fill-current" />}
+            {segment.arrondissement || 'Secteur Urbain'}
+          </p>
+          <h3 className="text-sm font-bold text-text-primary leading-tight mb-0.5" title={segment.axisName}>
+            {segment.streetName || 'Axe non identifié'}
+          </h3>
+          <p className="text-[10px] text-text-muted font-mono flex items-center gap-2">
+            <span className="bg-bg-subtle px-1.5 py-0.5 rounded border border-bg-border text-text-secondary font-bold">
+              {segment.direction || '—'}
+            </span>
+            <span className="truncate opacity-60 text-[9px]">{segment.id.split('-').pop()}</span>
+          </p>
         </div>
-        <button onClick={close} className="p-1.5 rounded-lg hover:bg-bg-surface text-text-muted hover:text-text-primary transition-colors flex-shrink-0">
-          <X className="w-4 h-4" />
+        <button onClick={close} className="p-2 rounded-xl hover:bg-bg-surface text-text-muted hover:text-text-primary transition-all flex-shrink-0 -mt-1 -mr-1">
+          <X className="w-5 h-5" />
         </button>
       </div>
 
@@ -64,7 +76,7 @@ export function EdgeDetailPanel() {
 
       {/* Metrics */}
       <div className="p-4 grid grid-cols-2 gap-3 border-b border-bg-border">
-        <Metric icon={Gauge} label="Vitesse" value={`${Math.round(segment.speedKmh)} km/h`}
+        <Metric icon={Gauge} label="Vitesse" value={`${Math.round(displaySpeed)} km/h`}
           sub={`/ ${segment.freeFlowSpeedKmh} km/h`} color={congestionColor(segment.congestionScore)} />
         <Metric icon={Clock} label="Trajet" value={`${travelMin} min`}
           sub={delayMin > 0.5 ? `+${delayMin.toFixed(1)} min retard` : 'Fluide'} />
@@ -103,6 +115,16 @@ export function EdgeDetailPanel() {
       </div>
     </div>
   )
+}
+
+function getCredibleDisplaySpeed(speedKmh: number, freeFlowSpeedKmh: number, congestionScore: number) {
+  const freeFlow = Math.max(18, freeFlowSpeedKmh || 18)
+  const floorRatio =
+    congestionScore >= 0.8 ? 0.16 :
+    congestionScore >= 0.6 ? 0.24 :
+    congestionScore >= 0.38 ? 0.4 :
+    0.58
+  return Math.max(speedKmh || 0, freeFlow * floorRatio, 8)
 }
 
 function Metric({ icon: Icon, label, value, sub, color }: {

@@ -1,0 +1,21 @@
+{
+  "name": "CrossFlow",
+  "fullName": "CrossFlow Mobility",
+  "tagline": "Decision Intelligence",
+  "description": "La lecture opérationnelle du trafic pour décider plus vite, avec clarté et précision.",
+  "metaTitle": "CrossFlow Mobility | Intelligence du trafic",
+  "metaDescription": "Une plateforme premium pour lire, anticiper et piloter la mobilité urbaine en temps réel.",
+  "ogTitle": "CrossFlow Mobility",
+  "ogDescription": "Lecture claire du trafic, des alertes et des tendances pour décider avec assurance.",
+  "twitterTitle": "CrossFlow Mobility | Intelligence du trafic",
+  "twitterDescription": "Une vue premium pour comprendre l'état du réseau et anticiper les actions.",
+  "author": "CrossFlow Team",
+  "locale": "fr_FR",
+  "lang": "fr",
+  "themeColor": "#08090B",
+  "url": "https://myaccount.crossflow-mobility.com",
+  "ogImageUrl": "https://crossflow-mobility.com/og-image.jpg",
+  "twitterImageUrl": "https://crossflow-mobility.com/twitter-image.jpg",
+  "keywords": ["mobilité urbaine", "pilotage réseau", "intelligence décisionnelle", "trafic temps réel", "prévision opérationnelle", "gestion urbaine"],
+  "userAgent": "CrossFlow-Mobility/1.0"
+}

@@ -7,7 +7,7 @@ import { generateEventsForCity } from '@/lib/engine/events.engine'
 import { useMapStore } from '@/store/mapStore'
 import { cn } from '@/lib/utils/cn'
 
-const CATEGORY_CONFIG: Record<UrbanEvent['category'], { emoji: string; color: string; bg: string }> = {
+const CATEGORY_CONFIG: Partial<Record<UrbanEvent['category'], { emoji: string; color: string; bg: string }>> = {
   concert:        { emoji: '🎵', color: '#AF52DE', bg: 'rgba(175,82,222,0.12)' },
   sport:          { emoji: '⚽', color: '#0A84FF', bg: 'rgba(10,132,255,0.12)' },
   manifestation:  { emoji: '📢', color: '#FF453A', bg: 'rgba(255,69,58,0.12)'  },
@@ -97,7 +97,7 @@ export function EventsWidget({ lat, lng, radiusKm = 15, maxItems = 6 }: EventsWi
             
             <div className="space-y-1">
               {distEvents.map(evt => {
-                const cfg = CATEGORY_CONFIG[evt.category]
+                const cfg = CATEGORY_CONFIG[evt.category] ?? CATEGORY_CONFIG.autre!
                 return (
                   <button 
                     key={evt.id} 

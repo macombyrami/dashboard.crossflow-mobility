@@ -1,49 +1,83 @@
-'use client'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Map, LayoutDashboard, TrendingUp, GitBranch, Settings } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
+import { Map, Cpu, AlertTriangle, Rss, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils/cn'
+import React, { useTransition } from 'react'
 
 const TABS = [
-  { href: '/map',        icon: Map,             label: 'Carte' },
-  { href: '/dashboard',  icon: LayoutDashboard, label: 'Tableau' },
-  { href: '/prediction', icon: TrendingUp,      label: 'Prévisions' },
-  { href: '/simulation', icon: GitBranch,       label: 'Simulation' },
-  { href: '/settings',   icon: Settings,        label: 'Réglages' },
+  { href: '/map',        icon: Map,           label: 'Carte' },
+  { href: '/simulation', icon: Cpu,           label: 'Simulation' },
+  { href: '/incidents',  icon: AlertTriangle, label: 'Alertes' },
+  { href: '/social',     icon: Rss,           label: 'Social' },
 ]
 
 export function BottomNav() {
   const pathname = usePathname()
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+
+  const handleNav = (href: string) => {
+    startTransition(() => {
+      router.push(href)
+    })
+  }
 
   return (
     <nav
-      className="print-hidden lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-bg-border"
+      aria-label="Navigation principale mobile"
+      className="print-hidden md:hidden fixed bottom-0 left-0 right-0 z-[100] border-t border-white/5 bg-[#030303]/90 backdrop-blur-2xl"
       style={{
-        background: 'rgba(12,13,16,0.92)',
-        backdropFilter: 'blur(24px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-        paddingBottom: 'max(env(safe-area-inset-bottom), 4px)',
-        height: 'calc(60px + max(env(safe-area-inset-bottom), 4px))',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        height: 'calc(64px + env(safe-area-inset-bottom))',
       }}
     >
-      <div className="flex h-[60px]">
+      <div className="flex h-16 items-center justify-around px-2" role="list">
         {TABS.map(({ href, icon: Icon, label }) => {
           const active = pathname === href || (href !== '/' && pathname.startsWith(href))
           return (
-            <Link
+            <button
               key={href}
-              href={href}
-              className="flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-150 active:scale-95"
+              onClick={() => handleNav(href)}
+              disabled={isPending}
+              role="listitem"
+              className={cn(
+                'relative flex flex-col items-center justify-center gap-1.5 flex-1 min-w-0 transition-all duration-200 active:scale-90',
+                active ? 'text-brand-green' : 'text-zinc-500',
+                isPending && !active && 'opacity-50'
+              )}
             >
-              <div className={`relative flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-200 ${active ? 'bg-brand/15' : ''}`}>
-                <Icon
-                  className={`w-[22px] h-[22px] transition-all duration-200 ${active ? 'text-brand' : 'text-text-muted'}`}
-                  strokeWidth={active ? 2.25 : 1.75}
-                />
+              <div className="relative">
+                {isPending && active ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-brand-green" />
+                ) : (
+                  <Icon
+                    className={cn(
+                      'w-6 h-6 transition-all duration-300',
+                      active ? 'scale-110' : 'opacity-70'
+                    )}
+                    strokeWidth={active ? 2.5 : 2}
+                  />
+                )}
+                {active && (
+                  <motion.div
+                    layoutId="glow"
+                    className="absolute inset-0 bg-brand-green/20 blur-xl rounded-full"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  />
+                )}
               </div>
-              <span className={`text-[10px] leading-none transition-colors duration-200 ${active ? 'text-brand font-medium' : 'text-text-muted'}`}>
+              <span className={cn(
+                'text-[9px] font-black uppercase tracking-[0.05em] transition-all',
+                active ? 'opacity-100 translate-y-0.5' : 'opacity-40'
+              )}>
                 {label}
               </span>
-            </Link>
+              
+              {active && (
+                <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-8 h-px bg-brand-green shadow-glow-green" />
+              )}
+            </button>
           )
         })}
       </div>

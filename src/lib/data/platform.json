@@ -1,0 +1,96 @@
+{
+  "map": {
+    "defaultCityId": "paris",
+    "pitch": 45,
+    "bearing": 0,
+    "layers": ["traffic", "heatmap", "transport", "incidents", "prediction"],
+    "transition": {
+      "durationMs": 1200,
+      "easing": "ease-in-out"
+    }
+  },
+  "traffic": {
+    "refreshIntervalMs": 30000,
+    "wsReconnectMs": 5000,
+    "maxSegmentsPerCity": 5000,
+    "congestionThresholds": {
+      "free":      { "min": 0,    "max": 0.30 },
+      "slow":      { "min": 0.30, "max": 0.60 },
+      "congested": { "min": 0.60, "max": 0.85 },
+      "critical":  { "min": 0.85, "max": 1.01 }
+    },
+    "colors": {
+      "free":      "#00E676",
+      "slow":      "#FFD600",
+      "congested": "#FF6D00",
+      "critical":  "#FF1744"
+    },
+    "lineWidths": {
+      "free":      2,
+      "slow":      2.5,
+      "congested": 3,
+      "critical":  4
+    }
+  },
+  "heatmap": {
+    "radiusPx": 28,
+    "opacityStart": 0.0,
+    "opacityEnd": 0.85,
+    "blurPx": 20,
+    "colorStops": [
+      [0,   "rgba(0,230,118,0)"],
+      [0.2, "rgba(0,230,118,0.5)"],
+      [0.4, "rgba(255,214,0,0.7)"],
+      [0.6, "rgba(255,109,0,0.85)"],
+      [0.8, "rgba(255,23,68,0.95)"],
+      [1.0, "rgba(255,23,68,1)"]
+    ]
+  },
+  "prediction": {
+    "horizonMinutes": 30,
+    "refreshIntervalMs": 60000,
+    "confidenceThreshold": 0.70,
+    "alertCongestionAbove": 0.80
+  },
+  "simulation": {
+    "maxDurationHours": 8,
+    "engineDelayMs": 1500
+  },
+  "kpi": {
+    "snapshotIntervalMs": 60000,
+    "dashboardRefreshMs": 30000,
+    "chartHistoryPoints": 48,
+    "targets": {
+      "congestion_rate":     { "good": 0.40, "warning": 0.65, "critical": 0.80 },
+      "avg_travel_time_min": { "good": 20,   "warning": 30,   "critical": 45  },
+      "pollution_index":     { "good": 3.0,  "warning": 6.0,  "critical": 8.0 }
+    }
+  },
+  "plans": {
+    "starter": {
+      "features":       ["live_traffic", "heatmap", "dashboard"],
+      "maxCities":       3,
+      "historyDays":    30,
+      "maxSimulations":  0
+    },
+    "pro": {
+      "features":       ["live_traffic", "heatmap", "dashboard", "prediction", "simulation"],
+      "maxCities":      10,
+      "historyDays":    90,
+      "maxSimulations": 10
+    },
+    "enterprise": {
+      "features":       ["all"],
+      "maxCities":      -1,
+      "historyDays":    365,
+      "maxSimulations": -1
+    }
+  },
+  "api": {
+    "tomtom": {
+      "baseUrl":  "https://api.tomtom.com",
+      "flowZoom": 16,
+      "tileSize": 256
+    }
+  }
+}

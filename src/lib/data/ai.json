@@ -1,0 +1,27 @@
+{
+  "openrouter": {
+    "baseUrl":       "https://openrouter.ai/api/v1",
+    "defaultModel":  "google/gemini-2.0-flash-001",
+    "miroFishModel": "openai/gpt-oss-120b:free",
+    "xTitle":        "CrossFlow Mobility",
+    "miroFishXTitle": "CrossFlow MiroFish"
+  },
+  "zep": {
+    "baseUrl": "https://api.getzep.com/api/v2"
+  },
+  "miroFish": {
+    "temperature":         0.7,
+    "maxTokensAgent":      300,
+    "maxTokensReport":     900,
+    "maxTokensDefault":    800,
+    "agentSelectionTiers": {
+      "small":  { "maxAgents": 50,  "personasCount": 3 },
+      "medium": { "maxAgents": 200, "personasCount": 4 },
+      "large":  { "maxAgents": -1,  "personasCount": 5 }
+    }
+  },
+  "main": {
+    "temperature": 0.65,
+    "maxTokens":   1200
+  }
+}

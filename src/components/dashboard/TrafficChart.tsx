@@ -11,16 +11,19 @@ import {
 import { useMapStore } from '@/store/mapStore'
 import { useKPIHistoryStore } from '@/store/kpiHistoryStore'
 import { generateKPIHistory } from '@/lib/engine/traffic.engine'
-import { useMemo } from 'react'
+import { useMemo, useRef, memo } from 'react'
 
 const METRICS = [
   { key: 'congestion',   label: 'Congestion',  color: '#22C55E', unit: '%' },
   { key: 'avgTravelMin', label: 'Trajet',     color: '#0A84FF', unit: 'min' },
 ] as const
 
-export function TrafficChart() {
+function TrafficChartInner() {
   const city        = useMapStore(s => s.city)
   const snapshots   = useKPIHistoryStore(s => s.snapshots)
+  // Track whether chart has been mounted to disable entry animation on data updates
+  const didMount    = useRef(false)
+
   const realHistory = useMemo(() => {
     const BUCKET_MS = 30 * 60 * 1000
     const cutoff    = Date.now() - 7 * 24 * 60 * 60 * 1000
@@ -31,11 +34,18 @@ export function TrafficChart() {
   }, [snapshots, city.id])
   const synth       = useMemo(() => generateKPIHistory(city, 48), [city])
 
-  // Use real history when we have at least 2 points, otherwise fall back to synthetic
+  // Use real history when we have at least 4 points, otherwise fall back to synthetic
   const data = realHistory.length >= 4 ? realHistory : synth
 
   // Show every 4th label
-  const labeledData = data.map((d, i) => ({ ...d, label: i % 4 === 0 ? d.time : '' }))
+  const labeledData = useMemo(
+    () => data.map((d, i) => ({ ...d, label: i % 4 === 0 ? d.time : '' })),
+    [data],
+  )
+
+  // Animate only on first mount; subsequent data changes update without animation
+  const animate = !didMount.current
+  if (!didMount.current) didMount.current = true
 
   return (
     <div className="glass-card p-6 space-y-6 hover:shadow-apple transition-all duration-500 group animate-scale-in">
@@ -100,7 +110,8 @@ export function TrafficChart() {
                 stroke={m.color}
                 strokeWidth={3}
                 fill={`url(#grad-${m.key})`}
-                animationDuration={2000}
+                isAnimationActive={animate}
+                animationDuration={1200}
               />
             ))}
           </AreaChart>
@@ -109,3 +120,5 @@ export function TrafficChart() {
     </div>
   )
 }
+
+export const TrafficChart = memo(TrafficChartInner)

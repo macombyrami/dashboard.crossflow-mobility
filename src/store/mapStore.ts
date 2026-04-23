@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { subscribeWithSelector, persist } from 'zustand/middleware'
-import type { TrafficMode, MapLayerId, MapViewState, City, HeatmapMode } from '@/types'
+import type { TrafficMode, MapLayerId, MapViewState, City, HeatmapMode, QuickFilterId, SearchFocusTarget } from '@/types'
 import { CITIES, DEFAULT_CITY_ID } from '@/config/cities.config'
 import { platformConfig } from '@/config/platform.config'
 import type { GeocodingResult } from '@/lib/api/geocoding'
@@ -52,10 +52,24 @@ interface MapStore {
   viewState:    MapViewState
   setViewState: (vs: MapViewState) => void
   flyToCity:    (city: City) => void
+  searchFocus: SearchFocusTarget | null
+  setSearchFocus: (target: SearchFocusTarget | null) => void
 
   // Selection
   selectedSegmentId: string | null
   selectSegment:     (id: string | null) => void
+  highlightedZoneLabel: string | null
+  setHighlightedZoneLabel: (label: string | null) => void
+
+  // Vehicle selection & tracking
+  selectedVehicleId:   string | null
+  setSelectedVehicle:  (id: string | null) => void
+  isTrackingVehicle:   boolean
+  setTrackingVehicle:  (tracking: boolean) => void
+  vehicleTypeFilter:   Set<string>  // empty = show all
+  toggleVehicleType:   (type: string) => void
+  vehicleSearchQuery:  string
+  setVehicleSearch:    (query: string) => void
 
   // Timeline
   timeOffsetMinutes: number
@@ -79,8 +93,11 @@ interface MapStore {
   setLockedCity:   (id: string | null) => void
 
   // Filter mode (map layer quick-filter)
-  filterMode:    'all' | 'congestion' | 'incidents' | 'travaux' | 'flux'
-  setFilterMode: (mode: MapStore['filterMode']) => void
+  filterMode:    QuickFilterId
+  setFilterMode: (mode: QuickFilterId) => void
+  activeQuickFilters: Set<QuickFilterId>
+  toggleQuickFilter: (filter: Exclude<QuickFilterId, 'all'>) => void
+  resetQuickFilters: () => void
 
   // UI
   isPanelOpen:   boolean
@@ -89,9 +106,15 @@ interface MapStore {
   setAIPanelOpen:(open: boolean) => void
   isMapReady:    boolean
   setMapReady:   (ready: boolean) => void
+
+  // Staff Features
+  splitRatio:    number
+  setSplitRatio: (ratio: number) => void
 }
 
 const defaultCity = CITIES.find(c => c.id === DEFAULT_CITY_ID)!
+let latestBoundaryRequestId = 0
+const EXCLUSIVE_VISUAL_LAYERS = new Set<MapLayerId>(['heatmap'])
 
 export const useMapStore = create<MapStore>()(
   persist(
@@ -100,6 +123,7 @@ export const useMapStore = create<MapStore>()(
       cityHistory:     CITIES.slice(0, 5),
       cityBoundary:    null,
       setCity: async (city) => {
+        const requestId = ++latestBoundaryRequestId
         set({ city, selectedSegmentId: null })
         get().addToHistory(city)
         get().flyToCity(city)
@@ -107,8 +131,14 @@ export const useMapStore = create<MapStore>()(
         // Reset and fetch new boundary
         set({ cityBoundary: null })
         const boundary = await fetchCityBoundary(city.name, city.country)
-        if (boundary) {
-          set({ cityBoundary: boundary })
+        if (boundary && requestId === latestBoundaryRequestId && get().city.id === city.id) {
+          set({
+            cityBoundary: {
+              type: 'Feature',
+              geometry: boundary,
+              properties: { cityId: city.id }
+            } as GeoJSON.Feature
+          })
         }
       },
       setCityBoundary: (boundary) => set({ cityBoundary: boundary }),
@@ -120,17 +150,31 @@ export const useMapStore = create<MapStore>()(
       mode:    'live',
       setMode: (mode) => set({ mode, selectedSegmentId: null }),
 
-      activeLayers: new Set<MapLayerId>(['traffic', 'incidents', 'boundary']),
+      activeLayers: new Set<MapLayerId>(['boundary']),
       toggleLayer: (layer) =>
         set(s => {
           const next = new Set(s.activeLayers)
-          next.has(layer) ? next.delete(layer) : next.add(layer)
+          if (next.has(layer)) {
+            next.delete(layer)
+          } else {
+            if (EXCLUSIVE_VISUAL_LAYERS.has(layer)) {
+              EXCLUSIVE_VISUAL_LAYERS.forEach(exclusiveLayer => next.delete(exclusiveLayer))
+            }
+            next.add(layer)
+          }
           return { activeLayers: next }
         }),
       setLayer: (layer, active) =>
         set(s => {
           const next = new Set(s.activeLayers)
-          active ? next.add(layer) : next.delete(layer)
+          if (active) {
+            if (EXCLUSIVE_VISUAL_LAYERS.has(layer)) {
+              EXCLUSIVE_VISUAL_LAYERS.forEach(exclusiveLayer => next.delete(exclusiveLayer))
+            }
+            next.add(layer)
+          } else {
+            next.delete(layer)
+          }
           return { activeLayers: next }
         }),
 
@@ -152,9 +196,26 @@ export const useMapStore = create<MapStore>()(
             bearing:   0,
           },
         }),
+      searchFocus: null,
+      setSearchFocus: (target) => set({ searchFocus: target }),
 
       selectedSegmentId: null,
       selectSegment:     (id) => set({ selectedSegmentId: id, isPanelOpen: id !== null }),
+      highlightedZoneLabel: null,
+      setHighlightedZoneLabel: (label) => set({ highlightedZoneLabel: label }),
+
+      selectedVehicleId:   null,
+      setSelectedVehicle:  (id) => set({ selectedVehicleId: id }),
+      isTrackingVehicle:   false,
+      setTrackingVehicle:  (tracking) => set({ isTrackingVehicle: tracking }),
+      vehicleTypeFilter:   new Set<string>(),
+      toggleVehicleType:   (type) => set(s => {
+        const next = new Set(s.vehicleTypeFilter)
+        next.has(type) ? next.delete(type) : next.add(type)
+        return { vehicleTypeFilter: next }
+      }),
+      vehicleSearchQuery:  '',
+      setVehicleSearch:    (query) => set({ vehicleSearchQuery: query }),
 
       timeOffsetMinutes: 0,
       setTimeOffset:     (min) => set({ timeOffsetMinutes: min }),
@@ -174,7 +235,36 @@ export const useMapStore = create<MapStore>()(
       setLockedCity:  (id) => set({ lockedCityId: id }),
 
       filterMode:     'all',
-      setFilterMode:  (mode) => set({ filterMode: mode }),
+      activeQuickFilters: new Set<QuickFilterId>(['all']),
+      setFilterMode:  (mode) => set({
+        filterMode: mode,
+        activeQuickFilters: new Set<QuickFilterId>([mode]),
+      }),
+      toggleQuickFilter: (filter) =>
+        set((state) => {
+          const next = new Set(state.activeQuickFilters)
+          next.delete('all')
+          next.has(filter) ? next.delete(filter) : next.add(filter)
+
+          if (next.size === 0) {
+            return {
+              filterMode: 'all' as QuickFilterId,
+              activeQuickFilters: new Set<QuickFilterId>(['all']),
+            }
+          }
+
+          const nextFilterMode =
+            next.size === 1 ? Array.from(next)[0] : ('all' as QuickFilterId)
+
+          return {
+            filterMode: nextFilterMode,
+            activeQuickFilters: next,
+          }
+        }),
+      resetQuickFilters: () => set({
+        filterMode: 'all',
+        activeQuickFilters: new Set<QuickFilterId>(['all']),
+      }),
 
       isPanelOpen:    false,
       setPanelOpen:   (open) => set({ isPanelOpen: open }),
@@ -182,38 +272,75 @@ export const useMapStore = create<MapStore>()(
       setAIPanelOpen: (open) => set({ isAIPanelOpen: open }),
       isMapReady:     false,
       setMapReady:    (ready) => set({ isMapReady: ready }),
+
+      // Staff Features
+      splitRatio:    50,
+      setSplitRatio: (ratio) => set({ splitRatio: ratio }),
     })),
     {
-      name: 'cf-map-storage',
-      // Since activeLayers is a Set, we need to handle its serialization
+      name: 'cf-map-storage-v2', // v2 — incompatible shape from v1 (cityId vs city object)
       storage: {
         getItem: (name) => {
           const str = localStorage.getItem(name)
           if (!str) return null
           const data = JSON.parse(str)
-          if (data.state && data.state.activeLayers) {
+          // Rehydrate activeLayers Set from persisted array
+          if (data.state?.activeLayers) {
             data.state.activeLayers = new Set(data.state.activeLayers)
+          }
+          if (data.state?.activeQuickFilters) {
+            data.state.activeQuickFilters = new Set(data.state.activeQuickFilters)
+          } else {
+            data.state.activeQuickFilters = new Set<QuickFilterId>(['all'])
+          }
+          // Rehydrate city from persisted cityId
+          if (data.state?.cityId) {
+            const found = CITIES.find(c => c.id === data.state.cityId)
+            data.state.city = found ?? defaultCity
+            delete data.state.cityId
+          }
+          // Rehydrate cityHistory from persisted IDs
+          if (data.state?.cityHistoryIds) {
+            data.state.cityHistory = data.state.cityHistoryIds
+              .map((id: string) => CITIES.find(c => c.id === id))
+              .filter(Boolean) as City[]
+            delete data.state.cityHistoryIds
           }
           return data
         },
         setItem: (name, value) => {
-          const data = { ...value }
-          if (data.state && data.state.activeLayers instanceof Set) {
-            // @ts-ignore
-            data.state.activeLayers = Array.from(data.state.activeLayers)
+          const data = { ...value } as any
+          if (data.state) {
+            // Serialize Set → Array
+            if (data.state.activeLayers instanceof Set) {
+              data.state.activeLayers = Array.from(data.state.activeLayers)
+            }
+            if (data.state.activeQuickFilters instanceof Set) {
+              data.state.activeQuickFilters = Array.from(data.state.activeQuickFilters)
+            }
+            // Persist only city ID — not the full object (~5KB → 20 bytes)
+            if (data.state.city) {
+              data.state.cityId = data.state.city.id
+              delete data.state.city
+            }
+            // Persist only city history IDs
+            if (Array.isArray(data.state.cityHistory)) {
+              data.state.cityHistoryIds = data.state.cityHistory.map((c: City) => c.id)
+              delete data.state.cityHistory
+            }
           }
           localStorage.setItem(name, JSON.stringify(data))
         },
         removeItem: (name) => localStorage.removeItem(name),
       },
-      // We only want to persist some parts of the store
       partialize: (state) => ({
-        city:         state.city,
-        cityHistory:  state.cityHistory,
+        city:         state.city,        // serialized as cityId by setItem above
+        cityHistory:  state.cityHistory, // serialized as cityHistoryIds by setItem above
         activeLayers: state.activeLayers,
+        activeQuickFilters: state.activeQuickFilters,
         mode:         state.mode,
-        // cityBoundary intentionally NOT persisted (large JSON)
-      } as MapStore), // Cast to satisfy the expected type, though only data is returned
+        lockedCityId: state.lockedCityId,
+      } as MapStore),
     }
   )
 )

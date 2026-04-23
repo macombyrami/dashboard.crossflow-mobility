@@ -8,7 +8,18 @@ import { generatePrediction } from '@/lib/engine/traffic.engine'
 import { cn } from '@/lib/utils/cn'
 import type { Prediction } from '@/types'
 
-export function TrafficIndexWidget() {
+export interface TrafficIndexFactor {
+  label: string
+  value: number
+  tone?: 'positive' | 'negative' | 'neutral'
+}
+
+interface Props {
+  factors?: TrafficIndexFactor[]
+  explanation?: string
+}
+
+export function TrafficIndexWidget({ factors = [], explanation }: Props) {
   const city    = useMapStore(s => s.city)
   const kpis    = useTrafficStore(s => s.kpis)
   const [pred, setPred] = useState<Prediction | null>(null)
@@ -117,6 +128,32 @@ export function TrafficIndexWidget() {
         <span>Critique</span>
         <span>Fluide</span>
       </div>
+
+      {factors.length > 0 && (
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-4 gap-2">
+          {factors.map((factor) => {
+            const tone =
+              factor.tone === 'positive' ? 'text-[#22C55E] bg-[rgba(34,197,94,0.08)] border-[rgba(34,197,94,0.16)]' :
+              factor.tone === 'negative' ? 'text-[#FF8A00] bg-[rgba(255,138,0,0.08)] border-[rgba(255,138,0,0.16)]' :
+              'text-text-secondary bg-bg-subtle border-bg-border'
+            return (
+              <div key={factor.label} className={cn('rounded-2xl border px-3 py-2.5', tone)}>
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em]">{factor.label}</p>
+                <p className="mt-1 text-[18px] font-black tabular-nums">
+                  {factor.value > 0 ? '+' : factor.value < 0 ? '' : '±'}
+                  {factor.value}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {explanation && (
+        <div className="mt-4 rounded-2xl border border-bg-border bg-bg-subtle/60 px-4 py-3">
+          <p className="text-[11px] font-medium text-text-secondary leading-relaxed">{explanation}</p>
+        </div>
+      )}
     </div>
   )
 }

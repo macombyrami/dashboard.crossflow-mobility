@@ -1,0 +1,41 @@
+{
+  "types": ["road_closure", "traffic_light", "bike_lane", "speed_limit", "public_transport", "event"],
+  "config": {
+    "road_closure": {
+      "label":       "Fermeture de voie",
+      "description": "Bloquer un ou plusieurs axes routiers",
+      "icon":        "ban",
+      "impact":      { "congestion": 0.18, "travelTime": 0.22, "pollution": 0.15 }
+    },
+    "traffic_light": {
+      "label":       "Feux intelligents",
+      "description": "Optimiser la durée des phases de signalisation",
+      "icon":        "traffic-cone",
+      "impact":      { "congestion": -0.12, "travelTime": -0.08, "pollution": -0.06 }
+    },
+    "bike_lane": {
+      "label":       "Piste cyclable",
+      "description": "Convertir une voie en infrastructure vélo protégée",
+      "icon":        "bike",
+      "impact":      { "congestion": 0.05, "travelTime": 0.03, "pollution": -0.12 }
+    },
+    "speed_limit": {
+      "label":       "Limitation de vitesse",
+      "description": "Abaisser ou relever la vitesse maximale autorisée",
+      "icon":        "gauge",
+      "impact":      { "congestion": 0.04, "travelTime": 0.08, "pollution": -0.09 }
+    },
+    "public_transport": {
+      "label":       "Nouvelle ligne TC",
+      "description": "Ajouter ou prolonger une ligne de bus ou de métro",
+      "icon":        "train",
+      "impact":      { "congestion": -0.20, "travelTime": -0.15, "pollution": -0.22 }
+    },
+    "event": {
+      "label":       "Événement majeur",
+      "description": "Simuler un concert, un match ou une manifestation",
+      "icon":        "calendar",
+      "impact":      { "congestion": 0.25, "travelTime": 0.30, "pollution": 0.20 }
+    }
+  }
+}

@@ -29,7 +29,7 @@ export function ZoneStatsPanel() {
   })
 
   if (inZone.length === 0) return (
-    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 glass rounded-apple px-4 py-3 border border-yellow-400/20 text-sm text-text-muted">
+    <div className="absolute bottom-20 left-1/2 z-20 w-[calc(100vw-40px)] -translate-x-1/2 rounded-[22px] border border-amber-200 bg-white/95 px-4 py-3 text-center text-sm text-stone-500 shadow-[0_14px_36px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:bottom-5 sm:w-auto sm:text-left">
       Aucun segment dans cette zone
     </div>
   )
@@ -43,7 +43,7 @@ export function ZoneStatsPanel() {
   const congColor = congPct < 30 ? '#22C55E' : congPct < 60 ? '#FFD600' : congPct < 80 ? '#FF9F0A' : '#FF3B30'
 
   return (
-    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 glass rounded-apple border border-yellow-400/20 shadow-apple overflow-hidden min-w-[320px]">
+    <div className="absolute bottom-20 left-1/2 z-20 max-w-[420px] w-[calc(100vw-40px)] -translate-x-1/2 overflow-hidden rounded-[24px] border border-amber-200 bg-white/96 shadow-[0_20px_48px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:bottom-5 sm:w-auto sm:min-w-[320px]">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-bg-border">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-yellow-400" />

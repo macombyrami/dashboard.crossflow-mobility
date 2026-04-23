@@ -5,18 +5,18 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import {
-  Map, LayoutDashboard, TrendingUp, Activity,
+  Map, LayoutDashboard, Activity,
   GitBranch, AlertTriangle, Settings, Zap,
-  LogOut, UserCircle
+  LogOut, UserCircle, BotMessageSquare,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { href: '/map',        icon: Map,             label: 'Carte',      description: 'Trafic temps réel' },
-  { href: '/dashboard',  icon: LayoutDashboard, label: 'Tableau',    description: 'Métriques & KPIs' },
-  { href: '/prediction', icon: TrendingUp,      label: 'Prévisions', description: 'Modèle prédictif' },
-  { href: '/simulation', icon: GitBranch,       label: 'Simulation', description: 'Scénarios' },
-  { href: '/transport',  icon: Activity,        label: 'Transport',  description: 'Réseau TC' },
-  { href: '/incidents',  icon: AlertTriangle,   label: 'Incidents',  description: 'Alertes actives' },
+  { href: '/map',                     icon: Map,              label: 'Carte',      description: 'Trafic temps reel' },
+  { href: '/dashboard',               icon: LayoutDashboard,  label: 'Tableau',    description: 'Metriques & KPIs' },
+  { href: '/dashboard/consultant-ai', icon: BotMessageSquare, label: 'Agent IA',   description: 'Copilote intelligent' },
+  { href: '/simulation',              icon: GitBranch,        label: 'Simulation', description: 'Scenarios' },
+  { href: '/transport',               icon: Activity,         label: 'Transport',  description: 'Reseau TC' },
+  { href: '/incidents',               icon: AlertTriangle,    label: 'Incidents',  description: 'Alertes actives' },
 ]
 
 export function Sidebar() {
@@ -41,7 +41,6 @@ export function Sidebar() {
 
   return (
     <aside className="print-hidden hidden lg:flex flex-col w-[200px] shrink-0 h-full border-r border-bg-border glass shadow-apple">
-      {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 h-[58px] border-b border-bg-border shrink-0">
         <div className="relative">
           <div className="w-8 h-8 rounded-[10px] bg-brand flex items-center justify-center shadow-glow-sm">
@@ -54,9 +53,9 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 py-2 overflow-y-auto">
-        <div className="px-3 space-y-1">
+        <div className="px-3">
+          <div className="space-y-1">
           {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
             const active = pathname === href || (href !== '/' && pathname.startsWith(href))
             return (
@@ -81,10 +80,10 @@ export function Sidebar() {
               </Link>
             )
           })}
+          </div>
         </div>
       </nav>
 
-      {/* User & Settings */}
       <div className="px-3 pb-5 border-t border-bg-border pt-4 space-y-1">
         {user && (
           <div className="px-3 py-3 flex items-center gap-3 mb-2 rounded-[14px] bg-bg-subtle border border-bg-border">
@@ -112,7 +111,7 @@ export function Sidebar() {
           )}
         >
           <Settings className={cn('w-4.5 h-4.5 shrink-0 transition-all duration-300', pathname === '/settings' ? 'text-brand scale-110' : 'text-text-muted group-hover:text-text-secondary group-hover:rotate-12')} strokeWidth={1.75} />
-          <span className="text-[13px] tracking-tight">Réglages</span>
+          <span className="text-[13px] tracking-tight">Reglages</span>
         </Link>
         
         <button
@@ -120,7 +119,7 @@ export function Sidebar() {
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-[12px] text-sm transition-all duration-300 text-text-secondary hover:text-red-400 hover:bg-red-400/10 group"
         >
           <LogOut className="w-4.5 h-4.5 shrink-0 text-text-muted group-hover:text-red-400 transition-all duration-300 group-hover:-translate-x-0.5" strokeWidth={1.75} />
-          <span className="text-[13px] tracking-tight">Déconnexion</span>
+          <span className="text-[13px] tracking-tight">Deconnexion</span>
         </button>
       </div>
     </aside>
