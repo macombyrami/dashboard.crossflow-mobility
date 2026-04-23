@@ -1,5 +1,6 @@
 'use client'
 import dynamic from 'next/dynamic'
+import { useState } from 'react'
 import { ModeSelector }      from '@/components/map/controls/ModeSelector'
 import { LayerControls }     from '@/components/map/controls/LayerControls'
 import { TrafficFilterBar }  from '@/components/map/controls/TrafficFilterBar'
@@ -12,6 +13,11 @@ import { AIPanel }           from '@/components/ai/AIPanel'
 import { DataSourceBadge }   from '@/components/map/DataSourceBadge'
 import { GlobalTrafficBanner } from '@/components/dashboard/GlobalTrafficBanner'
 import { IncidentFeed }   from '@/components/dashboard/IncidentFeed'
+import { ControlRoomStatus } from '@/components/map/controlRoom/ControlRoomStatus'
+import { CriticalEventsPanel } from '@/components/map/controlRoom/CriticalEventsPanel'
+import { TransportOverview } from '@/components/map/controlRoom/TransportOverview'
+import { SmartIncidentFeed } from '@/components/map/controlRoom/SmartIncidentFeed'
+import { SimulationControlPanel } from '@/components/map/controlRoom/SimulationControlPanel'
 import { useMapStore }       from '@/store/mapStore'
 import { useTrafficStore }   from '@/store/trafficStore'
 import { generateCityKPIs }  from '@/lib/engine/traffic.engine'
@@ -24,6 +30,7 @@ const CrossFlowMap = dynamic(
 )
 
 export default function MapPage() {
+  const [activeControlTab, setActiveControlTab] = useState<'transport' | 'incidents' | 'simulation'>('transport')
   const city           = useMapStore(s => s.city)
   const mode           = useMapStore(s => s.mode)
   const isAIPanelOpen  = useMapStore(s => s.isAIPanelOpen)
@@ -41,41 +48,82 @@ export default function MapPage() {
     <div className="flex flex-1 h-full w-full overflow-hidden bg-bg-base">
       {/* ─── LEFT CONTROL PANEL (Desktop: 30%, Hidden on mobile) ───────────── */}
       <div className="hidden lg:flex lg:w-[30%] flex-col bg-bg-surface border-r border-bg-border overflow-hidden">
-        {/* Header with city name and close button */}
+        {/* Header with city name */}
         <div className="flex-shrink-0 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-text-primary">{city.name}</h2>
           </div>
 
-          {/* Global Traffic Status Banner */}
-          <GlobalTrafficBanner />
+          {/* Control Room Status */}
+          <ControlRoomStatus />
+
+          {/* Critical Events (only first 2-3) */}
+          <div>
+            <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider px-2 mb-2">
+              Critical Events
+            </h3>
+            <CriticalEventsPanel />
+          </div>
         </div>
 
-        {/* Scrollable content area */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4 space-y-4">
-          {/* Incident Feed */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider px-2">
-              Recent Incidents
-            </h3>
-            <IncidentFeed />
+        {/* Tabs */}
+        <div className="flex-shrink-0 border-b border-bg-border">
+          <div className="flex gap-0 px-4">
+            {(['transport', 'incidents', 'simulation'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveControlTab(tab)}
+                className={`
+                  flex-1 py-3 px-2 text-xs font-semibold uppercase tracking-wider
+                  border-b-2 transition-colors relative
+                  ${activeControlTab === tab
+                    ? 'border-white/40 text-text-primary'
+                    : 'border-transparent text-text-secondary hover:text-text-primary'
+                  }
+                `}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
+        </div>
 
-          {/* Layer Controls */}
+        {/* Scrollable content area - Tab content */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-4">
+          {/* Transport Tab */}
+          {activeControlTab === 'transport' && (
+            <div>
+              <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider px-2 mb-3">
+                Busiest Transit Lines
+              </h3>
+              <TransportOverview />
+            </div>
+          )}
+
+          {/* Incidents Tab */}
+          {activeControlTab === 'incidents' && (
+            <div>
+              <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider px-2 mb-3">
+                Active Incidents
+              </h3>
+              <SmartIncidentFeed />
+            </div>
+          )}
+
+          {/* Simulation Tab */}
+          {activeControlTab === 'simulation' && (
+            <div>
+              <SimulationControlPanel />
+            </div>
+          )}
+
+          {/* Layer Controls (always available) */}
           {mode !== 'simulate' && (
-            <div className="space-y-2">
+            <div className="space-y-2 pt-4 border-t border-bg-border">
               <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider px-2">
                 Map Layers
               </h3>
               <LayerControls />
-            </div>
-          )}
-
-          {/* Simulation Controls */}
-          {mode === 'simulate' && (
-            <div className="space-y-3">
-              <SimulationPanel />
-              <SimulationResults />
             </div>
           )}
         </div>

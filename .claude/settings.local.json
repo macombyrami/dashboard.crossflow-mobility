@@ -17,7 +17,10 @@
       "Bash(npx skills *)",
       "Bash(git add *)",
       "Bash(git commit -m 'PHASE 2: Dashboard Component Refactoring - New composable components *)",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Bash(git commit -m ' *)",
+      "Bash(find /c/Users/Administrateur/crossflow-mobility/dashboard.crossflow-mobility/.claude/worktrees/zealous-sammet-6fac46/src -type f -name \"*.tsx\" -exec grep -l \"from '@/lib/utils'\" {} \\\\;)",
+      "Bash(find src *)"
     ]
   }
 }

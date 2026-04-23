@@ -3,7 +3,7 @@
 import React from 'react'
 import { AlertTriangle, Zap, TrendingUp } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils/cn'
 
 interface GlobalTrafficBannerProps {
   status: 'NORMAL' | 'TENSE' | 'CRITICAL'

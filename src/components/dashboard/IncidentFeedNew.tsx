@@ -5,7 +5,7 @@ import { AlertTriangle, MapPin, Clock, TrendingUp } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils/cn'
 
 interface Incident {
   id: string
