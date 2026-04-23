@@ -60,6 +60,10 @@ interface MapStore {
   selectSegment:     (id: string | null) => void
   highlightedZoneLabel: string | null
   setHighlightedZoneLabel: (label: string | null) => void
+  hoveredTransitLineSlug: string | null
+  focusedTransitLineSlug: string | null
+  setHoveredTransitLineSlug: (slug: string | null) => void
+  setFocusedTransitLineSlug: (slug: string | null) => void
 
   // Vehicle selection & tracking
   selectedVehicleId:   string | null
@@ -124,7 +128,12 @@ export const useMapStore = create<MapStore>()(
       cityBoundary:    null,
       setCity: async (city) => {
         const requestId = ++latestBoundaryRequestId
-        set({ city, selectedSegmentId: null })
+        set({
+          city,
+          selectedSegmentId: null,
+          hoveredTransitLineSlug: null,
+          focusedTransitLineSlug: null,
+        })
         get().addToHistory(city)
         get().flyToCity(city)
 
@@ -203,6 +212,10 @@ export const useMapStore = create<MapStore>()(
       selectSegment:     (id) => set({ selectedSegmentId: id, isPanelOpen: id !== null }),
       highlightedZoneLabel: null,
       setHighlightedZoneLabel: (label) => set({ highlightedZoneLabel: label }),
+      hoveredTransitLineSlug: null,
+      focusedTransitLineSlug: null,
+      setHoveredTransitLineSlug: (slug) => set({ hoveredTransitLineSlug: slug }),
+      setFocusedTransitLineSlug: (slug) => set({ focusedTransitLineSlug: slug }),
 
       selectedVehicleId:   null,
       setSelectedVehicle:  (id) => set({ selectedVehicleId: id }),
