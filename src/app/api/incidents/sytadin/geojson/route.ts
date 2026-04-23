@@ -8,6 +8,7 @@ import type { GeoJSON } from 'geojson'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic' // Dynamic server rendering to use cookies in request context
 export const revalidate = 30 // 30 second cache
 
 export async function GET(req: NextRequest) {
