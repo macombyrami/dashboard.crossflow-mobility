@@ -22,7 +22,6 @@ import { MapSplitSlider } from '@/components/map/MapSplitSlider'
 import { LiveSyncBadge } from '@/components/dashboard/LiveSyncBadge'
 import { LayerControls } from '@/components/map/controls/LayerControls'
 import { MapLegend } from '@/components/map/MapLegend'
-import { getSnapshots, saveSnapshot } from '@/lib/api/snapshots'
 import { toast } from 'sonner'
 import { GeolocationControl } from '@/components/map/controls/GeolocationControl'
 import type { UserPosition } from '@/hooks/useGeolocation'
@@ -33,31 +32,21 @@ import {
   generateCityKPIs,
 } from '@/lib/engine/traffic.engine'
 import {
-  fetchTrafficPOIs,
-  fetchRouteGeometries,
-  fetchMetroStations,
-} from '@/lib/api/overpass'
-import {
   fetchSytadinKPIs,
   generateSytadinKPIs,
   generateSytadinTravelTimes,
   fetchAndInjectSytadinIncidents,
 } from '@/lib/engine/sytadin.engine'
 import type { OSMPOIPoint, OSMRouteGeometry, MetroStation } from '@/lib/api/overpass'
-import { fetchAllTrafficStatus, LINE_COLORS } from '@/lib/api/ratp'
+import { LINE_COLORS } from '@/lib/api/ratp'
 import { simulateTransitVehicles, type TransitVehicle } from '@/lib/engine/transit.engine'
 import {
   getTrafficFlowTileUrl,
   getTrafficIncidentTileUrl,
   fetchFlowSegment,
-  fetchIncidents as fetchTomTomIncidents,
-  tomtomSeverityToLocal,
 } from '@/lib/api/tomtom'
-import { fetchHereFlow, hasKey as hereHasKey, jamFactorToCongestion, type HereFlowSegment } from '@/lib/api/here'
-import { fetchWeather as fetchOpenMeteoWeather, fetchAirQuality } from '@/lib/api/openmeteo'
 import { fetchCityBoundary, fetchCityDistricts } from '@/lib/api/geocoding'
 import type { AggregatedHeatFeatureCollection } from '@/lib/map/trafficHeatmap'
-import { decompressJSON } from '@/lib/utils/compression'
 import { useSocialStore } from '@/store/socialStore'
 import type { Incident, HeatmapMode, CongestionLevel, TrafficSnapshot, TrafficSegment, MapLayerId, QuickFilterId, City } from '@/types'
 
@@ -100,6 +89,24 @@ const ROAD_LABELS_LAYER           = 'road-labels'
 const DEBUG_ROAD_COLOR = '#22C55E'
 const ROAD_MAIN_CLASSES = ['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary'] as const
 const FULL_ROAD_CLASSES = ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'street', 'street_limited', 'service', 'residential', 'living_street'] as const
+
+type AggregatedCityPayload = {
+  city_id: string
+  traffic: {
+    snapshot: TrafficSnapshot
+    incidents: Incident[]
+    provider: 'snapshot' | 'live' | 'synthetic'
+    confidence: number
+  }
+  weather: any | null
+  air_quality: any | null
+  poi: OSMPOIPoint[]
+  transit: {
+    stations: MetroStation[]
+    lines: Array<{ slug: string; status: string; color?: string | null }>
+  }
+  events: any[]
+}
 
 
 // ─── Popup helpers ────────────────────────────────────────────────────────
@@ -484,141 +491,6 @@ function countRenderedRoadFeatures(map: maplibregl.Map | null) {
     return map.queryRenderedFeatures(undefined, { layers: [FULL_ROAD_LAYER] }).length
   } catch {
     return 0
-  }
-}
-
-function byteaLikeToBase64(value: unknown): string | null {
-  if (!value) return null
-  if (typeof value === 'string') return value
-  if (value instanceof Uint8Array) {
-    let binary = ''
-    value.forEach(byte => { binary += String.fromCharCode(byte) })
-    return btoa(binary)
-  }
-  if (Array.isArray(value)) {
-    let binary = ''
-    value.forEach((item) => {
-      if (typeof item === 'number') binary += String.fromCharCode(item)
-    })
-    return binary ? btoa(binary) : null
-  }
-  if (typeof value === 'object' && value && 'data' in (value as any) && Array.isArray((value as any).data)) {
-    return byteaLikeToBase64((value as any).data)
-  }
-  return null
-}
-
-async function loadCachedSnapshot(cityId: string): Promise<TrafficSnapshot | null> {
-  try {
-    const snapshots = await getSnapshots(cityId, 30)
-    const latest = Array.isArray(snapshots) ? snapshots[0] : null
-    if (!latest?.segments_gz) return null
-    const base64 = byteaLikeToBase64(latest.segments_gz)
-    if (!base64) return null
-    const decoded = await decompressJSON(base64)
-    if (!decoded || !Array.isArray(decoded.segments)) return null
-    return decoded as TrafficSnapshot
-  } catch (error) {
-    console.warn('[CrossFlow] Failed to load cached snapshot', error)
-    return null
-  }
-}
-
-function buildSnapshotFromHereFlow(city: City, hereFlow: HereFlowSegment[]): TrafficSnapshot {
-  const fetchedAt = new Date().toISOString()
-  const segments: TrafficSegment[] = hereFlow
-    .filter(segment => segment.coords.length >= 2)
-    .map((segment, index) => {
-      const congestionScore = jamFactorToCongestion(segment.jamFactor)
-      const freeFlowSpeedKmh = Math.max(25, Math.round(segment.freeFlow || segment.speedUncapped || segment.speed || 35))
-      const speedKmh = getCredibleSpeedKmh(segment.speed || freeFlowSpeedKmh, freeFlowSpeedKmh, congestionScore)
-      const roadType =
-        freeFlowSpeedKmh >= 100 ? 'motorway' :
-        freeFlowSpeedKmh >= 80 ? 'trunk' :
-        freeFlowSpeedKmh >= 60 ? 'primary' :
-        freeFlowSpeedKmh >= 40 ? 'secondary' :
-        'tertiary'
-      const length = estimateSegmentLength(segment.coords)
-      return {
-        id: `here-${city.id}-${segment.id || index}`,
-        roadType,
-        coordinates: segment.coords,
-        speedKmh,
-        freeFlowSpeedKmh,
-        congestionScore,
-        level: scoreToCongestionLevel(congestionScore),
-        flowVehiclesPerHour: Math.round((1 - congestionScore) * 1800 + 180),
-        travelTimeSeconds: Math.max(10, Math.round((length / 1000) / Math.max(speedKmh, 1) * 3600)),
-        length,
-        mode: 'car',
-        lastUpdated: fetchedAt,
-        observedTraffic: true,
-        estimatedTraffic: false,
-        priorityAxis: segment.confidence,
-      }
-    })
-
-  return {
-    cityId: city.id,
-    segments,
-    heatmap: segments.map(seg => ({
-      lng: seg.coordinates[Math.floor(seg.coordinates.length / 2)]?.[0] ?? city.center.lng,
-      lat: seg.coordinates[Math.floor(seg.coordinates.length / 2)]?.[1] ?? city.center.lat,
-      intensity: seg.congestionScore,
-    })),
-    heatmapPassages: [],
-    heatmapCo2: [],
-    fetchedAt,
-  }
-}
-
-function fuseTrafficSnapshots(base: TrafficSnapshot, incoming: TrafficSnapshot): TrafficSnapshot {
-  if (base.segments.length === 0) return incoming
-  if (incoming.segments.length === 0) return base
-
-  const merged = new Map<string, TrafficSegment>()
-  for (const segment of base.segments) merged.set(segment.id, segment)
-
-  for (const segment of incoming.segments) {
-    const key = `${Math.round((segment.coordinates[0]?.[0] ?? 0) * 1000)}:${Math.round((segment.coordinates[0]?.[1] ?? 0) * 1000)}:${segment.roadType ?? 'road'}`
-    const existingEntry = Array.from(merged.entries()).find(([, value]) => {
-      const coord = value.coordinates[0]
-      if (!coord || !segment.coordinates[0]) return false
-      return Math.abs(coord[0] - segment.coordinates[0][0]) < 0.0025 &&
-        Math.abs(coord[1] - segment.coordinates[0][1]) < 0.0025 &&
-        (value.roadType ?? 'road') === (segment.roadType ?? 'road')
-    })
-
-    if (existingEntry) {
-      const [existingId, existing] = existingEntry
-      const mergedCongestion = clamp01((existing.congestionScore + segment.congestionScore) / 2)
-      const mergedSpeed = Math.round(((existing.speedKmh + segment.speedKmh) / 2) * 10) / 10
-      merged.set(existingId, {
-        ...existing,
-        speedKmh: mergedSpeed,
-        freeFlowSpeedKmh: Math.max(existing.freeFlowSpeedKmh, segment.freeFlowSpeedKmh),
-        congestionScore: mergedCongestion,
-        level: scoreToCongestionLevel(mergedCongestion),
-        observedTraffic: existing.observedTraffic || segment.observedTraffic,
-        estimatedTraffic: existing.estimatedTraffic && segment.estimatedTraffic,
-      })
-    } else {
-      merged.set(`${segment.id}-${key}`, segment)
-    }
-  }
-
-  const segments = Array.from(merged.values())
-  return {
-    cityId: incoming.cityId || base.cityId,
-    segments,
-    heatmap: segments.map(seg => ({
-      lng: seg.coordinates[Math.floor(seg.coordinates.length / 2)]?.[0] ?? 0,
-      lat: seg.coordinates[Math.floor(seg.coordinates.length / 2)]?.[1] ?? 0,
-      intensity: seg.congestionScore,
-    })),
-    heatmapPassages: [],
-    heatmapCo2: [],
-    fetchedAt: incoming.fetchedAt,
   }
 }
 
@@ -1745,38 +1617,9 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
     })
   }, [mapLoaded]) // eslint-disable-line
 
-  // ─── Load POIs (traffic signals, bus stops, subway entrances) ───────
-
-  useEffect(() => {
-    if (!mapLoaded) return
-    const cityId = city.id
-
-    if (!osmPoisRef.current.has(cityId)) {
-      fetchTrafficPOIs(city.bbox).then(pois => {
-        if (cityRef.current.id !== cityId) return
-        if (!pois.length) return
-        osmPoisRef.current.set(cityId, pois)
-        const map = mapRef.current
-        if (!map) return
-        const src = map.getSource(POI_SOURCE) as maplibregl.GeoJSONSource | undefined
-        if (!src) return
-        src.setData({
-          type: 'FeatureCollection',
-          features: pois.map(poi => ({
-            type:       'Feature' as const,
-            geometry:   { type: 'Point' as const, coordinates: [poi.lng, poi.lat] },
-            properties: { id: poi.id, type: poi.type, name: poi.name },
-          })),
-        })
-      })
-    }
-  }, [city.id, mapLoaded]) // eslint-disable-line
+  // POIs are injected by the aggregated city snapshot during refreshData.
 
   // ─── Detect Paris (enables RATP real-time status) ────────────────────
-
-  const isParis = city.countryCode === 'FR' &&
-    Math.abs(city.center.lat - 48.8566) < 0.6 &&
-    Math.abs(city.center.lng - 2.3522) < 0.8
 
   // ─── Load transit route geometries + render as polylines ─────────────
 
@@ -1955,49 +1798,7 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
     })
   }, [mapLoaded, socialEvents, socialRange, city.center.lng, city.center.lat])
 
-  // ─── Metro stations with line labels ─────────────────────────────────
-
-  useEffect(() => {
-    if (!mapLoaded) return
-    if (osmMetroRef.current.has(city.id)) return
-
-    fetchMetroStations(city.bbox).then(stations => {
-      if (!stations.length) return
-      osmMetroRef.current.set(city.id, stations)
-      updateMetroStationsSource()
-    })
-  }, [city.id, mapLoaded]) // eslint-disable-line
-
-  // ─── RATP real-time status → bus + metro route colors (Paris only) ───
-
-  useEffect(() => {
-    if (!mapLoaded || !isParis) return
-
-    const applyRatp = async () => {
-      const { lines } = await fetchAllTrafficStatus()
-      const statusColors  = new Map<string, string>()
-      const disrupted     = new Set<string>()
-
-      for (const line of lines) {
-        let color: string
-        switch (line.status) {
-          case 'interrompu': color = '#EF4444'; disrupted.add(line.slug); break
-          case 'perturbé':   color = '#F59E0B'; disrupted.add(line.slug); break
-          case 'travaux':    color = '#F97316'; disrupted.add(line.slug); break
-          default:           color = line.color ?? LINE_COLORS[line.slug] ?? '#3B82F6'
-        }
-        statusColors.set(line.slug, color)
-      }
-      ratpStatusRef.current    = statusColors
-      ratpDisruptedRef.current = disrupted
-      updateTransitRoutesSource(statusColors)
-      updateMetroStationsSource()   // re-render station markers with disruption flags
-    }
-
-    applyRatp()
-    const iv = setInterval(applyRatp, 60_000)
-    return () => clearInterval(iv)
-  }, [mapLoaded, isParis, city.id]) // eslint-disable-line
+  // Transit stations and line statuses are injected by the aggregated city snapshot during refreshData.
 
   // ─── Vehicle position update (every 10 seconds) ───────────────────────
 
@@ -2006,6 +1807,39 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
 
 
   // ─── Transit route polylines (bus + metro as colored lines) ──────────
+
+  function applyTransitLineStatuses(lines: AggregatedCityPayload['transit']['lines']) {
+    const statusColors = new Map<string, string>()
+    const disrupted = new Set<string>()
+
+    for (const line of lines) {
+      const slug = line.slug?.toUpperCase?.() ?? ''
+      if (!slug) continue
+      let color: string
+      switch (line.status) {
+        case 'interrompu':
+          color = '#EF4444'
+          disrupted.add(slug)
+          break
+        case 'perturbé':
+          color = '#F59E0B'
+          disrupted.add(slug)
+          break
+        case 'travaux':
+          color = '#F97316'
+          disrupted.add(slug)
+          break
+        default:
+          color = line.color ?? LINE_COLORS[slug] ?? '#3B82F6'
+      }
+      statusColors.set(slug, color)
+    }
+
+    ratpStatusRef.current = statusColors
+    ratpDisruptedRef.current = disrupted
+    updateTransitRoutesSource(statusColors)
+    updateMetroStationsSource()
+  }
 
   function updateTransitRoutesSource(ratpStatus: Map<string, string>) {
     const map    = mapRef.current
@@ -2373,116 +2207,76 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
   const refreshData = useCallback(async () => {
     if (!mapRef.current || !mapLoadedRef.current) return
 
-    // CRITICAL: Stop background work if tab is inactive
     if (document.visibilityState === 'hidden') return
 
-    // Throttle: prevent multiple rapid refreshes (min 5s interval)
     const nowTs = Date.now()
     if (nowTs - lastRefreshRef.current < 5000) return
     lastRefreshRef.current = nowTs
     const requestId = ++refreshRequestRef.current
 
     const map = mapRef.current
-    const bounds = map.getBounds()
-    const viewportBbox: [number, number, number, number] = [
-      bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()
-    ]
-
     const cityNow = cityRef.current
     const activeLayersNow = activeLayersRef.current
-    const useHere = hereHasKey()
-    const useTomTom  = useLiveData
     const isRequestCurrent = () =>
       refreshRequestRef.current === requestId &&
       cityRef.current.id === cityNow.id &&
       mapRef.current === map
 
-    // ── 1. Determine base snapshot (never required for road rendering) ──
-    let snapshot = (await loadCachedSnapshot(cityNow.id)) ?? generateTrafficSnapshot(cityNow)
-    if (!isRequestCurrent()) return
-    if (snapshot.segments.length > 0) {
-      setSnapshot(snapshot)
-      setDataSource('live')
-      console.log('[CrossFlow] Loaded cached snapshot', {
-        city: cityNow.id,
-        segments: snapshot.segments.length,
+    let payload: AggregatedCityPayload | null = null
+    try {
+      const response = await fetch(`/api/aggregation/city?city_id=${encodeURIComponent(cityNow.id)}`, {
+        cache: 'no-store',
       })
-    }
-
-    if (useHere) {
-      try {
-        const hereFlow = await fetchHereFlow(viewportBbox)
-        if (!isRequestCurrent()) return
-        if (hereFlow.length > 0) {
-          const hereSnapshot = buildSnapshotFromHereFlow(cityNow, hereFlow)
-          snapshot = fuseTrafficSnapshots(snapshot, hereSnapshot)
-          setDataSource('live')
-          console.log('[CrossFlow] HERE flow fused', {
-            sourceSegments: hereFlow.length,
-            fusedSegments: snapshot.segments.length,
-          })
-        }
-      } catch (error) {
-        console.warn('[CrossFlow] HERE flow fusion failed', error)
+      if (!response.ok) {
+        throw new Error(`Aggregation request failed with ${response.status}`)
       }
+      payload = await response.json() as AggregatedCityPayload
+    } catch (error) {
+      console.error('[CrossFlow] Aggregation snapshot failed', error)
     }
 
-    console.log('[CrossFlow] Base snapshot generated', {
-      city: cityNow.id,
-      segments: snapshot.segments.length,
-      dataSource: dataSourceRef.current,
+    if (!isRequestCurrent()) return
+
+    const snapshot = payload?.traffic.snapshot ?? generateTrafficSnapshot(cityNow)
+    const incidents = payload?.traffic.incidents ?? generateIncidents(cityNow)
+    const nextSource = payload?.traffic.provider === 'synthetic' ? 'synthetic' : 'live'
+
+    setSnapshot(snapshot)
+    setIncidents(incidents)
+    setDataSource(nextSource)
+    setWeather(null)
+    setOpenMeteoWeather(payload?.weather ?? null)
+    setAirQuality(payload?.air_quality ?? null)
+
+    const poiList = payload?.poi ?? []
+    osmPoisRef.current.set(cityNow.id, poiList)
+    const poiSource = map.getSource(POI_SOURCE) as maplibregl.GeoJSONSource | undefined
+    poiSource?.setData({
+      type: 'FeatureCollection',
+      features: poiList.map(poi => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [poi.lng, poi.lat] },
+        properties: { id: poi.id, type: poi.type, name: poi.name },
+      })),
     })
 
-    const synthetic = generateIncidents(cityNow)
-    if (!isRequestCurrent()) return
-    setSnapshot(snapshot)
+    const stations = payload?.transit.stations ?? []
+    osmMetroRef.current.set(cityNow.id, stations)
+    applyTransitLineStatuses(payload?.transit.lines ?? [])
 
-    let incidents: Incident[] = synthetic
-
-    // ── 2. Fetch incidents only. Road geometry is now always local/synchronous. ──
-    if (useTomTom) {
-      // Fetch real TomTom incidents for current viewport
-      console.log('[DataSource] TomTom Incidents request started for bbox:', viewportBbox)
-      try {
-        const tomtomIncs = await fetchTomTomIncidents(viewportBbox)
-        console.log('[DataSource] TomTom Incidents response:', tomtomIncs.length, 'incidents')
-        if (!isRequestCurrent()) return
-        if (tomtomIncs.length > 0) {
-          incidents = tomtomIncs.map(inc => ({
-          id:          inc.id,
-          type:        mapIncidentType(inc.iconCategory),
-          severity:    tomtomSeverityToLocal(inc.magnitudeOfDelay),
-          title:       inc.description || `Incident sur ${inc.from || 'route'}`,
-          description: `${inc.from ? 'De ' + inc.from : ''}${inc.to ? ' vers ' + inc.to : ''}. Délai: ${Math.round(inc.delay / 60)} min.`,
-          location:    { lat: inc.point.latitude, lng: inc.point.longitude },
-          address:     inc.roadNumbers.join(', ') || `${cityNow.name}`,
-          startedAt:   inc.startTime,
-          resolvedAt:  inc.endTime,
-          source:      'CrossFlow Intelligence Engine',
-          iconColor:   getSeverityColor(tomtomSeverityToLocal(inc.magnitudeOfDelay)),
-        }))
-            console.log('[DataSource] TomTom Incidents applied, setting to live mode')
-            setDataSource('live')
-          }
-        } catch (err) {
-          console.error('[DataSource] TomTom Incidents request failed:', err instanceof Error ? err.message : String(err))
-          console.log('[DataSource] Using synthetic incidents')
-          setDataSource('synthetic')
-        }
-      } else {
-        console.log('[DataSource] No incident provider enabled, using synthetic incidents')
-        setDataSource('synthetic')
-      }
-
-    if (!snapshot) return
-    if (!isRequestCurrent()) return
+    console.log('[CrossFlow] Aggregated snapshot applied', {
+      city: cityNow.id,
+      provider: payload?.traffic.provider ?? 'fallback',
+      segments: snapshot.segments.length,
+      incidents: incidents.length,
+      poi: poiList.length,
+      transitStations: stations.length,
+    })
 
     const snappedSnapshot = snapshot
     if (!isRequestCurrent()) return
 
-    setSnapshot(snappedSnapshot)
     const incidentSplit = splitIncidents(incidents)
-    setIncidents(incidents)
 
     // --- High Performance: UCTN Property Updates ---
     if (safeGetSource(map, TRAFFIC_SOURCE)) {
@@ -2560,7 +2354,7 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
     console.log('[CrossFlow] Incident layer state', {
       incidents: incidents.length,
       active: activeLayersNow.has('incidents'),
-      tomtomEnabled: useTomTom,
+      provider: payload?.traffic.provider ?? 'fallback',
     })
 
     // Boundary
@@ -2605,7 +2399,16 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
 
     if (!isRequestCurrent()) return
     previousSnapshotRef.current = snapshot
-  }, [scheduleCongestionHeatmapUpdate, setSnapshot, setIncidents, setDataSource])
+  }, [
+    applyTransitLineStatuses,
+    scheduleCongestionHeatmapUpdate,
+    setAirQuality,
+    setDataSource,
+    setIncidents,
+    setOpenMeteoWeather,
+    setSnapshot,
+    setWeather,
+  ])
 
   useEffect(() => { refreshDataRef.current = refreshData }, [refreshData])
 
