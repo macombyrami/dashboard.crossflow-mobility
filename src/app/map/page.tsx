@@ -20,6 +20,7 @@ export default function MapPage() {
   const activeLayers = useMapStore(s => s.activeLayers)
   const setAIPanelOpen = useMapStore(s => s.setAIPanelOpen)
   const [layersOpen, setLayersOpen] = useState(false)
+  const [debugMode, setDebugMode] = useState(false)
 
   useEffect(() => {
     setMode('live')
@@ -34,7 +35,7 @@ export default function MapPage() {
   return (
     <div className="flex h-full flex-1 overflow-hidden bg-[#F3F4EF]">
       <div className="relative flex-1 overflow-hidden">
-        <CrossFlowMap />
+        <CrossFlowMap debugMode={debugMode} />
 
         <div className="pointer-events-none absolute inset-x-0 top-3 z-30 flex justify-center px-3 sm:top-4 sm:px-4">
           <div className="pointer-events-auto w-[min(560px,calc(100vw-32px))] sm:w-[min(560px,calc(100vw-220px))]">
@@ -44,7 +45,17 @@ export default function MapPage() {
 
         <MapLegend />
 
-        <div className="pointer-events-auto absolute bottom-5 right-3 z-30 sm:right-4">
+        <div className="pointer-events-auto absolute bottom-5 right-3 z-30 flex flex-col items-end gap-3 sm:right-4">
+          <button
+            onClick={() => setDebugMode(value => !value)}
+            className={`flex h-10 items-center gap-2 rounded-full border px-4 shadow-[0_14px_34px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-all ${
+              debugMode ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-stone-200 bg-white/96 text-stone-700 hover:border-stone-300'
+            }`}
+            aria-label="Toggle debug mode"
+          >
+            <span className="text-[11px] font-bold uppercase tracking-[0.18em]">Debug Mode</span>
+          </button>
+
           <button
             onClick={() => setLayersOpen(value => !value)}
             className="flex h-11 items-center gap-2 rounded-full border border-stone-200 bg-white/96 px-4 shadow-[0_14px_34px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-all hover:border-stone-300"

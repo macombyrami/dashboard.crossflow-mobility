@@ -22,7 +22,7 @@ import { MapSplitSlider } from '@/components/map/MapSplitSlider'
 import { LiveSyncBadge } from '@/components/dashboard/LiveSyncBadge'
 import { LayerControls } from '@/components/map/controls/LayerControls'
 import { MapLegend } from '@/components/map/MapLegend'
-import { saveSnapshot } from '@/lib/api/snapshots'
+import { getSnapshots, saveSnapshot } from '@/lib/api/snapshots'
 import { toast } from 'sonner'
 import { GeolocationControl } from '@/components/map/controls/GeolocationControl'
 import type { UserPosition } from '@/hooks/useGeolocation'
@@ -53,9 +53,11 @@ import {
   fetchIncidents as fetchTomTomIncidents,
   tomtomSeverityToLocal,
 } from '@/lib/api/tomtom'
+import { fetchHereFlow, hasKey as hereHasKey, jamFactorToCongestion, type HereFlowSegment } from '@/lib/api/here'
 import { fetchWeather as fetchOpenMeteoWeather, fetchAirQuality } from '@/lib/api/openmeteo'
 import { fetchCityBoundary, fetchCityDistricts } from '@/lib/api/geocoding'
 import type { AggregatedHeatFeatureCollection } from '@/lib/map/trafficHeatmap'
+import { decompressJSON } from '@/lib/utils/compression'
 import { useSocialStore } from '@/store/socialStore'
 import type { Incident, HeatmapMode, CongestionLevel, TrafficSnapshot, TrafficSegment, MapLayerId, QuickFilterId, City } from '@/types'
 
@@ -485,7 +487,142 @@ function countRenderedRoadFeatures(map: maplibregl.Map | null) {
   }
 }
 
-export const CrossFlowMap = memo(function CrossFlowMap() {
+function byteaLikeToBase64(value: unknown): string | null {
+  if (!value) return null
+  if (typeof value === 'string') return value
+  if (value instanceof Uint8Array) {
+    let binary = ''
+    value.forEach(byte => { binary += String.fromCharCode(byte) })
+    return btoa(binary)
+  }
+  if (Array.isArray(value)) {
+    let binary = ''
+    value.forEach((item) => {
+      if (typeof item === 'number') binary += String.fromCharCode(item)
+    })
+    return binary ? btoa(binary) : null
+  }
+  if (typeof value === 'object' && value && 'data' in (value as any) && Array.isArray((value as any).data)) {
+    return byteaLikeToBase64((value as any).data)
+  }
+  return null
+}
+
+async function loadCachedSnapshot(cityId: string): Promise<TrafficSnapshot | null> {
+  try {
+    const snapshots = await getSnapshots(cityId, 30)
+    const latest = Array.isArray(snapshots) ? snapshots[0] : null
+    if (!latest?.segments_gz) return null
+    const base64 = byteaLikeToBase64(latest.segments_gz)
+    if (!base64) return null
+    const decoded = await decompressJSON(base64)
+    if (!decoded || !Array.isArray(decoded.segments)) return null
+    return decoded as TrafficSnapshot
+  } catch (error) {
+    console.warn('[CrossFlow] Failed to load cached snapshot', error)
+    return null
+  }
+}
+
+function buildSnapshotFromHereFlow(city: City, hereFlow: HereFlowSegment[]): TrafficSnapshot {
+  const fetchedAt = new Date().toISOString()
+  const segments: TrafficSegment[] = hereFlow
+    .filter(segment => segment.coords.length >= 2)
+    .map((segment, index) => {
+      const congestionScore = jamFactorToCongestion(segment.jamFactor)
+      const freeFlowSpeedKmh = Math.max(25, Math.round(segment.freeFlow || segment.speedUncapped || segment.speed || 35))
+      const speedKmh = getCredibleSpeedKmh(segment.speed || freeFlowSpeedKmh, freeFlowSpeedKmh, congestionScore)
+      const roadType =
+        freeFlowSpeedKmh >= 100 ? 'motorway' :
+        freeFlowSpeedKmh >= 80 ? 'trunk' :
+        freeFlowSpeedKmh >= 60 ? 'primary' :
+        freeFlowSpeedKmh >= 40 ? 'secondary' :
+        'tertiary'
+      const length = estimateSegmentLength(segment.coords)
+      return {
+        id: `here-${city.id}-${segment.id || index}`,
+        roadType,
+        coordinates: segment.coords,
+        speedKmh,
+        freeFlowSpeedKmh,
+        congestionScore,
+        level: scoreToCongestionLevel(congestionScore),
+        flowVehiclesPerHour: Math.round((1 - congestionScore) * 1800 + 180),
+        travelTimeSeconds: Math.max(10, Math.round((length / 1000) / Math.max(speedKmh, 1) * 3600)),
+        length,
+        mode: 'car',
+        lastUpdated: fetchedAt,
+        observedTraffic: true,
+        estimatedTraffic: false,
+        priorityAxis: segment.confidence,
+      }
+    })
+
+  return {
+    cityId: city.id,
+    segments,
+    heatmap: segments.map(seg => ({
+      lng: seg.coordinates[Math.floor(seg.coordinates.length / 2)]?.[0] ?? city.center.lng,
+      lat: seg.coordinates[Math.floor(seg.coordinates.length / 2)]?.[1] ?? city.center.lat,
+      intensity: seg.congestionScore,
+    })),
+    heatmapPassages: [],
+    heatmapCo2: [],
+    fetchedAt,
+  }
+}
+
+function fuseTrafficSnapshots(base: TrafficSnapshot, incoming: TrafficSnapshot): TrafficSnapshot {
+  if (base.segments.length === 0) return incoming
+  if (incoming.segments.length === 0) return base
+
+  const merged = new Map<string, TrafficSegment>()
+  for (const segment of base.segments) merged.set(segment.id, segment)
+
+  for (const segment of incoming.segments) {
+    const key = `${Math.round((segment.coordinates[0]?.[0] ?? 0) * 1000)}:${Math.round((segment.coordinates[0]?.[1] ?? 0) * 1000)}:${segment.roadType ?? 'road'}`
+    const existingEntry = Array.from(merged.entries()).find(([, value]) => {
+      const coord = value.coordinates[0]
+      if (!coord || !segment.coordinates[0]) return false
+      return Math.abs(coord[0] - segment.coordinates[0][0]) < 0.0025 &&
+        Math.abs(coord[1] - segment.coordinates[0][1]) < 0.0025 &&
+        (value.roadType ?? 'road') === (segment.roadType ?? 'road')
+    })
+
+    if (existingEntry) {
+      const [existingId, existing] = existingEntry
+      const mergedCongestion = clamp01((existing.congestionScore + segment.congestionScore) / 2)
+      const mergedSpeed = Math.round(((existing.speedKmh + segment.speedKmh) / 2) * 10) / 10
+      merged.set(existingId, {
+        ...existing,
+        speedKmh: mergedSpeed,
+        freeFlowSpeedKmh: Math.max(existing.freeFlowSpeedKmh, segment.freeFlowSpeedKmh),
+        congestionScore: mergedCongestion,
+        level: scoreToCongestionLevel(mergedCongestion),
+        observedTraffic: existing.observedTraffic || segment.observedTraffic,
+        estimatedTraffic: existing.estimatedTraffic && segment.estimatedTraffic,
+      })
+    } else {
+      merged.set(`${segment.id}-${key}`, segment)
+    }
+  }
+
+  const segments = Array.from(merged.values())
+  return {
+    cityId: incoming.cityId || base.cityId,
+    segments,
+    heatmap: segments.map(seg => ({
+      lng: seg.coordinates[Math.floor(seg.coordinates.length / 2)]?.[0] ?? 0,
+      lat: seg.coordinates[Math.floor(seg.coordinates.length / 2)]?.[1] ?? 0,
+      intensity: seg.congestionScore,
+    })),
+    heatmapPassages: [],
+    heatmapCo2: [],
+    fetchedAt: incoming.fetchedAt,
+  }
+}
+
+export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { debugMode?: boolean }) {
   const pathname        = usePathname()
   const mapRef          = useRef<maplibregl.Map | null>(null)
   const containerRef    = useRef<HTMLDivElement>(null)
@@ -1695,7 +1832,8 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
             incident_count: kpis.activeIncidents,
             active_segments: snapshot.segments.length
           },
-          bbox: cityNow.bbox
+          bbox: cityNow.bbox,
+          raw_segments: snapshot,
         })
         toast.success(`Snapshot ${cityNow.name} synchronisé avec succès.`)
       }
@@ -2252,6 +2390,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
 
     const cityNow = cityRef.current
     const activeLayersNow = activeLayersRef.current
+    const useHere = hereHasKey()
     const useTomTom  = useLiveData
     const isRequestCurrent = () =>
       refreshRequestRef.current === requestId &&
@@ -2259,7 +2398,35 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       mapRef.current === map
 
     // ── 1. Determine base snapshot (never required for road rendering) ──
-    const snapshot = generateTrafficSnapshot(cityNow)
+    let snapshot = (await loadCachedSnapshot(cityNow.id)) ?? generateTrafficSnapshot(cityNow)
+    if (!isRequestCurrent()) return
+    if (snapshot.segments.length > 0) {
+      setSnapshot(snapshot)
+      setDataSource('live')
+      console.log('[CrossFlow] Loaded cached snapshot', {
+        city: cityNow.id,
+        segments: snapshot.segments.length,
+      })
+    }
+
+    if (useHere) {
+      try {
+        const hereFlow = await fetchHereFlow(viewportBbox)
+        if (!isRequestCurrent()) return
+        if (hereFlow.length > 0) {
+          const hereSnapshot = buildSnapshotFromHereFlow(cityNow, hereFlow)
+          snapshot = fuseTrafficSnapshots(snapshot, hereSnapshot)
+          setDataSource('live')
+          console.log('[CrossFlow] HERE flow fused', {
+            sourceSegments: hereFlow.length,
+            fusedSegments: snapshot.segments.length,
+          })
+        }
+      } catch (error) {
+        console.warn('[CrossFlow] HERE flow fusion failed', error)
+      }
+    }
+
     console.log('[CrossFlow] Base snapshot generated', {
       city: cityNow.id,
       segments: snapshot.segments.length,
@@ -2488,11 +2655,14 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
           provider: dataSourceNow,
           fetched_at: new Date().toISOString(),
           stats:    { 
-            avg_congestion: snapshotNow.segments.reduce((a, b) => a + b.congestionScore, 0) / snapshotNow.segments.length,
+            avg_congestion: snapshotNow.segments.length
+              ? snapshotNow.segments.reduce((a, b) => a + b.congestionScore, 0) / snapshotNow.segments.length
+              : 0,
             incident_count: incidentsNow.length,
             active_segments: snapshotNow.segments.length 
           },
-          bbox: cityNow.bbox
+          bbox: cityNow.bbox,
+          raw_segments: snapshotNow,
         })
         setLastSync(new Date())
       } catch (err) {
@@ -2731,7 +2901,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
     const incidentsEnabledByQuickFilter =
       quickFiltersNeutral || activeQuickFilters.has('incidents') || activeQuickFilters.has('travaux')
     const flowEnabledByQuickFilter = quickFiltersNeutral || activeQuickFilters.has('flux')
-    const trafficVis = activeLayers.has('traffic') && trafficEnabledByQuickFilter ? 'visible' : 'none'
+    const trafficVis = !debugMode && activeLayers.has('traffic') && trafficEnabledByQuickFilter ? 'visible' : 'none'
     const incidentsVis = activeLayers.has('incidents') && incidentsEnabledByQuickFilter ? 'visible' : 'none'
     const flowVis = activeLayers.has('flow') && flowEnabledByQuickFilter && !activeLayers.has('traffic') ? 'visible' : 'none'
     const boundaryVis = activeLayers.has('boundary') ? 'visible' : 'none'
@@ -2907,7 +3077,7 @@ export const CrossFlowMap = memo(function CrossFlowMap() {
       })
     }
     applyTrafficRenderingHierarchy(map)
-  }, [activeLayers, activeQuickFilters, city, mapLoaded, useLiveData, isDecisionMap])
+  }, [activeLayers, activeQuickFilters, city, mapLoaded, useLiveData, isDecisionMap, debugMode])
 
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return
