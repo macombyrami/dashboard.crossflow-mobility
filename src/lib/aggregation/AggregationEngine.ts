@@ -220,8 +220,10 @@ export class AggregationEngine {
       }
     })
 
-    // Build snapshot
+    // Build snapshot (filter out error objects)
     const aggregationTime = Date.now() - startTime
+    const isValidData = (val: any) => val && !('error' in val)
+
     const snapshot: CitySnapshot = {
       city_id: cityId,
       city_name: config.name,
@@ -231,14 +233,14 @@ export class AggregationEngine {
       timestamp: new Date().toISOString(),
       expires_at: new Date(Date.now() + this.SNAPSHOT_TTL * 1000).toISOString(),
 
-      traffic: traffic.status === 'fulfilled' ? traffic.value : null,
-      weather: weather.status === 'fulfilled' ? weather.value : null,
-      air_quality: airQuality.status === 'fulfilled' ? airQuality.value : null,
-      poi: poi.status === 'fulfilled' ? poi.value : null,
-      transit: transit.status === 'fulfilled' ? transit.value : null,
-      events: events.status === 'fulfilled' ? events.value : null,
-      mobility: mobility.status === 'fulfilled' ? mobility.value : null,
-      environmental: environmental.status === 'fulfilled' ? environmental.value : null,
+      traffic: traffic.status === 'fulfilled' && isValidData(traffic.value) ? (traffic.value as TrafficData) : null,
+      weather: weather.status === 'fulfilled' && isValidData(weather.value) ? (weather.value as WeatherData) : null,
+      air_quality: airQuality.status === 'fulfilled' && isValidData(airQuality.value) ? (airQuality.value as AirQualityData) : null,
+      poi: poi.status === 'fulfilled' && isValidData(poi.value) ? (poi.value as POIData) : null,
+      transit: transit.status === 'fulfilled' && isValidData(transit.value) ? (transit.value as TransitData) : null,
+      events: events.status === 'fulfilled' && isValidData(events.value) ? (events.value as EventsData) : null,
+      mobility: mobility.status === 'fulfilled' && isValidData(mobility.value) ? (mobility.value as MobilityData) : null,
+      environmental: environmental.status === 'fulfilled' && isValidData(environmental.value) ? (environmental.value as EnvironmentalData) : null,
 
       sources_used: sourcesUsed,
       confidence_score: sourcesUsed.length / 8, // 8 data domains
