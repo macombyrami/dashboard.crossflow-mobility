@@ -29,8 +29,10 @@ import { fetchWeather as fetchOpenMeteoWeather, fetchAirQuality } from '@/lib/ap
 import { fetchCityBoundary } from '@/lib/api/geocoding'
 import { useThemeStore } from '@/store/themeStore'
 import type { Incident, HeatmapMode } from '@/types'
+import { generateFlowFeatures, updateFlowAnimation } from '@/lib/engine/flow.engine'
 
 const TRAFFIC_SOURCE          = 'cf-traffic'
+const TRAFFIC_FLOW_SOURCE     = 'cf-traffic-flow'
 const HEATMAP_SOURCE          = 'cf-heatmap'
 const HEATMAP_PASSAGES_SOURCE = 'cf-heatmap-passages'
 const HEATMAP_CO2_SOURCE      = 'cf-heatmap-co2'
@@ -80,6 +82,43 @@ function computeRoadWidth(roadType: string | undefined, level: import('@/types')
     free: 0.9, slow: 1.1, congested: 1.3, critical: 1.5,
   }
   return Math.round((base[roadType ?? ''] ?? 2.5) * (mult[level] ?? 1) * 10) / 10
+}
+
+/**
+ * Add flow arrow icon to map for traffic flow visualization
+ * Creates an SVG arrow that points up (will be rotated by bearing property)
+ */
+function addFlowArrowImage(map: maplibregl.Map) {
+  // Create arrow SVG
+  const arrowSvg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+      <defs>
+        <linearGradient id="flow-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:#22C55E;stop-opacity:0.8" />
+          <stop offset="100%" style="stop-color:#00FF9D;stop-opacity:0.4" />
+        </linearGradient>
+      </defs>
+      <!-- Arrow pointing up -->
+      <polygon points="12,2 22,20 17,20 17,22 7,22 7,20 2,20" fill="url(#flow-gradient)" stroke="#22C55E" stroke-width="0.5" stroke-opacity="0.5"/>
+    </svg>
+  `
+
+  // Convert SVG to image data
+  const canvas = document.createElement('canvas')
+  canvas.width = 24
+  canvas.height = 24
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  const img = new Image()
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0)
+    const imageData = ctx.getImageData(0, 0, 24, 24)
+    if (!map.hasImage('flow-arrow')) {
+      map.addImage('flow-arrow', imageData)
+    }
+  }
+  img.src = 'data:image/svg+xml,' + encodeURIComponent(arrowSvg)
 }
 
 export function CrossFlowMap() {
@@ -151,6 +190,9 @@ export function CrossFlowMap() {
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left')
 
     map.on('load', () => {
+      // Add flow arrow image for traffic flow visualization
+      addFlowArrowImage(map)
+
       initStaticSources(map)
       initBoundaryLayers(map)
       initHeatmapPassagesLayers(map)
@@ -372,6 +414,7 @@ export function CrossFlowMap() {
     // setStyle destroys all sources/layers — re-add them after style loads
     map.setStyle(newStyle)
     map.once('style.load', () => {
+      addFlowArrowImage(map)
       initStaticSources(map)
       initBoundaryLayers(map)
       initHeatmapPassagesLayers(map)
@@ -794,6 +837,33 @@ export function CrossFlowMap() {
     }
   }, [currentResult, snapshot, mapLoaded]) // eslint-disable-line
 
+  // ─── Traffic flow animation ───────────────────────────────────────────
+  // Animate flow arrows to show continuous traffic movement
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded || !snapshot) return
+    const map = mapRef.current
+    const flowSrc = map.getSource(TRAFFIC_FLOW_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (!flowSrc) return
+
+    let animationId: number | null = null
+    let startTime = Date.now()
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime
+      const flowFeatures = updateFlowAnimation(snapshot, elapsed, 3000) // 3 second cycle
+      flowSrc.setData(flowFeatures)
+      animationId = requestAnimationFrame(animate)
+    }
+
+    animationId = requestAnimationFrame(animate)
+
+    return () => {
+      if (animationId !== null) {
+        cancelAnimationFrame(animationId)
+      }
+    }
+  }, [snapshot, mapLoaded]) // eslint-disable-line
+
   // ─── Layer visibility ─────────────────────────────────────────────────
 
   useEffect(() => {
@@ -805,6 +875,7 @@ export function CrossFlowMap() {
 
     trySet(TRAFFIC_SOURCE  + '-lines',    activeLayers.has('traffic')   ? 'visible' : 'none')
     trySet(TRAFFIC_SOURCE  + '-glow',     activeLayers.has('traffic')   ? 'visible' : 'none')
+    trySet(TRAFFIC_FLOW_SOURCE + '-arrows', activeLayers.has('traffic')   ? 'visible' : 'none')
     // Heatmap layers are managed by the heatmap mode effect below
     trySet(INCIDENT_SOURCE + '-circles',  activeLayers.has('incidents') ? 'visible' : 'none')
     trySet(INCIDENT_SOURCE + '-glow',     activeLayers.has('incidents') ? 'visible' : 'none')
@@ -927,6 +998,27 @@ function initStaticSources(map: maplibregl.Map) {
       // realData=true → HERE/OSM segments (on real roads) → fully visible
       // realData=false → synthetic grid → barely visible
       'line-opacity': ['case', ['boolean', ['get', 'realData'], false], 0.88, 0.08],
+    },
+  })
+
+  // ── Traffic Flow Arrows (Animation layer) ────────────────────────────────
+  map.addSource(TRAFFIC_FLOW_SOURCE, { type: 'geojson', data: emptyFC })
+
+  // Flow arrow symbols — animated directional movement indicators
+  map.addLayer({
+    id:     TRAFFIC_FLOW_SOURCE + '-arrows',
+    type:   'symbol',
+    source: TRAFFIC_FLOW_SOURCE,
+    minzoom: 12,
+    layout: {
+      'icon-image':     'flow-arrow',
+      'icon-size':      ['interpolate', ['linear'], ['get', 'size'], 8, 0.6, 24, 1.2],
+      'icon-rotate':    ['get', 'bearing'],
+      'icon-opacity':   ['get', 'opacity'],
+      'icon-allow-overlap': true,
+    },
+    paint: {
+      'icon-opacity': ['get', 'opacity'],
     },
   })
 

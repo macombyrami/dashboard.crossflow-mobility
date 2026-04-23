@@ -16,7 +16,8 @@
       "Bash(npm ls *)",
       "Bash(npx skills *)",
       "Bash(git add *)",
-      "Bash(git commit -m 'PHASE 2: Dashboard Component Refactoring - New composable components *)"
+      "Bash(git commit -m 'PHASE 2: Dashboard Component Refactoring - New composable components *)",
+      "Bash(xargs grep *)"
     ]
   }
 }
