@@ -359,6 +359,12 @@ export default function DashboardPage() {
     setLayer('traffic', true)
   }, [setLayer, setSearchFocus])
 
+  const handleIncidentFeedClick = useCallback((incident: { id: string }) => {
+    const matched = incidents.find(item => item.id === incident.id)
+    if (!matched) return
+    goToMapFocus(matched)
+  }, [goToMapFocus, incidents])
+
   useEffect(() => {
     const handler = (event: Event) => {
       const custom = event as CustomEvent<IncidentSelection>
@@ -417,7 +423,7 @@ export default function DashboardPage() {
                 timestamp: i.timestamp,
                 location: i.location,
               }))}
-              onIncidentClick={goToMapFocus}
+              onIncidentClick={handleIncidentFeedClick}
               isLoading={loading}
               maxItems={10}
             />
