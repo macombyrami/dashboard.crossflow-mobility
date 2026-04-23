@@ -6,7 +6,9 @@ export interface CriticalEvent {
   id: string
   type: 'incident' | 'congestion' | 'transport_overload'
   severity: 'critical' | 'high'
-  location: string
+  location: string // address string
+  latitude?: number
+  longitude?: number
   label: string
   impact: 'high' | 'medium'
   timestamp: string

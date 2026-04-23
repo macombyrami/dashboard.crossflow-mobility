@@ -432,7 +432,7 @@ export function CrossFlowMap() {
   useEffect(() => {
     if (!mapLoaded || cityBoundary) return
     fetchCityBoundary(city.name, city.country).then(b => {
-      if (b) setCityBoundary(b)
+      if (b) setCityBoundary({ type: 'Feature', geometry: b as any, properties: {} })
     })
   }, [mapLoaded]) // eslint-disable-line
 
@@ -1014,7 +1014,6 @@ function initStaticSources(map: maplibregl.Map) {
       'icon-image':     'flow-arrow',
       'icon-size':      ['interpolate', ['linear'], ['get', 'size'], 8, 0.6, 24, 1.2],
       'icon-rotate':    ['get', 'bearing'],
-      'icon-opacity':   ['get', 'opacity'],
       'icon-allow-overlap': true,
     },
     paint: {

@@ -10,7 +10,7 @@ import { SkeletonLoader } from '@/components/ui/SkeletonLoader'
 import { EmptyState } from '@/components/ui/EmptyState'
 import type { IncidentSeverity } from '@/types'
 import type { IncidentIntelligenceRecord } from '@/lib/incidents/intelligence'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils/cn'
 
 const SEVERITY_FILTERS = ['all', 'critical', 'high', 'medium', 'low'] as const
 

@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { useTrafficStore } from '@/store/trafficStore'
 import { useControlRoomStore } from '@/store/controlRoomStore'
 import { useMapStore } from '@/store/mapStore'
-import { AlertTriangle, MapPin, Clock, X, ChevronRight } from 'lucide-react'
+import { MapPin, Clock, X, ChevronRight } from 'lucide-react'
 import type { Incident } from '@/types'
 
 type SortMode = 'impact' | 'severity' | 'recency' | 'proximity'
@@ -70,52 +70,62 @@ export function SmartIncidentFeed() {
     [incidents, dismissedIncidentIds]
   )
 
-  // Sort incidents based on selected mode
-  const sortedIncidents = useMemo(() => {
-    const sorted = [...activeIncidents]
+  // Memoized sort function to avoid recalculations
+  const getSortedIncidents = useCallback(
+    (toSort: Incident[]): Incident[] => {
+      const sorted = [...toSort]
 
-    switch (sortMode) {
-      case 'impact':
-        return sorted.sort((a, b) => calculateImpactScore(b) - calculateImpactScore(a))
+      switch (sortMode) {
+        case 'impact':
+          return sorted.sort((a, b) => calculateImpactScore(b) - calculateImpactScore(a))
 
-      case 'severity':
-        return sorted.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
+        case 'severity':
+          return sorted.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
 
-      case 'recency':
-        return sorted.sort(
-          (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
-        )
+        case 'recency':
+          return sorted.sort(
+            (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+          )
 
-      case 'proximity': {
-        const mapCenter = mapStore.center || { lat: 48.856613, lng: 2.352222 } // Default to Paris
-        return sorted.sort(
-          (a, b) => calculateDistance(mapCenter, a.location) - calculateDistance(mapCenter, b.location)
-        )
+        case 'proximity': {
+          const mapCenter = mapStore.viewState
+            ? { lat: mapStore.viewState.latitude, lng: mapStore.viewState.longitude }
+            : { lat: 48.856613, lng: 2.352222 }
+          return sorted.sort(
+            (a, b) => calculateDistance(mapCenter, a.location) - calculateDistance(mapCenter, b.location)
+          )
+        }
+
+        default:
+          return sorted
       }
+    },
+    [sortMode, mapStore.viewState]
+  )
 
-      default:
-        return sorted
-    }
-  }, [activeIncidents, sortMode, mapStore.center])
+  // Sort incidents based on selected mode
+  const sortedIncidents = useMemo(
+    () => getSortedIncidents(activeIncidents),
+    [activeIncidents, getSortedIncidents]
+  )
 
   // Take only top 10
   const displayedIncidents = sortedIncidents.slice(0, 10)
 
-  const handleIncidentHover = (incidentId: string | null) => {
-    if (incidentId) {
-      mapStore.setState({ hoveredFeatureId: incidentId })
-    }
-  }
+  const handleIncidentHover = useCallback((incidentId: string | null) => {
+    // Hover handler for future map integration
+    // Currently mapStore doesn't support hover highlighting
+  }, [])
 
   const handleIncidentClick = useCallback(
     (incident: Incident) => {
-      // Zoom to incident location
-      mapStore.setState({
-        searchFocus: {
-          target: 'location',
-          location: incident.location,
-          zoomLevel: 15,
-        },
+      // Zoom to incident location with animation
+      mapStore.setSearchFocus({
+        id: incident.id,
+        label: incident.title,
+        latitude: incident.location.lat,
+        longitude: incident.location.lng,
+        bbox: null,
       })
     },
     [mapStore]

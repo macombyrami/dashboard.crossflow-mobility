@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useTransportStore, type TransportLineDetail } from '@/store/transportStore'
 import { useMapStore } from '@/store/mapStore'
-import { Zap, Users, Clock, AlertCircle } from 'lucide-react'
+import { Users, Clock, AlertCircle } from 'lucide-react'
 
 const TRANSPORT_MODES = ['metro', 'rer', 'tram', 'bus'] as const
 const MODE_COLORS = {
@@ -33,18 +33,16 @@ export function TransportOverview() {
     [activeTab, getTopLines]
   )
 
-  const handleLineHover = (lineId: string | null) => {
+  const handleLineHover = useCallback((lineId: string | null) => {
     setHoveredLine(lineId)
-    if (lineId) {
-      // Trigger map hover effect
-      mapStore.setState({ hoveredFeatureId: lineId })
-    }
-  }
+    // Hover handler for future map integration
+    // Currently mapStore doesn't support hover highlighting
+  }, [setHoveredLine])
 
-  const handleLineClick = (line: TransportLineDetail) => {
+  const handleLineClick = useCallback((line: TransportLineDetail) => {
     setSelectedLine(line.id)
 
-    // Zoom to line bounds on map
+    // Zoom to line bounds on map with animation
     if (line.coordinates.length > 0) {
       const lngs = line.coordinates.map(c => c[0])
       const lats = line.coordinates.map(c => c[1])
@@ -52,16 +50,18 @@ export function TransportOverview() {
       const maxLng = Math.max(...lngs)
       const minLat = Math.min(...lats)
       const maxLat = Math.max(...lats)
+      const centerLng = (minLng + maxLng) / 2
+      const centerLat = (minLat + maxLat) / 2
 
-      mapStore.setState({
-        searchFocus: {
-          target: 'bounds',
-          bounds: { minLng, maxLng, minLat, maxLat },
-          zoomLevel: 13,
-        },
+      mapStore.setSearchFocus({
+        id: line.id,
+        label: `${line.number} - ${line.name}`,
+        latitude: centerLat,
+        longitude: centerLng,
+        bbox: [minLng, minLat, maxLng, maxLat],
       })
     }
-  }
+  }, [setSelectedLine, mapStore])
 
   return (
     <div className="space-y-3">

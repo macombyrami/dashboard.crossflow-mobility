@@ -10,14 +10,17 @@ export function CriticalEventsPanel() {
   const mapStore = useMapStore()
 
   const handleEventClick = (event: CriticalEvent) => {
-    // TODO: Zoom map to event location
-    useMapStore.setState({
-      searchFocus: {
-        target: 'location',
-        location: event.location,
-        zoomLevel: 14,
-      },
-    })
+    // Zoom map to event location
+    if (event.latitude !== undefined && event.longitude !== undefined) {
+      const mapStore = useMapStore.getState()
+      mapStore.setSearchFocus({
+        id: event.id,
+        label: event.label,
+        latitude: event.latitude,
+        longitude: event.longitude,
+        bbox: null,
+      })
+    }
   }
 
   if (events.length === 0) {

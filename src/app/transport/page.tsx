@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/Card'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils/cn'
 
 type TransitType = 'metros' | 'rers' | 'tramways' | 'buses'
 

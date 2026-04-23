@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils/cn'
 
 const kpiVariants = cva(
   'rounded-lg border bg-glass-card-bg border-glass-card-border backdrop-blur-xl transition-all duration-300',
