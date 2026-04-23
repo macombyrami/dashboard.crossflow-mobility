@@ -211,10 +211,10 @@ export class AggregationEngine {
     ]
 
     sourceResults.forEach(({ name, result }) => {
-      if (result.status === 'fulfilled' && !result.value.error) {
+      if (result.status === 'fulfilled' && !(result.value as any)?.error) {
         sourcesUsed.push(name)
       } else if (result.status === 'fulfilled') {
-        console.warn(`⚠️  ${name} failed: ${result.value.error}`)
+        console.warn(`⚠️  ${name} failed: ${(result.value as any)?.error || 'unknown error'}`)
       } else {
         console.warn(`⚠️  ${name} promise rejected`)
       }
