@@ -1398,6 +1398,24 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
     })
 
     // Click on Incidents
+    const emitIncidentSelection = (raw: any, fallbackLng: number, fallbackLat: number) => {
+      if (typeof window === 'undefined') return
+      window.dispatchEvent(new CustomEvent('cf:incident-selected', {
+        detail: {
+          id: String(raw?.id ?? ''),
+          title: String(raw?.title ?? 'Incident'),
+          description: String(raw?.description ?? raw?.title ?? 'No details'),
+          severity: String(raw?.severity ?? 'medium'),
+          type: String(raw?.type ?? 'anomaly'),
+          source: String(raw?.source ?? 'CrossFlow'),
+          address: String(raw?.address ?? ''),
+          startedAt: String(raw?.startedAt ?? new Date().toISOString()),
+          lng: Number(raw?.lng ?? fallbackLng),
+          lat: Number(raw?.lat ?? fallbackLat),
+        },
+      }))
+    }
+
     map.on('click', INCIDENT_SOURCE + '-circles', (e) => {
       if (zoneActiveRef.current) return
       const feat = e.features?.[0]
@@ -1405,6 +1423,7 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
       const p = feat.properties as any
       const color = p.color || '#FFD600'
       const severity = (p.severity || 'medium').toUpperCase()
+      emitIncidentSelection(p, e.lngLat.lng, e.lngLat.lat)
       
       popupRef.current?.remove()
       popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '240px', className: 'apple-popup' })
@@ -1451,6 +1470,7 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
       const p = feat.properties as any
       const color = p.color || '#FFD600'
       const severity = (p.severity || 'medium').toUpperCase()
+      emitIncidentSelection(p, e.lngLat.lng, e.lngLat.lat)
       popupRef.current?.remove()
       popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '240px', className: 'apple-popup' })
         .setLngLat(e.lngLat)
@@ -1473,6 +1493,7 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
       if (!feat) return
       const p = feat.properties as any
       const color = p.color || '#FF3B30'
+      emitIncidentSelection(p, e.lngLat.lng, e.lngLat.lat)
       popupRef.current?.remove()
       popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: '240px', className: 'apple-popup' })
         .setLngLat(e.lngLat)
@@ -2346,7 +2367,19 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
       features: incidents.map(inc => ({
         type:     'Feature' as const,
         geometry: { type: 'Point' as const, coordinates: [inc.location.lng, inc.location.lat] },
-        properties: { id: inc.id, title: inc.title, severity: inc.severity, color: inc.iconColor },
+        properties: {
+          id: inc.id,
+          title: inc.title,
+          description: inc.description,
+          severity: inc.severity,
+          color: inc.iconColor,
+          type: inc.type,
+          source: inc.source,
+          address: inc.address,
+          startedAt: inc.startedAt,
+          lng: inc.location.lng,
+          lat: inc.location.lat,
+        },
       })),
     }
     const iSrc = safeGetSource(map, INCIDENT_SOURCE) as maplibregl.GeoJSONSource | null
@@ -2373,7 +2406,19 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
         features: incidentSplit.critical.map(inc => ({
           type: 'Feature' as const,
           geometry: { type: 'Point' as const, coordinates: [inc.location.lng, inc.location.lat] },
-          properties: { id: inc.id, title: inc.title, severity: inc.severity, color: inc.iconColor, type: inc.type },
+          properties: {
+            id: inc.id,
+            title: inc.title,
+            description: inc.description,
+            severity: inc.severity,
+            color: inc.iconColor,
+            type: inc.type,
+            source: inc.source,
+            address: inc.address,
+            startedAt: inc.startedAt,
+            lng: inc.location.lng,
+            lat: inc.location.lat,
+          },
         })),
       }
       const clusterGeo = {
@@ -2381,7 +2426,19 @@ export const CrossFlowMap = memo(function CrossFlowMap({ debugMode = false }: { 
         features: incidentSplit.clusterable.map(inc => ({
           type: 'Feature' as const,
           geometry: { type: 'Point' as const, coordinates: [inc.location.lng, inc.location.lat] },
-          properties: { id: inc.id, title: inc.title, severity: inc.severity, color: inc.iconColor, type: inc.type },
+          properties: {
+            id: inc.id,
+            title: inc.title,
+            description: inc.description,
+            severity: inc.severity,
+            color: inc.iconColor,
+            type: inc.type,
+            source: inc.source,
+            address: inc.address,
+            startedAt: inc.startedAt,
+            lng: inc.location.lng,
+            lat: inc.location.lat,
+          },
         })),
       }
 
