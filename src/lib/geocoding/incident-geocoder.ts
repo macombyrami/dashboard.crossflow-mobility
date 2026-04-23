@@ -1,47 +1,25 @@
 /**
  * Incident Geocoder
- * Converts city names to coordinates using Nominatim (OpenStreetMap)
- * Includes caching for performance
+ * Primary: Nominatim
+ * Fallback: Stadia
+ * Includes shared process cache.
  */
 
 import NodeCache from 'node-cache'
 import type { GeocodedIncident, ParsedIncident, Coordinates } from '@/types'
 
-interface GeocodingResult {
-  coordinates: Coordinates | null
-  accuracy: 'high' | 'medium' | 'low'
-  source: 'nominatim' | 'stadia'
-  cached: boolean
-}
+const cityCache = new NodeCache({ stdTTL: 2592000 }) // 30 days
+const geocoderInstances = new Map<string, IncidentGeocoder>()
 
 export class IncidentGeocoder {
-  private cache: NodeCache
-  private stadiaApiKey: string | null
-
-  constructor(stadiaApiKey?: string) {
-    // TTL: 30 days for city coordinates (they don't change)
-    this.cache = new NodeCache({ stdTTL: 2592000 })
-    this.stadiaApiKey = stadiaApiKey || process.env.STADIA_GEOCODING_API_KEY || null
-  }
+  constructor(private stadiaApiKey: string | null = process.env.STADIA_GEOCODING_API_KEY || null) {}
 
   async geocode(incident: ParsedIncident): Promise<GeocodedIncident | null> {
     try {
-      let fromCoords: Coordinates | null = null
-      let toCoords: Coordinates | null = null
+      const fromCoords = incident.from_city ? await this.geocodeCity(incident.from_city) : null
+      const toCoords = incident.to_city ? await this.geocodeCity(incident.to_city) : null
 
-      // Geocode from_city
-      if (incident.from_city) {
-        fromCoords = await this.geocodeCity(incident.from_city)
-      }
-
-      // Geocode to_city
-      if (incident.to_city) {
-        toCoords = await this.geocodeCity(incident.to_city)
-      }
-
-      // Must have at least one coordinate
       if (!fromCoords && !toCoords) {
-        console.debug(`[Geocoder] Could not geocode: ${incident.from_city} / ${incident.to_city}`)
         return null
       }
 
@@ -49,107 +27,92 @@ export class IncidentGeocoder {
         ...incident,
         from_coords: fromCoords,
         to_coords: toCoords,
-        geometry_type: fromCoords && toCoords ? 'LineString' : 'Point'
+        geometry_type: fromCoords && toCoords ? 'LineString' : 'Point',
       }
     } catch (error) {
-      console.error(`[Geocoder] Error geocoding incident:`, error)
+      console.error('[Geocoder] Error geocoding incident:', error)
       return null
     }
   }
 
   private async geocodeCity(cityName: string): Promise<Coordinates | null> {
-    const cacheKey = `city:${cityName.toLowerCase().trim()}`
+    const normalized = cityName.trim().toLowerCase()
+    const key = `idf:${normalized}`
 
-    // Check cache first
-    const cached = this.cache.get<Coordinates>(cacheKey)
-    if (cached) {
-      return cached
+    const cached = cityCache.get<Coordinates>(key)
+    if (cached) return cached
+
+    const nominatimResult = await this.nominatim(cityName)
+    if (nominatimResult) {
+      cityCache.set(key, nominatimResult)
+      return nominatimResult
     }
 
-    // Try Nominatim first (free, no key needed)
-    let result = await this.nominatim(cityName)
+    if (!this.stadiaApiKey) return null
 
-    // Fallback to Stadia if configured
-    if (!result && this.stadiaApiKey) {
-      result = await this.stadia(cityName)
+    const stadiaResult = await this.stadia(cityName)
+    if (stadiaResult) {
+      cityCache.set(key, stadiaResult)
     }
-
-    if (result) {
-      this.cache.set(cacheKey, result)
-      return result
-    }
-
-    return null
+    return stadiaResult
   }
 
   private async nominatim(cityName: string): Promise<Coordinates | null> {
     try {
-      // Add "France" to query for Paris area disambiguation
-      const query = `${cityName}, Île-de-France, France`
+      const query = `${cityName}, Ile-de-France, France`
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`
-
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'CrossFlowMobility/1.0'
+          'User-Agent': 'CrossFlowMobility/1.0 (Sytadin incident geocoder)',
         },
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(6000),
       })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
+      if (!response.ok) return null
 
       const results = await response.json()
-      if (!results || results.length === 0) {
-        return null
-      }
+      if (!Array.isArray(results) || !results[0]) return null
 
-      const [result] = results
       return {
-        lat: parseFloat(result.lat),
-        lng: parseFloat(result.lon)
+        lat: Number.parseFloat(results[0].lat),
+        lng: Number.parseFloat(results[0].lon),
       }
-    } catch (error) {
-      console.debug(`[Nominatim] Error geocoding "${cityName}":`, error)
+    } catch {
       return null
     }
   }
 
   private async stadia(cityName: string): Promise<Coordinates | null> {
     if (!this.stadiaApiKey) return null
-
     try {
-      const url = `https://geocoding.stadiamaps.com/search?text=${encodeURIComponent(cityName)}&api_key=${this.stadiaApiKey}&limit=1`
-
+      const query = `${cityName}, Ile-de-France, France`
+      const url = `https://geocoding.stadiamaps.com/search?text=${encodeURIComponent(query)}&api_key=${this.stadiaApiKey}&limit=1`
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'CrossFlowMobility/1.0'
+          'User-Agent': 'CrossFlowMobility/1.0 (Sytadin incident geocoder)',
         },
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(6000),
       })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
+      if (!response.ok) return null
 
       const data = await response.json()
-      if (!data.results || data.results.length === 0) {
-        return null
-      }
+      const first = data?.features?.[0] ?? data?.results?.[0]
+      if (!first) return null
 
-      const [result] = data.results
-      return {
-        lat: result.geometry.coordinates[1],
-        lng: result.geometry.coordinates[0]
-      }
-    } catch (error) {
-      console.debug(`[Stadia] Error geocoding "${cityName}":`, error)
+      const coords = first?.geometry?.coordinates
+      if (!Array.isArray(coords) || coords.length < 2) return null
+      return { lat: Number(coords[1]), lng: Number(coords[0]) }
+    } catch {
       return null
     }
   }
 }
 
 export async function geocodeIncident(incident: ParsedIncident, stadiaKey?: string): Promise<GeocodedIncident | null> {
-  const geocoder = new IncidentGeocoder(stadiaKey)
+  const key = stadiaKey ?? process.env.STADIA_GEOCODING_API_KEY ?? '__nominatim__'
+  let geocoder = geocoderInstances.get(key)
+  if (!geocoder) {
+    geocoder = new IncidentGeocoder(stadiaKey ?? null)
+    geocoderInstances.set(key, geocoder)
+  }
   return geocoder.geocode(incident)
 }

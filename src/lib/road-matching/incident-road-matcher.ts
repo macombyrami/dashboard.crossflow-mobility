@@ -31,29 +31,33 @@ export class IncidentRoadMatcher {
       let match_confidence: 'high' | 'medium' | 'low'
 
       if (incident.from_coords && incident.to_coords) {
+        const start = this.snapToNearestRoad(incident.from_coords)
+        const end = this.snapToNearestRoad(incident.to_coords)
         // LineString: create line between two cities
         geometry = {
           type: 'LineString',
           coordinates: [
-            [incident.from_coords.lng, incident.from_coords.lat],
-            [incident.to_coords.lng, incident.to_coords.lat]
+            [start.lng, start.lat],
+            [end.lng, end.lat]
           ]
         }
-        match_confidence = 'medium'
+        match_confidence = this.osmRoads.length > 0 ? 'high' : 'medium'
       } else if (incident.from_coords) {
+        const snapped = this.snapToNearestRoad(incident.from_coords)
         // Point: from_city location
         geometry = {
           type: 'Point',
-          coordinates: [incident.from_coords.lng, incident.from_coords.lat]
+          coordinates: [snapped.lng, snapped.lat]
         }
-        match_confidence = 'medium'
+        match_confidence = this.osmRoads.length > 0 ? 'high' : 'medium'
       } else {
+        const snapped = this.snapToNearestRoad(incident.to_coords!)
         // Point: to_city location
         geometry = {
           type: 'Point',
-          coordinates: [incident.to_coords!.lng, incident.to_coords!.lat]
+          coordinates: [snapped.lng, snapped.lat]
         }
-        match_confidence = 'medium'
+        match_confidence = this.osmRoads.length > 0 ? 'high' : 'medium'
       }
 
       return {

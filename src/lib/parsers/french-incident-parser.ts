@@ -1,6 +1,6 @@
 /**
  * French Incident Parser
- * Extracts structured data from French traffic incident tweets
+ * Extracts structured data from Sytadin tweets.
  */
 
 import type { ParsedIncident } from '@/types'
@@ -10,213 +10,184 @@ interface ParsingConfig {
   roads: string[]
 }
 
+const TYPE_PATTERNS: Record<ParsedIncident['type'], RegExp> = {
+  accident: /\b(accident|collision|carambolage|heurt|choc|panne)\b/i,
+  closure: /\b(fermeture|ferme|fermee|interdit|coupure|bloque|barre)\b/i,
+  roadwork: /\b(travaux|chantier|maintenance|entretien|reparation)\b/i,
+  congestion: /\b(circulation difficile|bouchon|embouteillage|ralentissement|saturation|trafic dense)\b/i,
+  blockage: /\b(manifestation|blocage|barrage|greve)\b/i,
+  weather: /\b(pluie|neige|verglas|brouillard|orage|inondation)\b/i,
+  other: /^$/i,
+}
+
 export class FrenchIncidentParser {
+  private cityLookup: Map<string, string>
   private roadPattern: RegExp
-  private directionPattern: RegExp
-  private typePatterns: Record<string, RegExp>
-  private severityPatterns: Record<string, RegExp>
-  private cityList: Set<string>
-  private config: ParsingConfig
 
-  constructor(config: ParsingConfig) {
-    this.config = config
-    this.cityList = new Set(config.cities.map(c => c.toLowerCase()))
-
-    // Road patterns: A86, N104, Périphérique, RER, etc.
-    this.roadPattern = /(?:l[''']?)?(?:autoroute\s)?(?:de\s)?([A-Z]\d{1,3}|Périphérique|RER\s[A-Z]|Métro\s\d{1,2}|Boulevard|Rue|Avenue|Chaussée)\b/gi
-
-    // Direction patterns
-    this.directionPattern = /(?:sens|direction|vers|en)\s+(intérieur|extérieur|Paris|province|Provins|Orly|nord|sud|est|ouest)/gi
-
-    // Type inference patterns
-    this.typePatterns = {
-      accident: /accident|collision|heurt|carambolage|choc|impact/i,
-      closure: /fermeture|fermé|interdiction|interdit|coupure|bloqué|fermée|clos/i,
-      roadwork: /travaux|chantier|maintenance|entretien|réparation|enrobé|réfection|travail/i,
-      congestion: /circulation\sdifficicle|bouchon|embouteillage|saturation|saturé|ralentissement|dense|chargé|trafic|charge|engorgement/i,
-      blockage: /manifestation|blocage|grève|protestation|piquets|barrage|occupation/i,
-      weather: /pluie|neige|verglas|brouillard|tempête|vent|inondation|orage|glace/i
+  constructor(private config: ParsingConfig) {
+    this.cityLookup = new Map()
+    for (const city of config.cities) {
+      this.cityLookup.set(this.normalizeToken(city), city)
     }
-
-    // Severity patterns
-    this.severityPatterns = {
-      critical: /complet|interdit|blocage|interrompu|incendie|fermé|totalement|aucun\spassage|coupée|complètement fermé/i,
-      high: /accident|grave|dommages|incendie|heurt|blocage total|très chargé|fermé/i,
-      medium: /saturation|complètement\ssaturé|très\schargé|trafic\sdense|très\sdifficicle|embouteillage/i,
-      low: /ralentissement|charge|difficile|trafic|débit\sréduit|lent|faible/i
-    }
+    this.roadPattern = /\b(A\d{1,3}[A-Za-z]?|N\d{1,3}|D\d{1,3}|Francilienne|Peripherique|Boulevard\s+Peripherique)\b/i
   }
 
   parse(rawTweet: string): ParsedIncident | null {
-    const text = rawTweet.trim()
-    if (!text || text.length < 10) return null
+    const text = rawTweet.replace(/\s+/g, ' ').trim()
+    if (!text || text.length < 8) return null
 
-    try {
-      const type = this.extractType(text)
-      const severity = this.extractSeverity(text, type)
-      const road = this.extractRoad(text)
-      const direction = this.extractDirection(text)
-      const [fromCity, toCity] = this.extractCities(text)
-      const event = this.extractEvent(text, type)
+    const road = this.extractRoad(text)
+    const [fromCity, toCity] = this.extractCities(text)
+    const direction = this.extractDirection(text)
+    const type = this.extractType(text)
+    const severity = this.extractSeverity(type, text)
+    const event = this.extractEvent(text, type)
 
-      // Validate: need at least road or cities
-      if (!road && !fromCity && !toCity) {
-        return null
-      }
+    if (!road && !fromCity && !toCity) return null
 
-      return {
-        type: type || 'other',
-        severity: severity || 'low',
-        road: road || null,
-        direction: direction || null,
-        from_city: fromCity || null,
-        to_city: toCity || null,
-        event: event || text.substring(0, 150),
-        confidence_parse: this.calculateConfidence(road, fromCity, toCity)
-      }
-    } catch (error) {
-      console.debug(`[Parser] Error parsing tweet`, error)
-      return null
+    return {
+      type,
+      severity,
+      road,
+      direction,
+      from_city: fromCity,
+      to_city: toCity,
+      event,
+      confidence_parse: this.calculateConfidence({ road, fromCity, toCity, direction }),
     }
   }
 
-  private extractType(text: string): 'accident' | 'closure' | 'roadwork' | 'congestion' | 'blockage' | 'weather' | 'other' {
-    for (const [type, pattern] of Object.entries(this.typePatterns)) {
-      if (pattern.test(text)) return type as any
-    }
+  private extractType(text: string): ParsedIncident['type'] {
+    if (TYPE_PATTERNS.accident.test(text)) return 'accident'
+    if (TYPE_PATTERNS.closure.test(text)) return 'closure'
+    if (TYPE_PATTERNS.roadwork.test(text)) return 'roadwork'
+    if (TYPE_PATTERNS.congestion.test(text)) return 'congestion'
+    if (TYPE_PATTERNS.blockage.test(text)) return 'blockage'
+    if (TYPE_PATTERNS.weather.test(text)) return 'weather'
     return 'other'
   }
 
-  private extractSeverity(text: string, type: string): 'critical' | 'high' | 'medium' | 'low' {
-    // Check explicit severity patterns first
-    for (const [severity, pattern] of Object.entries(this.severityPatterns)) {
-      if (pattern.test(text)) return severity as any
-    }
-
-    // Fall back to type-based severity
-    switch (type) {
-      case 'closure':
-        return 'critical'
-      case 'accident':
-        return 'high'
-      case 'roadwork':
-        return 'low'
-      case 'congestion':
-        return 'medium'
-      case 'blockage':
-        return 'high'
-      case 'weather':
-        return 'medium'
-      default:
-        return 'low'
-    }
+  private extractSeverity(type: ParsedIncident['type'], text: string): ParsedIncident['severity'] {
+    if (/\bflash\b/i.test(text) && type === 'closure') return 'critical'
+    if (type === 'closure') return 'critical'
+    if (type === 'accident') return 'high'
+    if (type === 'congestion') return 'medium'
+    if (type === 'roadwork') return /\bflash\b/i.test(text) ? 'medium' : 'low'
+    if (type === 'blockage') return 'high'
+    if (type === 'weather') return 'medium'
+    return 'low'
   }
 
   private extractRoad(text: string): string | null {
-    // Try primary patterns
-    const match = this.roadPattern.exec(text)
-    if (match) {
-      let road = match[1].toUpperCase().trim()
-      // Normalize: remove articles
-      road = road.replace(/^L[''']/, '').replace(/^LA\s/, '').replace(/^LE\s/, '')
-      return road
+    const direct = text.match(this.roadPattern)?.[1]
+    if (direct) {
+      return this.normalizeRoad(direct)
     }
-
-    // Try hardcoded road list as fallback
     for (const road of this.config.roads) {
-      if (text.toUpperCase().includes(road.toUpperCase())) {
-        return road
+      const normalizedRoad = road.toLowerCase()
+      if (text.toLowerCase().includes(normalizedRoad)) {
+        return this.normalizeRoad(road)
       }
     }
-
     return null
   }
 
   private extractDirection(text: string): string | null {
-    // Look for direction keywords
-    const directions = ['intérieur', 'extérieur', 'vers paris', 'vers la province', 'nord', 'sud', 'est', 'ouest']
-
-    for (const dir of directions) {
-      if (text.toLowerCase().includes(dir)) {
-        return dir
-      }
-    }
-
+    const lower = text.toLowerCase()
+    if (lower.includes('sens interieur') || lower.includes('sens intérieur')) return 'interieur'
+    if (lower.includes('sens exterieur') || lower.includes('sens extérieur')) return 'exterieur'
+    if (lower.includes('vers paris')) return 'vers paris'
+    if (lower.includes('vers la province')) return 'vers la province'
+    if (lower.includes('nord')) return 'nord'
+    if (lower.includes('sud')) return 'sud'
+    if (lower.includes('est')) return 'est'
+    if (lower.includes('ouest')) return 'ouest'
     return null
   }
 
   private extractCities(text: string): [string | null, string | null] {
-    // Look for "entre X et Y"
-    const betweenMatch = text.match(/entre\s+([^,]+)\s+et\s+([^,.!?]+)/i)
-    if (betweenMatch) {
-      const from = this.normalizeCityName(betweenMatch[1])
-      const to = this.normalizeCityName(betweenMatch[2])
-      if (this.isCityKnown(from) || this.isCityKnown(to)) {
-        return [from, to]
-      }
+    const between = text.match(/\bentre\s+([^\-,()]+?)\s+et\s+([^\-,()]+)\b/i)
+    if (between) {
+      const from = this.resolveCity(between[1])
+      const to = this.resolveCity(between[2])
+      if (from || to) return [from, to]
     }
 
-    // Look for "vers X"
-    const versMatch = text.match(/vers\s+([^,.\s!?]+)/i)
-    if (versMatch) {
-      const city = this.normalizeCityName(versMatch[1])
-      if (this.isCityKnown(city)) {
-        return [null, city]
-      }
+    const parentheses = text.match(/\(([^)]+)\)/)
+    if (parentheses) {
+      const one = this.resolveCity(parentheses[1])
+      if (one) return [one, null]
     }
 
-    // Look for "à X", "près de X", "au niveau de X"
-    const nearMatch = text.match(/(?:à|près\sde|au\sniveau\sde)\s+([^,.\s!?]+)/i)
-    if (nearMatch) {
-      const city = this.normalizeCityName(nearMatch[1])
-      if (this.isCityKnown(city)) {
+    const vers = text.match(/\bvers\s+([^\-,()]+)/i)
+    if (vers) {
+      const to = this.resolveCity(vers[1])
+      if (to) return [null, to]
+    }
+
+    for (const city of this.config.cities) {
+      const token = this.normalizeToken(city)
+      if (this.normalizeToken(text).includes(token)) {
         return [city, null]
       }
     }
-
-    // Fallback: search all known cities
-    for (const city of this.cityList) {
-      if (text.toLowerCase().includes(city)) {
-        return [city, null]
-      }
-    }
-
     return [null, null]
   }
 
-  private extractEvent(text: string, type: string): string {
-    // Get first line or first 150 chars
-    const lines = text.split('\n')
-    let event = lines[0]
-
-    // Remove FLASH prefix if present
-    event = event.replace(/^FLASH[/:\s]*/, '').trim()
-
-    return event.substring(0, 150)
+  private extractEvent(text: string, type: ParsedIncident['type']): string {
+    const clean = text.replace(/^!?FLASH[/: ]*/i, '').trim()
+    if (TYPE_PATTERNS.congestion.test(clean)) return 'Circulation difficile'
+    if (type === 'accident') return 'Accident'
+    if (type === 'closure') return 'Fermeture'
+    if (type === 'roadwork') return 'Travaux'
+    return clean.slice(0, 180)
   }
 
-  private normalizeCityName(city: string): string {
-    return city
-      .trim()
-      .replace(/[,.\s!?]+$/g, '') // Remove trailing punctuation
-      .split(/\s+/)
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-      .join(' ')
+  private resolveCity(raw: string): string | null {
+    const token = this.normalizeToken(raw)
+    if (!token) return null
+
+    if (this.cityLookup.has(token)) return this.cityLookup.get(token) ?? null
+
+    // loose matching for multi-word names.
+    for (const [knownToken, knownCity] of this.cityLookup.entries()) {
+      if (token.includes(knownToken) || knownToken.includes(token)) {
+        return knownCity
+      }
+    }
+    return null
+  }
+
+  private normalizeRoad(rawRoad: string): string {
+    const raw = rawRoad.trim()
+    if (/^francilienne$/i.test(raw)) return 'N104'
+    if (/peripherique/i.test(raw)) return 'BP'
+    return raw.toUpperCase()
+  }
+
+  private normalizeToken(value: string): string {
+    return value
       .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
   }
 
-  private isCityKnown(city: string): boolean {
-    const normalized = city.toLowerCase().trim()
-    return this.cityList.has(normalized) || this.cityList.has(normalized.replace(/-/g, ' '))
-  }
-
-  private calculateConfidence(road: string | null, from: string | null, to: string | null): 'high' | 'medium' | 'low' {
+  private calculateConfidence(parts: {
+    road: string | null
+    fromCity: string | null
+    toCity: string | null
+    direction: string | null
+  }): ParsedIncident['confidence_parse'] {
     let score = 0
-    if (road) score += 40
-    if (from) score += 30
-    if (to) score += 30
-
-    return score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low'
+    if (parts.road) score += 40
+    if (parts.fromCity) score += 25
+    if (parts.toCity) score += 25
+    if (parts.direction) score += 10
+    if (score >= 70) return 'high'
+    if (score >= 40) return 'medium'
+    return 'low'
   }
 }
 

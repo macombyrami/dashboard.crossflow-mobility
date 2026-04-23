@@ -1,16 +1,21 @@
 /**
  * Nitter Sytadin Scraper
- * Fetches real-time traffic incidents from Sytadin via Nitter
- * Uses Cheerio for fast parsing with Puppeteer fallback
+ * Primary: Python ntscraper
+ * Fallback: Cheerio HTML parser
  */
 
 import * as cheerio from 'cheerio'
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import type { RawTweet } from '@/types'
 
 interface NitterScraperConfig {
   url: string
   timeout: number
   retries: number
+  usePythonPrimary: boolean
 }
 
 export class NitterSytadinScraper {
@@ -22,24 +27,108 @@ export class NitterSytadinScraper {
       url: 'https://nitter.net/sytadin',
       timeout: 10000,
       retries: 2,
+      usePythonPrimary: true,
       ...config
     }
   }
 
   async scrape(): Promise<RawTweet[]> {
     try {
-      const html = await this.fetchHTML()
-      const tweets = this.parseCheerio(html)
-
-      if (tweets.length === 0) {
-        console.warn('[NitterScraper] No tweets found, Cheerio might have failed')
+      if (this.config.usePythonPrimary) {
+        const pythonTweets = await this.scrapeViaPython()
+        if (pythonTweets.length > 0) {
+          return this.deduplicateWithinRun(pythonTweets)
+        }
+        console.warn('[NitterScraper] Python scraper returned no tweets, falling back to Cheerio')
       }
 
-      return tweets
+      const html = await this.fetchHTML()
+      const tweets = this.parseCheerio(html)
+      return this.deduplicateWithinRun(tweets)
     } catch (error) {
       console.error('[NitterScraper] Fatal error:', error)
       return []
     }
+  }
+
+  private async scrapeViaPython(): Promise<RawTweet[]> {
+    const scriptPath = join(process.cwd(), 'scripts', 'sytadin_ntscraper.py')
+    if (!existsSync(scriptPath)) {
+      return []
+    }
+
+    const candidates = process.platform === 'win32'
+      ? ['python', 'python3', 'py']
+      : ['python3', 'python']
+
+    for (const bin of candidates) {
+      try {
+        const output = await this.runPython(bin, scriptPath)
+        if (!output) continue
+
+        const parsed = JSON.parse(output) as { ok?: boolean; tweets?: RawTweet[]; error?: string }
+        if (!parsed.ok) {
+          console.warn(`[NitterScraper] Python ${bin} execution failed: ${parsed.error ?? 'unknown error'}`)
+          continue
+        }
+
+        const tweets = Array.isArray(parsed.tweets) ? parsed.tweets : []
+        if (tweets.length > 0) {
+          console.log(`[NitterScraper] Extracted ${tweets.length} tweets via ntscraper (${bin})`)
+        }
+        return tweets
+      } catch (error) {
+        console.debug(`[NitterScraper] Python candidate ${bin} unavailable:`, error)
+      }
+    }
+
+    return []
+  }
+
+  private async runPython(binary: string, scriptPath: string): Promise<string> {
+    const args = binary === 'py' ? ['-3', scriptPath, 'sytadin', '50'] : [scriptPath, 'sytadin', '50']
+    const child = spawn(binary, args, {
+      cwd: process.cwd(),
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', chunk => {
+      stdout += chunk.toString()
+    })
+    child.stderr.on('data', chunk => {
+      stderr += chunk.toString()
+    })
+
+    const timeoutId = setTimeout(() => {
+      child.kill()
+    }, this.config.timeout)
+
+    const [exitCode] = await once(child, 'close')
+    clearTimeout(timeoutId)
+
+    if (exitCode !== 0) {
+      throw new Error(stderr.trim() || `Python exited with ${String(exitCode)}`)
+    }
+
+    return stdout.trim()
+  }
+
+  private deduplicateWithinRun(tweets: RawTweet[]): RawTweet[] {
+    const out: RawTweet[] = []
+    for (const tweet of tweets) {
+      if (!tweet.id || this.lastTweetIds.has(tweet.id)) {
+        continue
+      }
+      this.lastTweetIds.add(tweet.id)
+      out.push(tweet)
+    }
+
+    if (out.length === 0) {
+      console.warn('[NitterScraper] No tweets found from all strategies')
+    }
+    return out
   }
 
   private async fetchHTML(): Promise<string> {
@@ -114,10 +203,6 @@ export class NitterSytadinScraper {
             return
           }
 
-          if (this.lastTweetIds.has(tweetId)) {
-            return // Skip duplicates
-          }
-
           // Extract tweet text
           const textEl = $(element).find('p.tweet-text, div.tweet-content p, p')
           let text = textEl.text().trim()
@@ -146,7 +231,6 @@ export class NitterSytadinScraper {
               text,
               created_at
             })
-            this.lastTweetIds.add(tweetId)
           }
         } catch (error) {
           console.debug(`[NitterScraper] Error parsing individual tweet element:`, error)
