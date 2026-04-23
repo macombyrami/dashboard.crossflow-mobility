@@ -10,11 +10,28 @@ export async function GET(req: NextRequest) {
       .rpc('get_api_performance_stats', { hours: 24 })
 
     // Get city snapshot stats
-    const { data: cityStats } = await supabase
+    const { data: allSnapshots } = await supabase
       .from('city_snapshots')
-      .select('city_id, count(*) as snapshot_count, avg(confidence_score)')
+      .select('city_id, confidence_score')
       .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-      .group_by('city_id')
+
+    // Aggregate by city_id in JavaScript (Postgrest doesn't support GROUP BY)
+    const cityStats = allSnapshots ? Object.values(
+      allSnapshots.reduce((acc: Record<string, any>, s: any) => {
+        if (!acc[s.city_id]) {
+          acc[s.city_id] = { city_id: s.city_id, snapshot_count: 0, avg_confidence_score: 0, scores: [] }
+        }
+        acc[s.city_id].snapshot_count++
+        acc[s.city_id].scores.push(s.confidence_score || 0)
+        return acc
+      }, {})
+    ).map((group: any) => ({
+      city_id: group.city_id,
+      snapshot_count: group.snapshot_count,
+      avg_confidence_score: group.scores.length > 0
+        ? Math.round((group.scores.reduce((a: number, b: number) => a + b, 0) / group.scores.length) * 100) / 100
+        : 0
+    })) : []
 
     // Get cache hit rates
     const { data: cacheLogs } = await supabase
