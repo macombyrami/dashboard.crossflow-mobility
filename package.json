@@ -6,7 +6,10 @@
     "dev": "next dev --turbopack",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=4096 next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit --pretty false",
+    "test": "node -e \"const fs=require('node:fs'); const assert=require('node:assert/strict'); const env=fs.readFileSync('.env.example','utf8'); ['NEXT_PUBLIC_APP_URL','NEXT_PUBLIC_SUPABASE_URL','NEXT_PUBLIC_SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY','PREDICTIVE_BACKEND_URL','OPENROUTER_API_KEY','CRON_SECRET'].forEach((key)=>assert.match(env,new RegExp('^'+key+'=','m'))); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); assert.equal(pkg.scripts.lint,'eslint .'); assert.equal(pkg.scripts.typecheck,'tsc --noEmit --pretty false'); assert.ok(pkg.scripts.build); assert.ok(pkg.scripts.check); console.log('PASS smoke checks');\"",
+    "check": "npm run lint && npm run typecheck && npm run test"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.6",

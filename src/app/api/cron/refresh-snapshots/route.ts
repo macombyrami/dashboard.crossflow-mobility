@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aggregationEngine } from '@/lib/aggregation/AggregationEngine'
+import { isAuthorizedCronRequest, unauthorizedCronResponse } from '@/lib/security/cron'
 import { createClient } from '@/lib/supabase/server'
 
 const CITIES = ['paris', 'vildreth', 'lyon', 'marseille']
 
 export async function GET(req: NextRequest) {
-  // Verify cron secret
-  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isAuthorizedCronRequest(req)) {
+    return unauthorizedCronResponse()
   }
 
   const supabase = await createClient()

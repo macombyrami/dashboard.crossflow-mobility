@@ -1,33 +1,49 @@
-/**
- * 🛰️ STAFF ENGINEER: Environment Configuration (Safe-Type Layer)
- * 
- * Prevents "undefined" string comparison errors and runtime crashes 
- * by validating environment variables at the start of every request.
- */
+import { z } from 'zod'
+
+const publicEnvSchema = z.object({
+  NEXT_PUBLIC_APP_URL: z.string().min(1).optional(),
+  NEXT_PUBLIC_SUPABASE_URL: z.string().min(1).optional(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20).optional(),
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+})
+
+const serverEnvSchema = z.object({
+  CRON_SECRET: z.string().min(24).optional(),
+  PREDICTIVE_BACKEND_URL: z.string().min(1).optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
+  OPENROUTER_API_KEY: z.string().min(20).optional(),
+})
+
+const publicEnv = publicEnvSchema.parse(process.env)
+const serverEnv = serverEnvSchema.parse(process.env)
 
 export const ENV = {
-  SUPABASE_URL:      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-  IS_DEV:            process.env.NODE_ENV === 'development',
-}
+  APP_URL: publicEnv.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
+  SUPABASE_URL: publicEnv.NEXT_PUBLIC_SUPABASE_URL ?? '',
+  SUPABASE_ANON_KEY: publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+  PREDICTIVE_BACKEND_URL: serverEnv.PREDICTIVE_BACKEND_URL ?? 'http://localhost:8000',
+  CRON_SECRET: serverEnv.CRON_SECRET ?? '',
+  IS_DEV: publicEnv.NODE_ENV === 'development',
+  IS_PROD: publicEnv.NODE_ENV === 'production',
+} as const
 
-/**
- * Validates if the core Supabase infrastructure is configured.
- * 🚀 Fix 3: Returns a diagnostic object instead of a boolean for granular reporting.
- */
 export function validateSupabaseConfig() {
-  const issues: string[] = []
-  
+  const missing: string[] = []
+
   if (!ENV.SUPABASE_URL || ENV.SUPABASE_URL.includes('placeholder')) {
-    issues.push('NEXT_PUBLIC_SUPABASE_URL')
+    missing.push('NEXT_PUBLIC_SUPABASE_URL')
   }
-  
-  if (!ENV.SUPABASE_ANON_KEY || ENV.SUPABASE_ANON_KEY.length < 20) {
-    issues.push('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+
+  if (!ENV.SUPABASE_ANON_KEY || ENV.SUPABASE_ANON_KEY.includes('placeholder')) {
+    missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY')
   }
 
   return {
-    isValid: issues.length === 0,
-    missing: issues,
+    isValid: missing.length === 0,
+    missing,
   }
+}
+
+export function hasCronSecret() {
+  return ENV.CRON_SECRET.length >= 24
 }

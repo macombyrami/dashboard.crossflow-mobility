@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAuthorizedCronRequest } from '@/lib/security/cron'
 import { createClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
@@ -7,9 +8,7 @@ export async function POST(req: NextRequest) {
   // 🛰️ Staff Engineer Auth Verification
   // Allow if standard user session IS present OR if CRON_SECRET header matches
   const { data: { user } } = await supabase.auth.getUser()
-  const authHeader = req.headers.get('Authorization')
-  const cronSecret = process.env.CRON_SECRET
-  const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`
+  const isCron = isAuthorizedCronRequest(req)
 
   if (!user && !isCron) {
     return NextResponse.json({ success: false, error: 'Unauthorized: Valid session or Cron secret required' }, { status: 401 })
@@ -38,9 +37,10 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error
     return NextResponse.json({ success: true, data })
-  } catch (err: any) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown snapshots POST error'
     console.error('API Snapshots POST Error:', err)
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 })
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }
 
@@ -88,8 +88,9 @@ export async function GET(req: NextRequest) {
 
     if (error) throw error
     return NextResponse.json(data)
-  } catch (err: any) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown snapshots GET error'
     console.error('API Snapshots GET Error:', err)
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 })
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }
