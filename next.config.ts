@@ -1,4 +1,6 @@
 import type { NextConfig } from 'next'
+import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 // Environment-aware CORS: never expose localhost in production responses
 const IS_DEV    = process.env.NODE_ENV === 'development'
@@ -6,11 +8,15 @@ const APP_URL   = process.env.NEXT_PUBLIC_APP_URL ?? 'https://myaccount.crossflo
 const CORS_ORIGIN = IS_DEV
   ? `${APP_URL}, http://localhost:3000`
   : APP_URL
+const ROOT_DIR = dirname(fileURLToPath(import.meta.url))
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   compress:        true,
   poweredByHeader: false,
+  turbopack:       {
+    root: ROOT_DIR,
+  },
 
   async headers() {
     // ──────────────────────────────────────────────────────────────────
