@@ -18,12 +18,16 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
+.env
 .env*.local
+.env.*.local
 
 # vercel
 .vercel
 
-# crossflow data (raw IDF datasets at project root — not src/lib/data/)
+# test and tooling
+coverage/
+
+# crossflow data (raw IDF datasets at project root, not src/lib/data/)
 /data/
 outputs/
-scripts/

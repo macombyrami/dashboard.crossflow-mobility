@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAuthorizedCronRequest, unauthorizedCronResponse } from '@/lib/security/cron'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -10,11 +11,8 @@ import { createClient } from '@/lib/supabase/server'
  */
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('Authorization')
-  const cronSecret = process.env.CRON_SECRET || 'crossflow_internal_secret'
-  
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isAuthorizedCronRequest(req)) {
+    return unauthorizedCronResponse()
   }
 
   const supabase = await createClient()
@@ -42,8 +40,9 @@ export async function GET(req: NextRequest) {
       timestamp: new Date().toISOString()
     })
 
-  } catch (err: any) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown cleanup error'
     console.error('[CleanupJob] Maintenance Failed:', err)
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 })
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }

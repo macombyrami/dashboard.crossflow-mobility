@@ -10,6 +10,7 @@ import { parseIncident } from '@/lib/parsers/french-incident-parser'
 import { geocodeIncident } from '@/lib/geocoding/incident-geocoder'
 import { matchIncident } from '@/lib/road-matching/incident-road-matcher'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isAuthorizedCronRequest, unauthorizedCronResponse } from '@/lib/security/cron'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -41,10 +42,8 @@ function geometryToWkt(geometry: GeoJSON.Geometry): string | null {
 
 export async function POST(req: NextRequest) {
   const start = Date.now()
-  const secret = req.headers.get('X-Cron-Secret') || ''
-  const expectedSecret = process.env.CRON_SECRET || 'dev-secret'
-  if (secret !== expectedSecret) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isAuthorizedCronRequest(req, { headerName: 'x-cron-secret' })) {
+    return unauthorizedCronResponse()
   }
 
   const supabase = createAdminClient()

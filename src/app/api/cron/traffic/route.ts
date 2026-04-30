@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { serverFetchFlowSegment, serverFetchIncidents } from '@/lib/api/tomtom/server'
+import { ENV } from '@/lib/config/env'
+import { isAuthorizedCronRequest, unauthorizedCronResponse } from '@/lib/security/cron'
 import { compressJSON } from '@/lib/utils/compression'
 
 /**
@@ -12,11 +14,8 @@ import { compressJSON } from '@/lib/utils/compression'
  */
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('Authorization')
-  const cronSecret = process.env.CRON_SECRET || 'crossflow_internal_secret'
-  
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized: Missing or invalid secret key' }, { status: 401 })
+  if (!isAuthorizedCronRequest(req)) {
+    return unauthorizedCronResponse()
   }
 
   try {
@@ -54,7 +53,7 @@ export async function GET(req: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${cronSecret}`
+        'Authorization': `Bearer ${ENV.CRON_SECRET}`,
       },
       body: JSON.stringify({
         city_id:    cityId,
@@ -78,8 +77,9 @@ export async function GET(req: NextRequest) {
       snapshot_id: (await saveRes.json()).data?.id
     })
 
-  } catch (err: any) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown traffic cron error'
     console.error('[TrafficFetchJob] CRITICAL FAILED:', err)
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 })
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }
