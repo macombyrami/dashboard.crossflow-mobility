@@ -529,8 +529,8 @@ async function loadBundledRoadFallback(
 ): Promise<OSMRoad[]> {
   if (!intersectsBBox(bbox, PARIS_BBOX)) return []
 
-  const module = await import('@/lib/data/paris_network.json')
-  const roads = (module.default as unknown as BundledRoadEntry[])
+  const parisNetwork = await import('@/lib/data/paris_network.json')
+  const roads = (parisNetwork.default as unknown as BundledRoadEntry[])
     .filter((road): road is BundledRoadEntry & { coords: [number, number][] } =>
       Array.isArray(road.coords) &&
       road.coords.length >= 2 &&

@@ -45,7 +45,6 @@ function buildStats(): IdfStats {
     'data/data_IledeFrance/maprelease-geojson/extracted/France_Ile_de_France.geojson',
   )
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw = fs.readFileSync(filePath, 'utf8')
   const geojson = JSON.parse(raw) as { features: { properties: Record<string, string> }[] }
 

@@ -124,6 +124,8 @@ export const ConsultantMessage = memo(({ role, content, timestamp = new Date() }
   )
 })
 
+ConsultantMessage.displayName = 'ConsultantMessage'
+
 function SourceTag({ icon, label, active }: { icon: React.ReactNode, label: string, active?: boolean }) {
   return (
     <div className={cn(
